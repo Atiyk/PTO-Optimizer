@@ -5,6 +5,8 @@ import { Calendar } from './Calendar';
 import { Legend } from './Legend';
 import { BreakCard } from './BreakCard';
 import { SummaryStrip } from './SummaryStrip';
+import { ExportBar } from './ExportBar';
+import { PartnerOverlapBanner } from './PartnerOverlapBanner';
 import { FAQ } from './FAQ';
 import { useAppState, todayISO } from './useAppState';
 import { useHasHover } from './useHasHover';
@@ -77,6 +79,10 @@ export function App() {
         />
       )}
 
+      {state.partnerOverlapReceived && (
+        <PartnerOverlapBanner overlapDayCount={state.overlapDays.length} onDismiss={state.dismissPartnerOverlapBanner} />
+      )}
+
       <div className="border-b border-slate-200 bg-white px-4 py-3">
         <Legend />
       </div>
@@ -109,6 +115,21 @@ export function App() {
           <SummaryStrip budgetSpent={state.budgetSpent} totalDaysOff={state.totalDaysOff} scores={state.scores} />
         </div>
 
+        <ExportBar
+          breaks={state.breaks}
+          isSuggestedPto={state.isSuggestedPto}
+          categoryOf={state.categoryOf}
+          rangeStart={state.rangeStart}
+          rangeEnd={state.rangeEnd}
+          weekStart={state.weekStart}
+          budget={state.budget}
+          budgetSpent={state.budgetSpent}
+          totalDaysOff={state.totalDaysOff}
+          travelPercentile={state.scores?.travel.percentile ?? null}
+          efficiencyPercentile={state.scores?.efficiency.percentile ?? null}
+          buildOverlapLink={state.buildOverlapLink}
+        />
+
         <div className="mt-6 flex flex-col gap-3">
           {state.breaks.length === 0 && (
             <p className="text-sm text-slate-500">
@@ -117,7 +138,7 @@ export function App() {
             </p>
           )}
           {state.breaks.map((b) => (
-            <BreakCard key={b.id} brk={b} highlighted={state.highlightedBreakIds.has(b.id)} />
+            <BreakCard key={b.id} brk={b} highlighted={state.highlightedBreakIds.has(b.id)} isPtoDay={state.isSuggestedPto} />
           ))}
         </div>
 

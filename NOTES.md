@@ -1639,3 +1639,201 @@ is set, and `budgetMax` alone otherwise - never just `input.budget` unconditiona
 New test in `solve.test.ts`'s `expiry windowing` describe block: a single candidate
 spending more than `input.budget` alone via carryover, with budget/budgetSpent asserted
 directly rather than inferred. 152 tests total, all passing; `tsc`/`build`/`lint` clean.
+
+## Phase 13 - Production deploy sprint, Phase 0 + Phase 1 (exits)
+
+This is the "take it from a working local build to a deployed public page" pass. Working
+through the phases in order; this entry covers Phase 0 (pre-flight) and Phase 1 (the
+shareable exits: URL, .ics, image, partner-overlap link, request-ready text). The repo had
+no git remote and no deploy target yet at the start of this phase - still none; this phase
+is app-side only.
+
+### Phase 0 - pre-flight
+
+All verified, nothing failed:
+
+- `tsc --noEmit` and `vitest run` both clean at the start (152/152, since grown to 192/192).
+- Timezone: ran the solver and `buildMonths` under `TZ=UTC`, `TZ=Pacific/Auckland` (UTC+13),
+  and `TZ=Pacific/Honolulu` (UTC-10) via a throwaway script - byte-identical plans across all
+  three. Audited every `new Date(`/`toISOString()` call site in `src/`: all of them are
+  `Date.UTC(...)` construction or `getUTCFullYear/Month/Date`, never a bare
+  `new Date(isoString)` or local-timezone `toISOString()`. The two intentional exceptions
+  (`todayISO()` and `defaultRangeEnd()` in `useAppState.ts`) use the LOCAL date on purpose -
+  "today" should mean the viewer's own calendar day, not UTC's - and correctly differ by one
+  day between Auckland and Honolulu while the solver's own output never does.
+- count=1 at 15 PTO days returns one break spending all 15 (already covered by the Phase
+  11/12 regression tests); count=N returns exactly N breaks for every N the budget allows
+  (existing test, `solve.test.ts:346`); w 0->100 leaves PTO days spent unchanged while
+  travel percentile rises (existing test, `solve.test.ts:640`); both glosses match their
+  band across all three bands (existing tests in `scoreFormat.test.ts`).
+- Alternatives capped at 2 per break, verified by DIRECT COMPUTATION against the live
+  default scenario (US holidays via the real API, Oct 18 - Dec 31 2026, 15 PTO days): 5
+  primary breaks, 8 alternative runs total, grouped by `replaces` - every group has at most
+  2, several have exactly 2, one break has 0 (no close-value candidate exists for it). The
+  37 dashed DOM cells seen in a screenshot is a volume effect of multi-day alternative runs,
+  not a cap violation - confirmed by counting RUNS, not cells, per the spec's instruction.
+- No fixed numeric cap remains in the enumeration path (Phase 11/12 already fixed this;
+  re-confirmed by reading `buildCandidates`'s signature again - `maxCandidateCost` is still
+  a parameter, no module-level constant reintroduced).
+- Degenerate states, all tested live in the browser, none blank, none crashed:
+  - 0 PTO days: "Solver found no workable plan", calendar renders with no PTO fill.
+  - A one-week range (Oct 19-25): solves cleanly, "Using 5 of 15 days..." unspent-budget
+    message (correctly real for a range this small).
+  - A range with no holidays: the one-week range above has none; covered by the same test.
+  - Every day in range blacked out (added all 7 via More Options): "Using 0 of 15 days",
+    no crash.
+  - Every workday in range ruled out by the user (clicked each cell twice - include then
+    exclude): "Solver found no workable plan", no crash.
+  - Setting a React-controlled `<input type="date">`'s value via the native property setter
+    + a dispatched `input`/`change` event (not the picker UI) turned out to be a reliable
+    way to drive these inputs in the browser-automation harness - noted here since the
+    native picker itself was flaky in earlier phases; this bypasses it entirely and should
+    be the default approach for any future date-input testing in this harness.
+
+### Phase 1A - shareable URL
+
+`src/ui/urlState.ts` grew from slider-only (`w`/`count`, kept as-is for backward
+compatibility with old links) to a full state encoder: `readFullStateFromURL` /
+`writeFullStateToURL`. Short param names: `c` country, `sd` subdivision, `s`/`e` range,
+`b` budget, `ws` week-start override, `ac`/`am` accrual, `ex`/`xd`/`cc` expiry+carryover,
+`od` overlap days, `bo` blackouts, `ww` work-week bitmask, `p`/`r` pinned/ruled-out days.
+
+Two fields are ALWAYS written, never omitted even when they equal "the default": `c`
+(country) and `s`/`e` (date range). Their defaults are viewer-relative, not fixed constants
+- country from `geolocateCountry()` (browser locale), dates from "today" and "this Dec 31".
+Omitting them when they happen to match the CURRENT viewer's guess would mean a different
+visitor, or the same visitor days later, gets a silently different plan from the same link -
+exactly the determinism guarantee the spec calls out. Every other field is omitted at its
+stable, non-viewer-relative default to keep the URL short.
+
+Malformed input (bad dates, non-numeric budget, garbage work-week string, a mix of valid and
+invalid dates in a list) falls back field-by-field to defaults rather than crashing or
+discarding the whole param set - one bad date in a comma list just drops that one date.
+
+Wired into `useAppState.ts`: every piece of state that was previously a hardcoded default is
+now seeded from `readFullStateFromURL` once at mount, and a single `useEffect` (replacing
+the old slider-only one) calls `writeFullStateToURL` on every change, keeping the address
+bar live. Verified end-to-end in the browser: switched country to Germany (via the real
+combobox button, not a blind text-fill - the combobox is a custom typeahead, not a native
+`<select>`, so setting its text input's value alone opens the suggestion list but does NOT
+fire `onChangeCountry` until the matching option is actually clicked), pinned a day, copied
+the resulting URL, opened it as a fresh navigation (not a SPA route change) - country,
+pinned day, and the Monday-first week convention for Germany all reproduced correctly.
+
+### Phase 1B - download .ics
+
+`src/ui/icsExport.ts`. One all-day `VEVENT` per suggested-PTO day (not per break - a
+break's weekend/holiday days aren't PTO and get no event), titled `"PTO (<break's date
+range>)"` so every event within one break reads the same recognisable title.
+RFC 5545-correct: `DTSTART;VALUE=DATE` / `DTEND;VALUE=DATE` as an EXCLUSIVE pair one day
+apart (not the day's own date twice), CRLF line endings throughout, `SUMMARY` text escaped
+(comma/semicolon/backslash/newline), a unique `UID` and `DTSTAMP` per event, line folding at
+75 octets implemented defensively (not exercised by normal titles, but correct for an
+unusually long one). `src/ui/dateFormat.ts` is a new shared module for human-readable date
+formatting, built from parsed y/m/d integers rather than `new Date(iso).toLocaleDateString()`
+- same UTC discipline as the rest of the app, since that pattern is exactly the timezone bug
+Phase 0 was checking for elsewhere.
+
+Verified live: intercepted the `Blob` constructor around the real "Download .ics" button
+click (not a standalone reimplementation) and inspected the generated content - 15 VEVENTs
+for the default plan, correct exclusive DTEND pairs, correctly escaped titles. NOT verified
+by literally importing into Google Calendar or Apple Calendar - neither is reachable from
+this sandboxed environment. Confidence instead comes from strict RFC 5545 compliance
+(the all-day DTEND-exclusive convention and CRLF/escaping rules are exactly what both
+parsers require) plus 8 dedicated format tests in `icsExport.test.ts`. If Google/Apple
+import ever needs literal confirmation, that has to happen in a real browser with real
+calendar accounts, outside this harness.
+
+### Phase 1C - copy as image
+
+`src/ui/imageExport.ts`, hand-drawn to a 1200x630 `<canvas>` - no new dependency, nothing
+sent to a backend. Headline (`"N PTO days -> M days off"`), subtitle (Travel/Efficiency
+percentiles), a row of mini month-grids for only the months containing a suggestion (per
+spec), a 2-entry legend, and the site's own host (`window.location.host`) small at the
+bottom. Colors are hex copies of the live calendar's actual Tailwind tokens from
+`colorScheme.ts` (kept in a comment noting they must be updated together, since canvas can't
+read Tailwind classes) - same two colors as the live calendar, nothing new introduced.
+`copyShareImage()` tries `navigator.clipboard.write` with a `ClipboardItem` first and falls
+back to a plain file download on any failure (missing API, thrown error, Safari's
+restrictions) - verified the fallback path exists in code and is reachable, though Safari
+itself isn't available to literally exercise in this harness (see Phase 5 browser-testing
+section once that's reached).
+
+Verified live: reconstructed the app's actual category/out-of-range data from the rendered
+DOM and called `renderShareImageCanvas` directly, appending the canvas to the page to
+screenshot it - headline, subtitle, three correctly-populated month grids (October/
+November/December, the only months with suggestions in the default view), and the legend
+all render as designed.
+
+### Phase 1D - partner overlap link
+
+New `buildOverlapShareURL`/`readOverlapPayloadFromURL` in `urlState.ts`, using a dedicated
+`ov` param deliberately separate from the full-state `od` (overlap days) - `ov` is a
+one-shot input signal, consumed once at mount and always stripped by
+`writeFullStateToURL` afterward (never lingers as stale state once the app starts writing
+its own URL). "Share my days" (in `ExportBar.tsx`) builds a minimal URL - just origin +
+pathname + `ov=<the viewer's own resulting days off>` - with none of the sharer's own
+settings (country, budget, etc.), so the recipient sees their OWN defaults with the
+partner's days prefilled as overlap, not the sharer's whole setup transplanted onto them.
+
+`useAppState.ts` reads the payload once at mount, merges it into initial `overlapDays`, and
+sets `partnerOverlapReceived` for a one-time, dismissible banner (`PartnerOverlapBanner.tsx`)
+explaining what the visitor received. Since the app always auto-solves with defaults
+(Phase 3), a plan is already on screen beneath the banner with no extra wiring needed.
+
+Verified live end-to-end: generated the link from the default 15-PTO-day/5-break scenario
+(39 days off, including the partial start date), opened it as a cold navigation - banner
+correctly reads "Their 39 days off are already marked...", overlap dots appear on the
+calendar, the URL immediately normalizes `ov=` to `od=` once the app's own state-sync effect
+runs, and a solved plan is already showing.
+
+### Phase 1E - request-ready output
+
+`src/ui/requestText.ts`. Two copy buttons per `BreakCard`: a bare date list (the actual
+PTO-cost days, grouped into consecutive runs, e.g. "Oct 26-Oct 30, 2026 - 5 working days" -
+deliberately the days actually debited from the balance, not the break's full span including
+free weekend/holiday days, since that's what an HR system needs), and an exactly-three-
+sentence manager email draft (the request itself with the same date list, the days-off payoff
+from the surrounding weekend/holiday, a closing invitation to adjust). Verified live by
+spying on `navigator.clipboard.writeText` around the real buttons - both formats copy
+correctly for a real break from the default plan.
+
+### Bug found and fixed during Phase 1C verification (not previously reported)
+
+While building a debug reconstruction of the calendar's category data to preview the share
+image, the reconstruction (built from the DOM's own `aria-label` text, not test fixtures)
+disagreed with a direct visual read of the calendar: dates that render with a solid "Suggested
+PTO" fill - Oct 26, Nov 9, Dec 21 in the default scenario - had an `aria-label` of
+"alternative placement" instead of "suggested PTO day".
+
+Root cause: `alternativeForDate(iso)` in `useAppState.ts` matched ANY alternative whose
+`[start, end]` span contained `iso`, with no check for whether `iso` already belongs to a
+REAL primary break. An alternative "replaces" a break by shifting its placement, so its own
+date range routinely overlaps the SAME break it replaces - e.g. the default plan's Oct 24 -
+Nov 1 break has an alternative at Oct 25 - Nov 1 (the same window shifted one day later),
+which shares 8 of those 9 dates with the primary break it replaces. Every one of those
+shared dates matched BOTH `categoryOf(iso) === 'suggested-pto'` (correct) AND
+`alternativeForDate(iso)` (wrong) at once. This wasn't a rare edge case confined to a
+previously-documented corner (pinned-day-also-alternative, noted in Phase 10 as out of
+scope) - it's the literal default view: most of the real suggested-PTO days in a typical
+plan sit inside their own break's one-day-shifted alternative. Concretely this meant: the
+accessible label was wrong for most real PTO days, the dashed "alternative" outline was
+drawn OVER the solid PTO fill, and - more seriously - `DayCell`'s
+`isAlternative ? onSwapAlternative : () => onToggle(date)` meant clicking on what looked
+like "my own suggested PTO day" would silently swap in the shifted alternative instead of
+toggling that single day, since `isAlternative` was true for it.
+
+Fix: `alternativeForDate` now excludes any date already in `chosenDaySet` (every day
+belonging to some primary break, PTO-cost or not) before matching against the alternatives
+list - pulled out to a standalone pure function, `src/ui/alternativeForDate.ts`, same pattern
+as `dayCategory.ts`'s `classifyDay`, so the exact reproduction (a day that's both a primary
+break's own date and inside an alternative that overlaps-by-shifting) is directly unit-
+tested rather than only reachable by mounting the whole app. Re-verified live after the fix:
+the same three dates now correctly read "suggested PTO day".
+
+## Tests
+
+192 tests total (up from 152), `tsc`/`build`/`lint` all clean. New test files this phase:
+`dateFormat.test.ts`, `icsExport.test.ts`, `imageExport.test.ts`, `requestText.test.ts`,
+`alternativeForDate.test.ts`; `urlState.test.ts` extended with full-state round-trip and
+partner-overlap-link coverage.

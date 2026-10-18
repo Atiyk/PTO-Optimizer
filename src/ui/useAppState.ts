@@ -8,10 +8,11 @@ import { getStateHolidaysFallback } from '../data/usStateHolidays';
 import { geolocateCountry } from './geo';
 import { computeQualifyingRuns, type WeekStart } from './calendarMath';
 import { weekStartForCountry } from './locale';
-import { mondayIndexedDow } from '../solver/dateUtils';
-import { readSliderStateFromURL, writeSliderStateToURL } from './urlState';
+import { mondayIndexedDow, rangeISO } from '../solver/dateUtils';
+import { readFullStateFromURL, writeFullStateToURL, readOverlapPayloadFromURL, buildOverlapShareURL } from './urlState';
 import type { DayCategory, ForcedState } from './types';
 import { classifyDay } from './dayCategory';
+import { alternativeForDate as alternativeForDateImpl } from './alternativeForDate';
 
 /** The slider's own stored position while unchecked - also what it falls back to showing
  * (disabled) when "let the solver decide" is checked. The middle of the 1-7 range, so
@@ -47,43 +48,81 @@ export interface HolidayEntry {
 }
 
 export function useAppState() {
-  const initialSlider = useMemo(
-    () => (typeof window === 'undefined' ? { w: 30, breakCount: 0 } : readSliderStateFromURL(window.location.search)),
-    [],
-  );
+  const initial = useMemo(() => {
+    const defaults = {
+      rangeStart: todayISO(),
+      rangeEnd: defaultRangeEnd(),
+      budget: 15,
+      country: geolocateCountry(),
+    };
+    if (typeof window === 'undefined') {
+      return {
+        country: defaults.country,
+        subdivision: undefined,
+        rangeStart: defaults.rangeStart,
+        rangeEnd: defaults.rangeEnd,
+        budget: defaults.budget,
+        w: 30,
+        breakCount: 0,
+        weekStartOverride: 'auto' as const,
+        accrualEnabled: false,
+        accrualPerMonth: 1.25,
+        expiryEnabled: false,
+        expiryDate: undefined,
+        carryoverCap: 0,
+        overlapDays: [],
+        blackouts: [],
+        workWeek: DEFAULT_WORK_WEEK,
+        pinnedDays: [],
+        ruledOutDays: [],
+      };
+    }
+    return readFullStateFromURL(window.location.search, defaults);
+  }, []);
 
-  const [country, setCountry] = useState<string>(() => geolocateCountry());
-  const [subdivision, setSubdivision] = useState<string | undefined>(undefined);
-  const [rangeStart, setRangeStart] = useState(todayISO());
-  const [rangeEnd, setRangeEnd] = useState(defaultRangeEnd());
-  const [budget, setBudget] = useState(15);
+  const [country, setCountry] = useState<string>(initial.country ?? geolocateCountry());
+  const [subdivision, setSubdivision] = useState<string | undefined>(initial.subdivision);
+  const [rangeStart, setRangeStart] = useState(initial.rangeStart);
+  const [rangeEnd, setRangeEnd] = useState(initial.rangeEnd);
+  const [budget, setBudget] = useState(initial.budget);
 
-  const [w, setW] = useState(initialSlider.w);
+  const [w, setW] = useState(initial.w);
   // breakCount 0 from the URL ("Any", now spelled "let the solver decide") maps to the
   // checkbox being checked; 1-7 maps to it being unchecked with that exact slider position.
-  // This is the same (w, breakCount) URL shape Phase 5 already established - no urlState.ts
-  // changes needed, just a different UI built on top of the same 0-7 number.
-  const [letSolverDecide, setLetSolverDecide] = useState(initialSlider.breakCount === 0);
+  const [letSolverDecide, setLetSolverDecide] = useState(initial.breakCount === 0);
   const [manualBreakCount, setManualBreakCount] = useState(
-    initialSlider.breakCount === 0 ? DEFAULT_MANUAL_BREAK_COUNT : initialSlider.breakCount,
+    initial.breakCount === 0 ? DEFAULT_MANUAL_BREAK_COUNT : initial.breakCount,
   );
   const breakCount = letSolverDecide ? 0 : manualBreakCount;
   const [showAlternatives, setShowAlternatives] = useState(true);
   const [hoveredAlternativeId, setHoveredAlternativeId] = useState<string | null>(null);
 
   // 'auto' follows the selected country's convention; an explicit override wins.
-  const [weekStartOverride, setWeekStartOverride] = useState<WeekStart | 'auto'>('auto');
+  const [weekStartOverride, setWeekStartOverride] = useState<WeekStart | 'auto'>(initial.weekStartOverride);
 
-  const [accrualEnabled, setAccrualEnabled] = useState(false);
-  const [accrualPerMonth, setAccrualPerMonth] = useState(1.25);
+  const [accrualEnabled, setAccrualEnabled] = useState(initial.accrualEnabled);
+  const [accrualPerMonth, setAccrualPerMonth] = useState(initial.accrualPerMonth);
 
-  const [expiryEnabled, setExpiryEnabled] = useState(false);
-  const [expiryDate, setExpiryDate] = useState(defaultRangeEnd());
-  const [carryoverCap, setCarryoverCap] = useState(0);
+  const [expiryEnabled, setExpiryEnabled] = useState(initial.expiryEnabled);
+  const [expiryDate, setExpiryDate] = useState(initial.expiryDate ?? defaultRangeEnd());
+  const [carryoverCap, setCarryoverCap] = useState(initial.carryoverCap);
 
-  const [overlapDays, setOverlapDays] = useState<string[]>([]);
-  const [workWeek, setWorkWeek] = useState<WorkWeek>(DEFAULT_WORK_WEEK);
-  const [blackouts, setBlackouts] = useState<string[]>([]);
+  // A partner-overlap link ('ov' param) carries a one-shot payload of someone else's
+  // resulting days off, meant to prefill as THIS viewer's overlap days. Read once at
+  // mount, same as every other URL-seeded field.
+  const overlapPayload = useMemo(
+    () => (typeof window === 'undefined' ? [] : readOverlapPayloadFromURL(window.location.search)),
+    [],
+  );
+  const [overlapDays, setOverlapDays] = useState<string[]>(() =>
+    overlapPayload.length ? Array.from(new Set([...initial.overlapDays, ...overlapPayload])) : initial.overlapDays,
+  );
+  // True only for the visitor who just arrived via a partner's "share my days" link - drives
+  // the one-time banner explaining what they received. Dismissing it doesn't clear
+  // overlapDays; it only stops showing the explanation.
+  const [partnerOverlapReceived, setPartnerOverlapReceived] = useState(overlapPayload.length > 0);
+  const [workWeek, setWorkWeek] = useState<WorkWeek>(initial.workWeek);
+  const [blackouts, setBlackouts] = useState<string[]>(initial.blackouts);
 
   const [nationalHolidays, setNationalHolidays] = useState<Holiday[]>([]);
   const [stateHolidayCandidates, setStateHolidayCandidates] = useState<Holiday[]>([]);
@@ -91,15 +130,57 @@ export function useAppState() {
   const [checkedStateHolidays, setCheckedStateHolidays] = useState<Set<string>>(new Set());
   const [customHolidays, setCustomHolidays] = useState<HolidayEntry[]>([]);
 
-  const [forced, setForced] = useState<Record<string, ForcedState>>({});
+  const [forced, setForced] = useState<Record<string, ForcedState>>(() => {
+    const init: Record<string, ForcedState> = {};
+    for (const d of initial.pinnedDays) init[d] = 'include';
+    for (const d of initial.ruledOutDays) init[d] = 'exclude';
+    return init;
+  });
 
-  // Sync the sliders into the shareable URL whenever they change.
+  // Sync the full input state into the shareable URL whenever it changes, so the address
+  // bar always reflects a link that reproduces exactly this plan - not just the sliders.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const url = new URL(window.location.href);
-    writeSliderStateToURL(url.searchParams, { w, breakCount });
+    writeFullStateToURL(url.searchParams, {
+      country,
+      subdivision,
+      rangeStart,
+      rangeEnd,
+      budget,
+      w,
+      breakCount,
+      weekStartOverride,
+      accrualEnabled,
+      accrualPerMonth,
+      expiryEnabled,
+      expiryDate,
+      carryoverCap,
+      overlapDays,
+      blackouts,
+      workWeek,
+      forced,
+    });
     window.history.replaceState(null, '', url);
-  }, [w, breakCount]);
+  }, [
+    country,
+    subdivision,
+    rangeStart,
+    rangeEnd,
+    budget,
+    w,
+    breakCount,
+    weekStartOverride,
+    accrualEnabled,
+    accrualPerMonth,
+    expiryEnabled,
+    expiryDate,
+    carryoverCap,
+    overlapDays,
+    blackouts,
+    workWeek,
+    forced,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -305,16 +386,26 @@ export function useAppState() {
     [rangeStart, rangeEnd, isOffForBand, isSuggestedPto],
   );
 
+  // Every day this plan results in being off (weekends, holidays, suggested PTO combined) -
+  // the payload a "share my days" partner-overlap link hands to its recipient.
+  const allDaysOff = useMemo(
+    () => rangeISO(rangeStart, rangeEnd).filter(isOffForBand),
+    [rangeStart, rangeEnd, isOffForBand],
+  );
+
+  const buildOverlapLink = useCallback(() => {
+    if (typeof window === 'undefined') return '';
+    return buildOverlapShareURL(window.location.origin, window.location.pathname, allDaysOff);
+  }, [allDaysOff]);
+
   // Alternatives don't mean much once the plan is already fragmented into many short
   // breaks (breakCount near 7) - there's rarely a meaningful "placement" to swap to.
   const showAlternativesEffective = showAlternatives && breakCount < 7;
 
   const alternativeForDate = useCallback(
-    (iso: string): Alternative | undefined => {
-      if (!showAlternativesEffective) return undefined;
-      return alternatives.find((a) => iso >= a.start && iso <= a.end);
-    },
-    [alternatives, showAlternativesEffective],
+    (iso: string): Alternative | undefined =>
+      alternativeForDateImpl(iso, alternatives, chosenDaySet, showAlternativesEffective),
+    [alternatives, showAlternativesEffective, chosenDaySet],
   );
 
   const hoveredAlternative = useMemo(
@@ -391,6 +482,10 @@ export function useAppState() {
     setCarryoverCap,
     overlapDays,
     setOverlapDays,
+    allDaysOff,
+    buildOverlapLink,
+    partnerOverlapReceived,
+    dismissPartnerOverlapBanner: () => setPartnerOverlapReceived(false),
     workWeek,
     setWorkWeek,
     blackouts,
@@ -418,6 +513,7 @@ export function useAppState() {
     swapAlternative,
     categoryOf,
     isBlackoutDay,
+    isSuggestedPto,
     overlapSet,
     offRuns,
     toggleDay,
