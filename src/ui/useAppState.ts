@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { solve, computeScores } from '../solver/solve';
 import { computeMarginalValues } from '../solver/marginalValue';
-import type { Alternative, SolveInput, WorkWeek } from '../solver/types';
+import type { Alternative, Scores, SolveInput, SolveResult, WorkWeek } from '../solver/types';
 import { DEFAULT_WORK_WEEK } from '../solver/types';
-import { getHolidays, type Holiday } from '../data/holidays';
+import { getHolidays, getHolidaysWithStatus, type Holiday } from '../data/holidays';
 import { getStateHolidaysFallback } from '../data/usStateHolidays';
 import { geolocateCountry } from './geo';
 import { activeCountryPreset } from '../data/countryPresets';
@@ -15,6 +15,7 @@ import type { DayCategory, ForcedState } from './types';
 import { classifyDay } from './dayCategory';
 import { alternativeForDate as alternativeForDateImpl } from './alternativeForDate';
 import { track } from './analytics';
+import { validateInputs } from './validation';
 
 /** The slider's own stored position while unchecked - also what it falls back to showing
  * (disabled) when "let the solver decide" is checked. The middle of the 1-7 range, so
@@ -192,10 +193,18 @@ export function useAppState() {
     forced,
   ]);
 
+  // Graceful failure: a network/API failure degrades to cached data (if any was already
+  // stored for this country-year) or an empty list - either way the app keeps working with
+  // whatever it has (weekends alone still solve a plan) rather than erroring out, but
+  // `holidaysDegraded` lets the UI say so instead of silently presenting "no holidays" as
+  // if that were a real fact about the calendar.
+  const [holidaysDegraded, setHolidaysDegraded] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    getHolidays(country, rangeStart, rangeEnd).then((hs) => {
-      if (!cancelled) setNationalHolidays(hs);
+    getHolidaysWithStatus(country, rangeStart, rangeEnd).then(({ holidays, degraded }) => {
+      if (cancelled) return;
+      setNationalHolidays(holidays);
+      setHolidaysDegraded(degraded);
     });
     return () => {
       cancelled = true;
@@ -297,13 +306,34 @@ export function useAppState() {
     ],
   );
 
+  // Validation gate: end-before-start, a negative/absurd PTO budget, or an expiry date
+  // outside the selected range are all inputs the solver would otherwise either crash on
+  // or "handle" by silently producing a meaningless plan. Per spec, the UI shows an inline
+  // message AND keeps the last good plan on screen rather than collapsing to an empty
+  // state the moment a field becomes invalid mid-edit (e.g. the instant a user starts
+  // retyping the end date and it briefly precedes the start date).
+  const validationIssues = useMemo(
+    () => validateInputs({ rangeStart, rangeEnd, budget, expiryEnabled, expiryDate }),
+    [rangeStart, rangeEnd, budget, expiryEnabled, expiryDate],
+  );
+  const isValidInput = validationIssues.length === 0;
+
+  const EMPTY_RESULT: SolveResult = { primary: [], alternatives: [], breakCountRequested: 0, breakCountActual: 0, budgetSpent: 0 };
+  const lastGoodResultRef = useRef<SolveResult>(EMPTY_RESULT);
+  const lastGoodScoresRef = useRef<Scores | null>(null);
+
   const solveResult = useMemo(() => {
+    if (!isValidInput) return lastGoodResultRef.current;
     try {
-      return solve(solveInput);
+      const result = solve(solveInput);
+      lastGoodResultRef.current = result;
+      return result;
     } catch {
-      return { primary: [], alternatives: [], breakCountRequested: breakCount, breakCountActual: 0, budgetSpent: 0 };
+      // An unexpected solver throw on otherwise-valid input: still keep the last good plan
+      // on screen rather than blanking it, same as a validation failure would.
+      return lastGoodResultRef.current;
     }
-  }, [solveInput, breakCount]);
+  }, [solveInput, isValidInput]);
 
   const breaks = solveResult.primary;
   const alternatives = solveResult.alternatives;
@@ -314,7 +344,12 @@ export function useAppState() {
   // Summary strip: total days off/PTO spent plus the indexed Efficiency/Travel scores,
   // recomputed on every solve from the same input+result the rest of the app already has.
   const totalDaysOff = useMemo(() => totalDaysOffOf(breaks), [breaks]);
-  const scores = useMemo(() => computeScores(solveInput, solveResult), [solveInput, solveResult]);
+  const scores = useMemo(() => {
+    if (!isValidInput) return lastGoodScoresRef.current;
+    const result = computeScores(solveInput, solveResult);
+    lastGoodScoresRef.current = result;
+    return result;
+  }, [solveInput, solveResult, isValidInput]);
 
   // Briefly highlight breaks that are new since the last plan, so a slider move's effect
   // on the calendar/break list is visible, not just inferable from the summary numbers.
@@ -455,6 +490,8 @@ export function useAppState() {
   );
 
   return {
+    validationIssues,
+    holidaysDegraded,
     country,
     setCountry,
     subdivision,

@@ -2,7 +2,8 @@
 //   A: coral = suggested PTO, teal = days-off band (the original design)
 //   B: deep neutral-blue = suggested PTO, warm amber = days-off band
 // Coral reads as a warning color while marking the thing being recommended, so B is the
-// default; A is kept fully working behind the switch for comparison.
+// default; A is kept fully working behind the switch for comparison. Scheme A has no dark
+// variant defined (see colorScheme.test.ts) - B is the one actually shipped.
 export const COLOR_SCHEME: 'A' | 'B' = 'B';
 
 export interface ColorTokens {
@@ -28,23 +29,30 @@ const SCHEME_A: ColorTokens = {
   focusRing: 'ring-[#ff6b4a]',
 };
 
+// Values come from the CSS custom properties in index.css, which redefine themselves under
+// prefers-color-scheme - so this ONE token set already covers both light and dark, with no
+// separate dark token object and no component ever branching on theme itself. Light-mode
+// values: ptoBg blue-900/white text = 10.36:1, bandBg amber-200/slate-800 text = 11.75:1.
+// Dark-mode values: ptoBg blue-400/slate-900 text = 7.02:1, bandBg unchanged (already pops
+// against a dark background). Both re-verified in colorScheme.test.ts.
 const SCHEME_B: ColorTokens = {
-  ptoBg: 'bg-blue-900',
-  ptoBorder: 'border-blue-950',
-  ptoText: 'text-white', // white on #1e3a8a = 10.36:1
-  bandBg: 'bg-amber-200',
-  previewBandBg: 'bg-amber-200/60',
-  altBorder: 'border-blue-900',
-  focusRing: 'ring-blue-900',
+  ptoBg: 'bg-[var(--pto-bg)]',
+  ptoBorder: 'border-[var(--pto-border)]',
+  ptoText: 'text-[var(--pto-text)]',
+  bandBg: 'bg-[var(--band-bg)]',
+  previewBandBg: 'bg-[var(--band-bg)]/60',
+  altBorder: 'border-[var(--alt-border)]',
+  focusRing: 'ring-[var(--focus-ring)]',
 };
 
 const SCHEMES: Record<'A' | 'B', ColorTokens> = { A: SCHEME_A, B: SCHEME_B };
 export const COLORS: ColorTokens = SCHEMES[COLOR_SCHEME];
 
-// Shared text tokens, independent of the PTO/band scheme above.
-// slate-500 (not the previous slate-400) on white = 4.76:1, passes AA; slate-400 was 2.56:1.
-export const TEXT_PRIMARY = 'text-slate-800';
-export const TEXT_MUTED = 'text-slate-500';
+// Shared text tokens, independent of the PTO/band scheme above. Same CSS-variable approach:
+// one token, both themes. Light: slate-800/slate-500 on white = 14.63:1 / 4.76:1. Dark:
+// slate-100/slate-400 on slate-800 (the card surface) = 13.35:1 / 5.71:1.
+export const TEXT_PRIMARY = 'text-[var(--text-primary)]';
+export const TEXT_MUTED = 'text-[var(--text-muted)]';
 
 /**
  * Public holiday marker: a small dot, not a fill - a holiday is a fact about the
@@ -52,7 +60,8 @@ export const TEXT_MUTED = 'text-slate-500';
  * family, not a new hue: the calendar's only two "colours" are the PTO role (coral/blue)
  * and the band role (teal/amber); a third saturated hue for holidays was the actual bug
  * ("too busy" from each feature claiming its own colour) this token set replaces.
- * slate-600 on white = 7.58:1 - not load-bearing since only numerals need 4.5:1 per the
- * spec, but comfortably legible regardless.
+ * Light: slate-600 on white = 7.58:1. Dark: slate-300 on slate-800 = 9.85:1 - light mode's
+ * slate-600 would be nearly invisible against a dark card, so the dark value is lighter,
+ * not darker.
  */
-export const HOLIDAY_DOT = 'bg-slate-600';
+export const HOLIDAY_DOT = 'bg-[var(--holiday-dot)]';

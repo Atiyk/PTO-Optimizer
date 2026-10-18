@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getHolidays } from './holidays';
+import { getHolidays, getHolidaysWithStatus } from './holidays';
 
 interface RawHoliday {
   date: string;
@@ -140,5 +140,60 @@ describe('getHolidays', () => {
     const holidays = await getHolidays('US', '2026-07-01', '2026-07-31');
     expect(holidays).toHaveLength(1);
     expect(holidays[0].date).toBe('2026-07-03');
+  });
+});
+
+describe('getHolidaysWithStatus (graceful failure, Phase 5)', () => {
+  it('degraded is false on a normal successful fetch', async () => {
+    installFetchMock();
+    const result = await getHolidaysWithStatus('US', '2026-01-01', '2026-12-31');
+    expect(result.degraded).toBe(false);
+    expect(result.holidays.some((h) => h.name === 'Independence Day')).toBe(true);
+  });
+
+  it('degraded is false when the data comes from cache, even without a live fetch', async () => {
+    const fetchMock = installFetchMock();
+    await getHolidays('US', '2026-01-01', '2026-12-31'); // populates the cache
+    fetchMock.mockClear();
+    const result = await getHolidaysWithStatus('US', '2026-01-01', '2026-12-31');
+    expect(fetchMock).not.toHaveBeenCalled(); // confirms this really came from cache, not a fresh fetch
+    expect(result.degraded).toBe(false);
+  });
+
+  it('degraded is true when the network fails outright, with an empty holiday list (nothing cached)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('network down');
+      }),
+    );
+    const result = await getHolidaysWithStatus('US', '2026-01-01', '2026-12-31');
+    expect(result.degraded).toBe(true);
+    expect(result.holidays).toEqual([]);
+  });
+
+  it('degraded is true when the API responds with a non-2xx status', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, status: 503, json: async () => [] }) as Response),
+    );
+    const result = await getHolidaysWithStatus('US', '2026-01-01', '2026-12-31');
+    expect(result.degraded).toBe(true);
+  });
+
+  it('a range spanning two years is degraded if EITHER year fails, even if the other succeeds, and still returns the data the successful year had', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/2025/')) throw new Error('network down for 2025 only');
+      return { ok: true, json: async () => fixtureFor('US', 2026) } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await getHolidaysWithStatus('US', '2025-12-30', '2026-01-02');
+    expect(result.degraded).toBe(true);
+    // the year that DID succeed still contributes its (in-range) data - a partial failure
+    // doesn't throw away data that was actually retrieved successfully elsewhere.
+    expect(result.holidays).toEqual([]); // nothing from 2026's fixture falls in this narrow Dec30-Jan2 window, which is correct, not a bug
+    const widerRange = await getHolidaysWithStatus('US', '2025-12-30', '2026-12-31');
+    expect(widerRange.degraded).toBe(true);
+    expect(widerRange.holidays.some((h) => h.name === 'Independence Day')).toBe(true);
   });
 });

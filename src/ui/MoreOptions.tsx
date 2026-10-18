@@ -5,6 +5,8 @@ import { DateListEditor } from './DateListEditor';
 import type { HolidayEntry } from './useAppState';
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const H4_CLASS = 'mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200';
+const FIELD_CLASS = 'rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 px-2 py-1 text-sm';
 
 interface MoreOptionsProps {
   weekStartOverride: WeekStart | 'auto';
@@ -44,10 +46,10 @@ export function MoreOptions(props: MoreOptionsProps) {
   const [newHolidayName, setNewHolidayName] = useState('');
 
   return (
-    <div className="grid grid-cols-1 gap-6 border-b border-slate-200 bg-slate-50 p-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-4 md:grid-cols-2 lg:grid-cols-3">
       <section>
-        <h4 className="mb-2 text-sm font-semibold text-slate-700">Accrual</h4>
-        <label className="flex items-center gap-2 text-sm text-slate-600">
+        <h4 className={H4_CLASS}>Accrual</h4>
+        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
           <input
             type="checkbox"
             checked={props.accrualEnabled}
@@ -56,7 +58,7 @@ export function MoreOptions(props: MoreOptionsProps) {
           Accrue monthly instead of all-at-once
         </label>
         {props.accrualEnabled && (
-          <label className="mt-2 flex items-center gap-2 text-sm text-slate-600">
+          <label className="mt-2 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             Days / month
             <input
               type="number"
@@ -64,15 +66,15 @@ export function MoreOptions(props: MoreOptionsProps) {
               min={0}
               value={props.accrualPerMonth}
               onChange={(e) => props.onChangeAccrualPerMonth(Number(e.target.value))}
-              className="w-20 rounded-md border border-slate-200 px-2 py-1 text-sm"
+              className={`${FIELD_CLASS} w-20`}
             />
           </label>
         )}
       </section>
 
       <section>
-        <h4 className="mb-2 text-sm font-semibold text-slate-700">Expiry &amp; carryover</h4>
-        <label className="flex items-center gap-2 text-sm text-slate-600">
+        <h4 className={H4_CLASS}>Expiry &amp; carryover</h4>
+        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
           <input
             type="checkbox"
             checked={props.expiryEnabled}
@@ -82,23 +84,23 @@ export function MoreOptions(props: MoreOptionsProps) {
         </label>
         {props.expiryEnabled && (
           <div className="mt-2 flex flex-col gap-2">
-            <label className="flex items-center gap-2 text-sm text-slate-600">
+            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
               Expiry date
               <input
                 type="date"
                 value={props.expiryDate}
                 onChange={(e) => props.onChangeExpiryDate(e.target.value)}
-                className="rounded-md border border-slate-200 px-2 py-1 text-sm"
+                className={FIELD_CLASS}
               />
             </label>
-            <label className="flex items-center gap-2 text-sm text-slate-600">
+            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
               Carryover cap
               <input
                 type="number"
                 min={0}
                 value={props.carryoverCap}
                 onChange={(e) => props.onChangeCarryoverCap(Number(e.target.value))}
-                className="w-20 rounded-md border border-slate-200 px-2 py-1 text-sm"
+                className={`${FIELD_CLASS} w-20`}
               />
             </label>
           </div>
@@ -106,14 +108,14 @@ export function MoreOptions(props: MoreOptionsProps) {
       </section>
 
       <section>
-        <h4 className="mb-2 text-sm font-semibold text-slate-700">Week starts on</h4>
+        <h4 className={H4_CLASS}>Week starts on</h4>
         <select
           value={props.weekStartOverride}
           onChange={(e) => {
             const v = e.target.value;
             props.onChangeWeekStartOverride(v === 'auto' ? 'auto' : (Number(v) as WeekStart));
           }}
-          className="rounded-md border border-slate-200 px-2 py-1 text-sm"
+          className={FIELD_CLASS}
         >
           <option value="auto">Follow country</option>
           <option value={1}>Monday</option>
@@ -122,10 +124,10 @@ export function MoreOptions(props: MoreOptionsProps) {
       </section>
 
       <section>
-        <h4 className="mb-2 text-sm font-semibold text-slate-700">Work week</h4>
+        <h4 className={H4_CLASS}>Work week</h4>
         <div className="flex gap-2">
           {WEEKDAY_LABELS.map((label, i) => (
-            <label key={label} className="flex flex-col items-center gap-1 text-xs text-slate-600">
+            <label key={label} className="flex flex-col items-center gap-1 text-xs text-slate-600 dark:text-slate-300">
               {label}
               <input
                 type="checkbox"
@@ -142,20 +144,20 @@ export function MoreOptions(props: MoreOptionsProps) {
       </section>
 
       <section>
-        <h4 className="mb-2 text-sm font-semibold text-slate-700">Overlap days (someone else&apos;s time off)</h4>
+        <h4 className={H4_CLASS}>Overlap days (someone else&apos;s time off)</h4>
         <DateListEditor dates={props.overlapDays} onAdd={props.onAddOverlapDay} onRemove={props.onRemoveOverlapDay} />
       </section>
 
       <section>
-        <h4 className="mb-2 text-sm font-semibold text-slate-700">Blackout dates</h4>
+        <h4 className={H4_CLASS}>Blackout dates</h4>
         <DateListEditor dates={props.blackouts} onAdd={props.onAddBlackout} onRemove={props.onRemoveBlackout} />
       </section>
 
       <section>
-        <h4 className="mb-2 text-sm font-semibold text-slate-700">Public holidays</h4>
+        <h4 className={H4_CLASS}>Public holidays</h4>
         <div className="flex max-h-56 flex-col gap-1 overflow-auto">
           {props.holidayEntries.map((h) => (
-            <div key={`${h.date}-${h.name}`} className="flex items-center justify-between gap-2 text-sm text-slate-600">
+            <div key={`${h.date}-${h.name}`} className="flex items-center justify-between gap-2 text-sm text-slate-600 dark:text-slate-300">
               <label className="flex min-w-0 items-center gap-2">
                 {h.source === 'state' ? (
                   <input
@@ -168,38 +170,38 @@ export function MoreOptions(props: MoreOptionsProps) {
                 )}
                 <span className="truncate">
                   {h.date} &mdash; {h.name}
-                  {h.source === 'custom' && <span className="ml-1 text-xs text-slate-400">(custom)</span>}
+                  {h.source === 'custom' && <span className="ml-1 text-xs text-slate-400 dark:text-slate-500">(custom)</span>}
                 </span>
               </label>
               <button
                 type="button"
                 onClick={() => props.onRemoveHoliday(h.date, h.name)}
-                className="shrink-0 text-slate-400 hover:text-slate-700"
+                className="shrink-0 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
               >
                 &times;
               </button>
             </div>
           ))}
           {props.holidayEntries.some((h) => h.source === 'state') && (
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
               State holiday &mdash; check if your employer observes this.
             </p>
           )}
-          {props.holidayEntries.length === 0 && <span className="text-sm text-slate-400">None loaded yet.</span>}
+          {props.holidayEntries.length === 0 && <span className="text-sm text-slate-400 dark:text-slate-500">None loaded yet.</span>}
         </div>
         <div className="mt-2 flex items-center gap-2">
           <input
             type="date"
             value={newHolidayDate}
             onChange={(e) => setNewHolidayDate(e.target.value)}
-            className="rounded-md border border-slate-200 px-2 py-1 text-sm"
+            className={FIELD_CLASS}
           />
           <input
             type="text"
             placeholder="Holiday name"
             value={newHolidayName}
             onChange={(e) => setNewHolidayName(e.target.value)}
-            className="w-32 rounded-md border border-slate-200 px-2 py-1 text-sm"
+            className={`${FIELD_CLASS} w-32`}
           />
           <button
             type="button"
@@ -209,7 +211,7 @@ export function MoreOptions(props: MoreOptionsProps) {
               setNewHolidayDate('');
               setNewHolidayName('');
             }}
-            className="rounded-md bg-slate-100 px-2 py-1 text-sm font-medium text-slate-700 hover:bg-slate-200"
+            className="rounded-md bg-slate-100 dark:bg-slate-700 px-2 py-1 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600"
           >
             Add
           </button>

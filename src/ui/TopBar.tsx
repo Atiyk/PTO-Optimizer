@@ -32,7 +32,7 @@ interface TopBarProps {
 }
 
 const DATE_FIELD_CLASS =
-  'h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400';
+  'h-9 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-sm text-slate-800 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-500';
 
 export function TopBar({
   country,
@@ -63,7 +63,7 @@ export function TopBar({
   const locale = localeForCountry(country);
 
   return (
-    <div className="sticky top-0 z-40 flex flex-col gap-3 border-b border-slate-200 bg-white/95 p-4 backdrop-blur">
+    <div className="sticky top-0 z-40 flex flex-col gap-3 border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 p-4 backdrop-blur">
       <div className="flex flex-wrap items-end gap-4">
         <CountrySelect
           country={country}
@@ -72,8 +72,8 @@ export function TopBar({
           onChangeSubdivision={onChangeSubdivision}
         />
 
-        <fieldset className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-          <legend className="text-xs font-medium text-slate-600">Date range</legend>
+        <fieldset className="flex flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+          <legend className="text-xs font-medium text-slate-600 dark:text-slate-300">Date range</legend>
           <div className="flex items-center gap-2">
             <input
               type="date"
@@ -83,7 +83,7 @@ export function TopBar({
               onChange={(e) => onChangeRangeStart(e.target.value)}
               className={DATE_FIELD_CLASS}
             />
-            <span className="text-slate-400">&rarr;</span>
+            <span className="text-slate-400 dark:text-slate-500">&rarr;</span>
             <input
               type="date"
               lang={locale}
@@ -95,7 +95,7 @@ export function TopBar({
           </div>
         </fieldset>
 
-        <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+        <label className="flex flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
           PTO days available
           <input
             type="number"
@@ -107,7 +107,7 @@ export function TopBar({
             className={`${DATE_FIELD_CLASS} w-24`}
           />
           {budgetSpent < budget && (
-            <span className="text-xs font-normal text-amber-700">
+            <span className="text-xs font-normal text-amber-700 dark:text-amber-400">
               Using {budgetSpent} of {budget} days &mdash; the remaining {budget - budgetSpent} add no days off at
               any position.
             </span>
@@ -134,7 +134,7 @@ export function TopBar({
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
-        <label className="flex items-center gap-2 text-sm text-slate-600">
+        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
           <input
             type="checkbox"
             checked={showAlternatives}
@@ -147,7 +147,7 @@ export function TopBar({
       <button
         type="button"
         onClick={onToggleMore}
-        className="self-start text-sm font-medium text-slate-500 hover:text-slate-800"
+        className="self-start text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100"
       >
         {moreOpen ? 'Hide options ↑' : 'More options ↓'}
       </button>

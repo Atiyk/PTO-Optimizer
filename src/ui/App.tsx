@@ -8,6 +8,8 @@ import { SummaryStrip } from './SummaryStrip';
 import { ExportBar } from './ExportBar';
 import { PartnerOverlapBanner } from './PartnerOverlapBanner';
 import { FAQ } from './FAQ';
+import { CalendarErrorBoundary } from './CalendarErrorBoundary';
+import { ValidationBanner } from './ValidationBanner';
 import { useAppState, todayISO } from './useAppState';
 import { useHasHover } from './useHasHover';
 import { activeCountryPreset } from '../data/countryPresets';
@@ -27,8 +29,8 @@ export function App() {
   const introText = activeCountryPreset()?.copy ?? DEFAULT_INTRO;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <p className="border-b border-slate-200 bg-white px-4 py-2 text-sm text-slate-600">{introText}</p>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      <p className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-sm text-slate-600 dark:text-slate-300">{introText}</p>
       <TopBar
         country={state.country}
         subdivision={state.subdivision}
@@ -89,31 +91,45 @@ export function App() {
         <PartnerOverlapBanner overlapDayCount={state.overlapDays.length} onDismiss={state.dismissPartnerOverlapBanner} />
       )}
 
-      <div className="border-b border-slate-200 bg-white px-4 py-3">
+      <ValidationBanner issues={state.validationIssues} />
+
+      {state.holidaysDegraded && (
+        <p
+          role="status"
+          className="border-b border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-4 py-2 text-xs text-slate-600 dark:text-slate-300"
+        >
+          Couldn&apos;t reach public holiday data for this country &mdash; showing weekends and any holidays already
+          cached. You can add known holidays manually below, or try again later.
+        </p>
+      )}
+
+      <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3">
         <Legend />
       </div>
 
       <main className="mx-auto max-w-6xl p-4">
-        <Calendar
-          rangeStart={state.rangeStart}
-          rangeEnd={state.rangeEnd}
-          weekStart={state.weekStart}
-          today={today}
-          offRuns={state.offRuns}
-          previewRun={previewRun}
-          categoryOf={state.categoryOf}
-          isBlackoutDay={state.isBlackoutDay}
-          overlapSet={state.overlapSet}
-          marginalValues={state.marginalValues}
-          holidayNameFor={state.holidayNameFor}
-          hasHover={hasHover}
-          onDayClick={state.toggleDay}
-          alternativeForDate={state.alternativeForDate}
-          onSwapAlternative={state.swapAlternative}
-          onHoverAlternative={state.setHoveredAlternativeId}
-        />
+        <CalendarErrorBoundary>
+          <Calendar
+            rangeStart={state.rangeStart}
+            rangeEnd={state.rangeEnd}
+            weekStart={state.weekStart}
+            today={today}
+            offRuns={state.offRuns}
+            previewRun={previewRun}
+            categoryOf={state.categoryOf}
+            isBlackoutDay={state.isBlackoutDay}
+            overlapSet={state.overlapSet}
+            marginalValues={state.marginalValues}
+            holidayNameFor={state.holidayNameFor}
+            hasHover={hasHover}
+            onDayClick={state.toggleDay}
+            alternativeForDate={state.alternativeForDate}
+            onSwapAlternative={state.swapAlternative}
+            onHoverAlternative={state.setHoveredAlternativeId}
+          />
+        </CalendarErrorBoundary>
 
-        <p className="mt-2 text-xs text-slate-400">
+        <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
           Click any day to pin it in or rule it out. Hover or focus a day to see what it would gain.
         </p>
 
@@ -138,7 +154,7 @@ export function App() {
 
         <div className="mt-6 flex flex-col gap-3">
           {state.breaks.length === 0 && (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               No PTO-worthy breaks fit this range and budget yet &mdash; try widening the date range or increasing
               PTO days.
             </p>

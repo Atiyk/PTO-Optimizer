@@ -145,7 +145,7 @@ export function DayCell({
   const textColor = category === 'weekend' ? (inBand ? TEXT_PRIMARY : TEXT_MUTED) : TEXT_PRIMARY;
   const isPtoLike = category === 'suggested-pto' || category === 'pinned';
   const categoryClasses = isOutOfRange
-    ? 'text-slate-300'
+    ? 'text-slate-300 dark:text-slate-600'
     : isPtoLike
       ? `${COLORS.ptoBg} border ${COLORS.ptoBorder} ${COLORS.ptoText} font-medium`
       : textColor;
@@ -187,12 +187,12 @@ export function DayCell({
         className={`relative z-10 flex h-12 w-full items-center justify-center rounded text-sm transition-colors ${
           isOutOfRange
             ? 'cursor-default'
-            : `cursor-pointer hover:brightness-95 hover:outline hover:outline-1 hover:outline-offset-1 hover:outline-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${COLORS.focusRing}`
+            : `cursor-pointer hover:brightness-95 hover:outline hover:outline-1 hover:outline-offset-1 hover:outline-slate-400 dark:hover:outline-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${COLORS.focusRing}`
         } ${categoryClasses} ${
           // Noticeably fainter than the solid fill, not equal weight - an alternative is a
           // suggestion about a suggestion, not a second plan.
           isAlternative && !isOutOfRange ? `border border-dashed ${COLORS.altBorder}/40` : ''
-        } ${isToday && !isOutOfRange ? 'ring-2 ring-inset ring-slate-900' : ''}`}
+        } ${isToday && !isOutOfRange ? 'ring-2 ring-inset ring-slate-900 dark:ring-slate-100' : ''}`}
       >
         {!isOutOfRange && category === 'pinned' ? (
           <span className="flex items-center gap-0.5">
@@ -206,9 +206,12 @@ export function DayCell({
           <span aria-hidden className={`absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${HOLIDAY_DOT}`} />
         )}
         {!isOutOfRange && hasOverlap && (
+          // A ring around the dot (not just a colour swap) so it stays visible whatever it
+          // happens to sit on - a plain dark cell in dark mode, or the now-light pto/band
+          // fills - rather than needing one colour choice that only works on some of them.
           <span
             aria-label="Overlaps someone else's time off"
-            className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-slate-900"
+            className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-slate-900 ring-1 ring-white dark:bg-slate-100 dark:ring-slate-900"
           />
         )}
       </button>

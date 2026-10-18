@@ -63,7 +63,7 @@ function ActionButton({ label, onClick }: { label: string; onClick: () => Promis
         setMessage(result.message);
         setTimeout(() => setMessage(null), 2500);
       }}
-      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
+      className="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:cursor-wait disabled:opacity-60"
     >
       {message ?? label}
     </button>

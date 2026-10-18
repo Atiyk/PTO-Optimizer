@@ -57,8 +57,8 @@ export function BreakCountSlider({
 }: BreakCountSliderProps) {
   return (
     <div className="flex flex-col gap-1">
-      <h3 className="text-sm font-semibold text-slate-700">How many breaks</h3>
-      <label className="flex items-center gap-2 text-xs text-slate-600">
+      <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">How many breaks</h3>
+      <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
         <input
           type="checkbox"
           checked={letSolverDecide}
@@ -66,7 +66,7 @@ export function BreakCountSlider({
         />
         Let the solver decide
       </label>
-      <div className="flex items-center justify-between text-xs text-slate-500">
+      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
         <span>All in one</span>
         <span>As many as possible</span>
       </div>
@@ -82,9 +82,9 @@ export function BreakCountSlider({
         aria-valuetext={`${positionLabel(value)}${letSolverDecide ? ' (disabled — letting the solver decide)' : ''}`}
         // Muted clearly, not just faded on the same accent: a grey track/thumb reads as
         // "inert" at a glance, where opacity alone on the same blue still looked "set."
-        className={`w-full disabled:cursor-not-allowed ${letSolverDecide ? 'accent-slate-300' : 'accent-slate-800'}`}
+        className={`w-full disabled:cursor-not-allowed ${letSolverDecide ? 'accent-slate-300 dark:accent-slate-600' : 'accent-slate-800 dark:accent-slate-300'}`}
       />
-      <p className="text-xs text-slate-600">{caption(breakCountRequested, breakCountActual, breaks, budget, letSolverDecide)}</p>
+      <p className="text-xs text-slate-600 dark:text-slate-300">{caption(breakCountRequested, breakCountActual, breaks, budget, letSolverDecide)}</p>
     </div>
   );
 }

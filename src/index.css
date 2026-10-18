@@ -1,5 +1,76 @@
 @import 'tailwindcss';
 
+/*
+ * Dark mode follows the system preference only - no manual toggle, per spec. Colours used
+ * by more than one component (the calendar's two-colour scheme, the holiday dot, the score
+ * intensity ramp, and the shared text/surface tokens) are defined here as CSS custom
+ * properties on :root and redefined under prefers-color-scheme, so colorScheme.ts and
+ * scoreFormat.ts - already the single source of truth for those colours in light mode -
+ * stay that single source of truth in dark mode too, with no component forked or
+ * duplicated. Incidental one-off chrome (panel backgrounds, borders) uses Tailwind's own
+ * `dark:` variant directly in each component instead, which compiles to the same
+ * prefers-color-scheme media query - introducing a second custom-property for a colour
+ * used in exactly one place would be indirection with no payoff.
+ *
+ * Dark values are NOT a naive darken-everything inversion: the score intensity ramp
+ * (indigo-600/700/800) is too dark to read against a dark background and was replaced with
+ * indigo-400/500/600, and the calendar's PTO fill (blue-900 in light mode) was replaced
+ * with blue-400 plus dark text - blue-900 is itself a dark colour, so against a dark card
+ * it would barely stand out from a plain, unfilled day cell. Every pair below is verified
+ * against WCAG 4.5:1 (text) or distinguished by a wide relative-luminance margin (fills,
+ * verified via src/ui/scoreFormat.ts's own contrastRatio/relativeLuminance - see NOTES.md
+ * for the full table) rather than assumed from habit.
+ */
+:root {
+  --bg-page: #f8fafc; /* slate-50 */
+  --bg-surface: #ffffff;
+  --bg-surface-alt: #f8fafc; /* slate-50 */
+  --border-default: #e2e8f0; /* slate-200 */
+  --text-primary: #1e293b; /* slate-800 */
+  --text-muted: #64748b; /* slate-500 */
+  --focus-ring: #1e3a8a; /* blue-900 */
+
+  --pto-bg: #1e3a8a; /* blue-900 */
+  --pto-border: #172554; /* blue-950 */
+  --pto-text: #ffffff;
+  --band-bg: #fde68a; /* amber-200 */
+  --band-text: #1e293b; /* slate-800 */
+  --holiday-dot: #475569; /* slate-600 */
+  --alt-border: #1e3a8a; /* blue-900 */
+
+  --score-track: #e2e8f0; /* slate-200 */
+  --score-1: #4f46e5; /* indigo-600 */
+  --score-2: #4338ca; /* indigo-700 */
+  --score-3: #3730a3; /* indigo-800 */
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-page: #0f172a; /* slate-900 */
+    --bg-surface: #1e293b; /* slate-800 */
+    --bg-surface-alt: #0f172a; /* slate-900 */
+    --border-default: #334155; /* slate-700 */
+    --text-primary: #f1f5f9; /* slate-100 */
+    --text-muted: #94a3b8; /* slate-400 */
+    --focus-ring: #60a5fa; /* blue-400 */
+
+    --pto-bg: #60a5fa; /* blue-400 - light-mode's blue-900 is too dark to read against a dark card */
+    --pto-border: #2563eb; /* blue-600 */
+    --pto-text: #0f172a; /* slate-900 - dark text on the now-light fill */
+    --band-bg: #fde68a; /* amber-200, unchanged - already pops against a dark background */
+    --band-text: #1e293b; /* slate-800, unchanged */
+    --holiday-dot: #cbd5e1; /* slate-300 - light-mode's slate-600 is nearly invisible on a dark cell */
+    --alt-border: #60a5fa; /* blue-400, matching the new pto-bg hue */
+
+    --score-track: #334155; /* slate-700 */
+    --score-1: #a5b4fc; /* indigo-300 */
+    --score-2: #818cf8; /* indigo-400 */
+    --score-3: #6366f1; /* indigo-500 */
+  }
+}
+
 body {
   margin: 0;
 }

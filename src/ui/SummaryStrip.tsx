@@ -17,7 +17,7 @@ interface SummaryStripProps {
 function PercentileBar({ percentile }: { percentile: number }) {
   const width = barFillWidthPercent(percentile);
   return (
-    <div className="relative h-1 w-16 bg-slate-200" aria-hidden>
+    <div className="relative h-1 w-16 bg-[var(--score-track)]" aria-hidden>
       <div className={`h-full ${barFillClass(percentile)}`} style={{ width: `${width}%` }} />
       {/* The 50 tick: mix-blend-difference inverts whatever is beneath it, so it stays
           visible whether it lands on the light track or the dark fill, without needing a
@@ -30,7 +30,7 @@ function PercentileBar({ percentile }: { percentile: number }) {
 function ScoreLine({ text, percentile }: { text: string; percentile: number }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <p className="text-xs text-slate-600">{text}</p>
+      <p className="text-xs text-slate-600 dark:text-slate-300">{text}</p>
       <PercentileBar percentile={percentile} />
     </div>
   );
@@ -43,7 +43,7 @@ export function SummaryStrip({ budgetSpent, totalDaysOff, scores }: SummaryStrip
 
   return (
     <div className="flex flex-col gap-2" role="status">
-      <p className="text-sm text-slate-700">{headline}</p>
+      <p className="text-sm text-slate-700 dark:text-slate-200">{headline}</p>
       {scores && (
         <div className="flex flex-wrap gap-6">
           <ScoreLine text={travelLine(scores)} percentile={scores.travel.percentile} />

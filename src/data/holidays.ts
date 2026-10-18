@@ -51,17 +51,24 @@ function writeCache(countryCode: string, year: number, data: RawHoliday[]): void
   }
 }
 
-async function fetchYear(countryCode: string, year: number): Promise<RawHoliday[]> {
+interface YearFetch {
+  data: RawHoliday[];
+  /** True only when a live fetch was actually attempted and failed for this year - never
+   * set when a cached copy already satisfied the request without touching the network. */
+  failed: boolean;
+}
+
+async function fetchYear(countryCode: string, year: number): Promise<YearFetch> {
   const cached = readCache(countryCode, year);
-  if (cached) return cached;
+  if (cached) return { data: cached, failed: false };
   try {
     const res = await fetch(`${API_BASE}/${year}/${countryCode}`);
-    if (!res.ok) return [];
+    if (!res.ok) return { data: [], failed: true };
     const data = (await res.json()) as RawHoliday[];
     writeCache(countryCode, year, data);
-    return data;
+    return { data, failed: false };
   } catch {
-    return [];
+    return { data: [], failed: true };
   }
 }
 
@@ -90,9 +97,44 @@ function appliesToSubdivision(h: Holiday, subdivision?: string): boolean {
   return h.counties.includes(subdivision);
 }
 
+export interface HolidayFetchResult {
+  holidays: Holiday[];
+  /**
+   * True when at least one year's public-holiday data couldn't be fetched (network down,
+   * the API unreachable, a non-2xx response) and no cached copy existed to fall back on
+   * for that year - "fetched nothing" is quietly indistinguishable from "there are no
+   * holidays" otherwise, which is the actual failure mode this flag exists to surface.
+   * Never true when a cached copy served the request, even an old one - a cache hit is a
+   * success, not a degraded fallback, under this cache-forever-per-country-year design.
+   */
+  degraded: boolean;
+}
+
+function filterAndSort(holidays: Holiday[], rangeStart: string, rangeEnd: string, subdivision: string | undefined): Holiday[] {
+  return holidays
+    .filter((h) => appliesToSubdivision(h, subdivision))
+    .filter((h) => h.date >= rangeStart && h.date <= rangeEnd)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+async function fetchYears(countryCode: string, rangeStart: string, rangeEnd: string): Promise<{ holidays: Holiday[]; degraded: boolean }> {
+  const startYear = Number(rangeStart.slice(0, 4));
+  const endYear = Number(rangeEnd.slice(0, 4));
+  const years: number[] = [];
+  for (let y = startYear; y <= endYear; y++) years.push(y);
+
+  const perYear = await Promise.all(years.map((y) => fetchYear(countryCode, y)));
+  const holidays = perYear.flatMap((y) => y.data).map(toHoliday);
+  const degraded = perYear.some((y) => y.failed);
+  return { holidays, degraded };
+}
+
 /**
  * Fetches (or reads from cache) all public holidays overlapping [rangeStart, rangeEnd],
- * for every calendar year the range touches, filtered by subdivision if given.
+ * for every calendar year the range touches, filtered by subdivision if given. Fails
+ * silently to an empty list on an unreachable API - kept for existing callers/tests that
+ * only need the plain list; `getHolidaysWithStatus` is the version that reports the
+ * failure instead of hiding it, and is what the UI layer should use.
  */
 export async function getHolidays(
   countryCode: string,
@@ -100,16 +142,19 @@ export async function getHolidays(
   rangeEnd: string,
   subdivision?: string,
 ): Promise<Holiday[]> {
-  const startYear = Number(rangeStart.slice(0, 4));
-  const endYear = Number(rangeEnd.slice(0, 4));
-  const years: number[] = [];
-  for (let y = startYear; y <= endYear; y++) years.push(y);
+  const { holidays } = await fetchYears(countryCode, rangeStart, rangeEnd);
+  return filterAndSort(holidays, rangeStart, rangeEnd, subdivision);
+}
 
-  const perYear = await Promise.all(years.map((y) => fetchYear(countryCode, y)));
-  const holidays = perYear.flat().map(toHoliday);
-
-  return holidays
-    .filter((h) => appliesToSubdivision(h, subdivision))
-    .filter((h) => h.date >= rangeStart && h.date <= rangeEnd)
-    .sort((a, b) => a.date.localeCompare(b.date));
+/** Same data as getHolidays, plus whether the fetch degraded (network/API failure with no
+ * cached fallback) so the UI can say so instead of presenting a thin or empty result as if
+ * it were simply "no holidays here" - see HolidayFetchResult. */
+export async function getHolidaysWithStatus(
+  countryCode: string,
+  rangeStart: string,
+  rangeEnd: string,
+  subdivision?: string,
+): Promise<HolidayFetchResult> {
+  const { holidays, degraded } = await fetchYears(countryCode, rangeStart, rangeEnd);
+  return { holidays: filterAndSort(holidays, rangeStart, rangeEnd, subdivision), degraded };
 }

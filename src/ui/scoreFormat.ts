@@ -87,10 +87,20 @@ export type IntensityBand = 0 | 1 | 2;
  * the harder constraint to satisfy than "looks pastel." All three bars/text classes below
  * clear 4.5:1 against both backgrounds the strip can sit on - see scoreFormat.test.ts for
  * the actual assertions and NOTES.md for the full contrast table and this trade-off.
+ *
+ * Dark mode needs its OWN ramp, not the light-mode one reused: indigo-600/700/800 are
+ * already fairly dark colours, so against a dark page they'd read as three shades of
+ * "barely visible," collapsing the intensity signal the bar exists to carry - the ramp
+ * genuinely inverts, it doesn't just need a backdrop swap. `barClasses`/`rgb` below are
+ * Tailwind classes referencing index.css's `--score-N` custom properties (light:
+ * indigo-600/700/800, dark: indigo-300/400/500) so one call site works in both themes.
+ * `rgb` stays the LIGHT values specifically for the existing contrast tests below (dark
+ * values are re-verified separately in scoreFormat.test.ts's own dark-mode block) - it is
+ * not theme-aware, since nothing here needs it to be.
  */
 export const SCORE_INTENSITY = {
   thresholds: [33, 66] as const,
-  barClasses: ['bg-indigo-600', 'bg-indigo-700', 'bg-indigo-800'] as const,
+  barClasses: ['bg-[var(--score-1)]', 'bg-[var(--score-2)]', 'bg-[var(--score-3)]'] as const,
   rgb: [
     [79, 70, 229],
     [67, 56, 202],

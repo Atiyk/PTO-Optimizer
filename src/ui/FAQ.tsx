@@ -42,25 +42,25 @@ const ITEMS: FAQItem[] = [
 
 export function FAQ() {
   return (
-    <section className="mt-10 border-t border-slate-100 pt-6 text-sm text-slate-500">
-      <h2 className="mb-3 text-sm font-medium text-slate-600">Questions</h2>
-      <div className="flex flex-col divide-y divide-slate-100">
+    <section className="mt-10 border-t border-slate-100 dark:border-slate-800 pt-6 text-sm text-slate-500 dark:text-slate-400">
+      <h2 className="mb-3 text-sm font-medium text-slate-600 dark:text-slate-300">Questions</h2>
+      <div className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
         {ITEMS.map((item) => (
           <details key={item.question} className="group py-2.5">
             <summary className="cursor-pointer list-none">
-              <h3 className="inline text-sm font-normal text-slate-600 marker:content-none group-open:text-slate-800">
+              <h3 className="inline text-sm font-normal text-slate-600 dark:text-slate-300 marker:content-none group-open:text-slate-800 dark:group-open:text-slate-100">
                 {item.question}
               </h3>
             </summary>
-            <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-slate-500">{item.answer}</p>
+            <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-slate-500 dark:text-slate-400">{item.answer}</p>
           </details>
         ))}
       </div>
-      <p className="mt-4 text-xs text-slate-400">
+      <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">
         TSA checkpoint travel numbers:{' '}
         <a
           href="https://www.tsa.gov/travel/passenger-volumes"
-          className="underline hover:text-slate-600"
+          className="underline hover:text-slate-600 dark:hover:text-slate-300"
           target="_blank"
           rel="noreferrer"
         >
