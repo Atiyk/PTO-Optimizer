@@ -467,13 +467,15 @@ function solveMaxCount(
 }
 
 /**
- * Dual-window (expiry/carryover) solve. Break count here is a simple upper-bound cap, not
- * the full exact-target-with-fallback or true-maximise semantics the single-window path
- * gets - seeNOTES.md for why a full 4D (b1, b2, count) DP was judged disproportionate scope
- * against an advanced, secondary feature.
+ * budget1 (pre-expiry) and budget2 (post-expiry: carryover + any accrual earned after
+ * expiry) ceilings for the dual-window path. Pulled out of solveDualWindow so the SAME
+ * numbers can be used to size the candidate-enumeration cap before any candidates are
+ * built - budget2Max can legitimately exceed the plain annual `input.budget` whenever
+ * carryoverCap (or post-expiry accrual) adds room beyond it, so capping enumeration at
+ * `input.budget` alone would silently exclude a candidate that spends, say, 5 pre-expiry
+ * + 15 carried-over days even though 20 total is genuinely affordable. See NOTES.md.
  */
-function solveDualWindow(candidates: Candidate[], input: SolveInput, w: number, breakCountCap: number | null): Candidate[] {
-  const expiryDate = input.expiryDate as ISODate;
+function dualWindowBudgets(input: SolveInput, expiryDate: ISODate): { budget1Max: number; budget2Max: number } {
   const carryoverCap = input.carryoverCap ?? 0;
   const budget1Max = Math.max(
     0,
@@ -485,6 +487,20 @@ function solveDualWindow(candidates: Candidate[], input: SolveInput, w: number, 
     0,
     Math.floor(carryoverCap + (input.accrualPerMonth ? Math.max(0, accruedAtEnd - accruedAtExpiry) : 0)),
   );
+  return { budget1Max, budget2Max };
+}
+
+/**
+ * Dual-window (expiry/carryover) solve. Break count here is a simple upper-bound cap, not
+ * the full exact-target-with-fallback or true-maximise semantics the single-window path
+ * gets - seeNOTES.md for why a full 4D (b1, b2, count) DP was judged disproportionate scope
+ * against an advanced, secondary feature.
+ */
+function solveDualWindow(candidates: Candidate[], input: SolveInput, w: number, breakCountCap: number | null): Candidate[] {
+  const expiryDate = input.expiryDate as ISODate;
+  const carryoverCap = input.carryoverCap ?? 0;
+  const { budget1Max, budget2Max } = dualWindowBudgets(input, expiryDate);
+  const accruedAtExpiry = accruedBy(expiryDate, input.rangeStart, input.budget, input.accrualPerMonth);
 
   function window2BudgetAt(dateISO: ISODate): number {
     if (!input.accrualPerMonth) return carryoverCap;
@@ -673,8 +689,19 @@ export function solve(input: SolveInput): SolveResult {
   const budgetMax = Math.max(0, Math.floor(input.budget ?? 0));
   // Never more than the user could ever spend, and never more than the range could ever
   // hold (cost only counts workdays, which can't exceed the day count) - see
-  // buildCandidates's own comment for why this must not be a fixed constant.
-  const maxCandidateCost = Math.min(budgetMax, n);
+  // buildCandidates's own comment for why this must not be a fixed constant. With an
+  // expiry date, a single candidate's total cost is cost1+cost2 split across BOTH
+  // windows, and budget2 (carryover) can push the real ceiling above the plain annual
+  // `input.budget` - capping at budgetMax alone there would reintroduce the exact same
+  // class of bug this phase fixed, just scoped to the dual-window path instead of a
+  // literal constant.
+  const totalBudgetCeiling = input.expiryDate
+    ? (() => {
+        const { budget1Max, budget2Max } = dualWindowBudgets(input, input.expiryDate as ISODate);
+        return budget1Max + budget2Max;
+      })()
+    : budgetMax;
+  const maxCandidateCost = Math.min(totalBudgetCeiling, n);
 
   const candidates = buildCandidates(days, isOff, isBlackout, overlapSet, input.expiryDate, input.country, maxCandidateCost);
   candidates.sort((a, b) => a.endIdx - b.endIdx || a.startIdx - b.startIdx);

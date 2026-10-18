@@ -1581,3 +1581,61 @@ count` describe block, since the pre-existing `position 1 returns exactly one br
 checked COUNT only and would have passed even under the old broken cap (a 1-break plan
 costing 10 instead of 25 still satisfies "exactly one break") - it never actually
 exercised the bug.
+
+---
+
+# Phase 12 — Bug check: the Phase 11 cap fix had its own blind spot
+
+Requested as a follow-up sanity pass on Phase 11, not a response to a new report. Found
+and fixed one real regression the Phase 11 fix itself introduced, by reasoning about the
+fix's own edge cases rather than re-testing only the scenarios already covered.
+
+## The bug: `maxCandidateCost` used `input.budget` alone, but dual-window spend isn't bounded by that alone
+
+Phase 11's fix capped candidate enumeration at `Math.min(budgetMax, n)`, where
+`budgetMax = Math.floor(input.budget)`. That's correct for the plain single-window case -
+but with an expiry date set, a single candidate's cost splits across TWO budgets
+(`cost1` pre-expiry, `cost2` post-expiry), and `budget2Max` (the post-expiry pool) is
+`carryoverCap` plus any post-expiry accrual - a number that can legitimately exceed
+`input.budget` on its own whenever `carryoverCap` adds room beyond it. Capping enumeration
+at `budgetMax` alone silently excluded any boundary-crossing candidate needing more than
+that, even when `budget1Max + budget2Max` genuinely allowed it - the exact same class of
+bug Phase 11 had just fixed, just reintroduced in a narrower, easier-to-miss scope.
+
+Reproduced directly: a holiday-free stretch straddling an expiry date, `budget: 5`,
+`carryoverCap: 20` (so `budget1Max=5`, `budget2Max=20`, total 25 genuinely affordable).
+Before this fix, `breakCount: 1` returned a single break capped at cost 5 - silently
+truncated, with 20 of carryover never even offered to the solver. After the fix, the same
+input returns a single break spanning the boundary at cost 20+ (varies with exactly where
+the window falls), using carryover as intended.
+
+**The fix**: `budget1Max`/`budget2Max` computation was pulled out of `solveDualWindow`
+into a standalone `dualWindowBudgets()` helper, callable before any candidates are built.
+`solve()` now computes `maxCandidateCost` as `budget1Max + budget2Max` when `expiryDate`
+is set, and `budgetMax` alone otherwise - never just `input.budget` unconditionally.
+
+## Also re-verified live, not just re-read
+
+- **Dual-window UI path**: enabled "PTO expires on a date" and set a carryover cap
+  through the actual `MoreOptions` form (not a direct `solve()` call) - renders cleanly,
+  no console errors, confirming the fix reaches the UI through the normal
+  `useAppState` -> `solveInput` -> `solve()` pipeline, not just the unit tests.
+- **Non-US country path**: switched to Germany live - the "Estimated" tag appears on the
+  generic-heuristic break, and the Travel score correctly read "18th · busier than most
+  weeks" (a low percentile paired with the low-percentile gloss, confirming Phase 10's
+  gloss-derivation fix holds on a real, non-synthetic result, not just the hand-built test
+  fixtures).
+- Re-read `DayCell.tsx`, `MonthGrid.tsx`, `useAppState.ts`, `BreakCountSlider.tsx`, and
+  `SummaryStrip.tsx` fresh end-to-end (not from memory) specifically checking the
+  out-of-range/alternative/pinned interactions, the `scores`/`totalDaysOff`/`budgetSpent`
+  wiring, and the `letSolverDecide` branch of the caption - no further issues found.
+  Confirmed `computeMarginalValues` and `holidayEntries` are both already scoped to
+  `[rangeStart, rangeEnd]`, so an out-of-range date was never at risk of leaking a real
+  tooltip or marginal value even before `DayCell`'s own `isOutOfRange` suppression - two
+  independent layers happen to agree, not one relying on the other silently.
+
+## Tests
+
+New test in `solve.test.ts`'s `expiry windowing` describe block: a single candidate
+spending more than `input.budget` alone via carryover, with budget/budgetSpent asserted
+directly rather than inferred. 152 tests total, all passing; `tsc`/`build`/`lint` clean.

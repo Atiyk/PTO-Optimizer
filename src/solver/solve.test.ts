@@ -91,6 +91,27 @@ describe('expiry windowing', () => {
     expect(primary[0].end).toBe('2026-01-11');
     expect(primary[0].ptoCost).toBe(4); // 2 charged to window1 (Jan5,6), 2 to window2 (Jan8,9)
   });
+
+  it('a single candidate can legitimately cost more than the plain annual budget, once carryover is added - the enumeration cap must account for both windows, not just input.budget', () => {
+    // Regression for a second instance of the same class of bug the candidate-cap fix
+    // addressed: capping enumeration at input.budget alone (5 here) would silently
+    // exclude any candidate needing more than 5 total, even though budget1Max(5) +
+    // budget2Max(carryoverCap=20) = 25 is genuinely affordable via carryover. Nothing in
+    // this input artificially blocks shorter candidates - if the cap were wrong, the
+    // solver would simply never be offered the longer option to prefer.
+    const { primary, budgetSpent } = solve({
+      offDays: [],
+      rangeStart: '2026-02-01',
+      rangeEnd: '2026-03-31',
+      budget: 5,
+      expiryDate: '2026-02-15',
+      carryoverCap: 20,
+      breakCount: 1,
+    });
+    expect(primary).toHaveLength(1);
+    expect(budgetSpent).toBeGreaterThan(5); // exceeds input.budget alone - only possible via carryover
+    expect(primary[0].ptoCost).toBe(budgetSpent);
+  });
 });
 
 describe('accrual', () => {
