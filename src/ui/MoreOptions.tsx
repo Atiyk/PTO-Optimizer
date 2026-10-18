@@ -1,0 +1,220 @@
+import { useState } from 'react';
+import type { WorkWeek } from '../solver/types';
+import type { WeekStart } from './calendarMath';
+import { DateListEditor } from './DateListEditor';
+import type { HolidayEntry } from './useAppState';
+
+const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+interface MoreOptionsProps {
+  weekStartOverride: WeekStart | 'auto';
+  onChangeWeekStartOverride: (v: WeekStart | 'auto') => void;
+
+  accrualEnabled: boolean;
+  onToggleAccrual: (v: boolean) => void;
+  accrualPerMonth: number;
+  onChangeAccrualPerMonth: (v: number) => void;
+
+  expiryEnabled: boolean;
+  onToggleExpiry: (v: boolean) => void;
+  expiryDate: string;
+  onChangeExpiryDate: (v: string) => void;
+  carryoverCap: number;
+  onChangeCarryoverCap: (v: number) => void;
+
+  overlapDays: string[];
+  onAddOverlapDay: (d: string) => void;
+  onRemoveOverlapDay: (d: string) => void;
+
+  workWeek: WorkWeek;
+  onChangeWorkWeek: (w: WorkWeek) => void;
+
+  blackouts: string[];
+  onAddBlackout: (d: string) => void;
+  onRemoveBlackout: (d: string) => void;
+
+  holidayEntries: HolidayEntry[];
+  onRemoveHoliday: (date: string, name: string) => void;
+  onToggleStateHoliday: (date: string, name: string) => void;
+  onAddCustomHoliday: (date: string, name: string) => void;
+}
+
+export function MoreOptions(props: MoreOptionsProps) {
+  const [newHolidayDate, setNewHolidayDate] = useState('');
+  const [newHolidayName, setNewHolidayName] = useState('');
+
+  return (
+    <div className="grid grid-cols-1 gap-6 border-b border-slate-200 bg-slate-50 p-4 md:grid-cols-2 lg:grid-cols-3">
+      <section>
+        <h4 className="mb-2 text-sm font-semibold text-slate-700">Accrual</h4>
+        <label className="flex items-center gap-2 text-sm text-slate-600">
+          <input
+            type="checkbox"
+            checked={props.accrualEnabled}
+            onChange={(e) => props.onToggleAccrual(e.target.checked)}
+          />
+          Accrue monthly instead of all-at-once
+        </label>
+        {props.accrualEnabled && (
+          <label className="mt-2 flex items-center gap-2 text-sm text-slate-600">
+            Days / month
+            <input
+              type="number"
+              step={0.25}
+              min={0}
+              value={props.accrualPerMonth}
+              onChange={(e) => props.onChangeAccrualPerMonth(Number(e.target.value))}
+              className="w-20 rounded-md border border-slate-200 px-2 py-1 text-sm"
+            />
+          </label>
+        )}
+      </section>
+
+      <section>
+        <h4 className="mb-2 text-sm font-semibold text-slate-700">Expiry &amp; carryover</h4>
+        <label className="flex items-center gap-2 text-sm text-slate-600">
+          <input
+            type="checkbox"
+            checked={props.expiryEnabled}
+            onChange={(e) => props.onToggleExpiry(e.target.checked)}
+          />
+          PTO expires on a date
+        </label>
+        {props.expiryEnabled && (
+          <div className="mt-2 flex flex-col gap-2">
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              Expiry date
+              <input
+                type="date"
+                value={props.expiryDate}
+                onChange={(e) => props.onChangeExpiryDate(e.target.value)}
+                className="rounded-md border border-slate-200 px-2 py-1 text-sm"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              Carryover cap
+              <input
+                type="number"
+                min={0}
+                value={props.carryoverCap}
+                onChange={(e) => props.onChangeCarryoverCap(Number(e.target.value))}
+                className="w-20 rounded-md border border-slate-200 px-2 py-1 text-sm"
+              />
+            </label>
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h4 className="mb-2 text-sm font-semibold text-slate-700">Week starts on</h4>
+        <select
+          value={props.weekStartOverride}
+          onChange={(e) => {
+            const v = e.target.value;
+            props.onChangeWeekStartOverride(v === 'auto' ? 'auto' : (Number(v) as WeekStart));
+          }}
+          className="rounded-md border border-slate-200 px-2 py-1 text-sm"
+        >
+          <option value="auto">Follow country</option>
+          <option value={1}>Monday</option>
+          <option value={0}>Sunday</option>
+        </select>
+      </section>
+
+      <section>
+        <h4 className="mb-2 text-sm font-semibold text-slate-700">Work week</h4>
+        <div className="flex gap-2">
+          {WEEKDAY_LABELS.map((label, i) => (
+            <label key={label} className="flex flex-col items-center gap-1 text-xs text-slate-600">
+              {label}
+              <input
+                type="checkbox"
+                checked={props.workWeek[i]}
+                onChange={(e) => {
+                  const next = [...props.workWeek] as WorkWeek;
+                  next[i] = e.target.checked;
+                  props.onChangeWorkWeek(next);
+                }}
+              />
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h4 className="mb-2 text-sm font-semibold text-slate-700">Overlap days (someone else&apos;s time off)</h4>
+        <DateListEditor dates={props.overlapDays} onAdd={props.onAddOverlapDay} onRemove={props.onRemoveOverlapDay} />
+      </section>
+
+      <section>
+        <h4 className="mb-2 text-sm font-semibold text-slate-700">Blackout dates</h4>
+        <DateListEditor dates={props.blackouts} onAdd={props.onAddBlackout} onRemove={props.onRemoveBlackout} />
+      </section>
+
+      <section>
+        <h4 className="mb-2 text-sm font-semibold text-slate-700">Public holidays</h4>
+        <div className="flex max-h-56 flex-col gap-1 overflow-auto">
+          {props.holidayEntries.map((h) => (
+            <div key={`${h.date}-${h.name}`} className="flex items-center justify-between gap-2 text-sm text-slate-600">
+              <label className="flex min-w-0 items-center gap-2">
+                {h.source === 'state' ? (
+                  <input
+                    type="checkbox"
+                    checked={h.checked}
+                    onChange={() => props.onToggleStateHoliday(h.date, h.name)}
+                  />
+                ) : (
+                  <span className="inline-block w-[13px]" />
+                )}
+                <span className="truncate">
+                  {h.date} &mdash; {h.name}
+                  {h.source === 'custom' && <span className="ml-1 text-xs text-slate-400">(custom)</span>}
+                </span>
+              </label>
+              <button
+                type="button"
+                onClick={() => props.onRemoveHoliday(h.date, h.name)}
+                className="shrink-0 text-slate-400 hover:text-slate-700"
+              >
+                &times;
+              </button>
+            </div>
+          ))}
+          {props.holidayEntries.some((h) => h.source === 'state') && (
+            <p className="mt-1 text-xs text-slate-400">
+              State holiday &mdash; check if your employer observes this.
+            </p>
+          )}
+          {props.holidayEntries.length === 0 && <span className="text-sm text-slate-400">None loaded yet.</span>}
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            type="date"
+            value={newHolidayDate}
+            onChange={(e) => setNewHolidayDate(e.target.value)}
+            className="rounded-md border border-slate-200 px-2 py-1 text-sm"
+          />
+          <input
+            type="text"
+            placeholder="Holiday name"
+            value={newHolidayName}
+            onChange={(e) => setNewHolidayName(e.target.value)}
+            className="w-32 rounded-md border border-slate-200 px-2 py-1 text-sm"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              if (!newHolidayDate) return;
+              props.onAddCustomHoliday(newHolidayDate, newHolidayName || 'Company holiday');
+              setNewHolidayDate('');
+              setNewHolidayName('');
+            }}
+            className="rounded-md bg-slate-100 px-2 py-1 text-sm font-medium text-slate-700 hover:bg-slate-200"
+          >
+            Add
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
