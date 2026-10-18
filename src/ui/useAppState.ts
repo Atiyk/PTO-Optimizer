@@ -6,6 +6,7 @@ import { DEFAULT_WORK_WEEK } from '../solver/types';
 import { getHolidays, type Holiday } from '../data/holidays';
 import { getStateHolidaysFallback } from '../data/usStateHolidays';
 import { geolocateCountry } from './geo';
+import { activeCountryPreset } from '../data/countryPresets';
 import { computeQualifyingRuns, type WeekStart } from './calendarMath';
 import { weekStartForCountry } from './locale';
 import { mondayIndexedDow, rangeISO } from '../solver/dateUtils';
@@ -13,6 +14,7 @@ import { readFullStateFromURL, writeFullStateToURL, readOverlapPayloadFromURL, b
 import type { DayCategory, ForcedState } from './types';
 import { classifyDay } from './dayCategory';
 import { alternativeForDate as alternativeForDateImpl } from './alternativeForDate';
+import { track } from './analytics';
 
 /** The slider's own stored position while unchecked - also what it falls back to showing
  * (disabled) when "let the solver decide" is checked. The middle of the 1-7 range, so
@@ -53,7 +55,11 @@ export function useAppState() {
       rangeStart: todayISO(),
       rangeEnd: defaultRangeEnd(),
       budget: 15,
-      country: geolocateCountry(),
+      // A country landing page's preset wins over the geolocated guess - a visitor to
+      // /uk should see GB selected regardless of their own browser locale - but an
+      // explicit `c` URL param (e.g. a shared link that happens to open on that route)
+      // still wins over both, same priority order readFullStateFromURL already applies.
+      country: activeCountryPreset()?.code ?? geolocateCountry(),
     };
     if (typeof window === 'undefined') {
       return {
@@ -121,6 +127,10 @@ export function useAppState() {
   // the one-time banner explaining what they received. Dismissing it doesn't clear
   // overlapDays; it only stops showing the explanation.
   const [partnerOverlapReceived, setPartnerOverlapReceived] = useState(overlapPayload.length > 0);
+  useEffect(() => {
+    if (overlapPayload.length > 0) track('Overlap link opened');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [workWeek, setWorkWeek] = useState<WorkWeek>(initial.workWeek);
   const [blackouts, setBlackouts] = useState<string[]>(initial.blackouts);
 
@@ -313,6 +323,11 @@ export function useAppState() {
   useEffect(() => {
     const prevIds = prevBreakIdsRef.current;
     const currentIds = new Set(breaks.map((b) => b.id));
+    // 'Solve completed': fired once per distinct successful plan (including the first,
+    // default one) - not on every slider tick that happens to leave the plan unchanged.
+    if (currentIds.size > 0 && (!prevIds || [...currentIds].some((id) => !prevIds.has(id)))) {
+      track('Solve completed');
+    }
     if (prevIds) {
       const changed = new Set([...currentIds].filter((id) => !prevIds.has(id)));
       if (changed.size > 0) {

@@ -5,6 +5,7 @@ import type { WeekStart } from './calendarMath';
 import { downloadICS } from './icsExport';
 import { copyShareImage, buildShareImageMonths } from './imageExport';
 import { copyText } from './requestText';
+import { track } from './analytics';
 
 interface ExportBarProps {
   breaks: Break[];
@@ -21,7 +22,16 @@ interface ExportBarProps {
   buildOverlapLink: () => string;
 }
 
-type ButtonState = 'idle' | 'working' | 'done' | 'error';
+interface ActionResult {
+  ok: boolean;
+  /** What the button shows for 2s after the click - written by the handler that knows
+   * what actually happened, never a generic guess. A button with no fallback path must
+   * say so on failure rather than claiming a fallback (e.g. a download) that never
+   * happened - that was a real bug here: every button shared one hardcoded "Download
+   * started instead" error message, which was simply false for the two buttons (share
+   * link, overlap link) that have no download fallback at all. */
+  message: string;
+}
 
 function ordinal(n: number): string {
   const rem100 = n % 100;
@@ -38,30 +48,24 @@ function ordinal(n: number): string {
   }
 }
 
-function ActionButton({
-  label,
-  doneLabel,
-  onClick,
-}: {
-  label: string;
-  doneLabel: string;
-  onClick: () => Promise<boolean>;
-}) {
-  const [state, setState] = useState<ButtonState>('idle');
+function ActionButton({ label, onClick }: { label: string; onClick: () => Promise<ActionResult> }) {
+  const [message, setMessage] = useState<string | null>(null);
+  const [working, setWorking] = useState(false);
 
   return (
     <button
       type="button"
-      disabled={state === 'working'}
+      disabled={working}
       onClick={async () => {
-        setState('working');
-        const ok = await onClick();
-        setState(ok ? 'done' : 'error');
-        setTimeout(() => setState('idle'), 2000);
+        setWorking(true);
+        const result = await onClick();
+        setWorking(false);
+        setMessage(result.message);
+        setTimeout(() => setMessage(null), 2500);
       }}
       className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
     >
-      {state === 'done' ? doneLabel : state === 'error' ? 'Download started instead' : label}
+      {message ?? label}
     </button>
   );
 }
@@ -75,15 +79,15 @@ export function ExportBar(props: ExportBarProps) {
     <div className="mt-4 flex flex-wrap items-center gap-2">
       <ActionButton
         label="Copy share link"
-        doneLabel="Link copied"
         onClick={async () => {
-          if (typeof window === 'undefined') return false;
-          return copyText(window.location.href);
+          if (typeof window === 'undefined') return { ok: false, message: "Couldn't copy — try again" };
+          const ok = await copyText(window.location.href);
+          if (ok) track('URL shared');
+          return ok ? { ok: true, message: 'Link copied' } : { ok: false, message: "Couldn't copy — try again" };
         }}
       />
       <ActionButton
         label="Copy image"
-        doneLabel="Image copied"
         onClick={async () => {
           const months = buildShareImageMonths(props.rangeStart, props.rangeEnd, props.weekStart, props.categoryOf);
           const headline = `${props.budgetSpent} PTO days → ${props.totalDaysOff} days off`;
@@ -98,21 +102,34 @@ export function ExportBar(props: ExportBarProps) {
             isOutOfRange,
             siteUrl,
           });
-          return result.method === 'clipboard' || result.method === 'download';
+          if (result.method === 'clipboard') {
+            track('Image copied');
+            return { ok: true, message: 'Image copied' };
+          }
+          if (result.method === 'download') {
+            track('Image copied');
+            return { ok: true, message: 'Downloaded instead (clipboard unavailable)' };
+          }
+          return { ok: false, message: "Couldn't create image — try again" };
         }}
       />
       <ActionButton
         label="Download .ics"
-        doneLabel="Downloaded"
         onClick={async () => {
           downloadICS(props.breaks, props.isSuggestedPto);
-          return true;
+          track('ICS downloaded');
+          return { ok: true, message: 'Downloaded' };
         }}
       />
       <ActionButton
         label="Share my days"
-        doneLabel="Overlap link copied"
-        onClick={async () => copyText(props.buildOverlapLink())}
+        onClick={async () => {
+          const ok = await copyText(props.buildOverlapLink());
+          if (ok) track('URL shared');
+          return ok
+            ? { ok: true, message: 'Overlap link copied' }
+            : { ok: false, message: "Couldn't copy — try again" };
+        }}
       />
     </div>
   );

@@ -10,6 +10,9 @@ import { PartnerOverlapBanner } from './PartnerOverlapBanner';
 import { FAQ } from './FAQ';
 import { useAppState, todayISO } from './useAppState';
 import { useHasHover } from './useHasHover';
+import { activeCountryPreset } from '../data/countryPresets';
+
+const DEFAULT_INTRO = 'Turn your PTO into more time off — set your dates and budget below, no sign-up needed.';
 
 export function App() {
   const [moreOpen, setMoreOpen] = useState(false);
@@ -21,8 +24,11 @@ export function App() {
     ? { start: state.hoveredAlternative.start, end: state.hoveredAlternative.end }
     : null;
 
+  const introText = activeCountryPreset()?.copy ?? DEFAULT_INTRO;
+
   return (
     <div className="min-h-screen bg-slate-50">
+      <p className="border-b border-slate-200 bg-white px-4 py-2 text-sm text-slate-600">{introText}</p>
       <TopBar
         country={state.country}
         subdivision={state.subdivision}
