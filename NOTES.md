@@ -1960,3 +1960,189 @@ fires the `URL shared` event.
 199 tests total (up from 192). New: `analytics.test.ts`, `countryPresets.test.ts`.
 `tsc`/`build`/`lint` all clean; production build emits the main bundle plus all six country
 HTML entries sharing the same JS/CSS chunk.
+
+## Phase 15 - Phase 5 (robustness, compatibility, deploy) + the dark-mode addendum
+
+### Dark mode
+
+Follows `prefers-color-scheme` only - no manual toggle, per spec. Colours used by more than
+one component (the calendar's two-colour scheme, the holiday dot, the score intensity ramp,
+and the shared text/surface tokens) are CSS custom properties in `index.css`, light values on
+`:root`, redefined under `@media (prefers-color-scheme: dark)`. `colorScheme.ts` and
+`scoreFormat.ts` - already this app's single source of truth for those colours in light mode
+- now emit `bg-[var(--x)]`/`text-[var(--x)]` Tailwind arbitrary-value classes referencing
+those properties, so every component that already imports `COLORS`/`TEXT_PRIMARY`/
+`SCORE_INTENSITY` picked up dark mode automatically, with nothing forked. Everything else
+(panel backgrounds, borders, one-off chrome across `TopBar`/`MoreOptions`/`BreakCard`/etc.)
+got Tailwind `dark:` variants added directly - still "redefined under the dark media query"
+at the compiled-CSS level, just without the indirection of a custom property for a colour
+used in exactly one place.
+
+Dark values are a genuine redesign, not a mechanical darken-everything pass:
+- The score ramp (light: indigo-600/700/800) is too dark to read against a dark page -
+  shifted three steps lighter to indigo-300/400/500. Verified computationally: indigo-600
+  only reaches 2.84:1 against the dark page background, caught by a test before it ever hit
+  the browser.
+- The calendar's PTO fill (light: blue-900) has the same problem - blue-900 is itself dark,
+  so it barely stood out from a plain unfilled cell on a dark card (2.83:1). Dark mode uses
+  blue-400 with dark text instead (5.75:1 fill-vs-card, 7.02:1 text contrast).
+- The band fill (amber-200) and its dark text (slate-800) are unchanged in dark mode -
+  already pops against a dark background, no redesign needed there.
+
+Every pair re-verified at 4.5:1 (text) or wide relative-luminance separation (fills,
+greyscale distinguishability) using the project's own `contrastRatio`/`relativeLuminance`
+functions - see `colorScheme.test.ts`/`scoreFormat.test.ts`'s dark-mode describe blocks.
+Copy-as-image stays light regardless of page theme (confirmed live: sampled a pixel from a
+canvas rendered while the page was in dark mode - still `[255,255,255,255]`) - `imageExport.ts`
+was already theme-independent by construction (literal hex constants, no CSS variables), so
+this was verification, not a change.
+
+**Two real dark-mode contrast bugs, found by actually running Lighthouse against the
+production build, not by inspection:**
+
+1. Several `dark:text-slate-500` labels (the "Request this time off:" caption, the date-range
+   arrow, dropdown secondary text, etc.) only reached ~3.0-3.7:1 against the dark surfaces.
+   Fixed by using `dark:text-slate-400` (now the same slate-400 in both themes for these,
+   verified at 5.71-6.96:1 against the dark backgrounds).
+2. More seriously: a weekend or public-holiday numeral sitting ON the days-off band fill was
+   using `TEXT_PRIMARY`, which correctly flips to a light colour in dark mode for text on the
+   now-dark page/card background - but the band fill itself (amber-200) never changes between
+   themes. The result was near-white text on pale amber, 1.13:1, Lighthouse flagged it
+   immediately. Root cause: `DayCell.tsx`'s old `textColor` logic only special-cased
+   `category === 'weekend'` for the inBand/not-inBand branch, leaving `'public-holiday'`
+   (which is also routinely inBand, since a holiday is by definition an off day) hard-coded
+   to `TEXT_PRIMARY` regardless. Fixed with a new `BAND_TEXT` token (pinned to slate-800 in
+   BOTH themes, since bandBg itself never changes) and a simplified rule: `inBand ? BAND_TEXT
+   : (weekend ? TEXT_MUTED : TEXT_PRIMARY)` - band-membership now decides the text colour
+   before category does, for every category, not just weekend. Regression test reproduces the
+   exact failing ratio (1.13:1) and confirms the fix clears 4.5:1.
+
+Lighthouse accessibility went 96 → 100 after these two fixes - see Performance below for the
+full before/after scores.
+
+Live-verified: full light/dark screenshots of the default view, the score strip, break cards,
+the Legend, and the `MoreOptions` panel (checked via computed `backgroundColor`/`color`, not
+just a screenshot, to be certain the right CSS actually applied) - all correct in both themes,
+no regression in light mode.
+
+### Robustness
+
+- **`CalendarErrorBoundary`** wraps only the calendar grid (not the whole app), with a "Try
+  again" recovery button. `renderToStaticMarkup` (this project's only test-rendering
+  mechanism) does not run React's error-boundary lifecycle - confirmed by trying it, the
+  thrown error just propagates past the boundary instead of being caught - so the
+  catch-and-recover behaviour is verified LIVE instead: patched `Array.prototype.flat` to
+  throw, triggered a re-render, confirmed the fallback rendered while the rest of the page
+  (TopBar, Legend, SummaryStrip, ExportBar, BreakCard list) stayed fully functional around
+  it, restored the patch, clicked "Try again," confirmed full recovery.
+- **`validation.ts`** flags end-before-start, a negative or absurd (>3650) PTO budget, and an
+  expiry date outside the selected range - every issue at once, not just the first.
+  `useAppState.ts` now freezes `solveResult`/`scores` on the last successfully-solved plan
+  (via refs) instead of re-solving against invalid input, with `ValidationBanner` explaining
+  what's wrong inline. Verified live: set budget to -10, confirmed the banner appeared AND
+  the calendar kept showing the previous valid plan unchanged; fixed the budget, confirmed
+  it recovered; separately confirmed the end-before-start message too.
+- **`getHolidaysWithStatus`** (new, alongside the unchanged `getHolidays` for existing
+  callers) reports `degraded: true` when a year's holiday fetch fails outright with nothing
+  cached to fall back on - a cache hit is never "degraded," only a genuine network/API
+  failure is. Surfaced as an inline note in the app ("Couldn't reach public holiday data...")
+  while the app keeps solving off weekends alone. Verified live: stubbed `fetch` to throw for
+  `date.nager.at` specifically, switched country to France (forcing an uncached fetch), 
+  confirmed the note appeared and a plan still rendered.
+
+### Browser/device testing
+
+Only a Chromium-based browser was available in this environment - Safari and Firefox
+genuinely could not be tested here, and that limitation is being stated plainly rather than
+glossed over. What WAS verified:
+- **Chrome**: exhaustively, live, throughout every phase of this entire sprint.
+- **Mobile (375px, Android Chrome UA + touch-point emulation)**: no horizontal overflow
+  (`scrollWidth === clientWidth === 375`, checked programmatically, not just by eye); sliders
+  render full-width and touch-sized; controls stack in a single column; a tap on a day with a
+  marginal value opens the info tooltip with an explicit "Toggle this day" button rather than
+  toggling blind (confirmed via `hover: hover`/`pointer: fine` media queries both reporting
+  `false` under the emulation, and the tooltip DOM actually appearing).
+- **Safari-specific risk areas called out in the brief** (native date input rendering,
+  clipboard image-write restrictions) were not tested in real Safari, but both have
+  already-verified fallback paths: the date inputs are plain `<input type="date">` with no
+  custom rendering assumptions, and `copyShareImage` falls back to a file download whenever
+  `navigator.clipboard.write` is unavailable or throws - verified by forcing that exact
+  failure live (see Phase 1C/4's bug-fix note on `ExportBar`'s per-button outcome messages,
+  which this same fallback path feeds).
+- **Firefox**: not tested at all in this environment. No Firefox-specific code paths exist
+  (no vendor-prefixed CSS, no non-standard APIs), so there's no a priori reason to expect a
+  problem, but this is an assumption, not a verification, and is flagged as such.
+
+### Legal and repo
+
+`LICENSE` (MIT), `public/privacy.html` (plain static page, no React - it's pure text with no
+interactivity, so loading the whole app bundle for it would be wasteful), a one-line `Footer`
+component (what this is, who made it, a Privacy link - no source link, since the repository
+has no public remote configured yet), and a substantially rewritten `README.md`: the solver
+documentation was stale from before the `w`/`breakCount` sliders replaced the old `objective`
+field (a leftover from a much earlier phase, never updated since), and the `Break.tags` table
+still listed the pre-rename `"Peak pricing"` string. Added Features/Deploy/Privacy sections.
+Confirmed no secrets, API keys, tokens, or personal filesystem paths are committed anywhere
+in the repo (grepped every tracked file for common credential/path patterns - every hit was a
+false positive, "token" meaning "design token" throughout).
+
+### Performance and deploy
+
+`vercel.json`/`netlify.toml` - no SPA fallback rewrite in either, deliberately: every real
+route (the six country pages) is a genuine static file at build time, so an unmatched path
+should actually 404, which `public/404.html` (added in Phase 2D) already serves on both
+hosts automatically.
+
+**Lighthouse**, run against the actual production build (`vite build` + `vite preview`, not
+the dev server) via `npx lighthouse` headless: **Performance 99, Accessibility 100, Best
+Practices 100, SEO 100** (Accessibility started at 96 - see the dark-mode bugs above; this is
+the after-fix number). FCP 1.4s, LCP 1.9s, TBT 110ms, CLS 0, TTI 2.1s. Bundle: ~301KB JS /
+~95KB gzipped, ~31KB CSS / ~7KB gzipped, shared across the main app and all six country pages
+(one JS/CSS chunk, seven HTML entry points).
+
+**A genuine interaction-latency bug, found by actually timing a full-year interaction live,
+exactly per the brief's explicit instruction to check this ("twelve month grids is a lot of
+DOM") rather than assume it's fine:**
+
+Switching the date range to a full year (365 day cells) and then clicking a few day cells to
+pin them felt slow - timed at 1-2+ seconds per click in the dev server, and the browser
+automation itself timed out (45s) running several clicks in a row against the production
+build. Isolated the cause by timing each piece of the pipeline directly (not guessing):
+`solve()` alone for that scenario measured ~97ms (noticeable but reasonable for 365 days),
+`computeMarginalValues` ~1ms, but **`computeScores` measured 551ms** - nearly 6x the cost of a
+single `solve()` call. Root cause: `computeScores` builds its efficiency-percentile
+distribution by calling `solve()` again once per value in `SCORE_W_SWEEP` (6 values), on top
+of the primary solve the app already ran for the calendar itself - 7 total `solve()` calls
+per interaction, all synchronous inside a render-blocking `useMemo`. This is correct,
+intentional behaviour (documented in `solve.ts`'s own comments from an earlier phase) for
+building a real percentile distribution, not a logic bug - the cost simply scales with range
+size in a way a few-month range never exposes (6 × ~15ms is invisible; 6 × ~97ms is not).
+
+Fix: `scores` moved from a `useMemo` (blocks the render that updates the calendar) to a
+`useState` + `useEffect` pair, with the actual `computeScores` call deferred one tick via
+`setTimeout(fn, 0)` and cancelled/re-queued on every subsequent input change (`clearTimeout`
+in the effect's cleanup - a natural debounce, so rapid successive clicks don't pile up stale
+computations). `breaks`/`totalDaysOff`/the calendar itself are untouched and still update
+synchronously and fast (they never depended on the expensive sweep). The score line may now
+lag the rest of the UI by a moment on a large range - a strictly better trade than the whole
+page freezing. **The computation itself was not touched at all** - same distribution, same
+percentiles, same correctness - only when it runs changed.
+
+Re-verified live after the fix, against the production build, tab kept foregrounded
+throughout (a backgrounded browser tab pauses `requestAnimationFrame`, which had made an
+earlier timing attempt look even worse than the real bug - noted here so a future
+measurement doesn't get fooled the same way): five consecutive pin-clicks on a full 365-day
+year measured 121-183ms each (previously 1000-2000ms and climbing), and the score line
+correctly caught up ("Travel 85th · Efficiency 100th") within a few hundred milliseconds of
+the last click. A normal few-month range remains effectively instant (~440ms total including
+the deferred score settling, most of that the intentional wait in the test itself).
+
+No environment variables or secrets required to build, run, or deploy - confirmed by design
+throughout (Nager.Date needs no key; Plausible's embed script needs no key).
+
+## Tests
+
+230 tests total (up from 199, `countryPresets.test.ts`/`analytics.test.ts` already counted
+above). New this phase: `CalendarErrorBoundary.test.tsx`, `validation.test.ts`, plus dark-mode
+regression blocks added to `colorScheme.test.ts` and `scoreFormat.test.ts`, plus
+`getHolidaysWithStatus` coverage added to `holidays.test.ts`. `tsc`/`build`/`lint` all clean.

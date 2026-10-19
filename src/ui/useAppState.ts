@@ -341,14 +341,32 @@ export function useAppState() {
   const breakCountActual = solveResult.breakCountActual;
   const budgetSpent = solveResult.budgetSpent;
 
-  // Summary strip: total days off/PTO spent plus the indexed Efficiency/Travel scores,
-  // recomputed on every solve from the same input+result the rest of the app already has.
+  // Summary strip: total days off/PTO spent plus the indexed Efficiency/Travel scores.
   const totalDaysOff = useMemo(() => totalDaysOffOf(breaks), [breaks]);
-  const scores = useMemo(() => {
-    if (!isValidInput) return lastGoodScoresRef.current;
-    const result = computeScores(solveInput, solveResult);
-    lastGoodScoresRef.current = result;
-    return result;
+
+  // computeScores sweeps SCORE_W_SWEEP (up to 6 extra full solve() calls) to build the
+  // efficiency distribution - cheap for a normal few-month range, but a full-year range can
+  // make a single solve() cost ~100ms+, so the sweep alone can run past half a second. Doing
+  // that inside a render-blocking useMemo made every click on a full-year calendar feel
+  // frozen - found by actually timing a full-year interaction live, not by inspection; see
+  // NOTES.md Phase 5 performance section. Computed in a useEffect instead (runs after the
+  // commit/paint, deferred one more tick via setTimeout so the browser gets a chance to
+  // paint the already-fast `breaks`/`totalDaysOff` update first) rather than blocking the
+  // render that updates the calendar and break list - the score line may lag the rest of
+  // the UI by a moment on a large range, which is a far better trade than the whole page
+  // feeling unresponsive. The computation itself is untouched; only when it runs changed.
+  const [scores, setScores] = useState<Scores | null>(null);
+  useEffect(() => {
+    if (!isValidInput) {
+      setScores(lastGoodScoresRef.current);
+      return;
+    }
+    const timer = setTimeout(() => {
+      const result = computeScores(solveInput, solveResult);
+      lastGoodScoresRef.current = result;
+      setScores(result);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [solveInput, solveResult, isValidInput]);
 
   // Briefly highlight breaks that are new since the last plan, so a slider move's effect
