@@ -92,3 +92,18 @@ describe('the calendar\'s two colours plus the holiday dot stay distinguishable 
     expect(band / pto).toBeGreaterThan(1.5);
   });
 });
+
+describe('regression: a weekend/holiday numeral sitting on the band fill must use BAND_TEXT, not TEXT_PRIMARY, in dark mode', () => {
+  it('reproduces the bug: TEXT_PRIMARY on the band fill fails 4.5:1 in dark mode (near-white text on the still-pale amber fill), which is exactly why BAND_TEXT exists', () => {
+    expect(contrastRatio(DARK_TEXT_PRIMARY, DARK_BAND_BG)).toBeLessThan(4.5);
+  });
+
+  it('BAND_TEXT on the band fill passes 4.5:1 in dark mode - bandBg never changes between themes, so neither does the text that sits on it', () => {
+    expect(contrastRatio(DARK_BAND_TEXT, DARK_BAND_BG)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('BAND_TEXT is identical in light and dark mode - unlike TEXT_PRIMARY, it has nothing to flip, since bandBg itself never changes', () => {
+    const LIGHT_BAND_TEXT: RGB = [30, 41, 59]; // slate-800
+    expect(DARK_BAND_TEXT).toEqual(LIGHT_BAND_TEXT);
+  });
+});

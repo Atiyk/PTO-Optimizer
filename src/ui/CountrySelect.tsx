@@ -60,11 +60,11 @@ export function CountrySelect({ country, subdivision, onChangeCountry, onChangeS
                       setOpen(false);
                     }}
                   >
-                    {c.name} <span className="text-slate-400 dark:text-slate-500">({c.code})</span>
+                    {c.name} <span className="text-slate-400 dark:text-slate-400">({c.code})</span>
                   </button>
                 </li>
               ))}
-              {matches.length === 0 && <li className="px-3 py-1.5 text-sm text-slate-400 dark:text-slate-500">No matches</li>}
+              {matches.length === 0 && <li className="px-3 py-1.5 text-sm text-slate-400 dark:text-slate-400">No matches</li>}
             </ul>
           )}
         </div>

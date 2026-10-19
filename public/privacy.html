@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy &mdash; PTO Optimizer</title>
+    <meta name="description" content="PTO Optimizer collects no personal data. Everything runs in your browser; analytics are anonymous and cookieless." />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f8fafc;
+        --surface: #ffffff;
+        --text: #1e293b;
+        --muted: #64748b;
+        --border: #e2e8f0;
+        --link: #1e3a8a;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f172a;
+          --surface: #1e293b;
+          --text: #f1f5f9;
+          --muted: #94a3b8;
+          --border: #334155;
+          --link: #60a5fa;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 16px/1.6 system-ui, sans-serif;
+      }
+      main {
+        max-width: 38rem;
+        margin: 0 auto;
+        padding: 3rem 1.5rem;
+      }
+      h1 {
+        font-size: 1.5rem;
+        margin-bottom: 0.25rem;
+      }
+      p {
+        color: var(--muted);
+      }
+      h2 {
+        font-size: 1rem;
+        margin-top: 2rem;
+        color: var(--text);
+      }
+      a {
+        color: var(--link);
+      }
+      .back {
+        display: inline-block;
+        margin-top: 2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Privacy</h1>
+      <p>Short version: nothing about you is collected.</p>
+
+      <h2>What this tool does with your data</h2>
+      <p>
+        PTO Optimizer runs entirely in your browser. The dates, PTO balance, country, and every
+        other setting you enter stay on your device and are never sent to a server &mdash; there
+        isn't one. The only thing that leaves your browser is a request to
+        <a href="https://date.nager.at" target="_blank" rel="noreferrer">Nager.Date</a> to look up
+        public holidays for the country you select, which contains no personal information, just
+        a country code and a year.
+      </p>
+
+      <h2>Analytics</h2>
+      <p>
+        We use <a href="https://plausible.io" target="_blank" rel="noreferrer">Plausible</a>, a
+        cookieless analytics service. It sets no cookies and stores no cross-site identifier tied
+        to you &mdash; visit counts are derived from a rotating, salted daily hash that's discarded
+        after 24 hours. We track six anonymous events (page views and which export/share actions
+        were used) and nothing else: no inputs, no dates, no locations, no plan details.
+      </p>
+
+      <h2>Links you share</h2>
+      <p>
+        If you copy a share link, download a calendar file, or copy an image, that file or link is
+        created on your own device and only goes wherever you choose to send it &mdash; we never see
+        it.
+      </p>
+
+      <a class="back" href="/">&larr; Back to PTO Optimizer</a>
+    </main>
+  </body>
+</html>

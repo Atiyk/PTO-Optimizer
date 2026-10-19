@@ -1,0 +1,7 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# No SPA fallback redirect on purpose: every real route (the country landing pages)
+# is a genuine static file at build time, so an unmatched path should 404 - the
+# repo's public/404.html gets served automatically for that, same as Vercel.

@@ -2,9 +2,26 @@
 
 A client-side tool that turns a PTO budget and a public holiday calendar into
 the best set of long weekends and bridges. Everything runs in the browser —
-no backend, no database, no auth, no API keys. The only network call is to
-[Nager.Date](https://date.nager.at) for public holidays, and that's cached in
-`localStorage` after the first fetch.
+no backend, no database, no auth, no API keys, no environment variables. The
+only network calls are to [Nager.Date](https://date.nager.at) for public
+holidays (cached in `localStorage` after the first fetch, degrading
+gracefully — see below — if it's unreachable) and to
+[Plausible](https://plausible.io) for cookieless analytics (see Privacy).
+
+**Live features**, beyond the solver itself:
+
+- A shareable URL that encodes the full input state — the same link
+  reproduces the same plan for anyone, any time (`src/ui/urlState.ts`).
+- Export: download an `.ics` calendar file, copy a 1200×630 share image, or
+  copy per-break request text (a plain date list or a manager email draft)
+  for HR.
+- A "share my days" partner-overlap link: a minimal URL carrying just your
+  resulting days off, which prefills as the recipient's overlap days.
+- Country landing pages at `/uk`, `/canada`, `/australia`, `/germany`,
+  `/ireland`, `/india` — the same app with a country preset and its own
+  `<title>`/meta description (`vite.config.ts`'s multi-page build).
+- Dark mode, following the system preference only (no manual toggle) — see
+  `src/index.css`'s CSS custom properties.
 
 ## Running it
 
@@ -13,7 +30,8 @@ npm install
 npm run dev    # dev server
 npm test       # vitest
 npx tsc --noEmit   # typecheck
-npm run build  # production build
+npm run build  # production build — emits the main app plus all six country pages
+npm run lint   # oxlint
 ```
 
 ## Architecture
@@ -45,11 +63,23 @@ constructor — all date arithmetic happens in UTC on `YYYY-MM-DD` strings via
 | `blackouts?` | `string[]` | Dates that can never be PTO, even if they'd otherwise be off |
 | `overlapDays?` | `string[]` | Someone else's days off; breaks touching these get a small value bonus and an `Overlaps` tag |
 | `workWeek?` | `[boolean×7]` | Monday→Sunday, `true` = normally a working day. Defaults to Mon–Fri |
-| `objective?` | `Objective` | `'most-days-off' \| 'one-long-trip' \| 'spread-out' \| 'avoid-peak'`. Defaults to `'most-days-off'` |
+| `country?` | `string` | ISO country code — selects the travel-demand index (US has real TSA data; everything else gets a generic "Estimated" fallback) |
+| `w?` | `number` | 0–100 (step 10). 0 = maximise days off, ignore travel demand. 100 = minimise travel demand, accept fewer days off. Default 30 |
+| `breakCount?` | `number` | 0–7. 0 = unconstrained. 1–6 = target exactly that many breaks (falls back to the nearest achievable count). 7 = maximise break count. Default 0 |
 
-### Output (`Break[]`)
+### Output (`SolveResult`)
 
-Each `Break` is one chosen trip, in chronological order:
+```ts
+{
+  primary: Break[];           // the chosen plan, chronological, non-overlapping
+  alternatives: Alternative[]; // up to 2 near-equal-value swaps per primary break
+  breakCountRequested: number;
+  breakCountActual: number;   // may differ from requested if that exact count was infeasible
+  budgetSpent: number;        // always the max spendable for the current (w, breakCount) - never leaves budget on the table
+}
+```
+
+Each `Break` is one chosen trip:
 
 ```ts
 {
@@ -59,43 +89,39 @@ Each `Break` is one chosen trip, in chronological order:
   totalDaysOff: number;  // days.length
   ptoCost: number;       // workdays actually spent as PTO inside the break
   multiplier: number;    // totalDaysOff / ptoCost, rounded to 2 decimals
-  tags: string[];        // exactly one of "Peak pricing" / "Low travel demand", plus "Overlaps" if relevant
+  tags: BreakTag[];      // 'Peak travel' | 'Low travel demand' | 'Estimated' | 'Overlaps'
+  meanDemand: number;    // mean travel-demand index across the break, 1.0 = an average day
 }
 ```
 
 ### Algorithm
 
-Weighted interval scheduling under a budget, not a greedy search:
+Weighted interval scheduling under a budget and a break-count target, not a
+greedy search:
 
 1. Classify every day in the range as off (weekend per `workWeek`, holiday, or
    already booked) or working. `blackouts` always force a day to "working",
    overriding everything else.
-2. Enumerate every `[start, end]` candidate whose endpoints are both off days
-   and whose interior workday count ("PTO cost") is 1–10.
-3. Sort candidates by end date and run a 2D DP — `dp[i][b]` = best value using
-   the first `i` candidates with exactly `b` PTO days spent — with the
-   standard non-overlapping recurrence. Indexing by *exact spend* rather than
-   *remaining budget* is what makes the accrual rule a one-line check (below).
+2. Enumerate every `[start, end]` candidate whose endpoints are both off days.
+   The per-candidate PTO-cost cap is derived from the caller's own budget
+   (`min(budget, n)`, or `budget1 + budget2` across both expiry windows when
+   `expiryDate` is set) — never a fixed constant. An earlier fixed cap of 10
+   workdays was the root cause of a real bug (a 15-PTO-day request silently
+   capped at 10); see `NOTES.md` Phase 11/12 for the full writeup.
+3. Sort candidates by end date and run a 3D DP — `dp[i][b][c]` = best value
+   using the first `i` candidates, exactly `b` PTO days spent, exactly `c`
+   breaks chosen — with the standard non-overlapping recurrence. Indexing by
+   *exact spend* (not *remaining budget*) is what makes the accrual rule a
+   one-line check (below); indexing by *exact break count* is what makes
+   `breakCount` a target rather than a post-hoc filter.
 4. Reconstruct the chosen, non-overlapping candidates from the DP table.
 
-Tie-breaks (earliest start → fewest breaks → lowest cost) are carried as part
-of each DP cell's state, not resolved after the fact, so the result is
-byte-identical across repeated runs on the same input.
-
-Each `objective` only changes the per-candidate value function the DP
-maximizes — the DP itself is unchanged:
-
-- **most-days-off** — `value = length`
-- **one-long-trip** — `value = length²`. Squaring rewards concentrating
-  budget into one big interval over splitting it across several (sum of
-  squares < square of the sum for a fixed total length), and any leftover
-  budget still gets spent on whatever's left, since the DP always prefers
-  spending positive-value budget over leaving it idle.
-- **spread-out** — `value = 1` if `length ≥ 4` else `0`, maximizing the
-  *count* of qualifying long weekends rather than total days off.
-- **avoid-peak** — `value = length − 2 × peakDaysInside`, where peak windows
-  (US Thanksgiving week, Dec 20–Jan 2, mid-March–mid-April, Jul 1–7) are
-  hardcoded, not fetched from anywhere.
+Tie-breaks (spent-first → value → earliest start → fewest breaks) are carried
+as part of each DP cell's state via `betterCell`, not resolved after the
+fact, so the result is byte-identical across repeated runs on the same input
+— this is also what makes `w` a continuum rather than a discontinuous jump:
+every candidate's value blends days-off against travel demand by the same
+formula, weighted by `w`.
 
 ### Expiry windowing
 
@@ -142,13 +168,61 @@ just: a candidate can only be chosen into budget column `b` if
 ## UI notes
 
 - Single screen, no wizard. On first load the country is guessed from the
-  browser locale, sensible defaults are applied, and a plan is solved and
-  rendered immediately — there's no empty state.
-- The calendar's day-off "band" (the rounded light-teal strip behind a
-  continuous run of off days) is computed once per render from the full
-  solved range, then sliced per calendar week so a run crossing a week
-  boundary draws one full-width segment per row, rounded only at the ends
-  that are the *true* start/end of the run.
-- Clicking a day cycles it through default → force-include (free day off,
-  like a company holiday) → force-exclude (blackout) → default, re-solving
-  each time. That's the only interaction, by design.
+  browser locale (or from the country landing page's preset — see below),
+  sensible defaults are applied, and a plan is solved and rendered
+  immediately — there's no empty state, no onboarding modal, no cookie
+  banner.
+- The calendar's day-off "band" (the rounded strip behind a continuous run of
+  off days) is computed once per render from the full solved range, then
+  sliced per calendar week so a run crossing a week boundary draws one
+  full-width segment per row, rounded only at the ends that are the *true*
+  start/end of the run.
+- Clicking a day (mouse) cycles it through default → force-include (free day
+  off, like a company holiday) → force-exclude (blackout) → default,
+  re-solving each time. On touch, a tap opens an info tooltip with an
+  explicit "Toggle this day" button first, rather than toggling blind.
+- A `CalendarErrorBoundary` wraps just the calendar grid, so a render crash
+  there doesn't take the rest of the page down with it.
+- Invalid input (end date before start, a negative or wildly oversized PTO
+  budget, an expiry date outside the selected range — see
+  `src/ui/validation.ts`) freezes the plan on the last successfully-solved
+  result instead of re-solving against nonsense, with an inline banner
+  explaining what to fix.
+- If the public-holiday API is unreachable, `getHolidaysWithStatus` degrades
+  to cached data (if any) or weekends alone, and says so inline — it never
+  just silently shows "no holidays" as if that were a fact about the
+  calendar.
+
+## Deploy
+
+Static site, no backend, no environment variables or secrets. Works on
+Vercel, Netlify, or any static host.
+
+1. Connect the repository to Vercel or Netlify (import the repo; both
+   auto-detect the Vite build — `npm run build`, output directory `dist`).
+   `vercel.json` / `netlify.toml` in this repo pin that down explicitly.
+2. Set a custom domain in the host's dashboard.
+3. **Update the placeholder domain.** `index.html`, each
+   `<country>/index.html`, `public/robots.txt`, and `public/sitemap.xml` all
+   reference `https://pto-optimizer.app` for the canonical URL, Open Graph /
+   Twitter Card tags, and the sitemap — there's no real domain yet, so these
+   need a find-and-replace for the actual one once it's live.
+4. Every push to the connected branch redeploys automatically — no CI step
+   needed beyond what the host runs itself.
+
+No API keys: the Nager.Date holiday lookup and the Plausible analytics
+script both work with zero configuration.
+
+## Privacy
+
+No personal data is collected by this app. Everything — the solver, your
+inputs, your plan — runs entirely in your browser and is never sent
+anywhere. Analytics (Plausible) are cookieless: no cookies are set, no
+cross-site identifier is stored, and visitor counts are derived from a
+rotating, salted daily hash that's discarded after 24 hours — which is why
+no cookie-consent banner is shown. The only other network calls are to
+Nager.Date, to fetch public holidays for the country you select.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

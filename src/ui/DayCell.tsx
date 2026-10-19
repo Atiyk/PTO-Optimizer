@@ -1,6 +1,6 @@
 import { useState, type KeyboardEvent } from 'react';
 import type { MarginalValue } from '../solver/marginalValue';
-import { COLORS, HOLIDAY_DOT, TEXT_MUTED, TEXT_PRIMARY } from './colorScheme';
+import { COLORS, HOLIDAY_DOT, TEXT_MUTED, TEXT_PRIMARY, BAND_TEXT } from './colorScheme';
 import type { DayCategory } from './types';
 
 interface DayCellProps {
@@ -142,7 +142,14 @@ export function DayCell({
   // deliberately - distinguished by the pin glyph beside the numeral below, never a third
   // fill colour or a border-weight difference that turned out illegible at cell size (see
   // NOTES.md).
-  const textColor = category === 'weekend' ? (inBand ? TEXT_PRIMARY : TEXT_MUTED) : TEXT_PRIMARY;
+  // Any non-PTO-like numeral that happens to sit on the days-off BAND fill (a weekend or
+  // public holiday inside a qualifying off-stretch) needs BAND_TEXT specifically, not
+  // TEXT_PRIMARY - bandBg never changes between light/dark mode, but TEXT_PRIMARY does (it
+  // flips light for dark mode's now-dark page background), so TEXT_PRIMARY-on-band was a
+  // real bug in dark mode (near-white text on the still-pale amber fill, 1.13:1 - caught by
+  // Lighthouse, not by inspection). Outside a band, weekends stay muted; everything else
+  // (holiday not in a band, working) stays TEXT_PRIMARY, matching the original intent.
+  const textColor = inBand ? BAND_TEXT : category === 'weekend' ? TEXT_MUTED : TEXT_PRIMARY;
   const isPtoLike = category === 'suggested-pto' || category === 'pinned';
   const categoryClasses = isOutOfRange
     ? 'text-slate-300 dark:text-slate-600'

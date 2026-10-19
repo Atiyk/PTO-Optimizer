@@ -83,7 +83,7 @@ export function TopBar({
               onChange={(e) => onChangeRangeStart(e.target.value)}
               className={DATE_FIELD_CLASS}
             />
-            <span className="text-slate-400 dark:text-slate-500">&rarr;</span>
+            <span className="text-slate-400 dark:text-slate-400">&rarr;</span>
             <input
               type="date"
               lang={locale}

@@ -55,6 +55,18 @@ export const TEXT_PRIMARY = 'text-[var(--text-primary)]';
 export const TEXT_MUTED = 'text-[var(--text-muted)]';
 
 /**
+ * Text for a numeral sitting inside the days-off BAND specifically (a weekend day whose
+ * cell is drawn over the band fill) - deliberately NOT TEXT_PRIMARY. bandBg never changes
+ * between light and dark mode (amber-200 in both), but TEXT_PRIMARY DOES - it flips to a
+ * light colour in dark mode for use on the now-dark page/card background. Reusing
+ * TEXT_PRIMARY here was a real bug: a dark-mode weekend-in-band cell rendered near-white
+ * text (slate-100) on the still-pale-amber band fill, 1.13:1 - found by Lighthouse's
+ * accessibility audit, not by inspection. BAND_TEXT is pinned to slate-800 in both themes,
+ * matching bandBg's own light-mode-always value.
+ */
+export const BAND_TEXT = 'text-[var(--band-text)]';
+
+/**
  * Public holiday marker: a small dot, not a fill - a holiday is a fact about the
  * calendar, not something to act on. Deliberately the app's existing neutral (slate)
  * family, not a new hue: the calendar's only two "colours" are the PTO role (coral/blue)

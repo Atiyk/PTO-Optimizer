@@ -170,24 +170,24 @@ export function MoreOptions(props: MoreOptionsProps) {
                 )}
                 <span className="truncate">
                   {h.date} &mdash; {h.name}
-                  {h.source === 'custom' && <span className="ml-1 text-xs text-slate-400 dark:text-slate-500">(custom)</span>}
+                  {h.source === 'custom' && <span className="ml-1 text-xs text-slate-400 dark:text-slate-400">(custom)</span>}
                 </span>
               </label>
               <button
                 type="button"
                 onClick={() => props.onRemoveHoliday(h.date, h.name)}
-                className="shrink-0 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
+                className="shrink-0 text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               >
                 &times;
               </button>
             </div>
           ))}
           {props.holidayEntries.some((h) => h.source === 'state') && (
-            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+            <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">
               State holiday &mdash; check if your employer observes this.
             </p>
           )}
-          {props.holidayEntries.length === 0 && <span className="text-sm text-slate-400 dark:text-slate-500">None loaded yet.</span>}
+          {props.holidayEntries.length === 0 && <span className="text-sm text-slate-400 dark:text-slate-400">None loaded yet.</span>}
         </div>
         <div className="mt-2 flex items-center gap-2">
           <input

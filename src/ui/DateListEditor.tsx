@@ -33,7 +33,7 @@ export function DateListEditor({ dates, onAdd, onRemove }: DateListEditorProps) 
         {dates.map((d) => (
           <span key={d} className="flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-700 px-2.5 py-1 text-xs text-slate-700 dark:text-slate-200">
             {d}
-            <button type="button" onClick={() => onRemove(d)} className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200">
+            <button type="button" onClick={() => onRemove(d)} className="text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
               &times;
             </button>
           </span>

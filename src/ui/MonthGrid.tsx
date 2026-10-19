@@ -71,7 +71,7 @@ export function MonthGrid({
   return (
     <div className="rounded-lg border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-3">
       <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">{monthLabel(descriptor.year, descriptor.month)}</h3>
-      <div className="mb-1 grid grid-cols-7 text-center text-xs text-slate-400 dark:text-slate-500">
+      <div className="mb-1 grid grid-cols-7 text-center text-xs text-slate-400 dark:text-slate-400">
         {labels.map((l) => (
           <span key={l}>{l}</span>
         ))}

@@ -56,7 +56,7 @@ export function FAQ() {
           </details>
         ))}
       </div>
-      <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">
+      <p className="mt-4 text-xs text-slate-400 dark:text-slate-400">
         TSA checkpoint travel numbers:{' '}
         <a
           href="https://www.tsa.gov/travel/passenger-volumes"

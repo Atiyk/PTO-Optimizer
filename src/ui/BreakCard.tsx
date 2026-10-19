@@ -70,7 +70,7 @@ export function BreakCard({ brk, highlighted = false, isPtoDay }: BreakCardProps
         </div>
       </div>
       <div className="flex items-center gap-2 border-t border-slate-100 dark:border-slate-700 pt-3">
-        <span className="text-xs text-slate-400 dark:text-slate-500">Request this time off:</span>
+        <span className="text-xs text-slate-400 dark:text-slate-400">Request this time off:</span>
         <CopyRequestButton label="Copy date list" text={formatWorkingDaysList(brk, isPtoDay)} />
         <CopyRequestButton label="Copy email draft" text={formatManagerEmail(brk, isPtoDay)} />
       </div>

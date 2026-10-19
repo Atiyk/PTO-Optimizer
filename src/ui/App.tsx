@@ -8,6 +8,7 @@ import { SummaryStrip } from './SummaryStrip';
 import { ExportBar } from './ExportBar';
 import { PartnerOverlapBanner } from './PartnerOverlapBanner';
 import { FAQ } from './FAQ';
+import { Footer } from './Footer';
 import { CalendarErrorBoundary } from './CalendarErrorBoundary';
 import { ValidationBanner } from './ValidationBanner';
 import { useAppState, todayISO } from './useAppState';
@@ -129,7 +130,7 @@ export function App() {
           />
         </CalendarErrorBoundary>
 
-        <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
+        <p className="mt-2 text-xs text-slate-400 dark:text-slate-400">
           Click any day to pin it in or rule it out. Hover or focus a day to see what it would gain.
         </p>
 
@@ -166,6 +167,8 @@ export function App() {
 
         <FAQ />
       </main>
+
+      <Footer />
     </div>
   );
 }
