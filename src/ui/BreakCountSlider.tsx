@@ -72,9 +72,14 @@ export function BreakCountSlider({
           "a setting the user chose" even once the accent colour itself was muted. Combined
           with grayscale, it reads unambiguously as inert, not just faded. */}
       <div className={letSolverDecide ? 'opacity-40 grayscale' : ''}>
-        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-          <span>All in one</span>
-          <span>As many as possible</span>
+        {/* Phase 3.3: the mechanism is unchanged (still 1-7, still "how many breaks") - only
+            the framing around it. "All in one"/"As many as possible" described the slider's
+            own structure and said nothing about why either end might matter; too much
+            workload to justify time off (43%) and fear of falling behind (30%) are both
+            about what a break COSTS to take, which these two captions now name directly. */}
+        <div className="flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
+          <span className="max-w-[45%]">One big break. More disruption, more recovery.</span>
+          <span className="max-w-[45%] text-right">Shorter breaks. Less pile-up when you return.</span>
         </div>
         <input
           type="range"

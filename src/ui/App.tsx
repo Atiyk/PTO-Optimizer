@@ -52,6 +52,8 @@ export function App() {
         totalDaysOff={state.totalDaysOff}
         breakCountActual={state.breakCountActual}
         scores={state.scores}
+        budget={state.budget}
+        reserveDays={state.reserveDays}
       />
 
       <PinnedPlansStrip
@@ -91,6 +93,11 @@ export function App() {
         budget={state.budget}
         onChangeBudget={state.setBudget}
         budgetSpent={state.budgetSpent}
+        reserveDays={state.reserveDays}
+        onChangeReserveDays={state.setReserveDays}
+        effectiveBudget={state.effectiveBudget}
+        unlimitedPto={state.unlimitedPto}
+        onToggleUnlimitedPto={state.setUnlimitedPto}
       />
 
       {/* Always visible, not behind a disclosure - these are how most visitors actually
@@ -106,7 +113,7 @@ export function App() {
         breaks={state.breaks}
         breakCountRequested={state.breakCountRequested}
         breakCountActual={state.breakCountActual}
-        budget={state.budget}
+        budget={state.effectiveBudget}
       />
 
       <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2">
