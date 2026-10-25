@@ -645,7 +645,23 @@ function roundMultiplier(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-function demandTag(c: Candidate, estimated: boolean): BreakTag | null {
+/**
+ * BUG FOUND: a candidate whose own travel demand happens to be low/high still got tagged
+ * "Low travel demand"/"Peak travel" even at w=0, where candidateValue's demand term is
+ * multiplied by w and is therefore exactly zero - travel demand had NO influence on which
+ * candidate was picked. A day showing up at w=0 only ever does so because of
+ * budget-maximization (see buildCandidates/betterCell), never because it's quiet or busy,
+ * so labelling it "chosen for low travel demand" at w=0 asserts a causal reason that
+ * provably wasn't a factor at all. Confirmed empirically: at w=0 with "maximise break
+ * count" and a budget exceeding the number of 1-cost bridges available, the leftover
+ * standalone single day the optimizer was forced to spend on still carried the
+ * "Low travel demand" tag purely because its own TSA number happened to be low - nothing
+ * about why it was chosen. Gated to w > 0: the tag (and "Estimated", its non-US
+ * equivalent) now only appears when demand could plausibly have been a real factor in the
+ * choice, not just a true-but-irrelevant fact about the date.
+ */
+function demandTag(c: Candidate, estimated: boolean, w: number): BreakTag | null {
+  if (w === 0) return null;
   const mean = c.demandSum / c.length;
   const high = mean >= HIGH_DEMAND_THRESHOLD;
   const low = mean <= LOW_DEMAND_THRESHOLD;
@@ -654,10 +670,10 @@ function demandTag(c: Candidate, estimated: boolean): BreakTag | null {
   return high ? 'Peak travel' : 'Low travel demand';
 }
 
-function toBreak(c: Candidate, overlapSet: Set<string>, estimated: boolean): Break {
+function toBreak(c: Candidate, overlapSet: Set<string>, estimated: boolean, w: number): Break {
   const days = rangeISO(c.start, c.end);
   const tags: BreakTag[] = [];
-  const tag = demandTag(c, estimated);
+  const tag = demandTag(c, estimated, w);
   if (tag) tags.push(tag);
   if (c.overlapDayCount > 0 && days.some((d) => overlapSet.has(d))) tags.push('Overlaps');
   return {
@@ -821,7 +837,7 @@ export function solve(input: SolveInput): SolveResult {
     breakCountActual = chosen.length;
   }
 
-  const primary = chosen.map((c) => toBreak(c, overlapSet, estimated));
+  const primary = chosen.map((c) => toBreak(c, overlapSet, estimated, w));
 
   const alternatives: Alternative[] = [];
   for (const p of chosen) {
@@ -829,7 +845,7 @@ export function solve(input: SolveInput): SolveResult {
     const alts = findAlternatives(p, otherPrimary, candidates, w);
     for (const alt of alts) {
       alternatives.push({
-        ...toBreak(alt, overlapSet, estimated),
+        ...toBreak(alt, overlapSet, estimated, w),
         replaces: { start: p.start, end: p.end },
       });
     }

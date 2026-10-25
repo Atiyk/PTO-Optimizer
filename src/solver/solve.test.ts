@@ -650,6 +650,35 @@ describe('travel demand tagging', () => {
     expect(primary[0].tags).toContain('Estimated');
     expect(primary[0].tags).not.toContain('Peak travel');
   });
+
+  it('BUG FOUND: never tags a break by demand at w=0, even when the candidate\'s own demand would otherwise qualify - demand has zero influence on the choice at w=0, so labelling it as the reason is false', () => {
+    // Same low-demand window as the first test in this block, but at w=0 ("don't care
+    // about travel demand at all"). Before this fix, the tag still appeared purely because
+    // it's a true fact about the date, regardless of whether it had anything to do with
+    // why the day was picked - misleadingly implying a trade-off that didn't happen.
+    const { primary } = solve(
+      baseInput({
+        offDays: ['2026-01-21'],
+        rangeStart: '2026-01-17',
+        rangeEnd: '2026-01-25',
+        budget: 4,
+        country: 'US',
+        w: 0,
+      }),
+    );
+    expect(primary).toHaveLength(1);
+    expect(primary[0].tags).not.toContain('Low travel demand');
+    expect(primary[0].tags).not.toContain('Peak travel');
+  });
+
+  it('still tags correctly at every w > 0', () => {
+    for (const w of [10, 50, 100]) {
+      const { primary } = solve(
+        baseInput({ offDays: ['2026-01-21'], rangeStart: '2026-01-17', rangeEnd: '2026-01-25', budget: 4, country: 'US', w }),
+      );
+      expect(primary[0].tags).toContain('Low travel demand');
+    }
+  });
 });
 
 describe('standalone single-day candidates', () => {
