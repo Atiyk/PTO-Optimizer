@@ -1,7 +1,10 @@
 # Workflow — every change, no exceptions
 
-1. Work on a feature branch. Never commit to `main`.
+1. Work on a feature branch per phase/change. Never commit to `main`.
 2. Run `npx vitest run` and `npx tsc --noEmit` — both must be clean before continuing.
+   Also run `npm run build` before pushing: it runs `tsc -b` (a composite build that
+   includes test files, unlike plain `tsc --noEmit`), which is what Vercel actually runs.
+   A real build-breaking error here was missed by `tsc --noEmit` alone once already.
 3. Screenshot every affected view at 1440px and 375px, before and after.
 4. STOP. Show the screenshots and a plain-language summary. Wait for explicit approval.
    Do not push, do not open a PR.
