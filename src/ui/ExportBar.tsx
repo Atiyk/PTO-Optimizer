@@ -14,15 +14,13 @@ interface ExportBarProps {
   rangeStart: string;
   rangeEnd: string;
   weekStart: WeekStart;
-  budget: number;
   budgetSpent: number;
   totalDaysOff: number;
   travelPercentile: number | null;
   efficiencyPercentile: number | null;
-  buildOverlapLink: () => string;
 }
 
-interface ActionResult {
+export interface ActionResult {
   ok: boolean;
   /** What the button shows for 2s after the click - written by the handler that knows
    * what actually happened, never a generic guess. A button with no fallback path must
@@ -54,7 +52,7 @@ function ordinal(n: number): string {
  * difference; both still render the same success/failure message in place of the label,
  * so the weight distinction never affects what a click actually reports back.
  */
-function ActionButton({
+export function ActionButton({
   label,
   onClick,
   variant = 'secondary',
@@ -88,70 +86,69 @@ function ActionButton({
   );
 }
 
+/**
+ * The free, no-sign-up export actions - moved directly beneath the result headline
+ * (Phase 2 item 3), not buried below the calendar, since this is the actual payoff: take
+ * the plan with you. "Share with a partner" (the overlap link) isn't one of these three -
+ * it's a separate, secondary action and stays near the calendar (see App.tsx).
+ */
 export function ExportBar(props: ExportBarProps) {
   const siteUrl = typeof window !== 'undefined' ? window.location.host : 'pto-optimizer.app';
 
   const isOutOfRange = (iso: string) => iso < props.rangeStart || iso > props.rangeEnd;
 
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-2">
-      <ActionButton
-        label="Download .ics"
-        variant="primary"
-        onClick={async () => {
-          downloadICS(props.breaks, props.isSuggestedPto);
-          track('ICS downloaded');
-          return { ok: true, message: 'Downloaded' };
-        }}
-      />
-      <ActionButton
-        label="Copy share link"
-        onClick={async () => {
-          if (typeof window === 'undefined') return { ok: false, message: "Couldn't copy — try again" };
-          const ok = await copyText(window.location.href);
-          if (ok) track('URL shared');
-          return ok ? { ok: true, message: 'Link copied' } : { ok: false, message: "Couldn't copy — try again" };
-        }}
-      />
-      <ActionButton
-        label="Copy image"
-        onClick={async () => {
-          const months = buildShareImageMonths(props.rangeStart, props.rangeEnd, props.weekStart, props.categoryOf);
-          const ptoWord = props.budgetSpent === 1 ? 'day' : 'days';
-          const offWord = props.totalDaysOff === 1 ? 'day' : 'days';
-          const headline = `${props.budgetSpent} PTO ${ptoWord} → ${props.totalDaysOff} ${offWord} off`;
-          const subtitleParts: string[] = [];
-          if (props.travelPercentile !== null) subtitleParts.push(`Travel ${ordinal(props.travelPercentile)}`);
-          if (props.efficiencyPercentile !== null) subtitleParts.push(`Efficiency ${ordinal(props.efficiencyPercentile)}`);
-          const result = await copyShareImage({
-            headline,
-            subtitle: subtitleParts.join(' · '),
-            months,
-            categoryOf: props.categoryOf,
-            isOutOfRange,
-            siteUrl,
-          });
-          if (result.method === 'clipboard') {
-            track('Image copied');
-            return { ok: true, message: 'Image copied' };
-          }
-          if (result.method === 'download') {
-            track('Image copied');
-            return { ok: true, message: 'Downloaded instead (clipboard unavailable)' };
-          }
-          return { ok: false, message: "Couldn't create image — try again" };
-        }}
-      />
-      <ActionButton
-        label="Share with a partner"
-        onClick={async () => {
-          const ok = await copyText(props.buildOverlapLink());
-          if (ok) track('URL shared');
-          return ok
-            ? { ok: true, message: 'Overlap link copied' }
-            : { ok: false, message: "Couldn't copy — try again" };
-        }}
-      />
+    <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <ActionButton
+          label="Add to calendar (.ics)"
+          variant="primary"
+          onClick={async () => {
+            downloadICS(props.breaks, props.isSuggestedPto);
+            track('ICS downloaded');
+            return { ok: true, message: 'Downloaded' };
+          }}
+        />
+        <ActionButton
+          label="Copy as image"
+          onClick={async () => {
+            const months = buildShareImageMonths(props.rangeStart, props.rangeEnd, props.weekStart, props.categoryOf);
+            const ptoWord = props.budgetSpent === 1 ? 'day' : 'days';
+            const offWord = props.totalDaysOff === 1 ? 'day' : 'days';
+            const headline = `${props.budgetSpent} PTO ${ptoWord} → ${props.totalDaysOff} ${offWord} off`;
+            const subtitleParts: string[] = [];
+            if (props.travelPercentile !== null) subtitleParts.push(`Travel ${ordinal(props.travelPercentile)}`);
+            if (props.efficiencyPercentile !== null) subtitleParts.push(`Efficiency ${ordinal(props.efficiencyPercentile)}`);
+            const result = await copyShareImage({
+              headline,
+              subtitle: subtitleParts.join(' · '),
+              months,
+              categoryOf: props.categoryOf,
+              isOutOfRange,
+              siteUrl,
+            });
+            if (result.method === 'clipboard') {
+              track('Image copied');
+              return { ok: true, message: 'Image copied' };
+            }
+            if (result.method === 'download') {
+              track('Image copied');
+              return { ok: true, message: 'Downloaded instead (clipboard unavailable)' };
+            }
+            return { ok: false, message: "Couldn't create image — try again" };
+          }}
+        />
+        <ActionButton
+          label="Copy link"
+          onClick={async () => {
+            if (typeof window === 'undefined') return { ok: false, message: "Couldn't copy — try again" };
+            const ok = await copyText(window.location.href);
+            if (ok) track('URL shared');
+            return ok ? { ok: true, message: 'Link copied' } : { ok: false, message: "Couldn't copy — try again" };
+          }}
+        />
+      </div>
+      <p className="text-xs text-slate-400 dark:text-slate-500">Free, no sign-up, no email.</p>
     </div>
   );
 }

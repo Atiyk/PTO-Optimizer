@@ -8,6 +8,7 @@ import { Calendar } from './Calendar';
 import { Legend } from './Legend';
 import { BreakCard } from './BreakCard';
 import { ExportBar } from './ExportBar';
+import { PartnerShareButton } from './PartnerShareButton';
 import { PartnerOverlapBanner } from './PartnerOverlapBanner';
 import { FAQ } from './FAQ';
 import { Footer } from './Footer';
@@ -44,6 +45,24 @@ export function App() {
         breakCountActual={state.breakCountActual}
         scores={state.scores}
       />
+
+      {/* The free export actions, directly beneath the result - not buried below the
+          calendar. This is the actual payoff of the tool; it shouldn't require scrolling
+          past the whole plan to find it. */}
+      <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3">
+        <ExportBar
+          breaks={state.breaks}
+          isSuggestedPto={state.isSuggestedPto}
+          categoryOf={state.categoryOf}
+          rangeStart={state.rangeStart}
+          rangeEnd={state.rangeEnd}
+          weekStart={state.weekStart}
+          budgetSpent={state.budgetSpent}
+          totalDaysOff={state.totalDaysOff}
+          travelPercentile={state.scores?.travel.percentile ?? null}
+          efficiencyPercentile={state.scores?.efficiency.percentile ?? null}
+        />
+      </div>
 
       <PrimaryControls
         country={state.country}
@@ -185,20 +204,7 @@ export function App() {
         </div>
 
         <div className="mt-4">
-          <ExportBar
-            breaks={state.breaks}
-            isSuggestedPto={state.isSuggestedPto}
-            categoryOf={state.categoryOf}
-            rangeStart={state.rangeStart}
-            rangeEnd={state.rangeEnd}
-            weekStart={state.weekStart}
-            budget={state.budget}
-            budgetSpent={state.budgetSpent}
-            totalDaysOff={state.totalDaysOff}
-            travelPercentile={state.scores?.travel.percentile ?? null}
-            efficiencyPercentile={state.scores?.efficiency.percentile ?? null}
-            buildOverlapLink={state.buildOverlapLink}
-          />
+          <PartnerShareButton buildOverlapLink={state.buildOverlapLink} />
         </div>
 
         <div className="mt-6 flex flex-col gap-3">

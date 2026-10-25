@@ -27,8 +27,28 @@ export function todayISO(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
-function defaultRangeEnd(): string {
-  return `${new Date().getFullYear()}-12-31`;
+/** Below this many days remaining in the current year, the default range rolls forward to
+ * next year's Dec 31 instead - see defaultRangeEnd's own comment for why. */
+const DEFAULT_RANGE_ROLLOVER_DAYS = 21;
+
+/**
+ * BUG FOUND (Phase 2): this always returned the CURRENT year's Dec 31, regardless of how
+ * close "today" already is to it. Nothing in the solver, holiday fetch, or date-arithmetic
+ * layer actually blocks a multi-year range - confirmed directly: a real fiscal-year range
+ * (Apr 2027 - Mar 2028) solves and renders correctly today, with holidays fetched for both
+ * years. The tool only APPEARED bounded to the current year because of this default: visit
+ * the site on, say, December 20th, and the default range is an 11-day sliver with nowhere
+ * near enough room to find a real bridge, with no hint that picking a later end date is
+ * even useful. Per spec: the highest-value visitor right now has days expiring December
+ * 31, so the default should stay THIS year's Dec 31 for as long as that's still a useful
+ * planning window, then roll forward to next year's Dec 31 once there's too little of the
+ * current year left to plan around.
+ */
+export function defaultRangeEnd(todayIso: string): string {
+  const year = Number(todayIso.slice(0, 4));
+  const thisYearEnd = `${year}-12-31`;
+  const daysRemaining = rangeISO(todayIso, thisYearEnd).length - 1; // exclusive of today itself
+  return daysRemaining > DEFAULT_RANGE_ROLLOVER_DAYS ? thisYearEnd : `${year + 1}-12-31`;
 }
 
 function yearsBetween(rangeStart: string, rangeEnd: string): number[] {
@@ -54,7 +74,7 @@ export function useAppState() {
   const initial = useMemo(() => {
     const defaults = {
       rangeStart: todayISO(),
-      rangeEnd: defaultRangeEnd(),
+      rangeEnd: defaultRangeEnd(todayISO()),
       budget: 15,
       // A country landing page's preset wins over the geolocated guess - a visitor to
       // /uk should see GB selected regardless of their own browser locale - but an
@@ -114,7 +134,7 @@ export function useAppState() {
   const [accrualPerMonth, setAccrualPerMonth] = useState(initial.accrualPerMonth);
 
   const [expiryEnabled, setExpiryEnabled] = useState(initial.expiryEnabled);
-  const [expiryDate, setExpiryDate] = useState(initial.expiryDate ?? defaultRangeEnd());
+  const [expiryDate, setExpiryDate] = useState(initial.expiryDate ?? defaultRangeEnd(todayISO()));
   const [carryoverCap, setCarryoverCap] = useState(initial.carryoverCap);
 
   // A partner-overlap link ('ov' param) carries a one-shot payload of someone else's
