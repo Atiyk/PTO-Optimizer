@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { buildMonths, type OffRun, type WeekStart } from './calendarMath';
 import { MonthGrid } from './MonthGrid';
 import type { MarginalValue } from '../solver/marginalValue';
-import type { Alternative } from '../solver/types';
+import type { Alternative, Break } from '../solver/types';
 import type { DayCategory } from './types';
 
 interface CalendarProps {
@@ -12,6 +12,7 @@ interface CalendarProps {
   today: string;
   offRuns: OffRun[];
   previewRun: OffRun | null;
+  breakBandByRunIndex: Map<number, { index: number; brk: Break }>;
   categoryOf: (iso: string) => DayCategory;
   isBlackoutDay: (iso: string) => boolean;
   overlapSet: Set<string>;
@@ -31,6 +32,7 @@ export function Calendar({
   today,
   offRuns,
   previewRun,
+  breakBandByRunIndex,
   categoryOf,
   isBlackoutDay,
   overlapSet,
@@ -54,6 +56,7 @@ export function Calendar({
           rangeEnd={rangeEnd}
           offRuns={offRuns}
           previewRun={previewRun}
+          breakBandByRunIndex={breakBandByRunIndex}
           weekStart={weekStart}
           today={today}
           categoryOf={categoryOf}

@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { TopBar } from './TopBar';
+import { Headline } from './Headline';
+import { PrimaryControls } from './PrimaryControls';
+import { PlanSliders } from './PlanSliders';
+import { SubdivisionSelect } from './CountrySelect';
 import { MoreOptions } from './MoreOptions';
 import { Calendar } from './Calendar';
 import { Legend } from './Legend';
 import { BreakCard } from './BreakCard';
-import { SummaryStrip } from './SummaryStrip';
 import { ExportBar } from './ExportBar';
 import { PartnerOverlapBanner } from './PartnerOverlapBanner';
 import { FAQ } from './FAQ';
@@ -18,6 +20,7 @@ import { activeCountryPreset } from '../data/countryPresets';
 const DEFAULT_INTRO = 'Turn your PTO into more time off — set your dates and budget below, no sign-up needed.';
 
 export function App() {
+  const [adjustOpen, setAdjustOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const state = useAppState();
   const hasHover = useHasHover();
@@ -32,11 +35,19 @@ export function App() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       <p className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-sm text-slate-600 dark:text-slate-300">{introText}</p>
-      <TopBar
+
+      {/* The answer first: large, sticky, directly under the tagline - the most prominent
+          thing on the page, visible on load with nothing to configure first. */}
+      <Headline
+        budgetSpent={state.budgetSpent}
+        totalDaysOff={state.totalDaysOff}
+        breakCountActual={state.breakCountActual}
+        scores={state.scores}
+      />
+
+      <PrimaryControls
         country={state.country}
-        subdivision={state.subdivision}
         onChangeCountry={state.setCountry}
-        onChangeSubdivision={state.setSubdivision}
         rangeStart={state.rangeStart}
         rangeEnd={state.rangeEnd}
         onChangeRangeStart={state.setRangeStart}
@@ -44,6 +55,12 @@ export function App() {
         budget={state.budget}
         onChangeBudget={state.setBudget}
         budgetSpent={state.budgetSpent}
+      />
+
+      {/* Always visible, not behind a disclosure - these are how most visitors actually
+          shape the plan. Visual hierarchy: result -> country/date-range/PTO-days ->
+          these -> the calendar. */}
+      <PlanSliders
         w={state.w}
         onChangeW={state.setW}
         manualBreakCount={state.manualBreakCount}
@@ -53,39 +70,62 @@ export function App() {
         breaks={state.breaks}
         breakCountRequested={state.breakCountRequested}
         breakCountActual={state.breakCountActual}
+        budget={state.budget}
         showAlternatives={state.showAlternatives}
         onChangeShowAlternatives={state.setShowAlternatives}
-        moreOpen={moreOpen}
-        onToggleMore={() => setMoreOpen((v) => !v)}
       />
 
-      {moreOpen && (
-        <MoreOptions
-          weekStartOverride={state.weekStartOverride}
-          onChangeWeekStartOverride={state.setWeekStartOverride}
-          accrualEnabled={state.accrualEnabled}
-          onToggleAccrual={state.setAccrualEnabled}
-          accrualPerMonth={state.accrualPerMonth}
-          onChangeAccrualPerMonth={state.setAccrualPerMonth}
-          expiryEnabled={state.expiryEnabled}
-          onToggleExpiry={state.setExpiryEnabled}
-          expiryDate={state.expiryDate}
-          onChangeExpiryDate={state.setExpiryDate}
-          carryoverCap={state.carryoverCap}
-          onChangeCarryoverCap={state.setCarryoverCap}
-          overlapDays={state.overlapDays}
-          onAddOverlapDay={(d) => state.setOverlapDays([...state.overlapDays, d])}
-          onRemoveOverlapDay={(d) => state.setOverlapDays(state.overlapDays.filter((x) => x !== d))}
-          workWeek={state.workWeek}
-          onChangeWorkWeek={state.setWorkWeek}
-          blackouts={state.blackouts}
-          onAddBlackout={(d) => state.setBlackouts([...state.blackouts, d])}
-          onRemoveBlackout={(d) => state.setBlackouts(state.blackouts.filter((x) => x !== d))}
-          holidayEntries={state.holidayEntries}
-          onRemoveHoliday={state.removeHoliday}
-          onToggleStateHoliday={state.toggleStateHoliday}
-          onAddCustomHoliday={state.addCustomHoliday}
-        />
+      <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2">
+        <button
+          type="button"
+          onClick={() => setAdjustOpen((v) => !v)}
+          className="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100"
+        >
+          {adjustOpen ? 'Hide adjustments ↑' : 'Adjust ↓'}
+        </button>
+      </div>
+
+      {adjustOpen && (
+        <div className="flex flex-col gap-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-4">
+          <SubdivisionSelect country={state.country} subdivision={state.subdivision} onChangeSubdivision={state.setSubdivision} />
+
+          <button
+            type="button"
+            onClick={() => setMoreOpen((v) => !v)}
+            className="self-start text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100"
+          >
+            {moreOpen ? 'Hide options ↑' : 'More options ↓'}
+          </button>
+
+          {moreOpen && (
+            <MoreOptions
+              weekStartOverride={state.weekStartOverride}
+              onChangeWeekStartOverride={state.setWeekStartOverride}
+              accrualEnabled={state.accrualEnabled}
+              onToggleAccrual={state.setAccrualEnabled}
+              accrualPerMonth={state.accrualPerMonth}
+              onChangeAccrualPerMonth={state.setAccrualPerMonth}
+              expiryEnabled={state.expiryEnabled}
+              onToggleExpiry={state.setExpiryEnabled}
+              expiryDate={state.expiryDate}
+              onChangeExpiryDate={state.setExpiryDate}
+              carryoverCap={state.carryoverCap}
+              onChangeCarryoverCap={state.setCarryoverCap}
+              overlapDays={state.overlapDays}
+              onAddOverlapDay={(d) => state.setOverlapDays([...state.overlapDays, d])}
+              onRemoveOverlapDay={(d) => state.setOverlapDays(state.overlapDays.filter((x) => x !== d))}
+              workWeek={state.workWeek}
+              onChangeWorkWeek={state.setWorkWeek}
+              blackouts={state.blackouts}
+              onAddBlackout={(d) => state.setBlackouts([...state.blackouts, d])}
+              onRemoveBlackout={(d) => state.setBlackouts(state.blackouts.filter((x) => x !== d))}
+              holidayEntries={state.holidayEntries}
+              onRemoveHoliday={state.removeHoliday}
+              onToggleStateHoliday={state.toggleStateHoliday}
+              onAddCustomHoliday={state.addCustomHoliday}
+            />
+          )}
+        </div>
       )}
 
       {state.partnerOverlapReceived && (
@@ -104,10 +144,6 @@ export function App() {
         </p>
       )}
 
-      <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3">
-        <Legend />
-      </div>
-
       <main className="mx-auto max-w-6xl p-4">
         <CalendarErrorBoundary>
           <Calendar
@@ -117,6 +153,7 @@ export function App() {
             today={today}
             offRuns={state.offRuns}
             previewRun={previewRun}
+            breakBandByRunIndex={state.breakBandByRunIndex}
             categoryOf={state.categoryOf}
             isBlackoutDay={state.isBlackoutDay}
             overlapSet={state.overlapSet}
@@ -134,24 +171,26 @@ export function App() {
           Click any day to pin it in or rule it out. Hover or focus a day to see what it would gain.
         </p>
 
-        <div className="mt-4">
-          <SummaryStrip budgetSpent={state.budgetSpent} totalDaysOff={state.totalDaysOff} scores={state.scores} />
+        <div className="mt-4 border-t border-slate-200 dark:border-slate-700 pt-4">
+          <Legend />
         </div>
 
-        <ExportBar
-          breaks={state.breaks}
-          isSuggestedPto={state.isSuggestedPto}
-          categoryOf={state.categoryOf}
-          rangeStart={state.rangeStart}
-          rangeEnd={state.rangeEnd}
-          weekStart={state.weekStart}
-          budget={state.budget}
-          budgetSpent={state.budgetSpent}
-          totalDaysOff={state.totalDaysOff}
-          travelPercentile={state.scores?.travel.percentile ?? null}
-          efficiencyPercentile={state.scores?.efficiency.percentile ?? null}
-          buildOverlapLink={state.buildOverlapLink}
-        />
+        <div className="mt-4">
+          <ExportBar
+            breaks={state.breaks}
+            isSuggestedPto={state.isSuggestedPto}
+            categoryOf={state.categoryOf}
+            rangeStart={state.rangeStart}
+            rangeEnd={state.rangeEnd}
+            weekStart={state.weekStart}
+            budget={state.budget}
+            budgetSpent={state.budgetSpent}
+            totalDaysOff={state.totalDaysOff}
+            travelPercentile={state.scores?.travel.percentile ?? null}
+            efficiencyPercentile={state.scores?.efficiency.percentile ?? null}
+            buildOverlapLink={state.buildOverlapLink}
+          />
+        </div>
 
         <div className="mt-6 flex flex-col gap-3">
           {state.breaks.length === 0 && (

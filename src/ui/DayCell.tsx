@@ -151,10 +151,14 @@ export function DayCell({
   // (holiday not in a band, working) stays TEXT_PRIMARY, matching the original intent.
   const textColor = inBand ? BAND_TEXT : category === 'weekend' ? TEXT_MUTED : TEXT_PRIMARY;
   const isPtoLike = category === 'suggested-pto' || category === 'pinned';
+  // Suggested PTO is the thing the user must act on - the strongest, most saturated
+  // treatment on the page, deliberately heavier than the quiet "days off" band behind it
+  // (font-bold, not font-medium - no border-weight change, which DayCell.test.tsx already
+  // pins pinned/suggested-pto to sharing exactly, border weight included).
   const categoryClasses = isOutOfRange
     ? 'text-slate-300 dark:text-slate-600'
     : isPtoLike
-      ? `${COLORS.ptoBg} border ${COLORS.ptoBorder} ${COLORS.ptoText} font-medium`
+      ? `${COLORS.ptoBg} border ${COLORS.ptoBorder} ${COLORS.ptoText} font-bold`
       : textColor;
 
   return (
@@ -199,7 +203,12 @@ export function DayCell({
           // Noticeably fainter than the solid fill, not equal weight - an alternative is a
           // suggestion about a suggestion, not a second plan.
           isAlternative && !isOutOfRange ? `border border-dashed ${COLORS.altBorder}/40` : ''
-        } ${isToday && !isOutOfRange ? 'ring-2 ring-inset ring-slate-900 dark:ring-slate-100' : ''}`}
+        } ${
+          // A thin, mid-tone ring, not the old thick near-black/near-white box - that read
+          // as a selection state rather than a "today" marker, clearly distinct from any
+          // interactive/pressed state a cell can actually be in.
+          isToday && !isOutOfRange ? 'ring-1 ring-inset ring-slate-400 dark:ring-slate-500' : ''
+        }`}
       >
         {!isOutOfRange && category === 'pinned' ? (
           <span className="flex items-center gap-0.5">

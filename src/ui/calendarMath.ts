@@ -112,6 +112,10 @@ export interface BandSegment {
   colEnd: number;
   roundedLeft: boolean;
   roundedRight: boolean;
+  /** Index of the source run within the `runs` array passed to this call - lets a caller
+   * map a rendered segment back to whatever it associates with that run (e.g. a break
+   * number/label), without re-deriving which run produced it. */
+  runIndex: number;
 }
 
 /**
@@ -122,7 +126,7 @@ export interface BandSegment {
  */
 export function computeBandSegments(weekDates: (string | null)[], runs: OffRun[]): BandSegment[] {
   const segments: BandSegment[] = [];
-  for (const run of runs) {
+  runs.forEach((run, runIndex) => {
     let colStart = -1;
     let colEnd = -1;
     for (let i = 0; i < weekDates.length; i++) {
@@ -138,9 +142,10 @@ export function computeBandSegments(weekDates: (string | null)[], runs: OffRun[]
         colEnd,
         roundedLeft: weekDates[colStart] === run.start,
         roundedRight: weekDates[colEnd] === run.end,
+        runIndex,
       });
     }
-  }
+  });
   return segments;
 }
 

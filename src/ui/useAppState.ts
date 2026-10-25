@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { solve, computeScores } from '../solver/solve';
 import { computeMarginalValues } from '../solver/marginalValue';
-import type { Alternative, Scores, SolveInput, SolveResult, WorkWeek } from '../solver/types';
+import type { Alternative, Break, Scores, SolveInput, SolveResult, WorkWeek } from '../solver/types';
 import { DEFAULT_WORK_WEEK } from '../solver/types';
 import { getHolidays, getHolidaysWithStatus, type Holiday } from '../data/holidays';
 import { getStateHolidaysFallback } from '../data/usStateHolidays';
@@ -101,7 +101,10 @@ export function useAppState() {
     initial.breakCount === 0 ? DEFAULT_MANUAL_BREAK_COUNT : initial.breakCount,
   );
   const breakCount = letSolverDecide ? 0 : manualBreakCount;
-  const [showAlternatives, setShowAlternatives] = useState(true);
+  // Off by default: alternatives are an advanced/discoverable feature, not the primary
+  // signal - they live behind the "Adjust" disclosure now, unchecked, so a first-time
+  // visitor sees the plan itself first.
+  const [showAlternatives, setShowAlternatives] = useState(false);
   const [hoveredAlternativeId, setHoveredAlternativeId] = useState<string | null>(null);
 
   // 'auto' follows the selected country's convention; an explicit override wins.
@@ -454,6 +457,26 @@ export function useAppState() {
     [rangeStart, rangeEnd, isOffForBand, isSuggestedPto],
   );
 
+  /**
+   * Maps each qualifying run to the break it belongs to, plus a 1-based number in
+   * chronological (start-date) order - "break 1" is always the earliest break in the
+   * plan, regardless of solve order. A run and a break correspond 1:1 in every real case:
+   * `offRuns` only ever includes a run because it contains at least one chosen (break) day,
+   * breaks never overlap each other, and two distinct breaks are only ever "adjacent" with
+   * zero working days between them if the solver chose to run them together - which would
+   * make them one break, not two. Still looked up defensively (by containment, not index
+   * alignment) rather than assumed, so a mismatch renders no label instead of a wrong one.
+   */
+  const breakBandByRunIndex = useMemo(() => {
+    const orderedBreaks = [...breaks].sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+    const map = new Map<number, { index: number; brk: Break }>();
+    offRuns.forEach((run, runIndex) => {
+      const brk = orderedBreaks.find((b) => b.start >= run.start && b.end <= run.end);
+      if (brk) map.set(runIndex, { index: orderedBreaks.indexOf(brk) + 1, brk });
+    });
+    return map;
+  }, [offRuns, breaks]);
+
   // Every day this plan results in being off (weekends, holidays, suggested PTO combined) -
   // the payload a "share my days" partner-overlap link hands to its recipient.
   const allDaysOff = useMemo(
@@ -475,6 +498,15 @@ export function useAppState() {
       alternativeForDateImpl(iso, alternatives, chosenDaySet, showAlternativesEffective),
     [alternatives, showAlternativesEffective, chosenDaySet],
   );
+
+  // Picking a new country always resets any previously-selected subdivision - a stale
+  // US state code carried over into a country with its own (or no) subdivisions was
+  // previously the UI component's job to clear; moved here so every caller gets it for
+  // free, now that the subdivision picker is a separate component from CountrySelect.
+  const changeCountry = useCallback((code: string) => {
+    setCountry(code);
+    setSubdivision(undefined);
+  }, []);
 
   const hoveredAlternative = useMemo(
     () => alternatives.find((a) => a.id === hoveredAlternativeId),
@@ -511,7 +543,7 @@ export function useAppState() {
     validationIssues,
     holidaysDegraded,
     country,
-    setCountry,
+    setCountry: changeCountry,
     subdivision,
     setSubdivision,
     rangeStart,
@@ -586,6 +618,7 @@ export function useAppState() {
     isSuggestedPto,
     overlapSet,
     offRuns,
+    breakBandByRunIndex,
     toggleDay,
     forced,
   };

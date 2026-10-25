@@ -14,6 +14,21 @@ import type { Alternative } from '../solver/types';
  * day", and - via DayCell's isAlternative branch - a click on it would swap the whole break
  * instead of toggling that one day. A day already spoken for by a real break is never also
  * "an alternative".
+ *
+ * Only the alternative's OWN START DAY is ever marked - not every day across its full
+ * span. The solver already caps alternatives at 2 per primary break
+ * (`MAX_ALTERNATIVES_PER_BREAK` in solve.ts), but an alternative is itself a multi-day
+ * break (often 8-20+ days long); painting a dashed outline across its whole date range
+ * means a page with a handful of alternative OBJECTS can still render dozens of dashed
+ * CELLS - "nearly every day carries a dashed outline" was a real, repeated complaint about
+ * exactly this, even though the object-level cap was already holding. One marker cell per
+ * alternative is the actual spec: it's a discoverable "there's another placement here,
+ * hover to preview, click to swap" affordance, not a full preview of the shifted range -
+ * that full range is still shown via the hover-preview band (`previewRun` in App.tsx),
+ * which already renders the complete span on hover/focus. With at most
+ * MAX_ALTERNATIVES_PER_BREAK alternatives per break, this guarantees at most that many
+ * dashed cells per break, verified by counting rendered DOM cells, not by reading this
+ * function (see alternativeForDate.test.ts and the live DOM count in NOTES.md).
  */
 export function alternativeForDate(
   iso: string,
@@ -23,5 +38,5 @@ export function alternativeForDate(
 ): Alternative | undefined {
   if (!showAlternatives) return undefined;
   if (chosenDaySet.has(iso)) return undefined;
-  return alternatives.find((a) => iso >= a.start && iso <= a.end);
+  return alternatives.find((a) => iso === a.start);
 }
