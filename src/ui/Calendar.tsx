@@ -13,6 +13,8 @@ interface CalendarProps {
   offRuns: OffRun[];
   previewRun: OffRun | null;
   breakBandByRunIndex: Map<number, { index: number; brk: Break }>;
+  hoveredBreakDaySet: Set<string>;
+  onHoverBreak: (id: string | null) => void;
   categoryOf: (iso: string) => DayCategory;
   isBlackoutDay: (iso: string) => boolean;
   overlapSet: Set<string>;
@@ -33,6 +35,8 @@ export function Calendar({
   offRuns,
   previewRun,
   breakBandByRunIndex,
+  hoveredBreakDaySet,
+  onHoverBreak,
   categoryOf,
   isBlackoutDay,
   overlapSet,
@@ -57,6 +61,8 @@ export function Calendar({
           offRuns={offRuns}
           previewRun={previewRun}
           breakBandByRunIndex={breakBandByRunIndex}
+          hoveredBreakDaySet={hoveredBreakDaySet}
+          onHoverBreak={onHoverBreak}
           weekStart={weekStart}
           today={today}
           categoryOf={categoryOf}

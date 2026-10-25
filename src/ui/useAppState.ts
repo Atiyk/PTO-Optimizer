@@ -457,25 +457,41 @@ export function useAppState() {
     [rangeStart, rangeEnd, isOffForBand, isSuggestedPto],
   );
 
+  // Chronological (start-date) order with a 1-based index - "break 1" is always the
+  // earliest break in the plan, regardless of solve order. The SAME numbering both the
+  // calendar's badges (via breakBandByRunIndex below) and the break cards (App.tsx) use,
+  // so the two can never drift apart into showing different numbers for the same break.
+  const orderedBreaks = useMemo(
+    () => [...breaks].sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0)).map((brk, i) => ({ index: i + 1, brk })),
+    [breaks],
+  );
+
   /**
-   * Maps each qualifying run to the break it belongs to, plus a 1-based number in
-   * chronological (start-date) order - "break 1" is always the earliest break in the
-   * plan, regardless of solve order. A run and a break correspond 1:1 in every real case:
-   * `offRuns` only ever includes a run because it contains at least one chosen (break) day,
-   * breaks never overlap each other, and two distinct breaks are only ever "adjacent" with
-   * zero working days between them if the solver chose to run them together - which would
-   * make them one break, not two. Still looked up defensively (by containment, not index
-   * alignment) rather than assumed, so a mismatch renders no label instead of a wrong one.
+   * Maps each qualifying run to the break it belongs to, plus its 1-based number from
+   * `orderedBreaks`. A run and a break correspond 1:1 in every real case: `offRuns` only
+   * ever includes a run because it contains at least one chosen (break) day, breaks never
+   * overlap each other, and two distinct breaks are only ever "adjacent" with zero working
+   * days between them if the solver chose to run them together - which would make them one
+   * break, not two. Still looked up defensively (by containment, not index alignment)
+   * rather than assumed, so a mismatch renders no label instead of a wrong one.
    */
   const breakBandByRunIndex = useMemo(() => {
-    const orderedBreaks = [...breaks].sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
     const map = new Map<number, { index: number; brk: Break }>();
     offRuns.forEach((run, runIndex) => {
-      const brk = orderedBreaks.find((b) => b.start >= run.start && b.end <= run.end);
-      if (brk) map.set(runIndex, { index: orderedBreaks.indexOf(brk) + 1, brk });
+      const entry = orderedBreaks.find(({ brk }) => brk.start >= run.start && brk.end <= run.end);
+      if (entry) map.set(runIndex, entry);
     });
     return map;
-  }, [offRuns, breaks]);
+  }, [offRuns, orderedBreaks]);
+
+  // Hovering/focusing a break card highlights that break's days in the calendar, and
+  // hovering/focusing its calendar badge highlights the card - one shared id drives both
+  // directions, rather than two separate pieces of state that could disagree.
+  const [hoveredBreakId, setHoveredBreakId] = useState<string | null>(null);
+  const hoveredBreakDaySet = useMemo(() => {
+    const brk = breaks.find((b) => b.id === hoveredBreakId);
+    return new Set(brk?.days ?? []);
+  }, [breaks, hoveredBreakId]);
 
   // Every day this plan results in being off (weekends, holidays, suggested PTO combined) -
   // the payload a "share my days" partner-overlap link hands to its recipient.
@@ -606,12 +622,16 @@ export function useAppState() {
     addCustomHoliday: (date: string, name: string) =>
       setCustomHolidays((list) => [...list, { date, name, source: 'custom' as const, checked: true }]),
     breaks,
+    orderedBreaks,
     alternatives,
     showAlternativesEffective,
     alternativeForDate,
     hoveredAlternativeId,
     setHoveredAlternativeId,
     hoveredAlternative,
+    hoveredBreakId,
+    setHoveredBreakId,
+    hoveredBreakDaySet,
     swapAlternative,
     categoryOf,
     isBlackoutDay,
