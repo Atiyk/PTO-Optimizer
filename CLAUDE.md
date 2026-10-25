@@ -15,6 +15,8 @@ Never add a submit button, a "Generate" action, or a multi-step form — the app
 live as inputs change, and that immediacy is the main differentiator. Don't gate any
 result behind an explicit action.
 
+No backend, no accounts, no stored personal data. Everything stays client-side.
+
 Pushing and merging: use the Terminal panel (`run_in_terminal`), not the sandboxed Bash
 tool — `gh`/git credentials only exist in the user's real terminal shell, authenticated
 once via `gh auth login`. The sandboxed Bash tool has no network/credential access for

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type { WorkWeek } from '../solver/types';
 import type { WeekStart } from './calendarMath';
+import { addDays, rangeISO } from '../solver/dateUtils';
 import { DateListEditor } from './DateListEditor';
-import type { HolidayEntry } from './useAppState';
+import { todayISO, type HolidayEntry } from './useAppState';
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const H4_CLASS = 'mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200';
@@ -31,8 +32,14 @@ interface MoreOptionsProps {
   workWeek: WorkWeek;
   onChangeWorkWeek: (w: WorkWeek) => void;
 
+  altFridayEnabled: boolean;
+  onToggleAltFriday: (v: boolean) => void;
+  altFridayStart: string;
+  onChangeAltFridayStart: (v: string) => void;
+
   blackouts: string[];
   onAddBlackout: (d: string) => void;
+  onAddBlackouts: (dates: string[]) => void;
   onRemoveBlackout: (d: string) => void;
 
   holidayEntries: HolidayEntry[];
@@ -41,9 +48,19 @@ interface MoreOptionsProps {
   onAddCustomHoliday: (date: string, name: string) => void;
 }
 
+/** Pure, directly unit-testable: `n` consecutive days starting from (and including) `todayIso`
+ * - same pattern as validation.ts/dayCategory.ts. Exported so the exact day-count boundary
+ * (does "block the next 14 days" mean 14 or 15 dates?) is tested directly, not just inferred
+ * from a click handler. */
+export function blockNextNDays(todayIso: string, n: number): string[] {
+  if (!Number.isFinite(n) || n < 1) return [];
+  return rangeISO(todayIso, addDays(todayIso, n - 1));
+}
+
 export function MoreOptions(props: MoreOptionsProps) {
   const [newHolidayDate, setNewHolidayDate] = useState('');
   const [newHolidayName, setNewHolidayName] = useState('');
+  const [blockNextN, setBlockNextN] = useState(14);
 
   return (
     <div className="grid grid-cols-1 gap-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-4 md:grid-cols-2 lg:grid-cols-3">
@@ -144,13 +161,65 @@ export function MoreOptions(props: MoreOptionsProps) {
       </section>
 
       <section>
+        <h4 className={H4_CLASS}>Compressed schedule (9/80)</h4>
+        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <input
+            type="checkbox"
+            checked={props.altFridayEnabled}
+            onChange={(e) => props.onToggleAltFriday(e.target.checked)}
+          />
+          Every other Friday off
+        </label>
+        {props.altFridayEnabled && (
+          <label className="mt-2 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            Starting Friday
+            <input
+              type="date"
+              value={props.altFridayStart}
+              onChange={(e) => props.onChangeAltFridayStart(e.target.value)}
+              className={FIELD_CLASS}
+            />
+          </label>
+        )}
+        <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">
+          For a plain 4-day week (off every Friday), just uncheck Friday in Work week above &mdash; this is only
+          for a schedule that alternates week to week.
+        </p>
+      </section>
+
+      <section>
         <h4 className={H4_CLASS}>Overlap days (someone else&apos;s time off)</h4>
         <DateListEditor dates={props.overlapDays} onAdd={props.onAddOverlapDay} onRemove={props.onRemoveOverlapDay} />
       </section>
 
       <section>
-        <h4 className={H4_CLASS}>Blackout dates</h4>
+        <h4 className={H4_CLASS}>Days I can&apos;t take off</h4>
+        <p className="mb-2 text-xs text-slate-400 dark:text-slate-400">
+          Mandatory coverage, notice periods, quarter close, or any week you simply don&apos;t want &mdash; these
+          narrow what the solver can pick. They never count against your travel or efficiency scores.
+        </p>
         <DateListEditor dates={props.blackouts} onAdd={props.onAddBlackout} onRemove={props.onRemoveBlackout} />
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-slate-500 dark:text-slate-400">Block the next</span>
+          <input
+            type="number"
+            min={1}
+            max={365}
+            value={blockNextN}
+            onChange={(e) => setBlockNextN(Number(e.target.value))}
+            className={`${FIELD_CLASS} w-16`}
+            aria-label="Number of days to block"
+          />
+          <span className="text-xs text-slate-500 dark:text-slate-400">days</span>
+          <button
+            type="button"
+            onClick={() => props.onAddBlackouts(blockNextNDays(todayISO(), blockNextN))}
+            className="rounded-md bg-slate-100 dark:bg-slate-700 px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600"
+          >
+            Block
+          </button>
+          <span className="text-xs text-slate-400 dark:text-slate-400">for a notice period</span>
+        </div>
       </section>
 
       <section>

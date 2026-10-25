@@ -20,22 +20,22 @@ function makeBreak(overrides: Partial<Break> = {}): Break {
 const ptoDays = new Set(['2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30']);
 const isPtoDay = (iso: string) => ptoDays.has(iso);
 
-describe('formatWorkingDaysList', () => {
-  it('lists the actual PTO-cost days, not the break\'s full span, grouped into a consecutive range', () => {
+describe('formatWorkingDaysList (Phase 3: leads with working days, not the calendar span)', () => {
+  it('leads with the count, then enumerates every PTO-cost day individually with its weekday - never grouped into a range', () => {
     const text = formatWorkingDaysList(makeBreak(), isPtoDay);
-    expect(text).toBe('Oct 26–Oct 30, 2026 — 5 working days');
+    expect(text).toBe('5 working days: Mon Oct 26, Tue Oct 27, Wed Oct 28, Thu Oct 29, Fri Oct 30');
   });
 
-  it('groups non-consecutive PTO days into separate ranges', () => {
+  it('lists non-consecutive PTO days individually, each with its own weekday', () => {
     const scattered = new Set(['2026-10-24', '2026-10-26']);
     const text = formatWorkingDaysList(makeBreak(), (iso) => scattered.has(iso));
-    expect(text).toBe('Oct 24, Oct 26, 2026 — 2 working days');
+    expect(text).toBe('2 working days: Sat Oct 24, Mon Oct 26');
   });
 
   it('singular "working day" for exactly one day', () => {
     const one = new Set(['2026-10-26']);
     const text = formatWorkingDaysList(makeBreak(), (iso) => one.has(iso));
-    expect(text).toBe('Oct 26, 2026 — 1 working day');
+    expect(text).toBe('1 working day: Mon Oct 26');
   });
 });
 
@@ -46,10 +46,12 @@ describe('formatManagerEmail', () => {
     expect(sentences).toHaveLength(3);
   });
 
-  it('states the specific working days and the total days-off payoff', () => {
+  it('leads with the working days (with weekdays), the calendar span is secondary, and states the total days-off payoff', () => {
     const email = formatManagerEmail(makeBreak(), isPtoDay);
-    expect(email).toContain('5 working days');
-    expect(email).toContain('Oct 26–Oct 30');
+    // Working days come first, pasteable without the recipient doing arithmetic.
+    expect(email.indexOf('Mon Oct 26')).toBeLessThan(email.indexOf('calendar span'));
+    expect(email).toContain('5 working days of PTO: Mon Oct 26, Tue Oct 27, Wed Oct 28, Thu Oct 29, Fri Oct 30');
+    expect(email).toContain('calendar span Oct 24 – Nov 1');
     expect(email).toContain('9 days off in total');
   });
 

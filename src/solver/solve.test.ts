@@ -850,6 +850,36 @@ describe('score percentiles (travel & efficiency)', () => {
     const input: SolveInput = { offDays: [], rangeStart: '2026-01-03', rangeEnd: '2026-01-04', budget: 0 };
     expect(computeScores(input, solve(input))).toBeNull();
   });
+
+  /**
+   * Phase 3 spec: "Days I can't take off" (blackouts) narrow the candidate set, and the
+   * efficiency percentile must be computed against plans achievable WITHIN that narrowed
+   * set - a user should never be penalised for having constraints. Verified, not assumed:
+   * computeScores's own sweep (SCORE_W_SWEEP) re-solves with `{ ...input, w: sweepW }`,
+   * which carries `input.blackouts` through to every sweep solve automatically - the
+   * comparison distribution is already built from the same narrowed field the real plan
+   * came from. Confirmed empirically with a blackout that doesn't touch the chosen plan's
+   * own dates (an August notice period, while the w=100 solver's real pick lives in
+   * Jan-Feb): the resulting plan and its efficiency percentile are byte-identical with and
+   * without the blackout, not merely "close".
+   */
+  it('a blackout that narrows the field (without touching the chosen plan) does not drop the efficiency percentile', () => {
+    const offDays = [
+      '2026-01-01', '2026-01-19', '2026-02-16', '2026-05-25', '2026-07-03',
+      '2026-09-07', '2026-10-12', '2026-11-11', '2026-11-26', '2026-12-25',
+    ];
+    const base: SolveInput = { offDays, rangeStart: '2026-01-01', rangeEnd: '2026-12-31', budget: 15, country: 'US', w: 100 };
+    const resultNoBlackout = solve(base);
+    const scoresNoBlackout = computeScores(base, resultNoBlackout)!;
+
+    const augustBlackouts = Array.from({ length: 31 }, (_, i) => `2026-08-${String(i + 1).padStart(2, '0')}`);
+    const withBlackout: SolveInput = { ...base, blackouts: augustBlackouts };
+    const resultWithBlackout = solve(withBlackout);
+    const scoresWithBlackout = computeScores(withBlackout, resultWithBlackout)!;
+
+    expect(resultWithBlackout.primary).toEqual(resultNoBlackout.primary); // plan itself is unaffected
+    expect(scoresWithBlackout.efficiency.percentile).toBe(scoresNoBlackout.efficiency.percentile);
+  });
 });
 
 describe('alternatives', () => {

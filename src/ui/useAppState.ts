@@ -7,7 +7,7 @@ import { getHolidays, getHolidaysWithStatus, type Holiday } from '../data/holida
 import { getStateHolidaysFallback } from '../data/usStateHolidays';
 import { geolocateCountry } from './geo';
 import { activeCountryPreset } from '../data/countryPresets';
-import { computeQualifyingRuns, type WeekStart } from './calendarMath';
+import { computeQualifyingRuns, isAlternatingFridayOff, type WeekStart } from './calendarMath';
 import { weekStartForCountry } from './locale';
 import { mondayIndexedDow, rangeISO } from '../solver/dateUtils';
 import { readFullStateFromURL, writeFullStateToURL, readOverlapPayloadFromURL, buildOverlapShareURL } from './urlState';
@@ -49,6 +49,26 @@ export function defaultRangeEnd(todayIso: string): string {
   const thisYearEnd = `${year}-12-31`;
   const daysRemaining = rangeISO(todayIso, thisYearEnd).length - 1; // exclusive of today itself
   return daysRemaining > DEFAULT_RANGE_ROLLOVER_DAYS ? thisYearEnd : `${year + 1}-12-31`;
+}
+
+function isLeapYear(y: number): boolean {
+  return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+}
+
+/** Shifts both ends of a range forward by exactly one calendar year (same month/day), for
+ * the "no more breaks planned - plan next year" banner action (Phase 3 item 6). Feb 29
+ * clamps to Feb 28 when the target year isn't a leap year, rather than silently rolling
+ * over into March the way raw Date.UTC overflow would. */
+export function shiftRangeToNextYear(rangeStart: string, rangeEnd: string): { rangeStart: string; rangeEnd: string } {
+  const shiftYear = (iso: string): string => {
+    const y = Number(iso.slice(0, 4));
+    const m = iso.slice(5, 7);
+    const dNum = Number(iso.slice(8, 10));
+    const nextY = y + 1;
+    const day = m === '02' && dNum === 29 && !isLeapYear(nextY) ? 28 : dNum;
+    return `${nextY}-${m}-${String(day).padStart(2, '0')}`;
+  };
+  return { rangeStart: shiftYear(rangeStart), rangeEnd: shiftYear(rangeEnd) };
 }
 
 function yearsBetween(rangeStart: string, rangeEnd: string): number[] {
@@ -102,9 +122,28 @@ export function useAppState() {
         workWeek: DEFAULT_WORK_WEEK,
         pinnedDays: [],
         ruledOutDays: [],
+        altFridayEnabled: false,
+        altFridayStart: undefined,
       };
     }
     return readFullStateFromURL(window.location.search, defaults);
+  }, []);
+
+  // 'returned_with_saved_url' (Phase 3 item 9): fired once, only when the page was loaded
+  // with a full plan already in the query string - evidence someone kept/reopened a
+  // previously-shared link, as opposed to a fresh visit with no state to read. Captured
+  // from the RAW incoming search string, at mount, before this component's own URL-sync
+  // effect (below) rewrites the address bar with a full set of params regardless of how
+  // the visitor arrived - checking `window.location.search` again after that effect runs
+  // would always read "true" and defeat the whole signal.
+  const arrivedWithSavedUrl = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    return params.has('s') && params.has('b');
+  }, []);
+  useEffect(() => {
+    if (arrivedWithSavedUrl) track('returned_with_saved_url');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [country, setCountry] = useState<string>(initial.country ?? geolocateCountry());
@@ -155,8 +194,27 @@ export function useAppState() {
     if (overlapPayload.length > 0) track('Overlap link opened');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 'team_days_used' (Phase 3 item 9): fired once per session, the moment the overlap/team-
+  // days input first becomes non-empty - whether the visitor typed a date in manually or
+  // arrived via a partner's overlap link (both are genuinely "someone used the team-days
+  // feature"). A ref guard, not a dependency check, so toggling overlap days on/off/on
+  // again later doesn't re-fire it.
+  const firedTeamDaysUsedRef = useRef(false);
+  useEffect(() => {
+    if (overlapDays.length > 0 && !firedTeamDaysUsedRef.current) {
+      firedTeamDaysUsedRef.current = true;
+      track('team_days_used');
+    }
+  }, [overlapDays]);
   const [workWeek, setWorkWeek] = useState<WorkWeek>(initial.workWeek);
   const [blackouts, setBlackouts] = useState<string[]>(initial.blackouts);
+
+  // 9/80 compressed schedule (Phase 3 item 5): a plain weekly workWeek array can't express
+  // "every OTHER Friday off" - see calendarMath.ts's isAlternatingFridayOff for why. This is
+  // the narrow, dedicated primitive instead of a general recurrence engine.
+  const [altFridayEnabled, setAltFridayEnabled] = useState(initial.altFridayEnabled ?? false);
+  const [altFridayStart, setAltFridayStart] = useState(initial.altFridayStart ?? '');
 
   const [nationalHolidays, setNationalHolidays] = useState<Holiday[]>([]);
   const [stateHolidayCandidates, setStateHolidayCandidates] = useState<Holiday[]>([]);
@@ -194,6 +252,8 @@ export function useAppState() {
       blackouts,
       workWeek,
       forced,
+      altFridayEnabled,
+      altFridayStart,
     });
     window.history.replaceState(null, '', url);
   }, [
@@ -214,6 +274,8 @@ export function useAppState() {
     blackouts,
     workWeek,
     forced,
+    altFridayEnabled,
+    altFridayStart,
   ]);
 
   // Graceful failure: a network/API failure degrades to cached data (if any was already
@@ -283,10 +345,19 @@ export function useAppState() {
   // already-off and never actually guaranteed it would appear in the plan at all (confirmed
   // broken at breakCount=1 and breakCount=7 - see NOTES.md). It's passed separately as
   // mustIncludeDays now; solve() itself reserves its cost and guarantees its presence.
+  // The 9/80 off-Fridays within the current range - computed and merged exactly like a
+  // holiday list (free, no PTO cost), not treated as a weekend via workWeek, since
+  // workWeek has no notion of week parity (see calendarMath.ts's own comment).
+  const altFridayOffDates = useMemo(() => {
+    if (!altFridayEnabled || !altFridayStart) return [];
+    return rangeISO(rangeStart, rangeEnd).filter((d) => isAlternatingFridayOff(d, altFridayStart));
+  }, [altFridayEnabled, altFridayStart, rangeStart, rangeEnd]);
+
   const effectiveOffDays = useMemo(() => {
     const set = new Set(holidayEntries.filter((h) => h.checked).map((h) => h.date));
+    for (const d of altFridayOffDates) set.add(d);
     return Array.from(set);
-  }, [holidayEntries]);
+  }, [holidayEntries, altFridayOffDates]);
 
   const mustIncludeDays = useMemo(
     () => Object.entries(forced).filter(([, state]) => state === 'include').map(([date]) => date),
@@ -558,6 +629,12 @@ export function useAppState() {
     [alternatives, hoveredAlternativeId],
   );
 
+  const planNextYear = useCallback(() => {
+    const shifted = shiftRangeToNextYear(rangeStart, rangeEnd);
+    setRangeStart(shifted.rangeStart);
+    setRangeEnd(shifted.rangeEnd);
+  }, [rangeStart, rangeEnd]);
+
   const toggleDay = useCallback((date: string) => {
     setForced((prev) => {
       const current = prev[date];
@@ -637,6 +714,10 @@ export function useAppState() {
     setWorkWeek,
     blackouts,
     setBlackouts,
+    altFridayEnabled,
+    setAltFridayEnabled,
+    altFridayStart,
+    setAltFridayStart,
     holidayEntries,
     removeHoliday: (date: string, name: string) =>
       setRemovedHolidays((s) => new Set(s).add(`${date}|${name}`)),
@@ -670,6 +751,7 @@ export function useAppState() {
     breakBandByRunIndex,
     toggleDay,
     forced,
+    planNextYear,
   };
 }
 

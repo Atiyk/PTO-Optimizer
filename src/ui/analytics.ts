@@ -3,18 +3,23 @@
  * tag) - cookieless, no personal data, no consent banner required under GDPR/ePrivacy since
  * it sets no cookies and stores no cross-site identifiers (visitor counts use a rotating
  * daily salted hash of IP+user-agent, discarded after 24h, never written to disk tied to an
- * individual). Exactly six events are tracked, per spec, and nothing else: no inputs, no
- * dates, no locations, no plan details - every call below passes only the bare event name,
- * never a payload. `window.plausible` is undefined when the script hasn't loaded (local dev
- * without network, the script blocked, or a unit test), so every call is a no-op in that
- * case rather than a crash.
+ * individual). Every event below passes only the bare event name, never a payload - no
+ * inputs, no dates, no locations, no plan details. `window.plausible` is undefined when the
+ * script hasn't loaded (local dev without network, the script blocked, or a unit test), so
+ * every call is a no-op in that case rather than a crash.
+ *
+ * 'returned_with_saved_url' and 'team_days_used' (Phase 3 item 9) are instrumentation for a
+ * future product decision, not product features themselves - see NOTES.md for what they're
+ * meant to answer and why no payment infrastructure gets built before they do.
  */
 export type AnalyticsEvent =
   | 'Solve completed'
   | 'ICS downloaded'
   | 'Image copied'
   | 'URL shared'
-  | 'Overlap link opened';
+  | 'Overlap link opened'
+  | 'returned_with_saved_url'
+  | 'team_days_used';
 
 declare global {
   interface Window {
