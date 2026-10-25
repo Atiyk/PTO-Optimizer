@@ -79,4 +79,82 @@ describe('generateICS', () => {
     // no bare LF without a preceding CR
     expect(/(?<!\r)\n/.test(ics)).toBe(false);
   });
+
+  it('omits reminder events entirely when reminderOptions is left out (every existing call site)', () => {
+    const ics = generateICS([makeBreak()], (iso) => iso === '2026-10-26', FIXED_NOW);
+    expect(ics).not.toContain('Request time off');
+    expect(ics).not.toContain('VALARM');
+  });
+});
+
+describe('generateICS reminders', () => {
+  it('omits reminders when explicitly disabled', () => {
+    const ics = generateICS([makeBreak()], (iso) => iso === '2026-10-26', FIXED_NOW, { enabled: false, leadDays: 14 });
+    expect(ics).not.toContain('Request time off');
+  });
+
+  it('places a reminder leadDays before the break start, titled with the break\'s range', () => {
+    // break starts 2026-12-01, leadDays=14 -> reminder on 2026-11-17, well before today (2026-10-18)
+    const brk = makeBreak({ start: '2026-12-01', end: '2026-12-09' });
+    const ics = generateICS([brk], () => false, FIXED_NOW, { enabled: true, leadDays: 14 });
+    expect(ics).toContain('DTSTART;VALUE=DATE:20261117');
+    expect(ics).toContain('DTEND;VALUE=DATE:20261118');
+    expect(ics).toContain('SUMMARY:Request time off: Dec 1 – 9');
+  });
+
+  it('includes the break\'s cost/payoff details in the reminder description', () => {
+    const brk = makeBreak({ start: '2026-12-01', end: '2026-12-09', ptoCost: 5, totalDaysOff: 9, multiplier: 1.8 });
+    const ics = generateICS([brk], () => false, FIXED_NOW, { enabled: true, leadDays: 14 });
+    expect(ics).toContain('DESCRIPTION:5 PTO days -> 9 days off (1.80x).');
+  });
+
+  it('attaches a VALARM so the reminder actually notifies, not just sits silently on the calendar', () => {
+    const brk = makeBreak({ start: '2026-12-01', end: '2026-12-09' });
+    const ics = generateICS([brk], () => false, FIXED_NOW, { enabled: true, leadDays: 14 });
+    expect(ics).toContain('BEGIN:VALARM');
+    expect(ics).toContain('ACTION:DISPLAY');
+    expect(ics).toContain('TRIGGER:PT0S');
+    expect(ics).toContain('END:VALARM');
+  });
+
+  it('adjustable lead time: 7 and 30 days produce different reminder dates for the same break', () => {
+    const brk = makeBreak({ start: '2026-12-01', end: '2026-12-09' });
+    const ics7 = generateICS([brk], () => false, FIXED_NOW, { enabled: true, leadDays: 7 });
+    const ics30 = generateICS([brk], () => false, FIXED_NOW, { enabled: true, leadDays: 30 });
+    expect(ics7).toContain('DTSTART;VALUE=DATE:20261124'); // Dec 1 - 7 days
+    expect(ics30).toContain('DTSTART;VALUE=DATE:20261101'); // Dec 1 - 30 days
+  });
+
+  it('clamps the reminder to today rather than placing it in the past, when the break starts inside the lead-time window', () => {
+    // today = 2026-10-18, break starts 2026-10-24 (6 days away) - naive leadDays=14 would be
+    // 2026-10-10, nine days in the PAST. Must clamp to today, not that past date.
+    const brk = makeBreak({ start: '2026-10-24', end: '2026-11-01' });
+    const ics = generateICS([brk], () => false, FIXED_NOW, { enabled: true, leadDays: 14 });
+    expect(ics).toContain('DTSTART;VALUE=DATE:20261018'); // today, not 20261010
+    expect(ics).not.toContain('DTSTART;VALUE=DATE:20261010');
+  });
+
+  it('suppresses the reminder entirely once the break itself has already started', () => {
+    // today = 2026-10-18; a break starting on or before today has nothing left to "request".
+    const started = makeBreak({ start: '2026-10-10', end: '2026-10-20' });
+    const startsToday = makeBreak({ start: '2026-10-18', end: '2026-10-22', id: '2026-10-18|2026-10-22' });
+    const ics = generateICS([started, startsToday], () => false, FIXED_NOW, { enabled: true, leadDays: 14 });
+    expect(ics).not.toContain('Request time off');
+  });
+
+  it('gives one reminder per break, not per PTO day', () => {
+    const brk1 = makeBreak({ start: '2026-12-01', end: '2026-12-09', id: 'a' });
+    const brk2 = makeBreak({ start: '2026-12-15', end: '2026-12-20', id: 'b' });
+    const ics = generateICS([brk1, brk2], () => false, FIXED_NOW, { enabled: true, leadDays: 14 });
+    const reminderCount = (ics.match(/SUMMARY:Request time off/g) || []).length;
+    expect(reminderCount).toBe(2); // one reminder event per break, regardless of its length
+  });
+
+  it('every reminder UID is unique and distinct from the PTO-day event UIDs', () => {
+    const brk = makeBreak({ start: '2026-12-01', end: '2026-12-09' });
+    const ics = generateICS([brk], (iso) => iso === '2026-12-02', FIXED_NOW, { enabled: true, leadDays: 14 });
+    const uids = [...ics.matchAll(/UID:([^\r\n]+)/g)].map((m) => m[1]);
+    expect(new Set(uids).size).toBe(uids.length);
+    expect(uids.some((u) => u.startsWith('pto-reminder-'))).toBe(true);
+  });
 });

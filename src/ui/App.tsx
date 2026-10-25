@@ -7,6 +7,7 @@ import { MoreOptions } from './MoreOptions';
 import { Calendar } from './Calendar';
 import { Legend } from './Legend';
 import { BreakCard } from './BreakCard';
+import { NextBreakBanner } from './NextBreakBanner';
 import { ExportBar } from './ExportBar';
 import { PartnerShareButton } from './PartnerShareButton';
 import { PartnerOverlapBanner } from './PartnerOverlapBanner';
@@ -35,6 +36,7 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      <NextBreakBanner orderedBreaks={state.orderedBreaks} today={today} onPlanNextYear={state.planNextYear} />
       <p className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-sm text-slate-600 dark:text-slate-300">{introText}</p>
 
       {/* The answer first: large, sticky, directly under the tagline - the most prominent
@@ -142,8 +144,13 @@ export function App() {
               onRemoveOverlapDay={(d) => state.setOverlapDays(state.overlapDays.filter((x) => x !== d))}
               workWeek={state.workWeek}
               onChangeWorkWeek={state.setWorkWeek}
+              altFridayEnabled={state.altFridayEnabled}
+              onToggleAltFriday={state.setAltFridayEnabled}
+              altFridayStart={state.altFridayStart}
+              onChangeAltFridayStart={state.setAltFridayStart}
               blackouts={state.blackouts}
               onAddBlackout={(d) => state.setBlackouts([...state.blackouts, d])}
+              onAddBlackouts={(dates) => state.setBlackouts(Array.from(new Set([...state.blackouts, ...dates])))}
               onRemoveBlackout={(d) => state.setBlackouts(state.blackouts.filter((x) => x !== d))}
               holidayEntries={state.holidayEntries}
               onRemoveHoliday={state.removeHoliday}

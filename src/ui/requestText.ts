@@ -1,53 +1,52 @@
 import type { Break } from '../solver/types';
-import { addDays } from '../solver/dateUtils';
-import { formatShort, formatDateRange } from './dateFormat';
+import { mondayIndexedDow } from '../solver/dateUtils';
+import { formatShort, formatCardDateRange } from './dateFormat';
 
-/** Groups a sorted list of ISO dates into maximal runs of consecutive calendar days. */
-function groupConsecutive(dates: string[]): string[][] {
-  const groups: string[][] = [];
-  for (const d of dates) {
-    const last = groups[groups.length - 1];
-    if (last && addDays(last[last.length - 1], 1) === d) last.push(d);
-    else groups.push([d]);
-  }
-  return groups;
-}
+const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function ptoDatesOf(brk: Break, isPtoDay: (iso: string) => boolean): string[] {
   return brk.days.filter(isPtoDay).slice().sort();
 }
 
-function formatGroup(group: string[]): string {
-  if (group.length === 1) return formatShort(group[0]);
-  return `${formatShort(group[0])}–${formatShort(group[group.length - 1])}`;
+/** "Mon Dec 21" - a manager approves working days, not calendar spans, so every date in the
+ * request list carries its weekday: the recipient shouldn't have to look up a calendar to
+ * tell what day of the week "Dec 21" falls on before approving it. */
+function formatWeekdayDate(iso: string): string {
+  return `${WEEKDAY_SHORT[mondayIndexedDow(iso)]} ${formatShort(iso)}`;
 }
 
-/** The bare, HR-system-ready list: the exact working days being requested, grouped into
- * readable consecutive runs, plus the total count. Deliberately lists the PTO-cost days
- * themselves (not the break's full span) - an HR system wants the days actually being
- * deducted from the balance, not the weekends/holidays around them. */
+/**
+ * BUG FOUND (Phase 3 spec): this used to lead with the collapsed calendar span ("Dec 21–24,
+ * 2026 — 4 working days") and bury the actual day count/weekday detail second. A manager
+ * approves specific working days, not a calendar span - the old format made the recipient do
+ * arithmetic (which of those calendar days are actually workdays vs. already-off?) before
+ * they could even see what was being asked for. Now leads with the count, then enumerates
+ * every PTO-cost working day individually with its weekday, exactly as it would need to be
+ * typed into an HR system - "4 working days: Mon Dec 21, Tue Dec 22, Wed Dec 23, Thu Dec 24".
+ * Deliberately lists the PTO-cost days themselves (not the break's full span) - an HR system
+ * wants the days actually being deducted from the balance, not the weekends/holidays around
+ * them; the full calendar span (including those free days) stays available separately via
+ * the break card's own header, not repeated here.
+ */
 export function formatWorkingDaysList(brk: Break, isPtoDay: (iso: string) => boolean): string {
   const dates = ptoDatesOf(brk, isPtoDay);
   if (dates.length === 0) return 'No working days in this break.';
-  const groups = groupConsecutive(dates);
-  const groupText = groups.map(formatGroup).join(', ');
-  const year = dates[0].slice(0, 4);
-  const spansMultipleYears = dates.some((d) => d.slice(0, 4) !== year);
   const dayWord = dates.length === 1 ? 'working day' : 'working days';
-  return `${groupText}${spansMultipleYears ? '' : `, ${year}`} — ${dates.length} ${dayWord}`;
+  const list = dates.map(formatWeekdayDate).join(', ');
+  return `${dates.length} ${dayWord}: ${list}`;
 }
 
-/** A three-sentence manager email draft: the request itself, the payoff (total days off
- * gained from the surrounding weekend/holiday), and a closing invitation to adjust. */
+/** A three-sentence manager email draft: the request itself (working days first, calendar
+ * span second), the payoff (total days off gained from the surrounding weekend/holiday),
+ * and a closing invitation to adjust. */
 export function formatManagerEmail(brk: Break, isPtoDay: (iso: string) => boolean): string {
   const dates = ptoDatesOf(brk, isPtoDay);
-  const groups = groupConsecutive(dates);
-  const groupText = groups.map(formatGroup).join(', ');
   const dayWord = dates.length === 1 ? 'working day' : 'working days';
   const freeDays = Math.max(0, brk.totalDaysOff - dates.length);
   const totalWord = brk.totalDaysOff === 1 ? 'day' : 'days';
 
-  const sentence1 = `I'd like to request PTO covering ${formatDateRange(brk.start, brk.end)} — ${dates.length} ${dayWord}: ${groupText}.`;
+  const list = dates.map(formatWeekdayDate).join(', ');
+  const sentence1 = `I'd like to request ${dates.length} ${dayWord} of PTO: ${list} (calendar span ${formatCardDateRange(brk.start, brk.end)}).`;
   const sentence2 =
     freeDays > 0
       ? `With the surrounding weekend${freeDays === 1 ? '' : 's'}/holiday${freeDays === 1 ? '' : 's'}, this gives me ${brk.totalDaysOff} ${totalWord} off in total.`

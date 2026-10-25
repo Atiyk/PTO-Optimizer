@@ -133,6 +133,8 @@ export interface FullURLState {
   workWeek: WorkWeek;
   pinnedDays: string[];
   ruledOutDays: string[];
+  altFridayEnabled: boolean;
+  altFridayStart?: string;
 }
 
 /** Dates needed by the caller to fill in the viewer-relative fields (rangeStart/rangeEnd
@@ -185,6 +187,10 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
   const pinnedDays = parseDateList(params.get('p'));
   const ruledOutDays = parseDateList(params.get('r'));
 
+  const altFridayEnabled = params.get('af') === '1';
+  const afsRaw = params.get('afs');
+  const altFridayStart = afsRaw && isValidISODate(afsRaw) ? afsRaw : undefined;
+
   return {
     country,
     subdivision,
@@ -204,6 +210,8 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
     workWeek,
     pinnedDays,
     ruledOutDays,
+    altFridayEnabled,
+    altFridayStart,
   };
 }
 
@@ -225,6 +233,8 @@ export interface WriteStateInput {
   blackouts: string[];
   workWeek: WorkWeek;
   forced: Record<string, ForcedState>;
+  altFridayEnabled: boolean;
+  altFridayStart: string;
 }
 
 /** Writes the full app state into `params` in place. `country`/`rangeStart`/`rangeEnd` are
@@ -286,6 +296,14 @@ export function writeFullStateToURL(params: URLSearchParams, state: WriteStateIn
 
   if (ruledOut.length) params.set('r', encodeDateList(ruledOut));
   else params.delete('r');
+
+  if (state.altFridayEnabled && state.altFridayStart) {
+    params.set('af', '1');
+    params.set('afs', state.altFridayStart);
+  } else {
+    params.delete('af');
+    params.delete('afs');
+  }
 
   // 'ov' (partner-overlap payload) is a one-shot input signal consumed on load, never part
   // of ongoing state - always stripped once the app re-derives the URL from its own state.
