@@ -48,3 +48,19 @@ export function formatDateRange(startIso: string, endIso: string): string {
   }
   return `${formatShortWithYear(startIso)} - ${formatShortWithYear(endIso)}`;
 }
+
+/** "Dec 19 – 27" (same month), "Oct 24 – Nov 1" (same year, different month), or
+ * "Dec 28, 2026 – Jan 3, 2027" (spans years) - for a break card header, never an ISO
+ * string ("2026-12-19 -> 2026-12-27" reads as machine output, not something a person
+ * wrote). No year shown unless the range actually crosses one, since every plan this tool
+ * ever builds lives within a single bounded date range already shown elsewhere on the
+ * page. An en dash, not the plain hyphen `formatDateRange` uses for its ICS-safe context -
+ * this one is pure display, no character-set constraint to honour. */
+export function formatCardDateRange(startIso: string, endIso: string): string {
+  if (startIso === endIso) return formatShort(startIso);
+  const start = parseISO(startIso);
+  const end = parseISO(endIso);
+  if (start.y !== end.y) return `${formatShortWithYear(startIso)} – ${formatShortWithYear(endIso)}`;
+  if (start.m === end.m) return `${MONTH_SHORT[start.m - 1]} ${start.d} – ${end.d}`;
+  return `${MONTH_SHORT[start.m - 1]} ${start.d} – ${MONTH_SHORT[end.m - 1]} ${end.d}`;
+}

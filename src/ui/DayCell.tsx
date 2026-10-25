@@ -12,6 +12,10 @@ interface DayCellProps {
   isToday: boolean;
   /** True when this date falls inside a rendered days-off band (restores primary text over muted). */
   inBand: boolean;
+  /** True while this date's break is hovered/focused - via its own calendar badge, or its
+   * matching break card below. The two directions share one highlight so hovering either
+   * end of the link reads as the same state. */
+  isHighlighted: boolean;
   isBlackout: boolean;
   /** Outside [rangeStart, rangeEnd] - the month grid shows full calendar months, so the
    * first/last months routinely have real dates that aren't part of the solve at all. */
@@ -80,6 +84,7 @@ export function DayCell({
   isAlternative,
   isToday,
   inBand,
+  isHighlighted,
   isBlackout,
   isOutOfRange,
   marginalValue,
@@ -208,6 +213,11 @@ export function DayCell({
           // as a selection state rather than a "today" marker, clearly distinct from any
           // interactive/pressed state a cell can actually be in.
           isToday && !isOutOfRange ? 'ring-1 ring-inset ring-slate-400 dark:ring-slate-500' : ''
+        } ${
+          // `outline`, not `ring` - a separate CSS property from the "today" ring above, so
+          // a day that's both today AND part of the hovered break shows both at once
+          // instead of one Tailwind ring utility silently overriding the other.
+          isHighlighted && !isOutOfRange ? 'outline outline-2 outline-teal-400 dark:outline-teal-500 -outline-offset-1' : ''
         }`}
       >
         {!isOutOfRange && category === 'pinned' ? (

@@ -12,9 +12,9 @@ interface MonthGridProps {
   rangeEnd: string;
   offRuns: OffRun[];
   previewRun: OffRun | null;
-  /** Keyed by index into `offRuns` - which break (and its 1-based chronological number)
-   * each qualifying run belongs to, for numbering/labelling bands. */
   breakBandByRunIndex: Map<number, { index: number; brk: Break }>;
+  hoveredBreakDaySet: Set<string>;
+  onHoverBreak: (id: string | null) => void;
   weekStart: WeekStart;
   today: string;
   categoryOf: (iso: string) => DayCategory;
@@ -39,6 +39,8 @@ export function MonthGrid({
   offRuns,
   previewRun,
   breakBandByRunIndex,
+  hoveredBreakDaySet,
+  onHoverBreak,
   weekStart,
   today,
   categoryOf,
@@ -61,6 +63,7 @@ export function MonthGrid({
   let lastRealRow = descriptor.weeks.length - 1;
   while (lastRealRow > 0 && descriptor.weeks[lastRealRow].every((d) => d === null)) lastRealRow -= 1;
   const weeks = descriptor.weeks.slice(0, lastRealRow + 1);
+
   // Out-of-range days are real dates now (rendered muted/disabled), not null padding -
   // arrow-key navigation must still skip them, the same as it always skipped the null
   // padding cells, since a disabled button can't actually receive focus() anyway.
@@ -92,10 +95,14 @@ export function MonthGrid({
         {weeks.map((week, wIdx) => {
           const segments = computeBandSegments(week, offRuns);
           const previewSegments = previewRun ? computeBandSegments(week, [previewRun]) : [];
-          // A break's number + result ("2 · 9 days off · 4 PTO") sits in a thin caption
-          // row directly above the week its band starts in - never overlaid on top of the
-          // band/day-cell row itself, since a suggested-PTO cell is routinely the band's
-          // own leading cell and would silently hide anything drawn underneath it there.
+          // The badge sits in a thin row directly above the week its band starts in -
+          // never overlaid on top of the band/day-cell row itself, since a suggested-PTO
+          // cell is routinely the band's own leading cell and would silently hide
+          // anything drawn underneath it there. Text detail ("N days off - M PTO") lives
+          // on the break card now, not here - at ~65px of cell width there was no room
+          // for ~110px of text without truncating to illegibility; the number is the only
+          // thing the calendar promises to show, and the card is the one place the detail
+          // lives (see BreakCard.tsx).
           const leadingLabels = segments
             .filter((seg) => seg.roundedLeft)
             .map((seg) => ({ seg, band: breakBandByRunIndex.get(seg.runIndex) }))
@@ -103,81 +110,78 @@ export function MonthGrid({
           return (
             <div key={wIdx} className="flex flex-col gap-0.5">
               {leadingLabels.length > 0 && (
-                <div className="grid grid-cols-7 gap-x-1" aria-hidden>
+                <div className="grid grid-cols-7 gap-x-1">
                   {leadingLabels.map(({ seg, band }) => (
-                    <div
-                      key={`label-${seg.colStart}`}
-                      // Spans past the band's own width on purpose (into implicit grid
-                      // columns beyond the 7 real day columns, clipped by `truncate` below
-                      // if it still doesn't fit) - the label always shows the full result,
-                      // not just the number, the same as a wide band already did.
-                      style={{ gridColumn: `${seg.colStart + 1} / ${Math.min(seg.colEnd + 1, 7) + 4}` }}
-                      className="flex items-center gap-1 overflow-hidden"
-                    >
-                      <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-slate-600 dark:bg-slate-400 text-[9px] font-semibold leading-none text-white dark:text-slate-900">
+                    <div key={`label-${seg.colStart}`} style={{ gridColumn: seg.colStart + 1 }} className="flex items-center">
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        aria-hidden
+                        onMouseEnter={() => onHoverBreak(band.brk.id)}
+                        onMouseLeave={() => onHoverBreak(null)}
+                        className="flex h-3.5 w-3.5 cursor-default items-center justify-center rounded-full bg-slate-600 dark:bg-slate-400 text-[9px] font-semibold leading-none text-white dark:text-slate-900"
+                      >
                         {band.index}
-                      </span>
-                      <span className="truncate text-[10px] font-medium leading-none text-slate-500 dark:text-slate-400">
-                        {band.brk.totalDaysOff} days off &middot; {band.brk.ptoCost} PTO
-                      </span>
+                      </button>
                     </div>
                   ))}
                 </div>
               )}
               <div className="relative grid grid-cols-7 gap-x-1" style={{ gridTemplateRows: '3rem' }}>
-              {/*
-                Bands sit flush within their own row's box (no negative vertical margin).
-                A previous version used a negative margin to make the band "taller", which
-                bled into the inter-row gap and visually fused separate weeks' bands
-                together down the Sat/Su column - never let a segment extend outside its
-                own row's grid box.
-              */}
-              {segments.map((seg, i) => (
-                <div
-                  key={`band-${i}`}
-                  style={{ gridColumn: `${seg.colStart + 1} / ${seg.colEnd + 2}`, gridRow: '1' }}
-                  className={`my-0.5 ${COLORS.bandBg} ${seg.roundedLeft ? 'rounded-l-xl' : ''} ${
-                    seg.roundedRight ? 'rounded-r-xl' : ''
-                  }`}
-                />
-              ))}
-              {previewSegments.map((seg, i) => (
-                <div
-                  key={`preview-${i}`}
-                  style={{ gridColumn: `${seg.colStart + 1} / ${seg.colEnd + 2}`, gridRow: '1' }}
-                  className={`my-0.5 ${COLORS.previewBandBg} ${seg.roundedLeft ? 'rounded-l-xl' : ''} ${
-                    seg.roundedRight ? 'rounded-r-xl' : ''
-                  }`}
-                />
-              ))}
-              {week.map((iso, i) => {
-                const alt = iso ? alternativeForDate(iso) : undefined;
-                return (
-                  <div key={iso ?? `empty-${i}`} style={{ gridColumn: i + 1, gridRow: '1' }}>
-                    {iso && (
-                      <DayCell
-                        date={iso}
-                        dayOfMonth={Number(iso.slice(8, 10))}
-                        category={categoryOf(iso)}
-                        hasOverlap={overlapSet.has(iso)}
-                        isAlternative={!!alt}
-                        isToday={iso === today}
-                        inBand={inBand(iso)}
-                        isBlackout={isBlackoutDay(iso)}
-                        isOutOfRange={iso < rangeStart || iso > rangeEnd}
-                        marginalValue={marginalValues.get(iso) ?? null}
-                        holidayName={holidayNameFor(iso)}
-                        hasHover={hasHover}
-                        onToggle={onDayClick}
-                        onSwapAlternative={alt ? () => onSwapAlternative(alt) : undefined}
-                        onHoverAlternativeStart={alt ? () => onHoverAlternative(alt.id) : undefined}
-                        onHoverAlternativeEnd={alt ? () => onHoverAlternative(null) : undefined}
-                        onArrowKey={(direction) => moveFocus(iso, direction)}
-                      />
-                    )}
-                  </div>
-                );
-              })}
+                {/*
+                  Bands sit flush within their own row's box (no negative vertical margin).
+                  A previous version used a negative margin to make the band "taller", which
+                  bled into the inter-row gap and visually fused separate weeks' bands
+                  together down the Sat/Su column - never let a segment extend outside its
+                  own row's grid box.
+                */}
+                {segments.map((seg, i) => (
+                  <div
+                    key={`band-${i}`}
+                    style={{ gridColumn: `${seg.colStart + 1} / ${seg.colEnd + 2}`, gridRow: '1' }}
+                    className={`my-0.5 ${COLORS.bandBg} ${seg.roundedLeft ? 'rounded-l-xl' : ''} ${
+                      seg.roundedRight ? 'rounded-r-xl' : ''
+                    }`}
+                  />
+                ))}
+                {previewSegments.map((seg, i) => (
+                  <div
+                    key={`preview-${i}`}
+                    style={{ gridColumn: `${seg.colStart + 1} / ${seg.colEnd + 2}`, gridRow: '1' }}
+                    className={`my-0.5 ${COLORS.previewBandBg} ${seg.roundedLeft ? 'rounded-l-xl' : ''} ${
+                      seg.roundedRight ? 'rounded-r-xl' : ''
+                    }`}
+                  />
+                ))}
+                {week.map((iso, i) => {
+                  const alt = iso ? alternativeForDate(iso) : undefined;
+                  return (
+                    <div key={iso ?? `empty-${i}`} style={{ gridColumn: i + 1, gridRow: '1' }}>
+                      {iso && (
+                        <DayCell
+                          date={iso}
+                          dayOfMonth={Number(iso.slice(8, 10))}
+                          category={categoryOf(iso)}
+                          hasOverlap={overlapSet.has(iso)}
+                          isAlternative={!!alt}
+                          isToday={iso === today}
+                          inBand={inBand(iso)}
+                          isHighlighted={hoveredBreakDaySet.has(iso)}
+                          isBlackout={isBlackoutDay(iso)}
+                          isOutOfRange={iso < rangeStart || iso > rangeEnd}
+                          marginalValue={marginalValues.get(iso) ?? null}
+                          holidayName={holidayNameFor(iso)}
+                          hasHover={hasHover}
+                          onToggle={onDayClick}
+                          onSwapAlternative={alt ? () => onSwapAlternative(alt) : undefined}
+                          onHoverAlternativeStart={alt ? () => onHoverAlternative(alt.id) : undefined}
+                          onHoverAlternativeEnd={alt ? () => onHoverAlternative(null) : undefined}
+                          onArrowKey={(direction) => moveFocus(iso, direction)}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );

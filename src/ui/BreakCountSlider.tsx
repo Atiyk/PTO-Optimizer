@@ -30,7 +30,8 @@ function positionLabel(pos: number): string {
 function caption(requested: number, actual: number, breaks: Break[], budget: number, letSolverDecide: boolean): string {
   if (requested >= 1 && requested <= 6 && actual !== requested) {
     const breakWord = requested === 1 ? 'break' : 'breaks';
-    return `${requested} ${breakWord} isn't possible with ${budget} PTO days — showing ${actual}`;
+    const budgetWord = budget === 1 ? 'day' : 'days';
+    return `${requested} ${breakWord} isn't possible with ${budget} PTO ${budgetWord} — showing ${actual}`;
   }
   if (actual === 0 || breaks.length === 0) {
     return letSolverDecide ? 'Solver found no workable plan' : 'Not enough PTO days for a plan';
@@ -66,10 +67,11 @@ export function BreakCountSlider({
         />
         Let the solver decide
       </label>
-      {/* Dimmed as a single block (labels + thumb together), not just the track/thumb
-          colour alone - a positioned thumb in a still-fully-opaque row read as "a setting
-          the user chose" even once the accent colour itself was muted. */}
-      <div className={letSolverDecide ? 'opacity-40' : ''}>
+      {/* Dimmed AND desaturated as a single block (labels + thumb together) - opacity alone
+          left a still-fully-coloured thumb sitting at a specific position, which read as
+          "a setting the user chose" even once the accent colour itself was muted. Combined
+          with grayscale, it reads unambiguously as inert, not just faded. */}
+      <div className={letSolverDecide ? 'opacity-40 grayscale' : ''}>
         <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
           <span>All in one</span>
           <span>As many as possible</span>

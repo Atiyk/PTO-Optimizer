@@ -14,6 +14,7 @@ function renderCell(category: DayCategory, extra: { inBand?: boolean; isAlternat
       isAlternative={extra.isAlternative ?? false}
       isToday={false}
       inBand={extra.inBand ?? false}
+      isHighlighted={false}
       isBlackout={false}
       isOutOfRange={extra.isOutOfRange ?? false}
       marginalValue={null}

@@ -48,7 +48,21 @@ function ordinal(n: number): string {
   }
 }
 
-function ActionButton({ label, onClick }: { label: string; onClick: () => Promise<ActionResult> }) {
+/**
+ * Download .ics is the primary action - the one real "take this with you" step, the
+ * others are ways to share/preview the plan. Solid/filled vs outline is the only
+ * difference; both still render the same success/failure message in place of the label,
+ * so the weight distinction never affects what a click actually reports back.
+ */
+function ActionButton({
+  label,
+  onClick,
+  variant = 'secondary',
+}: {
+  label: string;
+  onClick: () => Promise<ActionResult>;
+  variant?: 'primary' | 'secondary';
+}) {
   const [message, setMessage] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
@@ -63,7 +77,11 @@ function ActionButton({ label, onClick }: { label: string; onClick: () => Promis
         setMessage(result.message);
         setTimeout(() => setMessage(null), 2500);
       }}
-      className="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:cursor-wait disabled:opacity-60"
+      className={
+        variant === 'primary'
+          ? 'rounded-md bg-slate-800 dark:bg-slate-200 px-3 py-1.5 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-700 dark:hover:bg-slate-300 disabled:cursor-wait disabled:opacity-60'
+          : 'rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:cursor-wait disabled:opacity-60'
+      }
     >
       {message ?? label}
     </button>
@@ -78,6 +96,15 @@ export function ExportBar(props: ExportBarProps) {
   return (
     <div className="mt-4 flex flex-wrap items-center gap-2">
       <ActionButton
+        label="Download .ics"
+        variant="primary"
+        onClick={async () => {
+          downloadICS(props.breaks, props.isSuggestedPto);
+          track('ICS downloaded');
+          return { ok: true, message: 'Downloaded' };
+        }}
+      />
+      <ActionButton
         label="Copy share link"
         onClick={async () => {
           if (typeof window === 'undefined') return { ok: false, message: "Couldn't copy — try again" };
@@ -90,7 +117,9 @@ export function ExportBar(props: ExportBarProps) {
         label="Copy image"
         onClick={async () => {
           const months = buildShareImageMonths(props.rangeStart, props.rangeEnd, props.weekStart, props.categoryOf);
-          const headline = `${props.budgetSpent} PTO days → ${props.totalDaysOff} days off`;
+          const ptoWord = props.budgetSpent === 1 ? 'day' : 'days';
+          const offWord = props.totalDaysOff === 1 ? 'day' : 'days';
+          const headline = `${props.budgetSpent} PTO ${ptoWord} → ${props.totalDaysOff} ${offWord} off`;
           const subtitleParts: string[] = [];
           if (props.travelPercentile !== null) subtitleParts.push(`Travel ${ordinal(props.travelPercentile)}`);
           if (props.efficiencyPercentile !== null) subtitleParts.push(`Efficiency ${ordinal(props.efficiencyPercentile)}`);
@@ -114,15 +143,7 @@ export function ExportBar(props: ExportBarProps) {
         }}
       />
       <ActionButton
-        label="Download .ics"
-        onClick={async () => {
-          downloadICS(props.breaks, props.isSuggestedPto);
-          track('ICS downloaded');
-          return { ok: true, message: 'Downloaded' };
-        }}
-      />
-      <ActionButton
-        label="Share my days"
+        label="Share with a partner"
         onClick={async () => {
           const ok = await copyText(props.buildOverlapLink());
           if (ok) track('URL shared');

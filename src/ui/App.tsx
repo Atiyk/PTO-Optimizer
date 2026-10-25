@@ -71,8 +71,6 @@ export function App() {
         breakCountRequested={state.breakCountRequested}
         breakCountActual={state.breakCountActual}
         budget={state.budget}
-        showAlternatives={state.showAlternatives}
-        onChangeShowAlternatives={state.setShowAlternatives}
       />
 
       <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2">
@@ -88,6 +86,15 @@ export function App() {
       {adjustOpen && (
         <div className="flex flex-col gap-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-4">
           <SubdivisionSelect country={state.country} subdivision={state.subdivision} onChangeSubdivision={state.setSubdivision} />
+
+          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <input
+              type="checkbox"
+              checked={state.showAlternatives}
+              onChange={(e) => state.setShowAlternatives(e.target.checked)}
+            />
+            Show alternatives
+          </label>
 
           <button
             type="button"
@@ -154,6 +161,8 @@ export function App() {
             offRuns={state.offRuns}
             previewRun={previewRun}
             breakBandByRunIndex={state.breakBandByRunIndex}
+            hoveredBreakDaySet={state.hoveredBreakDaySet}
+            onHoverBreak={state.setHoveredBreakId}
             categoryOf={state.categoryOf}
             isBlackoutDay={state.isBlackoutDay}
             overlapSet={state.overlapSet}
@@ -199,8 +208,15 @@ export function App() {
               PTO days.
             </p>
           )}
-          {state.breaks.map((b) => (
-            <BreakCard key={b.id} brk={b} highlighted={state.highlightedBreakIds.has(b.id)} isPtoDay={state.isSuggestedPto} />
+          {state.orderedBreaks.map(({ index, brk }) => (
+            <BreakCard
+              key={brk.id}
+              brk={brk}
+              index={index}
+              highlighted={state.highlightedBreakIds.has(brk.id) || state.hoveredBreakId === brk.id}
+              isPtoDay={state.isSuggestedPto}
+              onHover={state.setHoveredBreakId}
+            />
           ))}
         </div>
 

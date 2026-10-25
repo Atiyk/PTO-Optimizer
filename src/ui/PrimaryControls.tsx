@@ -76,8 +76,8 @@ export function PrimaryControls({
         />
         {budgetSpent < budget && (
           <span className="text-xs font-normal text-amber-700 dark:text-amber-400">
-            Using {budgetSpent} of {budget} days &mdash; the remaining {budget - budgetSpent} add no days off at any
-            position.
+            Using {budgetSpent} of {budget} day{budget === 1 ? '' : 's'} &mdash; the remaining {budget - budgetSpent} day
+            {budget - budgetSpent === 1 ? '' : 's'} add no days off at any position.
           </span>
         )}
       </label>
