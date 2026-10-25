@@ -20,6 +20,14 @@ export interface SolveInput {
   carryoverCap?: number;
   /** Days that can never be chosen as PTO, even if they would otherwise be off. */
   blackouts?: ISODate[];
+  /**
+   * Days the user has explicitly pinned: must appear in the plan, at real PTO cost (unlike
+   * offDays, which are free). A day here that's already a weekend/holiday/in offDays costs
+   * nothing extra (it was already free); a day here that's a genuine workday is guaranteed
+   * to appear in `primary`, spending 1 PTO day, regardless of w or breakCount - see solve()'s
+   * own comment for how this is enforced.
+   */
+  mustIncludeDays?: ISODate[];
   /** Days someone else is off; chosen breaks overlapping these get a bonus + tag. */
   overlapDays?: ISODate[];
   workWeek?: WorkWeek;

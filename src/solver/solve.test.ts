@@ -176,6 +176,88 @@ describe('blackouts', () => {
   });
 });
 
+describe('pinned days (mustIncludeDays) - regression: an isolated pin was silently dropped', () => {
+  // Phase 1 bug hunt found this empirically: pinning used to work by injecting the date into
+  // offDays, making it FREE and only coincidentally present when some other candidate's span
+  // happened to cross it. An isolated pinned day (nothing naturally off nearby) was silently
+  // absent from the result at breakCount=1 ("all in one") and breakCount=7 ("as many as
+  // possible") - confirmed via a direct script against solve() before the fix, not assumed.
+  const PINNED = '2026-03-11'; // an isolated Wednesday, nothing off nearby in this range
+
+  it('appears in the plan at every w and every breakCount position - the exact case that was broken', () => {
+    for (const w of [0, 30, 60, 100]) {
+      for (const breakCount of [0, 1, 2, 3, 4, 5, 6, 7]) {
+        const { primary } = solve(
+          baseInput({
+            offDays: [],
+            rangeStart: '2026-01-01',
+            rangeEnd: '2026-06-30',
+            budget: 10,
+            w,
+            breakCount,
+            mustIncludeDays: [PINNED],
+          }),
+        );
+        expect(primary.some((b) => b.days.includes(PINNED))).toBe(true);
+      }
+    }
+  });
+
+  it('costs a real PTO day, not a free one', () => {
+    const { primary, budgetSpent } = solve(
+      baseInput({
+        offDays: [],
+        rangeStart: '2026-01-01',
+        rangeEnd: '2026-06-30',
+        budget: 10,
+        breakCount: 1,
+        mustIncludeDays: [PINNED],
+      }),
+    );
+    const brk = primary.find((b) => b.days.includes(PINNED));
+    expect(brk).toBeDefined();
+    expect(budgetSpent).toBeGreaterThan(0);
+    // Reconstructing cost from two independent solves (with and without the pin) would be
+    // circular; instead assert the direct, load-bearing fact: the pinned day is a real
+    // PTO-cost day in the result, not folded into a free offDay the way a holiday is.
+    expect(brk!.ptoCost).toBeGreaterThanOrEqual(1);
+  });
+
+  it('a pin landing on an already-free day (a weekend) costs nothing extra and does not change budgetSpent', () => {
+    const withoutPin = solve(
+      baseInput({ offDays: [], rangeStart: '2026-01-01', rangeEnd: '2026-02-28', budget: 10, breakCount: 0 }),
+    );
+    const withPin = solve(
+      baseInput({
+        offDays: [],
+        rangeStart: '2026-01-01',
+        rangeEnd: '2026-02-28',
+        budget: 10,
+        breakCount: 0,
+        mustIncludeDays: ['2026-01-03'], // a Saturday
+      }),
+    );
+    expect(withPin.budgetSpent).toBe(withoutPin.budgetSpent);
+  });
+
+  it('pinning more days than the budget allows spends over budget rather than silently dropping a pin', () => {
+    const { primary, budgetSpent } = solve(
+      baseInput({
+        offDays: [],
+        rangeStart: '2026-01-01',
+        rangeEnd: '2026-06-30',
+        budget: 2,
+        breakCount: 0,
+        mustIncludeDays: ['2026-03-11', '2026-04-08', '2026-05-13'],
+      }),
+    );
+    for (const d of ['2026-03-11', '2026-04-08', '2026-05-13']) {
+      expect(primary.some((b) => b.days.includes(d))).toBe(true);
+    }
+    expect(budgetSpent).toBeGreaterThan(2); // honest overspend, not a silently dropped pin
+  });
+});
+
 describe('optimisation weighting (slider 1)', () => {
   // A full year of real US federal holidays, rich enough for the weighting to have
   // genuinely different candidates to trade off against each other.

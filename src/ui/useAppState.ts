@@ -258,13 +258,20 @@ export function useAppState() {
     return [...national, ...state, ...custom].sort((a, b) => a.date.localeCompare(b.date));
   }, [nationalHolidays, stateHolidayCandidates, checkedStateHolidays, customHolidays, removedHolidays]);
 
+  // A pinned (forced 'include') day is NOT free - it must cost a real PTO day, unlike a
+  // holiday. It used to be merged into offDays here, which made the solver treat it as
+  // already-off and never actually guaranteed it would appear in the plan at all (confirmed
+  // broken at breakCount=1 and breakCount=7 - see NOTES.md). It's passed separately as
+  // mustIncludeDays now; solve() itself reserves its cost and guarantees its presence.
   const effectiveOffDays = useMemo(() => {
     const set = new Set(holidayEntries.filter((h) => h.checked).map((h) => h.date));
-    for (const [date, state] of Object.entries(forced)) {
-      if (state === 'include') set.add(date);
-    }
     return Array.from(set);
-  }, [holidayEntries, forced]);
+  }, [holidayEntries]);
+
+  const mustIncludeDays = useMemo(
+    () => Object.entries(forced).filter(([, state]) => state === 'include').map(([date]) => date),
+    [forced],
+  );
 
   const effectiveBlackouts = useMemo(() => {
     const set = new Set(blackouts);
@@ -284,6 +291,7 @@ export function useAppState() {
       expiryDate: expiryEnabled ? expiryDate : undefined,
       carryoverCap: expiryEnabled ? carryoverCap : undefined,
       blackouts: effectiveBlackouts,
+      mustIncludeDays,
       overlapDays,
       workWeek,
       country,
@@ -292,6 +300,7 @@ export function useAppState() {
     }),
     [
       effectiveOffDays,
+      mustIncludeDays,
       rangeStart,
       rangeEnd,
       budget,

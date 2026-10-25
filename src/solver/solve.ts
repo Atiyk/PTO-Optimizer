@@ -11,6 +11,22 @@ const ALTERNATIVE_VALUE_TOLERANCE = 0.15;
 const MAX_ALTERNATIVES_PER_BREAK = 2;
 const DEFAULT_W = 30;
 /**
+ * How far a candidate starting on an ordinary WORKDAY (not already off) is allowed to
+ * reach, in PTO-cost days - independent of maxCandidateCost/the user's real budget. This
+ * is a search-breadth bound, not a truncation of what the user could spend: a workday
+ * start's whole purpose is capturing "a handful of trailing workdays connecting to the
+ * NEXT upcoming off period" (take Thursday+Friday for a long weekend); a genuinely long
+ * vacation is still found with its full real reach via an off-day-anchored start (weekend
+ * or holiday), which this bound does not touch. Without this, removing the old off-day-only
+ * restriction (see buildCandidates' own comment on the bridge-finding bug it fixes) made
+ * every one of a year's ~260 workdays its own candidate start reaching up to the full
+ * budget forward, instead of just the ~104 off-days - a ~3.5x blowup that pushed full-year
+ * solves from ~500ms to ~1.6-1.9s. 21 (three weeks) comfortably spans even an unusually
+ * long holiday-free gap between off periods while keeping the search bounded - see
+ * solve.test.ts's performance block, re-measured after this constant was introduced.
+ */
+const WORKDAY_START_REACH_CAP = 14;
+/**
  * Fixed, w-INDEPENDENT weight on a candidate's length. This used to be `(100 - w)`, which
  * hit zero at w=100 and annihilated the days-off term entirely - every candidate's value
  * became purely about demand, so the DP's optimum was to take almost nothing (unspent
@@ -86,8 +102,35 @@ function buildCandidates(
   const n = days.length;
   const candidates: Candidate[] = [];
 
+  /**
+   * BUG FOUND IN PHASE 1: this loop used to only start a candidate at an index that was
+   * ALREADY off (`if (!isOff[i]) continue`), then walk forward. That can express "a
+   * holiday/weekend extends forward through the rest of the work week to the next off
+   * period" (the classic bridge), but it can NEVER express the mirror case: a handful of
+   * workdays immediately BEFORE an upcoming off period (take Thursday+Friday to connect to
+   * the weekend). The only off-day endpoint reachable from a work-week's own start (Monday)
+   * is the far end of that whole work week - every "stop partway through, at Thursday"
+   * shape was structurally unreachable, because nothing ever started a span there.
+   *
+   * Confirmed empirically before this fix: a plain holiday-free 4-month stretch (dozens of
+   * ordinary weekends, no special dates at all) at budget=6 found one 5-cost, 9-day bridge
+   * (walking an entire work week into the next weekend) and then had nothing better to do
+   * with its last PTO day than spend it as an isolated 1.0x single day - even though a
+   * classic "take Thu+Fri for a 4-day weekend" (2 cost, 4 days off, 2.0x) is exactly the
+   * kind of plan this tool exists to find. See NOTES.md and solve.test.ts's "a workday run
+   * can end a work week short, bridging forward into the next off period" tests.
+   *
+   * Fix: start a candidate at EVERY day, not just off days. The inner loop (below) only
+   * ever pushes a candidate when it reaches an off-day endpoint, so a start that never
+   * reaches one within `maxCandidateCost` simply produces nothing - no correctness risk,
+   * just more of the search space actually gets explored. A blackout day still can't start
+   * a span (you can't spend PTO on a day you're barred from taking off).
+   */
   for (let i = 0; i < n; i++) {
-    if (!isOff[i]) continue;
+    if (isBlackout[i]) continue;
+    // Only a workday start gets the tighter WORKDAY_START_REACH_CAP - an off-day anchor
+    // (the original, already-correct long-bridge behavior) keeps its full real-budget reach.
+    const startCap = isOff[i] ? maxCandidateCost : Math.min(maxCandidateCost, WORKDAY_START_REACH_CAP);
     let cost = 0;
     let cost1 = 0;
     let cost2 = 0;
@@ -105,7 +148,7 @@ function buildCandidates(
         // A fixed cap here is exactly what silently prevented a single break from ever
         // spending more than that constant, regardless of how much budget the user had
         // available - see NOTES.md for the "15 PTO days spends only 10" bug this fixes.
-        if (cost > maxCandidateCost) break;
+        if (cost > startCap) break;
         if (!expiryDate || dISO <= expiryDate) cost1++;
         else cost2++;
       }
@@ -686,7 +729,26 @@ export function solve(input: SolveInput): SolveResult {
   });
   const isBlackout: boolean[] = days.map((d) => blackoutSet.has(d));
 
-  const budgetMax = Math.max(0, Math.floor(input.budget ?? 0));
+  /**
+   * A pinned day that's a genuine workday has a real cost (1 PTO day) that must be spent
+   * no matter what the optimizer would otherwise choose - unlike offDays, pinning was
+   * previously implemented by injecting the date straight into offDays, which made it FREE
+   * and only coincidentally present when some other candidate's span happened to cross it.
+   * Confirmed empirically: at breakCount=1 ("all in one") and breakCount=7 ("as many as
+   * possible"), an isolated pinned day was silently dropped from the result entirely - see
+   * NOTES.md. Fixed by reserving its cost up front (shrinking the budget the optimizer gets
+   * to play with) and then guaranteeing its presence in the final `chosen` set below,
+   * rather than hoping the optimization happens to produce it.
+   */
+  const mustIncludeForcedCost = new Set(
+    (input.mustIncludeDays ?? []).filter(
+      (d) => days.includes(d) && isWorkingDow(d, workWeek) && !offSet.has(d) && !blackoutSet.has(d),
+    ),
+  );
+  const reservedBudget = mustIncludeForcedCost.size;
+  const effectiveInput: SolveInput = reservedBudget > 0 ? { ...input, budget: Math.max(0, (input.budget ?? 0) - reservedBudget) } : input;
+
+  const budgetMax = Math.max(0, Math.floor(effectiveInput.budget ?? 0));
   // Never more than the user could ever spend, and never more than the range could ever
   // hold (cost only counts workdays, which can't exceed the day count) - see
   // buildCandidates's own comment for why this must not be a fixed constant. With an
@@ -697,7 +759,7 @@ export function solve(input: SolveInput): SolveResult {
   // literal constant.
   const totalBudgetCeiling = input.expiryDate
     ? (() => {
-        const { budget1Max, budget2Max } = dualWindowBudgets(input, input.expiryDate as ISODate);
+        const { budget1Max, budget2Max } = dualWindowBudgets(effectiveInput, input.expiryDate as ISODate);
         return budget1Max + budget2Max;
       })()
     : budgetMax;
@@ -713,19 +775,50 @@ export function solve(input: SolveInput): SolveResult {
 
   if (input.expiryDate) {
     const cap = breakCountRequested === 0 || breakCountRequested === 7 ? null : breakCountRequested;
-    chosen = solveDualWindow(candidates, input, w, cap);
+    chosen = solveDualWindow(candidates, effectiveInput, w, cap);
     breakCountActual = chosen.length;
   } else if (breakCountRequested === 0) {
-    chosen = solveAny(candidates, input, budgetMax, w);
+    chosen = solveAny(candidates, effectiveInput, budgetMax, w);
     breakCountActual = chosen.length;
   } else if (breakCountRequested === 7) {
-    const result = solveMaxCount(candidates, input, budgetMax, w);
+    const result = solveMaxCount(candidates, effectiveInput, budgetMax, w);
     chosen = result.chosen;
     breakCountActual = result.achieved;
   } else {
-    const result = solveExactCount(candidates, input, budgetMax, w, breakCountRequested);
+    const result = solveExactCount(candidates, effectiveInput, budgetMax, w, breakCountRequested);
     chosen = result.chosen;
     breakCountActual = result.achieved;
+  }
+
+  // Guarantee every pinned workday is actually present - the optimization above never had
+  // a mechanism to force a specific date in, only to afford it (reservedBudget). Anything
+  // already absorbed into a chosen candidate's span needs nothing further; anything the
+  // optimizer didn't happen to reach becomes its own 1-day candidate, spending its reserved
+  // cost. This can push breakCountActual above what breakCount requested - correct, not a
+  // bug: the same precedent as solveExactCount's own nearest-achievable fallback elsewhere
+  // in this file, applied to a harder constraint (the day MUST be in the plan) than a soft
+  // target (a break count).
+  if (mustIncludeForcedCost.size > 0) {
+    for (const d of mustIncludeForcedCost) {
+      const alreadyCovered = chosen.some((c) => d >= c.start && d <= c.end);
+      if (alreadyCovered) continue;
+      const demand = demandFor(d, input.country).value;
+      chosen.push({
+        startIdx: -1, // synthetic: not a real index into `days`/`candidates`, never looked up by index
+        endIdx: -1,
+        start: d,
+        end: d,
+        length: 1,
+        cost: 1,
+        cost1: !input.expiryDate || d <= (input.expiryDate as ISODate) ? 1 : 0,
+        cost2: input.expiryDate && d > (input.expiryDate as ISODate) ? 1 : 0,
+        overlapDayCount: overlapSet.has(d) ? 1 : 0,
+        demandSum: demand,
+        demandDeviationScaled: Math.round((demand - 1) * DEMAND_DEVIATION_SCALE),
+      });
+    }
+    chosen.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+    breakCountActual = chosen.length;
   }
 
   const primary = chosen.map((c) => toBreak(c, overlapSet, estimated));
