@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { defaultRangeEnd, shiftRangeToNextYear } from './useAppState';
+import { defaultRangeEnd } from './useAppState';
 
 describe('defaultRangeEnd (Phase 2, bug found: always stuck to the current year)', () => {
   // Nothing in the solver/holiday-fetch/date-arithmetic layer actually blocks a
@@ -26,23 +26,5 @@ describe('defaultRangeEnd (Phase 2, bug found: always stuck to the current year)
 
   it('rolls forward correctly across a leap year boundary', () => {
     expect(defaultRangeEnd('2027-12-20')).toBe('2028-12-31');
-  });
-});
-
-describe('shiftRangeToNextYear (Phase 3 item 6: "Plan next year" banner action)', () => {
-  it('shifts both ends forward by exactly one year, same month/day', () => {
-    expect(shiftRangeToNextYear('2026-10-25', '2026-12-31')).toEqual({ rangeStart: '2027-10-25', rangeEnd: '2027-12-31' });
-  });
-
-  it('clamps Feb 29 to Feb 28 when the target year is not a leap year', () => {
-    // 2028 is a leap year, 2029 is not.
-    expect(shiftRangeToNextYear('2028-02-29', '2028-03-15')).toEqual({ rangeStart: '2029-02-28', rangeEnd: '2029-03-15' });
-  });
-
-  it('keeps Feb 29 when the target year is also a leap year', () => {
-    expect(shiftRangeToNextYear('2024-02-29', '2024-03-01')).toEqual({ rangeStart: '2025-02-28', rangeEnd: '2025-03-01' });
-    // 2024 -> 2028 (4 years later, still leap) via two hops lands back on Feb 29.
-    const once = shiftRangeToNextYear('2027-02-28', '2027-03-01');
-    expect(once.rangeStart).toBe('2028-02-28');
   });
 });

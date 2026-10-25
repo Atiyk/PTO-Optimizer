@@ -51,26 +51,6 @@ export function defaultRangeEnd(todayIso: string): string {
   return daysRemaining > DEFAULT_RANGE_ROLLOVER_DAYS ? thisYearEnd : `${year + 1}-12-31`;
 }
 
-function isLeapYear(y: number): boolean {
-  return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
-}
-
-/** Shifts both ends of a range forward by exactly one calendar year (same month/day), for
- * the "no more breaks planned - plan next year" banner action (Phase 3 item 6). Feb 29
- * clamps to Feb 28 when the target year isn't a leap year, rather than silently rolling
- * over into March the way raw Date.UTC overflow would. */
-export function shiftRangeToNextYear(rangeStart: string, rangeEnd: string): { rangeStart: string; rangeEnd: string } {
-  const shiftYear = (iso: string): string => {
-    const y = Number(iso.slice(0, 4));
-    const m = iso.slice(5, 7);
-    const dNum = Number(iso.slice(8, 10));
-    const nextY = y + 1;
-    const day = m === '02' && dNum === 29 && !isLeapYear(nextY) ? 28 : dNum;
-    return `${nextY}-${m}-${String(day).padStart(2, '0')}`;
-  };
-  return { rangeStart: shiftYear(rangeStart), rangeEnd: shiftYear(rangeEnd) };
-}
-
 function yearsBetween(rangeStart: string, rangeEnd: string): number[] {
   const startYear = Number(rangeStart.slice(0, 4));
   const endYear = Number(rangeEnd.slice(0, 4));
@@ -740,12 +720,6 @@ export function useAppState() {
     setPinnedPlans((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  const planNextYear = useCallback(() => {
-    const shifted = shiftRangeToNextYear(rangeStart, rangeEnd);
-    setRangeStart(shifted.rangeStart);
-    setRangeEnd(shifted.rangeEnd);
-  }, [rangeStart, rangeEnd]);
-
   const toggleDay = useCallback((date: string) => {
     setForced((prev) => {
       const current = prev[date];
@@ -862,7 +836,6 @@ export function useAppState() {
     breakBandByRunIndex,
     toggleDay,
     forced,
-    planNextYear,
     pinnedPlans,
     canPin,
     pinPlan,
