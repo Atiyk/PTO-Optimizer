@@ -12,6 +12,7 @@
     "build:demand-index": "tsx scripts/build-demand-index.ts"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
