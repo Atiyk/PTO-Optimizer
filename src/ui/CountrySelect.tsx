@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { COUNTRIES, SUBDIVISIONS } from '../data/countries';
+import { COUNTRIES, subdivisionLabel } from '../data/countries';
 
 interface CountrySelectProps {
   country: string;
@@ -73,16 +73,19 @@ export function CountrySelect({ country, onChangeCountry }: CountrySelectProps) 
 }
 
 interface SubdivisionSelectProps {
-  country: string;
+  /** Subdivision codes discovered for the current country/range (from the `counties` field
+   * on its actual fetched holidays - see useAppState's `discoveredSubdivisions`), not a
+   * static per-country list - this is what makes the field work for any of the 204
+   * countries that have county-specific holidays, not just a hardcoded few. */
+  subdivisions: string[];
   subdivision: string | undefined;
   onChangeSubdivision: (code: string | undefined) => void;
 }
 
-/** Only renders a field when the selected country actually has subdivisions (e.g. US
- * states) - returns null otherwise, so a caller can render it unconditionally. */
-export function SubdivisionSelect({ country, subdivision, onChangeSubdivision }: SubdivisionSelectProps) {
-  const subdivisions = SUBDIVISIONS[country];
-  if (!subdivisions) return null;
+/** Only renders a field when the selected country/range actually turned up subdivisions -
+ * returns null otherwise, so a caller can render it unconditionally. */
+export function SubdivisionSelect({ subdivisions, subdivision, onChangeSubdivision }: SubdivisionSelectProps) {
+  if (subdivisions.length === 0) return null;
 
   return (
     <label className="flex flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
@@ -94,9 +97,9 @@ export function SubdivisionSelect({ country, subdivision, onChangeSubdivision }:
         style={CHEVRON_BG}
       >
         <option value="">All regions</option>
-        {subdivisions.map((s) => (
-          <option key={s.code} value={s.code}>
-            {s.name}
+        {subdivisions.map((code) => (
+          <option key={code} value={code}>
+            {subdivisionLabel(code)}
           </option>
         ))}
       </select>
