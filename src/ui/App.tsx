@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Headline } from './Headline';
 import { PrimaryControls } from './PrimaryControls';
-import { AdjustPanel } from './AdjustPanel';
+import { PlanSliders } from './PlanSliders';
+import { SubdivisionSelect } from './CountrySelect';
 import { MoreOptions } from './MoreOptions';
 import { Calendar } from './Calendar';
 import { Legend } from './Legend';
@@ -56,6 +57,24 @@ export function App() {
         budgetSpent={state.budgetSpent}
       />
 
+      {/* Always visible, not behind a disclosure - these are how most visitors actually
+          shape the plan. Visual hierarchy: result -> country/date-range/PTO-days ->
+          these -> the calendar. */}
+      <PlanSliders
+        w={state.w}
+        onChangeW={state.setW}
+        manualBreakCount={state.manualBreakCount}
+        onChangeManualBreakCount={state.setManualBreakCount}
+        letSolverDecide={state.letSolverDecide}
+        onToggleLetSolverDecide={state.setLetSolverDecide}
+        breaks={state.breaks}
+        breakCountRequested={state.breakCountRequested}
+        breakCountActual={state.breakCountActual}
+        budget={state.budget}
+        showAlternatives={state.showAlternatives}
+        onChangeShowAlternatives={state.setShowAlternatives}
+      />
+
       <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2">
         <button
           type="button"
@@ -68,23 +87,7 @@ export function App() {
 
       {adjustOpen && (
         <div className="flex flex-col gap-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-4">
-          <AdjustPanel
-            w={state.w}
-            onChangeW={state.setW}
-            manualBreakCount={state.manualBreakCount}
-            onChangeManualBreakCount={state.setManualBreakCount}
-            letSolverDecide={state.letSolverDecide}
-            onToggleLetSolverDecide={state.setLetSolverDecide}
-            breaks={state.breaks}
-            breakCountRequested={state.breakCountRequested}
-            breakCountActual={state.breakCountActual}
-            budget={state.budget}
-            country={state.country}
-            subdivision={state.subdivision}
-            onChangeSubdivision={state.setSubdivision}
-            showAlternatives={state.showAlternatives}
-            onChangeShowAlternatives={state.setShowAlternatives}
-          />
+          <SubdivisionSelect country={state.country} subdivision={state.subdivision} onChangeSubdivision={state.setSubdivision} />
 
           <button
             type="button"

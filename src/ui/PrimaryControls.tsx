@@ -17,11 +17,11 @@ const DATE_FIELD_CLASS =
   'h-9 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-sm text-slate-800 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-500';
 
 /**
- * The only inputs visible by default, alongside the result itself - country, date range,
- * PTO days. Everything else (weighting, break count, state/subdivision, alternatives,
- * and the full "More options" panel) lives behind the "Adjust" disclosure in
- * `AdjustPanel`, collapsed on load. A first-time visitor configures as little as possible
- * before seeing a plan - the defaults already produce one.
+ * Always-visible primary inputs - country, date range, PTO days. Only the state
+ * (subdivision) picker and the "More options" panel (accrual, expiry, work week, blackout
+ * dates, etc) are collapsed behind the "Adjust" disclosure in App.tsx - the two sliders
+ * and "Show alternatives" are always visible too (see `PlanSliders`), since they're how
+ * most visitors actually shape the plan, not an advanced/secondary setting.
  */
 export function PrimaryControls({
   country,

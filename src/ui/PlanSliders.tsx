@@ -1,9 +1,8 @@
 import type { Break } from '../solver/types';
 import { WeightingSlider } from './WeightingSlider';
 import { BreakCountSlider } from './BreakCountSlider';
-import { SubdivisionSelect } from './CountrySelect';
 
-interface AdjustPanelProps {
+interface PlanSlidersProps {
   w: number;
   onChangeW: (w: number) => void;
   manualBreakCount: number;
@@ -14,20 +13,19 @@ interface AdjustPanelProps {
   breakCountRequested: number;
   breakCountActual: number;
   budget: number;
-  country: string;
-  subdivision: string | undefined;
-  onChangeSubdivision: (code: string | undefined) => void;
   showAlternatives: boolean;
   onChangeShowAlternatives: (v: boolean) => void;
 }
 
 /**
- * Everything that isn't country/date-range/PTO-days: the two sliders, the state
- * (subdivision) picker, and "Show alternatives" - collapsed behind a single "Adjust"
- * disclosure, closed by default. The defaults already produce a good plan; a first-time
- * visitor discovers these only after seeing the answer, never before.
+ * The two sliders that shape the plan ("what matters more" and "how many breaks") plus
+ * "Show alternatives" - always on screen, not behind a disclosure. Visual hierarchy:
+ * result -> country/date-range/PTO-days -> these -> the calendar. Only the state
+ * (subdivision) picker and the "More options" panel (accrual, expiry, work week, blackout
+ * dates, etc) stay behind the "Adjust" disclosure - these two sliders are how most
+ * visitors actually shape the plan, not an advanced/secondary setting.
  */
-export function AdjustPanel({
+export function PlanSliders({
   w,
   onChangeW,
   manualBreakCount,
@@ -38,14 +36,11 @@ export function AdjustPanel({
   breakCountRequested,
   breakCountActual,
   budget,
-  country,
-  subdivision,
-  onChangeSubdivision,
   showAlternatives,
   onChangeShowAlternatives,
-}: AdjustPanelProps) {
+}: PlanSlidersProps) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3">
       <div className="flex flex-wrap items-start gap-6">
         <div className="min-w-[16rem] max-w-sm flex-1">
           <WeightingSlider value={w} onChange={onChangeW} />
@@ -64,17 +59,10 @@ export function AdjustPanel({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-end gap-4">
-        <SubdivisionSelect country={country} subdivision={subdivision} onChangeSubdivision={onChangeSubdivision} />
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-          <input
-            type="checkbox"
-            checked={showAlternatives}
-            onChange={(e) => onChangeShowAlternatives(e.target.checked)}
-          />
-          Show alternatives
-        </label>
-      </div>
+      <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <input type="checkbox" checked={showAlternatives} onChange={(e) => onChangeShowAlternatives(e.target.checked)} />
+        Show alternatives
+      </label>
     </div>
   );
 }
