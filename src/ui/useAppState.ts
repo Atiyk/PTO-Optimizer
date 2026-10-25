@@ -102,6 +102,8 @@ export interface PlanSnapshot {
   forced: Record<string, ForcedState>;
   altFridayEnabled: boolean;
   altFridayStart: string;
+  reserveDays: number;
+  unlimitedPto: boolean;
   summary: {
     budgetSpent: number;
     totalDaysOff: number;
@@ -153,6 +155,8 @@ export function useAppState() {
         ruledOutDays: [],
         altFridayEnabled: false,
         altFridayStart: undefined,
+        reserveDays: 3,
+        unlimitedPto: false,
       };
     }
     return readFullStateFromURL(window.location.search, defaults);
@@ -180,6 +184,22 @@ export function useAppState() {
   const [rangeStart, setRangeStart] = useState(initial.rangeStart);
   const [rangeEnd, setRangeEnd] = useState(initial.rangeEnd);
   const [budget, setBudget] = useState(initial.budget);
+  // Phase 3.1: "just in case" saving is the single largest reason PTO goes unused (44%).
+  // Reserve days are subtracted from the budget BEFORE it reaches the solver - a plain
+  // subtraction, no new solver logic - so the plan never asks for the user's entire
+  // balance. Defaults to 3, not 0: the whole point is that committing everything is the
+  // thing people refuse to do, so a deliberate non-zero default is what actually changes
+  // behavior, not a feature nobody opts into.
+  const [reserveDays, setReserveDays] = useState(initial.reserveDays ?? 3);
+  // Phase 3.2: unlimited-PTO workers still self-cap (66% at 15 days or fewer) because the
+  // expectation is unclear, not because they prefer fewer days - so flipping this on seeds
+  // a concrete number rather than leaving the field at whatever it was. The field stays
+  // fully editable either way; this is a default, not a lock.
+  const [unlimitedPto, setUnlimitedPtoRaw] = useState(initial.unlimitedPto ?? false);
+  const setUnlimitedPto = useCallback((v: boolean) => {
+    setUnlimitedPtoRaw(v);
+    if (v) setBudget(15);
+  }, []);
 
   const [w, setW] = useState(initial.w);
   // breakCount 0 from the URL ("Any", now spelled "let the solver decide") maps to the
@@ -283,6 +303,8 @@ export function useAppState() {
       forced,
       altFridayEnabled,
       altFridayStart,
+      reserveDays,
+      unlimitedPto,
     });
     window.history.replaceState(null, '', url);
   }, [
@@ -305,6 +327,8 @@ export function useAppState() {
     forced,
     altFridayEnabled,
     altFridayStart,
+    reserveDays,
+    unlimitedPto,
   ]);
 
   // Graceful failure: a network/API failure degrades to cached data (if any was already
@@ -431,12 +455,17 @@ export function useAppState() {
     return Array.from(set);
   }, [blackouts, forced]);
 
+  // Phase 3.1: reserve days are subtracted from the budget before the solver ever sees it -
+  // a plain subtraction, not new solver logic. Clamped at 0 (reserving more than the whole
+  // balance just means nothing is planned, not a negative budget).
+  const effectiveBudget = Math.max(0, budget - reserveDays);
+
   const solveInput: SolveInput = useMemo(
     () => ({
       offDays: effectiveOffDays,
       rangeStart,
       rangeEnd,
-      budget,
+      budget: effectiveBudget,
       accrualPerMonth: accrualEnabled ? accrualPerMonth : undefined,
       expiryDate: expiryEnabled ? expiryDate : undefined,
       carryoverCap: expiryEnabled ? carryoverCap : undefined,
@@ -453,7 +482,7 @@ export function useAppState() {
       mustIncludeDays,
       rangeStart,
       rangeEnd,
-      budget,
+      effectiveBudget,
       accrualEnabled,
       accrualPerMonth,
       expiryEnabled,
@@ -715,6 +744,8 @@ export function useAppState() {
         forced,
         altFridayEnabled,
         altFridayStart,
+        reserveDays,
+        unlimitedPto,
         summary: {
           budgetSpent,
           totalDaysOff,
@@ -728,7 +759,7 @@ export function useAppState() {
     country, subdivision, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
     weekStartOverride, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap,
     overlapDays, blackouts, workWeek, forced, altFridayEnabled, altFridayStart,
-    budgetSpent, totalDaysOff, breakCountActual, scores,
+    reserveDays, unlimitedPto, budgetSpent, totalDaysOff, breakCountActual, scores,
   ]);
 
   // Restores every input the snapshot carries - the raw setters (not `changeCountry`, which
@@ -757,6 +788,8 @@ export function useAppState() {
       setForced(snap.forced);
       setAltFridayEnabled(snap.altFridayEnabled);
       setAltFridayStart(snap.altFridayStart);
+      setReserveDays(snap.reserveDays);
+      setUnlimitedPtoRaw(snap.unlimitedPto);
     },
     [pinnedPlans],
   );
@@ -805,6 +838,11 @@ export function useAppState() {
     setRangeEnd,
     budget,
     setBudget,
+    reserveDays,
+    setReserveDays,
+    unlimitedPto,
+    setUnlimitedPto,
+    effectiveBudget,
     w,
     setW,
     breakCount,

@@ -6,6 +6,28 @@ interface HeadlineProps {
   totalDaysOff: number;
   breakCountActual: number;
   scores: Scores | null;
+  /** Raw total PTO balance, before reserve is subtracted - only needed to render the
+   * reserve-aware headline (Phase 3.1); omit entirely elsewhere. */
+  budget: number;
+  reserveDays: number;
+}
+
+/**
+ * Phase 3.1: "12 of 15 days planned · 3 kept in reserve → 26 days off" when a reserve is
+ * set - must read as a DELIBERATE choice, never as the unspent-budget warning
+ * (PrimaryControls' own "add no days off at any position" message, which is a different
+ * thing and compares against the post-reserve budget, not this). Falls back to the plain
+ * "N PTO days → M days off" phrasing when reserveDays is 0 - a reserve of zero means the
+ * user explicitly chose to plan with their whole balance, so there's nothing to call out.
+ */
+export function headlineText(budgetSpent: number, budget: number, reserveDays: number, totalDaysOff: number): string {
+  const offWord = totalDaysOff === 1 ? 'day' : 'days';
+  if (reserveDays > 0) {
+    const dayWord = budget === 1 ? 'day' : 'days';
+    return `${budgetSpent} of ${budget} ${dayWord} planned · ${reserveDays} kept in reserve → ${totalDaysOff} ${offWord} off`;
+  }
+  const spentWord = budgetSpent === 1 ? 'day' : 'days';
+  return `${budgetSpent} PTO ${spentWord} → ${totalDaysOff} ${offWord} off`;
 }
 
 /**
@@ -36,14 +58,14 @@ function ScoreLine({ text, percentile }: { text: string; percentile: number }) {
   );
 }
 
-export function Headline({ budgetSpent, totalDaysOff, breakCountActual, scores }: HeadlineProps) {
+export function Headline({ budgetSpent, totalDaysOff, breakCountActual, scores, budget, reserveDays }: HeadlineProps) {
   return (
     <div
       className="sticky top-0 z-40 border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 px-4 py-3 backdrop-blur"
       role="status"
     >
       <p className="text-2xl font-bold leading-tight text-slate-900 dark:text-slate-50 sm:text-3xl">
-        {budgetSpent} PTO day{budgetSpent === 1 ? '' : 's'} &rarr; {totalDaysOff} day{totalDaysOff === 1 ? '' : 's'} off
+        {headlineText(budgetSpent, budget, reserveDays, totalDaysOff)}
       </p>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
         {breakCountActual} break{breakCountActual === 1 ? '' : 's'}

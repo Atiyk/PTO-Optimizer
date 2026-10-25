@@ -11,6 +11,11 @@ interface PrimaryControlsProps {
   budget: number;
   onChangeBudget: (v: number) => void;
   budgetSpent: number;
+  reserveDays: number;
+  onChangeReserveDays: (v: number) => void;
+  effectiveBudget: number;
+  unlimitedPto: boolean;
+  onToggleUnlimitedPto: (v: boolean) => void;
 }
 
 const DATE_FIELD_CLASS =
@@ -33,6 +38,11 @@ export function PrimaryControls({
   budget,
   onChangeBudget,
   budgetSpent,
+  reserveDays,
+  onChangeReserveDays,
+  effectiveBudget,
+  unlimitedPto,
+  onToggleUnlimitedPto,
 }: PrimaryControlsProps) {
   const locale = localeForCountry(country);
 
@@ -74,12 +84,50 @@ export function PrimaryControls({
           onChange={(e) => onChangeBudget(Number(e.target.value))}
           className={`${DATE_FIELD_CLASS} w-24`}
         />
-        {budgetSpent < budget && (
-          <span className="text-xs font-normal text-amber-700 dark:text-amber-400">
-            Using {budgetSpent} of {budget} day{budget === 1 ? '' : 's'} &mdash; the remaining {budget - budgetSpent} day
-            {budget - budgetSpent === 1 ? '' : 's'} add no days off at any position.
+        {/* Phase 3.2: unlimited-PTO workers still self-cap (66% at 15 or fewer) because the
+            expectation is unclear, not because they prefer fewer days - this seeds a
+            concrete starting number rather than leaving the field blank/undefined. The
+            budget field above stays fully editable either way - this is a default, not a
+            lock on the number. */}
+        <span className="flex items-center gap-1.5 font-normal normal-case">
+          <input
+            type="checkbox"
+            id="unlimited-pto"
+            checked={unlimitedPto}
+            onChange={(e) => onToggleUnlimitedPto(e.target.checked)}
+          />
+          <label htmlFor="unlimited-pto">I have unlimited PTO</label>
+        </span>
+        {unlimitedPto && (
+          <span className="max-w-[16rem] text-xs font-normal normal-case text-slate-500 dark:text-slate-400">
+            Most people with unlimited PTO take 15 days or fewer. Adjust if yours differs.
           </span>
         )}
+        {/* Phase 3.1: compared against the budget actually available to the solver
+            (after reserve), never the raw total - otherwise every deliberately-reserved
+            day would misleadingly look like a solver failure ("add no days off at any
+            position"), which is exactly what this warning must never say about a reserve. */}
+        {budgetSpent < effectiveBudget && (
+          <span className="text-xs font-normal normal-case text-amber-700 dark:text-amber-400">
+            Using {budgetSpent} of {effectiveBudget} planned day{effectiveBudget === 1 ? '' : 's'} &mdash; the remaining{' '}
+            {effectiveBudget - budgetSpent} day{effectiveBudget - budgetSpent === 1 ? '' : 's'} add no days off at any
+            position.
+          </span>
+        )}
+      </label>
+
+      <label className="flex flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+        Keep in reserve
+        <input
+          type="number"
+          min={0}
+          max={budget}
+          step={1}
+          value={reserveDays}
+          onChange={(e) => onChangeReserveDays(Number(e.target.value))}
+          aria-label="Days to keep in reserve"
+          className={`${DATE_FIELD_CLASS} w-24`}
+        />
       </label>
     </div>
   );

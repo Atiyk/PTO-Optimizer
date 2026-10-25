@@ -78,6 +78,8 @@ function fullState(overrides: Partial<WriteStateInput> = {}): WriteStateInput {
     forced: {},
     altFridayEnabled: false,
     altFridayStart: '',
+    reserveDays: 3,
+    unlimitedPto: false,
     ...overrides,
   };
 }

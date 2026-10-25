@@ -135,6 +135,8 @@ export interface FullURLState {
   ruledOutDays: string[];
   altFridayEnabled: boolean;
   altFridayStart?: string;
+  reserveDays: number;
+  unlimitedPto: boolean;
 }
 
 /** Dates needed by the caller to fill in the viewer-relative fields (rangeStart/rangeEnd
@@ -191,6 +193,11 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
   const afsRaw = params.get('afs');
   const altFridayStart = afsRaw && isValidISODate(afsRaw) ? afsRaw : undefined;
 
+  const rvRaw = params.get('rv');
+  const rvParsed = rvRaw !== null ? Number(rvRaw) : NaN;
+  const reserveDays = Number.isFinite(rvParsed) && rvParsed >= 0 ? rvParsed : 3;
+  const unlimitedPto = params.get('up') === '1';
+
   return {
     country,
     subdivision,
@@ -212,6 +219,8 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
     ruledOutDays,
     altFridayEnabled,
     altFridayStart,
+    reserveDays,
+    unlimitedPto,
   };
 }
 
@@ -235,6 +244,8 @@ export interface WriteStateInput {
   forced: Record<string, ForcedState>;
   altFridayEnabled: boolean;
   altFridayStart: string;
+  reserveDays: number;
+  unlimitedPto: boolean;
 }
 
 /** Writes the full app state into `params` in place. `country`/`rangeStart`/`rangeEnd` are
@@ -304,6 +315,12 @@ export function writeFullStateToURL(params: URLSearchParams, state: WriteStateIn
     params.delete('af');
     params.delete('afs');
   }
+
+  if (state.reserveDays !== 3) params.set('rv', String(state.reserveDays));
+  else params.delete('rv');
+
+  if (state.unlimitedPto) params.set('up', '1');
+  else params.delete('up');
 
   // 'ov' (partner-overlap payload) is a one-shot input signal consumed on load, never part
   // of ongoing state - always stripped once the app re-derives the URL from its own state.
