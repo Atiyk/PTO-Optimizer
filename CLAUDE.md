@@ -10,3 +10,12 @@
 
 Never skip step 4 or step 6, even for trivial changes. Verify claims (like a cap on
 rendered elements) by counting them in the actual DOM output, not by reading the code.
+
+Never add a submit button, a "Generate" action, or a multi-step form — the app updates
+live as inputs change, and that immediacy is the main differentiator. Don't gate any
+result behind an explicit action.
+
+Pushing and merging: use the Terminal panel (`run_in_terminal`), not the sandboxed Bash
+tool — `gh`/git credentials only exist in the user's real terminal shell, authenticated
+once via `gh auth login`. The sandboxed Bash tool has no network/credential access for
+GitHub at all.
