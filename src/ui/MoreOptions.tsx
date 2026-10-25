@@ -3,6 +3,7 @@ import type { WorkWeek } from '../solver/types';
 import type { WeekStart } from './calendarMath';
 import { addDays, rangeISO } from '../solver/dateUtils';
 import { DateListEditor } from './DateListEditor';
+import { ImportCalendar } from './ImportCalendar';
 import { todayISO, type HolidayEntry } from './useAppState';
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -221,6 +222,8 @@ export function MoreOptions(props: MoreOptionsProps) {
           <span className="text-xs text-slate-400 dark:text-slate-400">for a notice period</span>
         </div>
       </section>
+
+      <ImportCalendar onImportBusyDays={props.onAddBlackouts} />
 
       <section>
         <h4 className={H4_CLASS}>Public holidays</h4>
