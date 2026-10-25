@@ -2185,7 +2185,11 @@ address, then pushing a new commit (this one) rather than rewriting/force-pushin
 No code in the solver, UI, or export paths changed in this phase - deploy/account
 configuration only.
 
-## Phase 17 - .ics reminders, consolidated "Days I can't take off", 9/80, next-break banner, pin-compare, keyboard shortcuts, .ics import, instrumentation
+## Phase 17 - .ics reminders, consolidated "Days I can't take off", 9/80, pin-compare, keyboard shortcuts, .ics import, instrumentation
+
+A "your next break, N days away" banner was built for this phase and then cut before
+shipping - removed entirely (component, its tests, and the now-unused `planNextYear`/
+`shiftRangeToNextYear` helpers it alone depended on) rather than left disabled or dead.
 
 Nine-item feature spec, built on top of Phase 1 (solver bug hunt) and Phase 2 (arbitrary
 date ranges, visible export). Full writeup of each item's own bugs/decisions lives in the
