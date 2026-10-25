@@ -66,24 +66,27 @@ export function BreakCountSlider({
         />
         Let the solver decide
       </label>
-      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-        <span>All in one</span>
-        <span>As many as possible</span>
+      {/* Dimmed as a single block (labels + thumb together), not just the track/thumb
+          colour alone - a positioned thumb in a still-fully-opaque row read as "a setting
+          the user chose" even once the accent colour itself was muted. */}
+      <div className={letSolverDecide ? 'opacity-40' : ''}>
+        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+          <span>All in one</span>
+          <span>As many as possible</span>
+        </div>
+        <input
+          type="range"
+          min={1}
+          max={7}
+          step={1}
+          value={value}
+          disabled={letSolverDecide}
+          onChange={(e) => onChange(Number(e.target.value))}
+          aria-label="How many breaks"
+          aria-valuetext={`${positionLabel(value)}${letSolverDecide ? ' (disabled — letting the solver decide)' : ''}`}
+          className={`w-full disabled:cursor-not-allowed ${letSolverDecide ? 'accent-slate-300 dark:accent-slate-600' : 'accent-slate-800 dark:accent-slate-300'}`}
+        />
       </div>
-      <input
-        type="range"
-        min={1}
-        max={7}
-        step={1}
-        value={value}
-        disabled={letSolverDecide}
-        onChange={(e) => onChange(Number(e.target.value))}
-        aria-label="How many breaks"
-        aria-valuetext={`${positionLabel(value)}${letSolverDecide ? ' (disabled — letting the solver decide)' : ''}`}
-        // Muted clearly, not just faded on the same accent: a grey track/thumb reads as
-        // "inert" at a glance, where opacity alone on the same blue still looked "set."
-        className={`w-full disabled:cursor-not-allowed ${letSolverDecide ? 'accent-slate-300 dark:accent-slate-600' : 'accent-slate-800 dark:accent-slate-300'}`}
-      />
       <p className="text-xs text-slate-600 dark:text-slate-300">{caption(breakCountRequested, breakCountActual, breaks, budget, letSolverDecide)}</p>
     </div>
   );

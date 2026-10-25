@@ -33,7 +33,14 @@
   --pto-bg: #1e3a8a; /* blue-900 */
   --pto-border: #172554; /* blue-950 */
   --pto-text: #ffffff;
-  --band-bg: #fde68a; /* amber-200 */
+  /* amber-100, not amber-200: suggested-PTO (blue) is the day the user acts on and must
+     read as the strongest thing on the page; "days off" is the outcome and should sit
+     behind it as a quiet tint, not a saturated fill competing for attention across a run
+     that often spans most of a month. Contrast re-verified in colorScheme.test.ts - at
+     this lightness the band is nearly invisible against the white card on its own
+     (1.11:1), by design: it reads as a wash the band text/holiday dot are visible on, not
+     as a block that competes with the solid pto-bg fill. */
+  --band-bg: #fef3c7; /* amber-100 */
   --band-text: #1e293b; /* slate-800 */
   --holiday-dot: #475569; /* slate-600 */
   --alt-border: #1e3a8a; /* blue-900 */
@@ -59,7 +66,9 @@
     --pto-bg: #60a5fa; /* blue-400 - light-mode's blue-900 is too dark to read against a dark card */
     --pto-border: #2563eb; /* blue-600 */
     --pto-text: #0f172a; /* slate-900 - dark text on the now-light fill */
-    --band-bg: #fde68a; /* amber-200, unchanged - already pops against a dark background */
+    --band-bg: #fef3c7; /* amber-100, same quiet-tint reasoning as light mode - still pops
+                            clearly against the dark card surface (13.1:1) without reading
+                            as a second saturated fill next to the blue-400 pto-bg */
     --band-text: #1e293b; /* slate-800, unchanged */
     --holiday-dot: #cbd5e1; /* slate-300 - light-mode's slate-600 is nearly invisible on a dark cell */
     --alt-border: #60a5fa; /* blue-400, matching the new pto-bg hue */

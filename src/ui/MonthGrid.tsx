@@ -3,7 +3,7 @@ import type { MarginalValue } from '../solver/marginalValue';
 import { computeBandSegments, monthLabel, type MonthDescriptor, type OffRun, type WeekStart } from './calendarMath';
 import { COLORS } from './colorScheme';
 import { DayCell } from './DayCell';
-import type { Alternative } from '../solver/types';
+import type { Alternative, Break } from '../solver/types';
 import type { DayCategory } from './types';
 
 interface MonthGridProps {
@@ -12,6 +12,9 @@ interface MonthGridProps {
   rangeEnd: string;
   offRuns: OffRun[];
   previewRun: OffRun | null;
+  /** Keyed by index into `offRuns` - which break (and its 1-based chronological number)
+   * each qualifying run belongs to, for numbering/labelling bands. */
+  breakBandByRunIndex: Map<number, { index: number; brk: Break }>;
   weekStart: WeekStart;
   today: string;
   categoryOf: (iso: string) => DayCategory;
@@ -35,6 +38,7 @@ export function MonthGrid({
   rangeEnd,
   offRuns,
   previewRun,
+  breakBandByRunIndex,
   weekStart,
   today,
   categoryOf,
@@ -49,6 +53,14 @@ export function MonthGrid({
   onHoverAlternative,
 }: MonthGridProps) {
   const labels = weekStart === 0 ? WEEKDAY_LABELS_SUNDAY : WEEKDAY_LABELS_MONDAY;
+  // Padding always builds exactly 6 rows (42 cells) so every month box lines up at a fixed
+  // height regardless of how many real weeks that month needs - but a trailing row with no
+  // real date in it at all (pure grid padding, not an out-of-range date) is dead space with
+  // nothing to render. Only trailing all-null rows are dropped; a row with even one real
+  // date stays, so a mid-month 5th/6th week is never cut off.
+  let lastRealRow = descriptor.weeks.length - 1;
+  while (lastRealRow > 0 && descriptor.weeks[lastRealRow].every((d) => d === null)) lastRealRow -= 1;
+  const weeks = descriptor.weeks.slice(0, lastRealRow + 1);
   // Out-of-range days are real dates now (rendered muted/disabled), not null padding -
   // arrow-key navigation must still skip them, the same as it always skipped the null
   // padding cells, since a disabled button can't actually receive focus() anyway.
@@ -69,19 +81,55 @@ export function MonthGrid({
   };
 
   return (
-    <div className="rounded-lg border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-3">
-      <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">{monthLabel(descriptor.year, descriptor.month)}</h3>
+    <div className="rounded-lg border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-2">
+      <h3 className="mb-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">{monthLabel(descriptor.year, descriptor.month)}</h3>
       <div className="mb-1 grid grid-cols-7 text-center text-xs text-slate-400 dark:text-slate-400">
         {labels.map((l) => (
           <span key={l}>{l}</span>
         ))}
       </div>
-      <div className="flex flex-col gap-1.5">
-        {descriptor.weeks.map((week, wIdx) => {
+      <div className="flex flex-col gap-1">
+        {weeks.map((week, wIdx) => {
           const segments = computeBandSegments(week, offRuns);
           const previewSegments = previewRun ? computeBandSegments(week, [previewRun]) : [];
+          // A break's number + result ("2 · 9 days off · 4 PTO") sits in a thin caption
+          // row directly above the week its band starts in - never overlaid on top of the
+          // band/day-cell row itself, since a suggested-PTO cell is routinely the band's
+          // own leading cell and would silently hide anything drawn underneath it there.
+          const leadingLabels = segments
+            .filter((seg) => seg.roundedLeft)
+            .map((seg) => ({ seg, band: breakBandByRunIndex.get(seg.runIndex) }))
+            .filter((x): x is { seg: typeof x.seg; band: NonNullable<typeof x.band> } => !!x.band);
           return (
-            <div key={wIdx} className="relative grid grid-cols-7 gap-x-1" style={{ gridTemplateRows: '3rem' }}>
+            <div key={wIdx} className="flex flex-col gap-0.5">
+              {leadingLabels.length > 0 && (
+                <div className="grid grid-cols-7 gap-x-1" aria-hidden>
+                  {leadingLabels.map(({ seg, band }) => {
+                    // "Where the run is wide enough": a 1-column-wide leading segment has
+                    // no room for the result text, so show just the number there - the
+                    // full "N days off · M PTO" line only renders once at least 2 columns
+                    // of width are available to hold it without truncating illegibly.
+                    const wide = seg.colEnd - seg.colStart >= 1;
+                    return (
+                      <div
+                        key={`label-${seg.colStart}`}
+                        style={{ gridColumn: `${seg.colStart + 1} / ${Math.min(seg.colEnd + 1, 7) + 2}` }}
+                        className="flex items-center gap-1 overflow-hidden"
+                      >
+                        <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-slate-600 dark:bg-slate-400 text-[9px] font-semibold leading-none text-white dark:text-slate-900">
+                          {band.index}
+                        </span>
+                        {wide && (
+                          <span className="truncate text-[10px] font-medium leading-none text-slate-500 dark:text-slate-400">
+                            {band.brk.totalDaysOff} days off &middot; {band.brk.ptoCost} PTO
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="relative grid grid-cols-7 gap-x-1" style={{ gridTemplateRows: '3rem' }}>
               {/*
                 Bands sit flush within their own row's box (no negative vertical margin).
                 A previous version used a negative margin to make the band "taller", which
@@ -135,6 +183,7 @@ export function MonthGrid({
                   </div>
                 );
               })}
+              </div>
             </div>
           );
         })}

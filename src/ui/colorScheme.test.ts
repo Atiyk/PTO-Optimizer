@@ -9,7 +9,7 @@ import { contrastRatio, relativeLuminance } from './scoreFormat';
 type RGB = [number, number, number];
 const SCHEMES: Record<'A' | 'B', { ptoBg: RGB; ptoText: RGB; bandBg: RGB }> = {
   A: { ptoBg: [255, 107, 74], ptoText: [69, 10, 10], bandBg: [94, 234, 212] },
-  B: { ptoBg: [30, 58, 138], ptoText: [255, 255, 255], bandBg: [253, 230, 138] },
+  B: { ptoBg: [30, 58, 138], ptoText: [255, 255, 255], bandBg: [254, 243, 199] }, // amber-100
 };
 const WHITE: [number, number, number] = [255, 255, 255];
 const TEXT_PRIMARY_RGB: [number, number, number] = [30, 41, 59]; // slate-800
@@ -41,7 +41,7 @@ const DARK_BG_PAGE: RGB = [15, 23, 42]; // slate-900
 const DARK_BG_SURFACE: RGB = [30, 41, 59]; // slate-800 - the calendar month-box card colour
 const DARK_PTO_BG: RGB = [96, 165, 250]; // blue-400
 const DARK_PTO_TEXT: RGB = [15, 23, 42]; // slate-900
-const DARK_BAND_BG: RGB = [253, 230, 138]; // amber-200, unchanged from light mode
+const DARK_BAND_BG: RGB = [254, 243, 199]; // amber-100, same quiet tint as light mode
 const DARK_BAND_TEXT: RGB = [30, 41, 59]; // slate-800, unchanged
 const DARK_HOLIDAY_DOT: RGB = [203, 213, 225]; // slate-300
 const DARK_TEXT_PRIMARY: RGB = [241, 245, 249]; // slate-100
