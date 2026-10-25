@@ -77,4 +77,10 @@ describe('MoreOptions (Phase 3: consolidated "Days I can\'t take off")', () => {
     expect(html).toContain('Compressed schedule (9/80)');
     expect(html).toContain('Every other Friday off');
   });
+
+  it('wires the .ics import into the same blackout bulk-add handler as "Block the next N days"', () => {
+    const html = renderToStaticMarkup(<MoreOptions {...baseProps} />);
+    expect(html).toContain('Import my calendar (.ics)');
+    expect(html).toContain('Parsed in your browser. Nothing is uploaded.');
+  });
 });
