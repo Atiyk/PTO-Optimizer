@@ -104,29 +104,24 @@ export function MonthGrid({
             <div key={wIdx} className="flex flex-col gap-0.5">
               {leadingLabels.length > 0 && (
                 <div className="grid grid-cols-7 gap-x-1" aria-hidden>
-                  {leadingLabels.map(({ seg, band }) => {
-                    // "Where the run is wide enough": a 1-column-wide leading segment has
-                    // no room for the result text, so show just the number there - the
-                    // full "N days off · M PTO" line only renders once at least 2 columns
-                    // of width are available to hold it without truncating illegibly.
-                    const wide = seg.colEnd - seg.colStart >= 1;
-                    return (
-                      <div
-                        key={`label-${seg.colStart}`}
-                        style={{ gridColumn: `${seg.colStart + 1} / ${Math.min(seg.colEnd + 1, 7) + 2}` }}
-                        className="flex items-center gap-1 overflow-hidden"
-                      >
-                        <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-slate-600 dark:bg-slate-400 text-[9px] font-semibold leading-none text-white dark:text-slate-900">
-                          {band.index}
-                        </span>
-                        {wide && (
-                          <span className="truncate text-[10px] font-medium leading-none text-slate-500 dark:text-slate-400">
-                            {band.brk.totalDaysOff} days off &middot; {band.brk.ptoCost} PTO
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {leadingLabels.map(({ seg, band }) => (
+                    <div
+                      key={`label-${seg.colStart}`}
+                      // Spans past the band's own width on purpose (into implicit grid
+                      // columns beyond the 7 real day columns, clipped by `truncate` below
+                      // if it still doesn't fit) - the label always shows the full result,
+                      // not just the number, the same as a wide band already did.
+                      style={{ gridColumn: `${seg.colStart + 1} / ${Math.min(seg.colEnd + 1, 7) + 4}` }}
+                      className="flex items-center gap-1 overflow-hidden"
+                    >
+                      <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-slate-600 dark:bg-slate-400 text-[9px] font-semibold leading-none text-white dark:text-slate-900">
+                        {band.index}
+                      </span>
+                      <span className="truncate text-[10px] font-medium leading-none text-slate-500 dark:text-slate-400">
+                        {band.brk.totalDaysOff} days off &middot; {band.brk.ptoCost} PTO
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
               <div className="relative grid grid-cols-7 gap-x-1" style={{ gridTemplateRows: '3rem' }}>
