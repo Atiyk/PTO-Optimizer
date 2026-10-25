@@ -76,6 +76,8 @@ function fullState(overrides: Partial<WriteStateInput> = {}): WriteStateInput {
     blackouts: [],
     workWeek: DEFAULT_WORK_WEEK,
     forced: {},
+    altFridayEnabled: false,
+    altFridayStart: '',
     ...overrides,
   };
 }
