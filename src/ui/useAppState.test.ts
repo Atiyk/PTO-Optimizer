@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { defaultRangeEnd } from './useAppState';
+import { defaultRangeEnd, discoverSubdivisions } from './useAppState';
+import type { Holiday } from '../data/holidays';
 
 describe('defaultRangeEnd (Phase 2, bug found: always stuck to the current year)', () => {
   // Nothing in the solver/holiday-fetch/date-arithmetic layer actually blocks a
@@ -26,5 +27,35 @@ describe('defaultRangeEnd (Phase 2, bug found: always stuck to the current year)
 
   it('rolls forward correctly across a leap year boundary', () => {
     expect(defaultRangeEnd('2027-12-20')).toBe('2028-12-31');
+  });
+});
+
+function makeHoliday(overrides: Partial<Holiday> = {}): Holiday {
+  return { date: '2027-01-01', nominalDate: '2027-01-01', name: 'Test holiday', countryCode: 'DE', counties: null, ...overrides };
+}
+
+describe('discoverSubdivisions (Phase 2: subdivisions via the counties field, any country)', () => {
+  it('collects unique subdivision codes from holidays that carry them', () => {
+    const holidays = [
+      makeHoliday({ counties: ['DE-BW', 'DE-BY'] }),
+      makeHoliday({ counties: ['DE-BE'] }),
+      makeHoliday({ counties: null }), // national holiday - no counties
+    ];
+    expect(discoverSubdivisions(holidays)).toEqual(['DE-BE', 'DE-BW', 'DE-BY']);
+  });
+
+  it('deduplicates a code that appears on multiple holidays', () => {
+    const holidays = [makeHoliday({ counties: ['DE-BY'] }), makeHoliday({ counties: ['DE-BY', 'DE-BW'] })];
+    expect(discoverSubdivisions(holidays)).toEqual(['DE-BW', 'DE-BY']);
+  });
+
+  it('returns an empty list when nothing has subdivision data - the "no subdivisions" case, not a crash', () => {
+    expect(discoverSubdivisions([makeHoliday({ counties: null })])).toEqual([]);
+    expect(discoverSubdivisions([])).toEqual([]);
+  });
+
+  it('is not tied to any particular country - works for any code shape', () => {
+    const holidays = [makeHoliday({ countryCode: 'JP', counties: ['JP-13'] })];
+    expect(discoverSubdivisions(holidays)).toEqual(['JP-13']);
   });
 });

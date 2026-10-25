@@ -121,7 +121,11 @@ export function App() {
 
       {adjustOpen && (
         <div className="flex flex-col gap-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-4">
-          <SubdivisionSelect country={state.country} subdivision={state.subdivision} onChangeSubdivision={state.setSubdivision} />
+          <SubdivisionSelect
+            subdivisions={state.discoveredSubdivisions}
+            subdivision={state.subdivision}
+            onChangeSubdivision={state.setSubdivision}
+          />
 
           <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             <input

@@ -158,3 +158,23 @@ export async function getHolidaysWithStatus(
   const { holidays, degraded } = await fetchYears(countryCode, rangeStart, rangeEnd);
   return { holidays: filterAndSort(holidays, rangeStart, rangeEnd, subdivision), degraded };
 }
+
+/**
+ * BUG FOUND (Phase 2): `appliesToSubdivision` strips every county-specific holiday out of
+ * the result whenever no subdivision is passed (`if (!subdivision) return false`) - exactly
+ * backwards for "which subdivisions does this country even have", which needs to see the
+ * county-specific holidays BEFORE any subdivision is picked, not after. getHolidays/
+ * getHolidaysWithStatus can't be reused for this - confirmed empirically: a real DE 2027
+ * fetch with no subdivision came back with zero `counties` entries, even though the same
+ * range fetched WITH subdivision='DE-BY' correctly returned 3 Bavaria-specific holidays.
+ * This bypasses the subdivision filter entirely (date-range filter still applies) so a
+ * caller can see every county-specific holiday regardless of selection.
+ */
+export async function getSubdivisionCandidates(
+  countryCode: string,
+  rangeStart: string,
+  rangeEnd: string,
+): Promise<Holiday[]> {
+  const { holidays } = await fetchYears(countryCode, rangeStart, rangeEnd);
+  return holidays.filter((h) => h.counties && h.date >= rangeStart && h.date <= rangeEnd);
+}

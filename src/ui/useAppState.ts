@@ -3,7 +3,7 @@ import { solve, computeScores } from '../solver/solve';
 import { computeMarginalValues } from '../solver/marginalValue';
 import type { Alternative, Break, Scores, SolveInput, SolveResult, WorkWeek } from '../solver/types';
 import { DEFAULT_WORK_WEEK } from '../solver/types';
-import { getHolidays, getHolidaysWithStatus, type Holiday } from '../data/holidays';
+import { getHolidays, getHolidaysWithStatus, getSubdivisionCandidates, type Holiday } from '../data/holidays';
 import { getStateHolidaysFallback } from '../data/usStateHolidays';
 import { geolocateCountry } from './geo';
 import { activeCountryPreset } from '../data/countryPresets';
@@ -61,6 +61,21 @@ function yearsBetween(rangeStart: string, rangeEnd: string): number[] {
 
 function totalDaysOffOf(breaks: { totalDaysOff: number }[]): number {
   return breaks.reduce((s, b) => s + b.totalDaysOff, 0);
+}
+
+/**
+ * Phase 2: which subdivisions exist for a country/range, discovered from the `counties`
+ * field its actual fetched holidays already carry - not a static per-country list. Works
+ * for any country that has county-specific holidays, not just a hardcoded few (confirmed
+ * directly: a real German 2027 holidays fetch already returns DE-BW/DE-BY/DE-ST etc. on
+ * Epiphany, with nothing special needed to read it).
+ */
+export function discoverSubdivisions(holidays: Holiday[]): string[] {
+  const set = new Set<string>();
+  for (const h of holidays) {
+    if (h.counties) for (const c of h.counties) set.add(c);
+  }
+  return Array.from(set).sort();
 }
 
 /** Everything restorePlan needs to put every input back exactly - deliberately the same
@@ -310,9 +325,20 @@ export function useAppState() {
     };
   }, [country, rangeStart, rangeEnd]);
 
+  /**
+   * BUG FOUND (Phase 2): this effect used to gate on `country !== 'US'` - subdivision
+   * selection existed for GB/CA/AU in the old hardcoded SUBDIVISIONS map, but picking a
+   * state/province there never actually fetched subdivision-filtered holidays at all; the
+   * selector did something visible while doing nothing underneath. Confirmed directly: a
+   * real German holidays request for 2027 already returns proper `counties` data
+   * (DE-BW/DE-BY/DE-ST for Epiphany, etc.) - nothing about this needed to be US-only.
+   * `getStateHolidaysFallback` (the static supplementary table) genuinely IS US-specific
+   * (see usStateHolidays.ts's own comment on Nager.Date's thin US county coverage), so that
+   * part alone stays gated to US; the live-fetch-and-filter part now works for any country.
+   */
   useEffect(() => {
     let cancelled = false;
-    if (country !== 'US' || !subdivision) {
+    if (!subdivision) {
       setStateHolidayCandidates([]);
       return;
     }
@@ -320,14 +346,16 @@ export function useAppState() {
       const withSubdivision = await getHolidays(country, rangeStart, rangeEnd, subdivision);
       const stateOnly = withSubdivision.filter((h) => h.counties);
 
-      const seen = new Set(stateOnly.map((h) => `${h.date}|${h.name}`));
-      for (const year of yearsBetween(rangeStart, rangeEnd)) {
-        for (const fallback of getStateHolidaysFallback(subdivision, year)) {
-          const key = `${fallback.date}|${fallback.name}`;
-          if (seen.has(key)) continue;
-          if (fallback.date < rangeStart || fallback.date > rangeEnd) continue;
-          seen.add(key);
-          stateOnly.push({ date: fallback.date, nominalDate: fallback.date, name: fallback.name, countryCode: country, counties: [subdivision] });
+      if (country === 'US') {
+        const seen = new Set(stateOnly.map((h) => `${h.date}|${h.name}`));
+        for (const year of yearsBetween(rangeStart, rangeEnd)) {
+          for (const fallback of getStateHolidaysFallback(subdivision, year)) {
+            const key = `${fallback.date}|${fallback.name}`;
+            if (seen.has(key)) continue;
+            if (fallback.date < rangeStart || fallback.date > rangeEnd) continue;
+            seen.add(key);
+            stateOnly.push({ date: fallback.date, nominalDate: fallback.date, name: fallback.name, countryCode: country, counties: [subdivision] });
+          }
         }
       }
 
@@ -337,6 +365,23 @@ export function useAppState() {
       cancelled = true;
     };
   }, [country, rangeStart, rangeEnd, subdivision]);
+
+  // BUG FOUND (Phase 2): nationalHolidays can't be used for this - getHolidaysWithStatus's
+  // own subdivision filter strips every county-specific holiday out when no subdivision is
+  // passed (see getSubdivisionCandidates's comment in holidays.ts for the empirical check
+  // that found this). Fetched separately via the one function that bypasses that filter.
+  const [subdivisionCandidates, setSubdivisionCandidates] = useState<Holiday[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    getSubdivisionCandidates(country, rangeStart, rangeEnd).then((holidays) => {
+      if (!cancelled) setSubdivisionCandidates(holidays);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [country, rangeStart, rangeEnd]);
+
+  const discoveredSubdivisions = useMemo(() => discoverSubdivisions(subdivisionCandidates), [subdivisionCandidates]);
 
   const holidayEntries: HolidayEntry[] = useMemo(() => {
     const national: HolidayEntry[] = nationalHolidays
@@ -753,6 +798,7 @@ export function useAppState() {
     setCountry: changeCountry,
     subdivision,
     setSubdivision,
+    discoveredSubdivisions,
     rangeStart,
     setRangeStart,
     rangeEnd,

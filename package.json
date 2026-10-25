@@ -10,7 +10,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "NODE_OPTIONS=--no-experimental-webstorage vitest run",
-    "build:demand-index": "tsx scripts/build-demand-index.ts"
+    "build:demand-index": "tsx scripts/build-demand-index.ts",
+    "build:countries": "tsx scripts/build-countries.ts"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
