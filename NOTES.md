@@ -2146,3 +2146,41 @@ throughout (Nager.Date needs no key; Plausible's embed script needs no key).
 above). New this phase: `CalendarErrorBoundary.test.tsx`, `validation.test.ts`, plus dark-mode
 regression blocks added to `colorScheme.test.ts` and `scoreFormat.test.ts`, plus
 `getHolidaysWithStatus` coverage added to `holidays.test.ts`. `tsc`/`build`/`lint` all clean.
+
+## Phase 16 - Live on Vercel: public access, Web Analytics, git author verification
+
+Pushed to GitHub (`Atiyk/PTO-Optimizer`) and connected to Vercel. Three things needed fixing
+beyond the deploy config already shipped in Phase 15 (`vercel.json`):
+
+**Deployment Protection was on by default.** Vercel's "Vercel Authentication" (Require Log
+In, Standard Protection) was enabled on project creation, which means every visitor would
+have been redirected to a Vercel login wall and required to be a member of the project's
+team to see the site at all - silently defeating the entire point of Phase 1's shareable
+exits (a URL, an .ics file, an image - all useless if the link behind them demands a Vercel
+login). Disabled under Project Settings -> Deployment Protection. Password Protection was
+already off (and is Pro-plan only). Verified live: the production URL now loads directly for
+an unauthenticated visitor, no SSO redirect.
+
+**Vercel Web Analytics added alongside the existing Plausible tracking.** Separate product
+from the six custom events tracked in `src/ui/analytics.ts` (Phase 4) - this is Vercel's own
+pageview/visitor counter, enabled by installing `@vercel/analytics` and mounting
+`<Analytics />` once in `main.tsx` (covers all 7 entry points - the root app plus the six
+country landing pages - since they all load the same `/src/main.tsx`). No dashboard toggle
+exists for it; it activates the moment a deployment ships with the component present. Build
+and full test suite (230/230, one flaky performance-timing test re-confirmed in isolation)
+verified clean before pushing.
+
+**First post-launch deployment was blocked by git author verification.** Vercel's Git
+integration refuses to build a deployment whose commit author email can't be matched to a
+verified email on the connected GitHub account - a security measure against unauthorized
+pushes building production deployments. The repo's commits so far all carried
+machine-autodetected git identities (`atiykahmeed@mac.lan`,
+`atiykahmeed@Atiyks-MacBook-Air.local`, etc. - visible via `git log --format='%an <%ae>'`),
+none of which match any GitHub-verified email, so the very first git-push-triggered
+deployment (the Analytics commit) came back status "Blocked" rather than building. Fixed by
+setting `git config user.email`/`user.name` explicitly in this repo to the account's real
+address, then pushing a new commit (this one) rather than rewriting/force-pushing the already
+-blocked commit - that earlier blocked deployment is harmless and left alone.
+
+No code in the solver, UI, or export paths changed in this phase - deploy/account
+configuration only.
