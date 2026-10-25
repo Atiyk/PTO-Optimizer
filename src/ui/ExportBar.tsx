@@ -56,10 +56,12 @@ export function ActionButton({
   label,
   onClick,
   variant = 'secondary',
+  id,
 }: {
   label: string;
   onClick: () => Promise<ActionResult>;
   variant?: 'primary' | 'secondary';
+  id?: string;
 }) {
   const [message, setMessage] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
@@ -67,6 +69,7 @@ export function ActionButton({
   return (
     <button
       type="button"
+      id={id}
       disabled={working}
       onClick={async () => {
         setWorking(true);
@@ -106,6 +109,7 @@ export function ExportBar(props: ExportBarProps) {
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-2">
         <ActionButton
+          id="shortcut-download-ics"
           label="Add to calendar (.ics)"
           variant="primary"
           onClick={async () => {
@@ -144,6 +148,7 @@ export function ExportBar(props: ExportBarProps) {
           }}
         />
         <ActionButton
+          id="shortcut-copy-link"
           label="Copy link"
           onClick={async () => {
             if (typeof window === 'undefined') return { ok: false, message: "Couldn't copy — try again" };

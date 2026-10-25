@@ -83,6 +83,40 @@ function totalDaysOffOf(breaks: { totalDaysOff: number }[]): number {
   return breaks.reduce((s, b) => s + b.totalDaysOff, 0);
 }
 
+/** Everything restorePlan needs to put every input back exactly - deliberately the same
+ * fields the shareable URL carries, since "a plan" is defined by the same input set either
+ * way (Phase 3 item 7). */
+export interface PlanSnapshot {
+  country: string;
+  subdivision: string | undefined;
+  rangeStart: string;
+  rangeEnd: string;
+  budget: number;
+  w: number;
+  letSolverDecide: boolean;
+  manualBreakCount: number;
+  weekStartOverride: WeekStart | 'auto';
+  accrualEnabled: boolean;
+  accrualPerMonth: number;
+  expiryEnabled: boolean;
+  expiryDate: string;
+  carryoverCap: number;
+  overlapDays: string[];
+  blackouts: string[];
+  workWeek: WorkWeek;
+  forced: Record<string, ForcedState>;
+  altFridayEnabled: boolean;
+  altFridayStart: string;
+  summary: {
+    budgetSpent: number;
+    totalDaysOff: number;
+    breakCountActual: number;
+    travelPercentile: number | null;
+  };
+}
+
+const MAX_PINNED_PLANS = 2;
+
 export interface HolidayEntry {
   date: string;
   name: string;
@@ -629,6 +663,83 @@ export function useAppState() {
     [alternatives, hoveredAlternativeId],
   );
 
+  const [pinnedPlans, setPinnedPlans] = useState<PlanSnapshot[]>([]);
+  const canPin = pinnedPlans.length < MAX_PINNED_PLANS;
+
+  const pinPlan = useCallback(() => {
+    setPinnedPlans((prev) => {
+      if (prev.length >= MAX_PINNED_PLANS) return prev;
+      const snapshot: PlanSnapshot = {
+        country,
+        subdivision,
+        rangeStart,
+        rangeEnd,
+        budget,
+        w,
+        letSolverDecide,
+        manualBreakCount,
+        weekStartOverride,
+        accrualEnabled,
+        accrualPerMonth,
+        expiryEnabled,
+        expiryDate,
+        carryoverCap,
+        overlapDays,
+        blackouts,
+        workWeek,
+        forced,
+        altFridayEnabled,
+        altFridayStart,
+        summary: {
+          budgetSpent,
+          totalDaysOff,
+          breakCountActual,
+          travelPercentile: scores?.travel.percentile ?? null,
+        },
+      };
+      return [...prev, snapshot];
+    });
+  }, [
+    country, subdivision, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
+    weekStartOverride, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap,
+    overlapDays, blackouts, workWeek, forced, altFridayEnabled, altFridayStart,
+    budgetSpent, totalDaysOff, breakCountActual, scores,
+  ]);
+
+  // Restores every input the snapshot carries - the raw setters (not `changeCountry`, which
+  // also clears subdivision) so a pinned plan's subdivision comes back too.
+  const restorePlan = useCallback(
+    (index: number) => {
+      const snap = pinnedPlans[index];
+      if (!snap) return;
+      setCountry(snap.country);
+      setSubdivision(snap.subdivision);
+      setRangeStart(snap.rangeStart);
+      setRangeEnd(snap.rangeEnd);
+      setBudget(snap.budget);
+      setW(snap.w);
+      setLetSolverDecide(snap.letSolverDecide);
+      setManualBreakCount(snap.manualBreakCount);
+      setWeekStartOverride(snap.weekStartOverride);
+      setAccrualEnabled(snap.accrualEnabled);
+      setAccrualPerMonth(snap.accrualPerMonth);
+      setExpiryEnabled(snap.expiryEnabled);
+      setExpiryDate(snap.expiryDate);
+      setCarryoverCap(snap.carryoverCap);
+      setOverlapDays(snap.overlapDays);
+      setBlackouts(snap.blackouts);
+      setWorkWeek(snap.workWeek);
+      setForced(snap.forced);
+      setAltFridayEnabled(snap.altFridayEnabled);
+      setAltFridayStart(snap.altFridayStart);
+    },
+    [pinnedPlans],
+  );
+
+  const removePinnedPlan = useCallback((index: number) => {
+    setPinnedPlans((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
   const planNextYear = useCallback(() => {
     const shifted = shiftRangeToNextYear(rangeStart, rangeEnd);
     setRangeStart(shifted.rangeStart);
@@ -752,6 +863,11 @@ export function useAppState() {
     toggleDay,
     forced,
     planNextYear,
+    pinnedPlans,
+    canPin,
+    pinPlan,
+    restorePlan,
+    removePinnedPlan,
   };
 }
 
