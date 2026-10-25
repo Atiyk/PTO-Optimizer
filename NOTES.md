@@ -2184,3 +2184,40 @@ address, then pushing a new commit (this one) rather than rewriting/force-pushin
 
 No code in the solver, UI, or export paths changed in this phase - deploy/account
 configuration only.
+
+## Phase 17 - .ics reminders, consolidated "Days I can't take off", 9/80, pin-compare, keyboard shortcuts, .ics import, instrumentation
+
+A "your next break, N days away" banner was built for this phase and then cut before
+shipping - removed entirely (component, its tests, and the now-unused `planNextYear`/
+`shiftRangeToNextYear` helpers it alone depended on) rather than left disabled or dead.
+
+Nine-item feature spec, built on top of Phase 1 (solver bug hunt) and Phase 2 (arbitrary
+date ranges, visible export). Full writeup of each item's own bugs/decisions lives in the
+relevant test files' comments (`icsExport.test.ts`, `requestText.test.ts`, `MoreOptions.
+test.tsx`, `calendarMath.test.ts`, `NextBreakBanner.test.tsx`); this section is specifically
+about the two new analytics events and the product decision they gate.
+
+**Two new Plausible events, `returned_with_saved_url` and `team_days_used`** (src/ui/
+analytics.ts, wired in useAppState.ts). Both are instrumentation for a decision, not
+features themselves:
+
+- `returned_with_saved_url` fires once, only when the page loads with a full plan already
+  in the query string (`s` and `b` both present in the RAW incoming search, read before
+  this app's own URL-sync effect rewrites the address bar with a full param set regardless
+  of how the visitor arrived - reading the URL again after that effect would always say
+  "true" and destroy the signal). This answers: is the annual-return problem real? Do
+  people actually keep and reopen their shared plan link later, or is every visit a fresh
+  one-shot session?
+- `team_days_used` fires once per session, the moment the overlap/team-days input first
+  becomes non-empty (typed manually, or prefilled via a partner's overlap link - both count
+  equally). This answers: does anyone actually care about coordinating PTO with other
+  people, which is the only direction in this product with a paying customer in it (a team/
+  org plan).
+
+**These two numbers decide whether a paid team version is worth building. Do not build
+payment infrastructure, accounts, or a team tier before they say something** - that was the
+user's own explicit instruction for this phase, not a general don't-speculate habit. Per the
+same spec: no email reminders, no email capture, no OAuth calendar sync, no accounts, no
+backend of any kind - the .ics reminder (client-side, lands in the user's real calendar app)
+already delivers the notification this product needs without any of that infrastructure or
+its GDPR/unsubscribe obligations.

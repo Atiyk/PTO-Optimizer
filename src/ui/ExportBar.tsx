@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Break } from '../solver/types';
 import type { DayCategory } from './types';
 import type { WeekStart } from './calendarMath';
-import { downloadICS } from './icsExport';
+import { downloadICS, type ReminderOptions } from './icsExport';
 import { copyShareImage, buildShareImageMonths } from './imageExport';
 import { copyText } from './requestText';
 import { track } from './analytics';
@@ -56,10 +56,12 @@ export function ActionButton({
   label,
   onClick,
   variant = 'secondary',
+  id,
 }: {
   label: string;
   onClick: () => Promise<ActionResult>;
   variant?: 'primary' | 'secondary';
+  id?: string;
 }) {
   const [message, setMessage] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
@@ -67,6 +69,7 @@ export function ActionButton({
   return (
     <button
       type="button"
+      id={id}
       disabled={working}
       onClick={async () => {
         setWorking(true);
@@ -95,16 +98,22 @@ export function ActionButton({
 export function ExportBar(props: ExportBarProps) {
   const siteUrl = typeof window !== 'undefined' ? window.location.host : 'pto-optimizer.app';
 
+  // Default on, 14 days - a UI-level default; generateICS/downloadICS themselves default to
+  // disabled (see icsExport.ts) so every other caller is unaffected.
+  const [remindersEnabled, setRemindersEnabled] = useState(true);
+  const [leadDays, setLeadDays] = useState<ReminderOptions['leadDays']>(14);
+
   const isOutOfRange = (iso: string) => iso < props.rangeStart || iso > props.rangeEnd;
 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-2">
         <ActionButton
+          id="shortcut-download-ics"
           label="Add to calendar (.ics)"
           variant="primary"
           onClick={async () => {
-            downloadICS(props.breaks, props.isSuggestedPto);
+            downloadICS(props.breaks, props.isSuggestedPto, { enabled: remindersEnabled, leadDays });
             track('ICS downloaded');
             return { ok: true, message: 'Downloaded' };
           }}
@@ -139,6 +148,7 @@ export function ExportBar(props: ExportBarProps) {
           }}
         />
         <ActionButton
+          id="shortcut-copy-link"
           label="Copy link"
           onClick={async () => {
             if (typeof window === 'undefined') return { ok: false, message: "Couldn't copy — try again" };
@@ -148,6 +158,29 @@ export function ExportBar(props: ExportBarProps) {
           }}
         />
       </div>
+      <label className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+        <input
+          type="checkbox"
+          checked={remindersEnabled}
+          onChange={(e) => setRemindersEnabled(e.target.checked)}
+        />
+        Remind me to request time off
+        {remindersEnabled && (
+          <>
+            <select
+              value={leadDays}
+              onChange={(e) => setLeadDays(Number(e.target.value) as ReminderOptions['leadDays'])}
+              className="rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-1 py-0.5 text-xs text-slate-600 dark:text-slate-300"
+              aria-label="Reminder lead time"
+            >
+              <option value={7}>7 days before</option>
+              <option value={14}>14 days before</option>
+              <option value={30}>30 days before</option>
+            </select>
+            <span>&mdash; lands in the .ics file above</span>
+          </>
+        )}
+      </label>
       <p className="text-xs text-slate-400 dark:text-slate-500">Free, no sign-up, no email.</p>
     </div>
   );

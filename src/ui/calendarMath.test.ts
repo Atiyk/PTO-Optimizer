@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildMonths, computeBandSegments, computeQualifyingRuns } from './calendarMath';
+import { buildMonths, computeBandSegments, computeQualifyingRuns, isAlternatingFridayOff } from './calendarMath';
 
 describe('buildMonths week start', () => {
   it('defaults to Monday-first (column 0)', () => {
@@ -147,5 +147,48 @@ describe('computeBandSegments', () => {
       totalSegments += computeBandSegments(week, runs).length;
     }
     expect(totalSegments).toBe(0);
+  });
+});
+
+describe('isAlternatingFridayOff (Phase 3: 9/80 compressed schedule primitive)', () => {
+  // Jan 1 2026 is a Thursday (see buildMonths test above), so Jan Fridays are: 2, 9, 16, 23, 30.
+  const anchor = '2026-01-02';
+
+  it('the anchor Friday itself is off', () => {
+    expect(isAlternatingFridayOff('2026-01-02', anchor)).toBe(true);
+  });
+
+  it('the very next Friday (one week later) is NOT off - this is the whole point of "every OTHER Friday"', () => {
+    expect(isAlternatingFridayOff('2026-01-09', anchor)).toBe(false);
+  });
+
+  it('the Friday two weeks later is off again', () => {
+    expect(isAlternatingFridayOff('2026-01-16', anchor)).toBe(true);
+  });
+
+  it('alternates correctly across several cycles, forward and across a month boundary', () => {
+    expect(isAlternatingFridayOff('2026-01-23', anchor)).toBe(false);
+    expect(isAlternatingFridayOff('2026-01-30', anchor)).toBe(true);
+    expect(isAlternatingFridayOff('2026-02-13', anchor)).toBe(true); // 6 weeks after anchor
+    expect(isAlternatingFridayOff('2026-02-06', anchor)).toBe(false); // 5 weeks after anchor
+  });
+
+  it('a date BEFORE the anchor still follows the same 14-day cadence', () => {
+    expect(isAlternatingFridayOff('2025-12-19', anchor)).toBe(true); // 2 weeks before anchor
+    expect(isAlternatingFridayOff('2025-12-26', anchor)).toBe(false); // 1 week before anchor
+  });
+
+  it('never true for a day that is not a Friday, regardless of cadence', () => {
+    expect(isAlternatingFridayOff('2026-01-01', anchor)).toBe(false); // Thursday
+    expect(isAlternatingFridayOff('2026-01-03', anchor)).toBe(false); // Saturday
+  });
+
+  it('is independent of which Friday in the cadence is used as the anchor', () => {
+    // Anchoring on Jan 16 instead of Jan 2 (both "on" Fridays in the same real-world
+    // schedule) must produce the identical on/off pattern.
+    const altAnchor = '2026-01-16';
+    for (const d of ['2025-12-19', '2026-01-02', '2026-01-09', '2026-01-16', '2026-01-23', '2026-01-30']) {
+      expect(isAlternatingFridayOff(d, altAnchor)).toBe(isAlternatingFridayOff(d, anchor));
+    }
   });
 });

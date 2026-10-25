@@ -1,4 +1,4 @@
-import { parseISO, rangeISO } from '../solver/dateUtils';
+import { parseISO, rangeISO, mondayIndexedDow, isoToSerial } from '../solver/dateUtils';
 
 /** 0 = weeks start Sunday, 1 = weeks start Monday. Display-only - independent of the solver's WorkWeek. */
 export type WeekStart = 0 | 1;
@@ -147,6 +147,26 @@ export function computeBandSegments(weekDates: (string | null)[], runs: OffRun[]
     }
   });
   return segments;
+}
+
+/**
+ * Phase 3 spec item 5: a 4-day week (every Friday off, every week) is already fully
+ * supported by the existing weekly `workWeek` checkboxes - confirmed empirically, nothing
+ * to build. A 9/80 schedule (every OTHER Friday off) is structurally different: `WorkWeek`
+ * is a 7-length boolean array with no notion of week parity, so it can only express "this
+ * weekday is always off" or "always working" - never "off every other occurrence".
+ * Confirmed empirically: unchecking Friday in `workWeek` to approximate 9/80 makes EVERY
+ * Friday free, not alternating ones, silently overstating the real schedule. Rather than
+ * build a general recurrence engine for one case, this is the narrow primitive a 9/80
+ * pattern actually needs: true if `iso` is a Friday on the same 14-day cadence as
+ * `anchorFriday`. `anchorFriday` doesn't need to be in-range itself - only which 14-day
+ * bucket it falls in matters, which is why the modulo is taken on the raw day serial, not
+ * on any particular range.
+ */
+export function isAlternatingFridayOff(iso: string, anchorFriday: string): boolean {
+  if (mondayIndexedDow(iso) !== 4) return false; // not a Friday
+  const diff = isoToSerial(iso) - isoToSerial(anchorFriday);
+  return ((diff % 14) + 14) % 14 === 0;
 }
 
 export function monthLabel(year: number, month: number): string {

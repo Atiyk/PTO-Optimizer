@@ -26,6 +26,11 @@ export function formatShort(iso: string): string {
   return `${MONTH_SHORT[m - 1]} ${d}`;
 }
 
+export function monthShortName(iso: string): string {
+  const { m } = parseISO(iso);
+  return MONTH_SHORT[m - 1];
+}
+
 export function formatLong(iso: string): string {
   const { y, m, d } = parseISO(iso);
   return `${MONTH_LONG[m - 1]} ${d}, ${y}`;

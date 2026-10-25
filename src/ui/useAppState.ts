@@ -7,7 +7,7 @@ import { getHolidays, getHolidaysWithStatus, type Holiday } from '../data/holida
 import { getStateHolidaysFallback } from '../data/usStateHolidays';
 import { geolocateCountry } from './geo';
 import { activeCountryPreset } from '../data/countryPresets';
-import { computeQualifyingRuns, type WeekStart } from './calendarMath';
+import { computeQualifyingRuns, isAlternatingFridayOff, type WeekStart } from './calendarMath';
 import { weekStartForCountry } from './locale';
 import { mondayIndexedDow, rangeISO } from '../solver/dateUtils';
 import { readFullStateFromURL, writeFullStateToURL, readOverlapPayloadFromURL, buildOverlapShareURL } from './urlState';
@@ -63,6 +63,40 @@ function totalDaysOffOf(breaks: { totalDaysOff: number }[]): number {
   return breaks.reduce((s, b) => s + b.totalDaysOff, 0);
 }
 
+/** Everything restorePlan needs to put every input back exactly - deliberately the same
+ * fields the shareable URL carries, since "a plan" is defined by the same input set either
+ * way (Phase 3 item 7). */
+export interface PlanSnapshot {
+  country: string;
+  subdivision: string | undefined;
+  rangeStart: string;
+  rangeEnd: string;
+  budget: number;
+  w: number;
+  letSolverDecide: boolean;
+  manualBreakCount: number;
+  weekStartOverride: WeekStart | 'auto';
+  accrualEnabled: boolean;
+  accrualPerMonth: number;
+  expiryEnabled: boolean;
+  expiryDate: string;
+  carryoverCap: number;
+  overlapDays: string[];
+  blackouts: string[];
+  workWeek: WorkWeek;
+  forced: Record<string, ForcedState>;
+  altFridayEnabled: boolean;
+  altFridayStart: string;
+  summary: {
+    budgetSpent: number;
+    totalDaysOff: number;
+    breakCountActual: number;
+    travelPercentile: number | null;
+  };
+}
+
+const MAX_PINNED_PLANS = 2;
+
 export interface HolidayEntry {
   date: string;
   name: string;
@@ -102,9 +136,28 @@ export function useAppState() {
         workWeek: DEFAULT_WORK_WEEK,
         pinnedDays: [],
         ruledOutDays: [],
+        altFridayEnabled: false,
+        altFridayStart: undefined,
       };
     }
     return readFullStateFromURL(window.location.search, defaults);
+  }, []);
+
+  // 'returned_with_saved_url' (Phase 3 item 9): fired once, only when the page was loaded
+  // with a full plan already in the query string - evidence someone kept/reopened a
+  // previously-shared link, as opposed to a fresh visit with no state to read. Captured
+  // from the RAW incoming search string, at mount, before this component's own URL-sync
+  // effect (below) rewrites the address bar with a full set of params regardless of how
+  // the visitor arrived - checking `window.location.search` again after that effect runs
+  // would always read "true" and defeat the whole signal.
+  const arrivedWithSavedUrl = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    return params.has('s') && params.has('b');
+  }, []);
+  useEffect(() => {
+    if (arrivedWithSavedUrl) track('returned_with_saved_url');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [country, setCountry] = useState<string>(initial.country ?? geolocateCountry());
@@ -155,8 +208,27 @@ export function useAppState() {
     if (overlapPayload.length > 0) track('Overlap link opened');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 'team_days_used' (Phase 3 item 9): fired once per session, the moment the overlap/team-
+  // days input first becomes non-empty - whether the visitor typed a date in manually or
+  // arrived via a partner's overlap link (both are genuinely "someone used the team-days
+  // feature"). A ref guard, not a dependency check, so toggling overlap days on/off/on
+  // again later doesn't re-fire it.
+  const firedTeamDaysUsedRef = useRef(false);
+  useEffect(() => {
+    if (overlapDays.length > 0 && !firedTeamDaysUsedRef.current) {
+      firedTeamDaysUsedRef.current = true;
+      track('team_days_used');
+    }
+  }, [overlapDays]);
   const [workWeek, setWorkWeek] = useState<WorkWeek>(initial.workWeek);
   const [blackouts, setBlackouts] = useState<string[]>(initial.blackouts);
+
+  // 9/80 compressed schedule (Phase 3 item 5): a plain weekly workWeek array can't express
+  // "every OTHER Friday off" - see calendarMath.ts's isAlternatingFridayOff for why. This is
+  // the narrow, dedicated primitive instead of a general recurrence engine.
+  const [altFridayEnabled, setAltFridayEnabled] = useState(initial.altFridayEnabled ?? false);
+  const [altFridayStart, setAltFridayStart] = useState(initial.altFridayStart ?? '');
 
   const [nationalHolidays, setNationalHolidays] = useState<Holiday[]>([]);
   const [stateHolidayCandidates, setStateHolidayCandidates] = useState<Holiday[]>([]);
@@ -194,6 +266,8 @@ export function useAppState() {
       blackouts,
       workWeek,
       forced,
+      altFridayEnabled,
+      altFridayStart,
     });
     window.history.replaceState(null, '', url);
   }, [
@@ -214,6 +288,8 @@ export function useAppState() {
     blackouts,
     workWeek,
     forced,
+    altFridayEnabled,
+    altFridayStart,
   ]);
 
   // Graceful failure: a network/API failure degrades to cached data (if any was already
@@ -283,10 +359,19 @@ export function useAppState() {
   // already-off and never actually guaranteed it would appear in the plan at all (confirmed
   // broken at breakCount=1 and breakCount=7 - see NOTES.md). It's passed separately as
   // mustIncludeDays now; solve() itself reserves its cost and guarantees its presence.
+  // The 9/80 off-Fridays within the current range - computed and merged exactly like a
+  // holiday list (free, no PTO cost), not treated as a weekend via workWeek, since
+  // workWeek has no notion of week parity (see calendarMath.ts's own comment).
+  const altFridayOffDates = useMemo(() => {
+    if (!altFridayEnabled || !altFridayStart) return [];
+    return rangeISO(rangeStart, rangeEnd).filter((d) => isAlternatingFridayOff(d, altFridayStart));
+  }, [altFridayEnabled, altFridayStart, rangeStart, rangeEnd]);
+
   const effectiveOffDays = useMemo(() => {
     const set = new Set(holidayEntries.filter((h) => h.checked).map((h) => h.date));
+    for (const d of altFridayOffDates) set.add(d);
     return Array.from(set);
-  }, [holidayEntries]);
+  }, [holidayEntries, altFridayOffDates]);
 
   const mustIncludeDays = useMemo(
     () => Object.entries(forced).filter(([, state]) => state === 'include').map(([date]) => date),
@@ -558,6 +643,83 @@ export function useAppState() {
     [alternatives, hoveredAlternativeId],
   );
 
+  const [pinnedPlans, setPinnedPlans] = useState<PlanSnapshot[]>([]);
+  const canPin = pinnedPlans.length < MAX_PINNED_PLANS;
+
+  const pinPlan = useCallback(() => {
+    setPinnedPlans((prev) => {
+      if (prev.length >= MAX_PINNED_PLANS) return prev;
+      const snapshot: PlanSnapshot = {
+        country,
+        subdivision,
+        rangeStart,
+        rangeEnd,
+        budget,
+        w,
+        letSolverDecide,
+        manualBreakCount,
+        weekStartOverride,
+        accrualEnabled,
+        accrualPerMonth,
+        expiryEnabled,
+        expiryDate,
+        carryoverCap,
+        overlapDays,
+        blackouts,
+        workWeek,
+        forced,
+        altFridayEnabled,
+        altFridayStart,
+        summary: {
+          budgetSpent,
+          totalDaysOff,
+          breakCountActual,
+          travelPercentile: scores?.travel.percentile ?? null,
+        },
+      };
+      return [...prev, snapshot];
+    });
+  }, [
+    country, subdivision, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
+    weekStartOverride, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap,
+    overlapDays, blackouts, workWeek, forced, altFridayEnabled, altFridayStart,
+    budgetSpent, totalDaysOff, breakCountActual, scores,
+  ]);
+
+  // Restores every input the snapshot carries - the raw setters (not `changeCountry`, which
+  // also clears subdivision) so a pinned plan's subdivision comes back too.
+  const restorePlan = useCallback(
+    (index: number) => {
+      const snap = pinnedPlans[index];
+      if (!snap) return;
+      setCountry(snap.country);
+      setSubdivision(snap.subdivision);
+      setRangeStart(snap.rangeStart);
+      setRangeEnd(snap.rangeEnd);
+      setBudget(snap.budget);
+      setW(snap.w);
+      setLetSolverDecide(snap.letSolverDecide);
+      setManualBreakCount(snap.manualBreakCount);
+      setWeekStartOverride(snap.weekStartOverride);
+      setAccrualEnabled(snap.accrualEnabled);
+      setAccrualPerMonth(snap.accrualPerMonth);
+      setExpiryEnabled(snap.expiryEnabled);
+      setExpiryDate(snap.expiryDate);
+      setCarryoverCap(snap.carryoverCap);
+      setOverlapDays(snap.overlapDays);
+      setBlackouts(snap.blackouts);
+      setWorkWeek(snap.workWeek);
+      setForced(snap.forced);
+      setAltFridayEnabled(snap.altFridayEnabled);
+      setAltFridayStart(snap.altFridayStart);
+    },
+    [pinnedPlans],
+  );
+
+  const removePinnedPlan = useCallback((index: number) => {
+    setPinnedPlans((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
   const toggleDay = useCallback((date: string) => {
     setForced((prev) => {
       const current = prev[date];
@@ -637,6 +799,10 @@ export function useAppState() {
     setWorkWeek,
     blackouts,
     setBlackouts,
+    altFridayEnabled,
+    setAltFridayEnabled,
+    altFridayStart,
+    setAltFridayStart,
     holidayEntries,
     removeHoliday: (date: string, name: string) =>
       setRemovedHolidays((s) => new Set(s).add(`${date}|${name}`)),
@@ -670,6 +836,11 @@ export function useAppState() {
     breakBandByRunIndex,
     toggleDay,
     forced,
+    pinnedPlans,
+    canPin,
+    pinPlan,
+    restorePlan,
+    removePinnedPlan,
   };
 }
 
