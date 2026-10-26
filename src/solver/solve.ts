@@ -1,7 +1,7 @@
 import { rangeISO, mondayIndexedDow, monthsElapsed } from './dateUtils';
 import { DEFAULT_WORK_WEEK } from './types';
 import { demandFor } from '../data/demandIndex';
-import type { Alternative, Break, BreakTag, ISODate, Scores, SolveInput, SolveResult, WorkWeek } from './types';
+import type { Alternative, Break, BreakTag, ISODate, PeakCapInput, Scores, SolveInput, SolveResult, WorkWeek } from './types';
 
 const VALUE_MULT = 1000;
 const SENTINEL_START = '9999-12-31';
@@ -724,13 +724,14 @@ export function findAlternatives(primary: Candidate, otherPrimary: Candidate[], 
   return pool.slice(0, MAX_ALTERNATIVES_PER_BREAK);
 }
 
-export function solve(input: SolveInput): SolveResult {
+function solveCore(input: SolveInput): SolveResult {
   const workWeek = input.workWeek ?? DEFAULT_WORK_WEEK;
   const w = Math.max(0, Math.min(100, Math.round(input.w ?? DEFAULT_W)));
   const breakCountRequested = Math.max(0, Math.min(7, Math.round(input.breakCount ?? 0)));
   const days = rangeISO(input.rangeStart, input.rangeEnd);
   const n = days.length;
-  if (n === 0) return { primary: [], alternatives: [], breakCountRequested, breakCountActual: 0, budgetSpent: 0 };
+  if (n === 0)
+    return { primary: [], alternatives: [], breakCountRequested, breakCountActual: 0, budgetSpent: 0, peakCapApplied: false };
 
   const offSet = new Set(input.offDays ?? []);
   const blackoutSet = new Set(input.blackouts ?? []);
@@ -784,7 +785,7 @@ export function solve(input: SolveInput): SolveResult {
   const candidates = buildCandidates(days, isOff, isBlackout, overlapSet, input.expiryDate, input.country, maxCandidateCost);
   candidates.sort((a, b) => a.endIdx - b.endIdx || a.startIdx - b.startIdx);
   if (candidates.length === 0)
-    return { primary: [], alternatives: [], breakCountRequested, breakCountActual: 0, budgetSpent: 0 };
+    return { primary: [], alternatives: [], breakCountRequested, breakCountActual: 0, budgetSpent: 0, peakCapApplied: false };
 
   let chosen: Candidate[];
   let breakCountActual: number;
@@ -856,7 +857,90 @@ export function solve(input: SolveInput): SolveResult {
   // value out of three different solve* functions with three different DP shapes.
   const budgetSpent = chosen.reduce((s, c) => s + (input.expiryDate ? c.cost1 + c.cost2 : c.cost), 0);
 
-  return { primary, alternatives, breakCountRequested, breakCountActual, budgetSpent };
+  return { primary, alternatives, breakCountRequested, breakCountActual, budgetSpent, peakCapApplied: false };
+}
+
+const MAX_PEAK_CAP_ITERATIONS = 50;
+
+/** PTO-cost days (not free weekends/holidays) that a set of breaks spends inside
+ * [windowStart, windowEnd] - the same "is this day actually costing a PTO day" logic
+ * solveCore itself uses (isOff), recomputed here from the plain offDays/workWeek inputs
+ * since Break only carries its full day span, not a per-day free/cost flag. */
+function peakSpendInWindow(
+  breaks: Break[],
+  offSet: Set<string>,
+  workWeek: WorkWeek,
+  windowStart: ISODate,
+  windowEnd: ISODate,
+): number {
+  let spent = 0;
+  for (const b of breaks) {
+    for (const d of b.days) {
+      if (d < windowStart || d > windowEnd) continue;
+      if (!isWorkingDow(d, workWeek)) continue; // weekend - free, not PTO spend
+      if (offSet.has(d)) continue; // holiday - free, not PTO spend
+      spent++;
+    }
+  }
+  return spent;
+}
+
+/**
+ * Phase 5.1: enforces a peak-window PTO cap by repeatedly blacking out the single
+ * PTO-cost day, within the window, belonging to the LOWEST-multiplier break still
+ * crossing it, then re-solving from scratch - never touching a day the user has
+ * explicitly pinned (mustIncludeDays), since a hard user request outranks a soft employer
+ * policy default. Bounded by MAX_PEAK_CAP_ITERATIONS, generous relative to how many
+ * distinct breaks could realistically overlap one window. This is NOT a joint optimum
+ * (a true one would need a peak-budget DP dimension) - see PeakCapInput's own comment for
+ * why that scope was deliberately not taken on for a secondary, opt-in constraint.
+ */
+function enforcePeakCap(input: SolveInput, peakCap: PeakCapInput, initial: SolveResult): SolveResult {
+  if (!peakCap.enabled || peakCap.maxDays < 0 || peakCap.startDate > peakCap.endDate) {
+    return { ...initial, peakCapApplied: false };
+  }
+
+  const offSet = new Set(input.offDays ?? []);
+  const workWeek = input.workWeek ?? DEFAULT_WORK_WEEK;
+  const pinned = new Set(input.mustIncludeDays ?? []);
+  const blackouts = new Set(input.blackouts ?? []);
+
+  let result = initial;
+  let applied = false;
+
+  for (let iter = 0; iter < MAX_PEAK_CAP_ITERATIONS; iter++) {
+    const spent = peakSpendInWindow(result.primary, offSet, workWeek, peakCap.startDate, peakCap.endDate);
+    if (spent <= peakCap.maxDays) break;
+
+    const inWindow = result.primary.filter((b) =>
+      b.days.some(
+        (d) => d >= peakCap.startDate && d <= peakCap.endDate && isWorkingDow(d, workWeek) && !offSet.has(d) && !pinned.has(d),
+      ),
+    );
+    if (inWindow.length === 0) break; // every remaining in-window PTO day is pinned - cap can't be honoured further
+
+    inWindow.sort((a, b) => a.multiplier - b.multiplier || (a.start < b.start ? -1 : 1));
+    const worst = inWindow[0];
+    let removedAny = false;
+    for (const d of worst.days) {
+      if (d >= peakCap.startDate && d <= peakCap.endDate && isWorkingDow(d, workWeek) && !offSet.has(d) && !pinned.has(d)) {
+        blackouts.add(d);
+        removedAny = true;
+      }
+    }
+    if (!removedAny) break; // defensive: inWindow's own filter guarantees this, kept for safety
+
+    applied = true;
+    result = solveCore({ ...input, blackouts: Array.from(blackouts) });
+  }
+
+  return { ...result, peakCapApplied: applied };
+}
+
+export function solve(input: SolveInput): SolveResult {
+  const result = solveCore(input);
+  if (!input.peakCap) return result;
+  return enforcePeakCap(input, input.peakCap, result);
 }
 
 /** w values sampled to build the "achievable plans at this budget and break count"

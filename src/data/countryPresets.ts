@@ -17,7 +17,7 @@ export interface CountryPreset {
 
 export const COUNTRY_PRESETS: CountryPreset[] = [
   { slug: 'uk', code: 'GB', copy: 'Plan your 2027 annual leave around UK bank holidays.' },
-  { slug: 'canada', code: 'CA', copy: 'Plan your 2027 vacation days around Canadian statutory holidays.' },
+  { slug: 'canada', code: 'CA', copy: 'Plan your 2027 time off around Canadian statutory holidays.' },
   { slug: 'australia', code: 'AU', copy: 'Plan your 2027 annual leave around Australian public holidays.' },
   { slug: 'germany', code: 'DE', copy: 'Plan your 2027 Urlaub around German public holidays.' },
   { slug: 'ireland', code: 'IE', copy: 'Plan your 2027 annual leave around Irish public holidays.' },

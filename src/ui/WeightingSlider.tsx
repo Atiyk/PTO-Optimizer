@@ -42,6 +42,14 @@ export function WeightingSlider({ value, onChange }: WeightingSliderProps) {
       <p className="text-xs text-slate-600 dark:text-slate-300">
         <span className="font-medium text-slate-800 dark:text-slate-100">{value}</span> &middot; {CAPTIONS[value]}
       </p>
+      {/* Phase 5.2: "don't assume travel" - this tool is built around real travel-demand
+          data (it's the clearest public signal for how contested/busy a week is), but not
+          every PTO day is a trip: staying home, errands, appointments, rest. Not travelling
+          is a reason to set this toward 0, not a reason the slider doesn't apply. */}
+      <p className="text-xs text-slate-400 dark:text-slate-400">
+        Not travelling? Set this toward 0 &mdash; this slider is about demand on your dates, not whether you&apos;re
+        going anywhere.
+      </p>
     </div>
   );
 }

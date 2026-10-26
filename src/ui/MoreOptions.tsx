@@ -29,6 +29,15 @@ interface MoreOptionsProps {
   noticePeriodDays: number;
   onChangeNoticePeriodDays: (v: number) => void;
 
+  peakCapEnabled: boolean;
+  onTogglePeakCap: (v: boolean) => void;
+  peakCapStart: string;
+  onChangePeakCapStart: (v: string) => void;
+  peakCapEnd: string;
+  onChangePeakCapEnd: (v: string) => void;
+  peakCapMaxDays: number;
+  onChangePeakCapMaxDays: (v: number) => void;
+
   overlapDays: string[];
   onAddOverlapDay: (d: string) => void;
   onRemoveOverlapDay: (d: string) => void;
@@ -147,6 +156,61 @@ export function MoreOptions(props: MoreOptionsProps) {
         <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">
           Drives the &quot;Request by&quot; date on each break card, and the lead time for the .ics reminder above
           &mdash; the same number for both.
+        </p>
+      </section>
+
+      <section>
+        <h4 className={H4_CLASS}>Peak season limit</h4>
+        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <input
+            type="checkbox"
+            checked={props.peakCapEnabled}
+            onChange={(e) => props.onTogglePeakCap(e.target.checked)}
+          />
+          Limit how much time off I take in one window
+        </label>
+        {props.peakCapEnabled && (
+          <div className="mt-2 flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                From
+                <input
+                  type="date"
+                  value={props.peakCapStart}
+                  onChange={(e) => props.onChangePeakCapStart(e.target.value)}
+                  className={FIELD_CLASS}
+                />
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                to
+                <input
+                  type="date"
+                  value={props.peakCapEnd}
+                  onChange={(e) => props.onChangePeakCapEnd(e.target.value)}
+                  className={FIELD_CLASS}
+                />
+              </label>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              No more than
+              <input
+                type="number"
+                min={0}
+                max={365}
+                step={1}
+                value={props.peakCapMaxDays}
+                onChange={(e) => props.onChangePeakCapMaxDays(Number(e.target.value))}
+                aria-label="Maximum PTO days in the peak window"
+                className={`${FIELD_CLASS} w-20`}
+              />
+              PTO days in that window
+            </label>
+          </div>
+        )}
+        <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">
+          Off by default. Some employers cap how much leave you can take during a busy season
+          &mdash; turn this on if yours does. The rest of your budget still gets used, just moved
+          elsewhere in your range.
         </p>
       </section>
 

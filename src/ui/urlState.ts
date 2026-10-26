@@ -138,6 +138,10 @@ export interface FullURLState {
   reserveDays: number;
   unlimitedPto: boolean;
   noticePeriodDays: number;
+  peakCapEnabled: boolean;
+  peakCapStart?: string;
+  peakCapEnd?: string;
+  peakCapMaxDays: number;
 }
 
 /** Dates needed by the caller to fill in the viewer-relative fields (rangeStart/rangeEnd
@@ -203,6 +207,15 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
   const npParsed = npRaw !== null ? Number(npRaw) : NaN;
   const noticePeriodDays = Number.isFinite(npParsed) && npParsed >= 0 ? npParsed : 14;
 
+  const peakCapEnabled = params.get('pc') === '1';
+  const pcs = params.get('pcs');
+  const peakCapStart = pcs && isValidISODate(pcs) ? pcs : undefined;
+  const pce = params.get('pce');
+  const peakCapEnd = pce && isValidISODate(pce) ? pce : undefined;
+  const pcmRaw = params.get('pcm');
+  const pcmParsed = pcmRaw !== null ? Number(pcmRaw) : NaN;
+  const peakCapMaxDays = Number.isFinite(pcmParsed) && pcmParsed >= 0 ? pcmParsed : 5;
+
   return {
     country,
     subdivision,
@@ -227,6 +240,10 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
     reserveDays,
     unlimitedPto,
     noticePeriodDays,
+    peakCapEnabled,
+    peakCapStart,
+    peakCapEnd,
+    peakCapMaxDays,
   };
 }
 
@@ -253,6 +270,10 @@ export interface WriteStateInput {
   reserveDays: number;
   unlimitedPto: boolean;
   noticePeriodDays: number;
+  peakCapEnabled: boolean;
+  peakCapStart: string;
+  peakCapEnd: string;
+  peakCapMaxDays: number;
 }
 
 /** Writes the full app state into `params` in place. `country`/`rangeStart`/`rangeEnd` are
@@ -331,6 +352,18 @@ export function writeFullStateToURL(params: URLSearchParams, state: WriteStateIn
 
   if (state.noticePeriodDays !== 14) params.set('np', String(state.noticePeriodDays));
   else params.delete('np');
+
+  if (state.peakCapEnabled && state.peakCapStart && state.peakCapEnd) {
+    params.set('pc', '1');
+    params.set('pcs', state.peakCapStart);
+    params.set('pce', state.peakCapEnd);
+    params.set('pcm', String(state.peakCapMaxDays));
+  } else {
+    params.delete('pc');
+    params.delete('pcs');
+    params.delete('pce');
+    params.delete('pcm');
+  }
 
   // 'ov' (partner-overlap payload) is a one-shot input signal consumed on load, never part
   // of ongoing state - always stripped once the app re-derives the URL from its own state.

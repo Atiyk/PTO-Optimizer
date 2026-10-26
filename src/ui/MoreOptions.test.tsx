@@ -43,6 +43,14 @@ describe('MoreOptions (Phase 3: consolidated "Days I can\'t take off")', () => {
     onChangeCarryoverCap: () => {},
     noticePeriodDays: 14,
     onChangeNoticePeriodDays: () => {},
+    peakCapEnabled: false,
+    onTogglePeakCap: () => {},
+    peakCapStart: '',
+    onChangePeakCapStart: () => {},
+    peakCapEnd: '',
+    onChangePeakCapEnd: () => {},
+    peakCapMaxDays: 5,
+    onChangePeakCapMaxDays: () => {},
     overlapDays: [],
     onAddOverlapDay: () => {},
     onRemoveOverlapDay: () => {},
@@ -84,5 +92,17 @@ describe('MoreOptions (Phase 3: consolidated "Days I can\'t take off")', () => {
     const html = renderToStaticMarkup(<MoreOptions {...baseProps} />);
     expect(html).toContain('Import my calendar (.ics)');
     expect(html).toContain('Parsed in your browser. Nothing is uploaded.');
+  });
+
+  it('Phase 5.1: the peak season limit is off by default, with its date/max-days fields hidden until enabled', () => {
+    const html = renderToStaticMarkup(<MoreOptions {...baseProps} />);
+    expect(html).toContain('Peak season limit');
+    expect(html).toContain('Off by default');
+    expect(html).not.toContain('PTO days in that window');
+  });
+
+  it('Phase 5.1: shows the window/max-days fields once the peak season limit is enabled', () => {
+    const html = renderToStaticMarkup(<MoreOptions {...baseProps} peakCapEnabled />);
+    expect(html).toContain('PTO days in that window');
   });
 });
