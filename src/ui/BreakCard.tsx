@@ -158,18 +158,21 @@ export function BreakCard({
         highlighted ? 'border-slate-300 bg-slate-100' : 'border-slate-200 bg-slate-50'
       }`}
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
+      {/* Phase 2: wraps instead of truncating - this card now lives in a ~40%-width
+          recommendations column, not the full page width, so the date/badges row needs to
+          become two lines gracefully rather than clipping the date range. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-600 text-[11px] font-semibold leading-none tabular-nums text-white">
             {index}
           </span>
-          <span className="min-w-0 truncate font-medium text-slate-900">
+          <span className="font-medium text-slate-900">
             {formatCardDateRange(brk.start, brk.end)} &middot;{' '}
             <span className="tabular-nums">{brk.totalDaysOff}</span> {dayWord} off for{' '}
             <span className="tabular-nums">{brk.ptoCost}</span> PTO {ptoWord}
           </span>
         </div>
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Multiplier: weight and tone carry "this one's good," not a new colour - a
               category tag needs the same hue every time it appears, which stops being true
               the moment the hue also means "strong result" here. */}

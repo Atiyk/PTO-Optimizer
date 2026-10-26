@@ -51,7 +51,11 @@ export function Calendar({
   const months = useMemo(() => buildMonths(rangeStart, rangeEnd, weekStart), [rangeStart, rangeEnd, weekStart]);
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+    // Two months, not three: the calendar now shares its container with the recommendations
+    // column (Phase 2's two-column workspace), so a 3-month grid no longer has the width to
+    // keep day cells comfortably sized - two is what actually fits well at every width this
+    // component is used at, tablet's own full-width single-column layout included.
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       {months.map((m) => (
         <MonthGrid
           key={`${m.year}-${m.month}`}
