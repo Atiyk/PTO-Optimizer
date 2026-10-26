@@ -86,14 +86,3 @@ export function mostContestedBreakId(breaks: Break[]): string | undefined {
   }
   return best.id;
 }
-
-/** Phase 4.2: "Order the break cards so the most contested break appears FIRST, not
- * chronologically." Deliberately returns a NEW order for rendering only - the 1-based
- * numbers on each card/calendar badge stay keyed to chronological order (orderedBreaks in
- * useAppState), so a card's own number never changes just because of where it's drawn. */
-export function sortByContestedness(breaks: Break[]): Break[] {
-  return [...breaks].sort((a, b) => {
-    if (b.meanDemand !== a.meanDemand) return b.meanDemand - a.meanDemand;
-    return a.start < b.start ? -1 : a.start > b.start ? 1 : 0;
-  });
-}

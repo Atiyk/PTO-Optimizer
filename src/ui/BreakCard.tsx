@@ -204,10 +204,14 @@ export function BreakCard({
 
       {lowValue && <p className="text-xs text-slate-500 dark:text-slate-400">{lowValueExplanation(brk)}</p>}
 
+      {/* Layout fix: this used to be a full-width red bar, which reads as an error - it's
+          advice, not a problem with the plan. Red is reserved for actual problems (an
+          infeasible setting, a passed deadline); this is now inline text at normal size,
+          directly beneath the card header, in the same neutral/subtle tone the low-value
+          explanation above already uses. */}
       {isMostContested && (
-        <p className="rounded-md bg-rose-50 dark:bg-rose-950 px-3 py-2 text-xs font-medium text-rose-700 dark:text-rose-300">
-          This is the most contested week in your plan &mdash; colleagues are likely to request it too. Request it
-          first.
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          Most contested week in your plan &mdash; colleagues are likely to want it too.
         </p>
       )}
 

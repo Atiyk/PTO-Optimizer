@@ -6,11 +6,8 @@ interface PartnerShareButtonProps {
   buildOverlapLink: () => string;
 }
 
-/**
- * Split out from the free-export trio (Phase 2 item 3): "Share with a partner" isn't one
- * of the three core free-export actions that moved under the headline - it's a separate,
- * secondary action, so it stays near the calendar it's describing.
- */
+/** The fourth action in ExportBar's row (see its own comment) - a plain ActionButton like
+ * its siblings, just with its own overlap-link click handler. */
 export function PartnerShareButton({ buildOverlapLink }: PartnerShareButtonProps) {
   const onClick = async (): Promise<ActionResult> => {
     const ok = await copyText(buildOverlapLink());

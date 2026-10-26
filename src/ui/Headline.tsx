@@ -1,5 +1,6 @@
 import type { Scores } from '../solver/types';
 import { ordinal } from './scoreFormat';
+import { Container } from './Container';
 
 interface HeadlineProps {
   budgetSpent: number;
@@ -56,10 +57,10 @@ export function Headline({ budgetSpent, totalDaysOff, breakCountActual, scores, 
         : 'Two pinned — remove one to pin another.';
   return (
     <div
-      className="sticky top-0 z-40 border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 px-4 py-3 backdrop-blur"
+      className="sticky top-0 z-40 border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur"
       role="status"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <Container className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
           <span className="text-2xl font-bold leading-tight text-slate-900 dark:text-slate-50 sm:text-3xl">
             {headlineText(budgetSpent, budget, reserveDays, totalDaysOff)}
@@ -78,7 +79,7 @@ export function Headline({ budgetSpent, totalDaysOff, breakCountActual, scores, 
         >
           Pin this plan
         </button>
-      </div>
+      </Container>
     </div>
   );
 }
