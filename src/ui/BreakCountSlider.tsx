@@ -1,4 +1,11 @@
 import type { Break } from '../solver/types';
+import { InfoHint } from './InfoHint';
+
+/** UI density pass: the full disruption/pile-up reasoning moved off its own permanent line
+ * into a hover/focus hint on the label - still the Phase 3.3 framing, just not a fourth
+ * line of prose above the calendar on every load. */
+const BREAK_COUNT_HINT =
+  'One big break means more disruption but more recovery time. Shorter, more frequent breaks mean less pile-up when you return to work.';
 
 interface BreakCountSliderProps {
   value: number; // 1-7, the slider's own stored position (shown disabled while letSolverDecide)
@@ -58,7 +65,10 @@ export function BreakCountSlider({
 }: BreakCountSliderProps) {
   return (
     <div className="flex flex-col gap-1">
-      <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">How many breaks</h3>
+      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
+        How many breaks
+        <InfoHint text={BREAK_COUNT_HINT} />
+      </h3>
       <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
         <input
           type="checkbox"
@@ -72,14 +82,12 @@ export function BreakCountSlider({
           "a setting the user chose" even once the accent colour itself was muted. Combined
           with grayscale, it reads unambiguously as inert, not just faded. */}
       <div className={letSolverDecide ? 'opacity-40 grayscale' : ''}>
-        {/* Phase 3.3: the mechanism is unchanged (still 1-7, still "how many breaks") - only
-            the framing around it. "All in one"/"As many as possible" described the slider's
-            own structure and said nothing about why either end might matter; too much
-            workload to justify time off (43%) and fear of falling behind (30%) are both
-            about what a break COSTS to take, which these two captions now name directly. */}
+        {/* Phase 3.3's full "more disruption/less pile-up" reasoning now lives in the
+            InfoHint above - these are short axis labels (matching WeightingSlider's own
+            "Most days off"/"Cheapest to travel" pattern), not the explanation itself. */}
         <div className="flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
-          <span className="max-w-[45%]">One big break. More disruption, more recovery.</span>
-          <span className="max-w-[45%] text-right">Shorter breaks. Less pile-up when you return.</span>
+          <span>One big break</span>
+          <span>Many short breaks</span>
         </div>
         <input
           type="range"

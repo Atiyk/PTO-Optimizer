@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import { act, type ComponentProps } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { BreakCard } from './BreakCard';
 import { DEFAULT_WORK_WEEK } from '../solver/types';
@@ -33,6 +35,117 @@ function render(brk: Break) {
     />,
   );
 }
+
+let container: HTMLDivElement | null = null;
+let root: Root | null = null;
+
+function mountInteractive(props: Partial<ComponentProps<typeof BreakCard>> = {}) {
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  const full = {
+    brk: makeBreak(),
+    index: 1,
+    isPtoDay: () => true,
+    onHover: () => {},
+    isMostContested: false,
+    today: '2025-12-01',
+    noticePeriodDays: 14,
+    workWeek: DEFAULT_WORK_WEEK,
+    ...props,
+  };
+  act(() => {
+    root!.render(<BreakCard {...full} />);
+  });
+  return { rerender: (next: Partial<typeof full>) => act(() => root!.render(<BreakCard {...{ ...full, ...next }} />)) };
+}
+
+afterEach(() => {
+  act(() => {
+    root?.unmount();
+  });
+  container?.remove();
+  container = null;
+  root = null;
+});
+
+describe('BreakCard defaultExpanded (regression: async holiday loading changes which break is "position 0")', () => {
+  it('BUG FOUND: a plain useState(defaultExpanded) locked in a mount-time snapshot, so a break that was briefly "position 0" during an early render (before holidays loaded) stayed expanded forever, even after it moved away from position 0 once the real plan settled - leaving two cards expanded. Fixed: `expanded` now mirrors the CURRENT defaultExpanded prop every render, absent an explicit user choice.', () => {
+    const { rerender } = mountInteractive({ defaultExpanded: true });
+    expect(container!.textContent).toContain('Hide ↑');
+
+    // The plan settles (e.g. holidays finish loading) and this break is no longer position 0.
+    rerender({ defaultExpanded: false });
+    expect(container!.textContent).toContain('Request this time off ↓');
+    expect(container!.textContent).not.toContain('Hide ↑');
+  });
+
+  it('an explicit user choice overrides the prop on every later render, in both directions', () => {
+    const { rerender } = mountInteractive({ defaultExpanded: false });
+    act(() => {
+      container!.querySelector('button')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(container!.textContent).toContain('Hide ↑');
+
+    // Even if the prop later says this card should collapse, the user's own expand stands.
+    rerender({ defaultExpanded: false });
+    expect(container!.textContent).toContain('Hide ↑');
+  });
+});
+
+describe('BreakCard collapse (UI density pass: collapsed by default, request tools behind a toggle)', () => {
+  it('starts collapsed by default: no request-by line, no copy dropdown, just a toggle', () => {
+    const html = render(makeBreak());
+    expect(html).toContain('Request this time off ↓');
+    expect(html).not.toContain('Copy request');
+    expect(html).not.toContain('Request by');
+    expect(html).not.toContain('already started');
+  });
+
+  it('starts expanded when defaultExpanded is set (the first rendered card)', () => {
+    const html = renderToStaticMarkup(
+      <BreakCard
+        brk={makeBreak()}
+        index={1}
+        isPtoDay={() => true}
+        onHover={() => {}}
+        isMostContested={false}
+        today="2025-12-01"
+        noticePeriodDays={14}
+        workWeek={DEFAULT_WORK_WEEK}
+        defaultExpanded
+      />,
+    );
+    expect(html).toContain('Copy request');
+    expect(html).toContain('Hide ↑');
+    expect(html).not.toContain('Request this time off ↓');
+  });
+
+  it('collapsing still shows any warning (low-value explanation, most-contested callout)', () => {
+    const html = render(makeBreak({ multiplier: 1, tags: [] }));
+    expect(html).toContain('uses the full available budget');
+  });
+
+  it('a single "Copy request" control replaces the three always-visible copy buttons', () => {
+    const html = renderToStaticMarkup(
+      <BreakCard
+        brk={makeBreak()}
+        index={1}
+        isPtoDay={() => true}
+        onHover={() => {}}
+        isMostContested={false}
+        today="2025-12-01"
+        noticePeriodDays={14}
+        workWeek={DEFAULT_WORK_WEEK}
+        defaultExpanded
+      />,
+    );
+    expect(html).not.toContain('Copy date list</button>');
+    expect(html).not.toContain('Copy email draft</button>');
+    expect(html).not.toContain('Copy detailed email draft</button>');
+    expect((html.match(/Copy request/g) || []).length).toBe(1);
+  });
+});
 
 describe('BreakCard low-value explanation (regression: unconditional "chosen for low travel demand")', () => {
   it('BUG FOUND: used to say "chosen for low travel demand" for ANY 1.0x break - even one with no such tag at all (e.g. w=0, or ordinary demand)', () => {

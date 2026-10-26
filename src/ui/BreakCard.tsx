@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { Break, WorkWeek } from '../solver/types';
 import { formatWorkingDaysList, formatManagerEmailShort, formatManagerEmailDetailed, copyText } from './requestText';
 import { formatCardDateRange } from './dateFormat';
@@ -17,26 +17,74 @@ interface BreakCardProps {
   today: string;
   noticePeriodDays: number;
   workWeek: WorkWeek;
+  /** UI density pass: whether the request tools (request-by line + copy dropdown) start
+   * expanded. Only the first rendered card defaults to true, "so the pattern is
+   * discoverable" - every other card starts collapsed to the compact summary row. */
+  defaultExpanded?: boolean;
 }
 
-type CopyState = 'idle' | 'done';
+interface CopyOption {
+  label: string;
+  text: string;
+}
 
-function CopyRequestButton({ label, text }: { label: string; text: string }) {
-  const [state, setState] = useState<CopyState>('idle');
+/**
+ * UI density pass: a 10-break plan used to render 30 identical copy buttons (3 per card,
+ * always visible). One dropdown trigger per card instead - "Copy request", opening a small
+ * menu with the same three options it always had. Closes on an outside click so it never
+ * lingers open over the next card's controls.
+ */
+function CopyRequestDropdown({ options }: { options: CopyOption[] }) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [open]);
+
   return (
-    <button
-      type="button"
-      onClick={async () => {
-        const ok = await copyText(text);
-        if (ok) {
-          setState('done');
-          setTimeout(() => setState('idle'), 2000);
-        }
-      }}
-      className="rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
-    >
-      {state === 'done' ? 'Copied' : label}
-    </button>
+    <div ref={containerRef} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+      >
+        {copied ? 'Copied' : 'Copy request ▾'}
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute left-0 z-10 mt-1 min-w-[12rem] rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 py-1 shadow-lg"
+        >
+          {options.map((o) => (
+            <button
+              key={o.label}
+              type="button"
+              role="menuitem"
+              onClick={async () => {
+                setOpen(false);
+                const ok = await copyText(o.text);
+                if (ok) {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }
+              }}
+              className="block w-full px-3 py-1.5 text-left text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -75,7 +123,23 @@ export function BreakCard({
   today,
   noticePeriodDays,
   workWeek,
+  defaultExpanded = false,
 }: BreakCardProps) {
+  // BUG FOUND: a plain `useState(defaultExpanded)` captures its initial value once, at
+  // mount, and never again - but holidays load asynchronously (see useAppState.ts), so the
+  // very first render solves without them, producing a different/smaller break set than
+  // the final one. Whichever break happened to be "position 0" in that transient first
+  // render got defaultExpanded=true locked in permanently, even after it moved away from
+  // position 0 once the real holiday-aware plan settled a moment later - while the TRUE
+  // final position-0 break, being a newly-mounted instance, ALSO got defaultExpanded=true,
+  // leaving two cards expanded instead of one. Confirmed empirically: logging each render
+  // pass showed a different break at position 0 on the first pass than on every pass after
+  // holidays finished loading. Fixed by tracking only an EXPLICIT user choice locally
+  // (`userExpanded`, null until they click); absent that, `expanded` mirrors the current
+  // `defaultExpanded` prop every render, so it stays correct as the plan settles instead of
+  // freezing a one-time snapshot.
+  const [userExpanded, setUserExpanded] = useState<boolean | null>(null);
+  const expanded = userExpanded ?? defaultExpanded;
   const lowValue = isLowValue(brk);
   const dayWord = brk.totalDaysOff === 1 ? 'day' : 'days';
   const ptoWord = brk.ptoCost === 1 ? 'day' : 'days';
@@ -147,17 +211,39 @@ export function BreakCard({
         </p>
       )}
 
-      <p className="text-xs text-slate-500 dark:text-slate-400">{requestLine}</p>
-
-      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 dark:border-slate-700 pt-3">
-        <span className="text-xs text-slate-400 dark:text-slate-400">Request this time off:</span>
-        <CopyRequestButton label="Copy date list" text={formatWorkingDaysList(brk, isPtoDay)} />
-        <CopyRequestButton label="Copy email draft" text={formatManagerEmailShort(brk, isPtoDay)} />
-        <CopyRequestButton
-          label="Copy detailed email draft"
-          text={formatManagerEmailDetailed(brk, isPtoDay, noticePeriodDays, workWeek)}
-        />
-      </div>
+      {/* UI density pass: collapsed by default (every card past the first) down to just the
+          summary row and any warning above - the request-by date and the copy tools are
+          "the request tools," revealed on expand, not permanent chrome on every card. */}
+      {expanded ? (
+        <>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{requestLine}</p>
+          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 dark:border-slate-700 pt-3">
+            <span className="text-xs text-slate-400 dark:text-slate-400">Request this time off:</span>
+            <CopyRequestDropdown
+              options={[
+                { label: 'Copy date list', text: formatWorkingDaysList(brk, isPtoDay) },
+                { label: 'Copy email draft', text: formatManagerEmailShort(brk, isPtoDay) },
+                { label: 'Copy detailed email draft', text: formatManagerEmailDetailed(brk, isPtoDay, noticePeriodDays, workWeek) },
+              ]}
+            />
+            <button
+              type="button"
+              onClick={() => setUserExpanded(false)}
+              className="text-xs text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+            >
+              Hide ↑
+            </button>
+          </div>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setUserExpanded(true)}
+          className="self-start border-t border-slate-100 dark:border-slate-700 pt-3 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100"
+        >
+          Request this time off ↓
+        </button>
+      )}
     </div>
   );
 }

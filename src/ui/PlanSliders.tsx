@@ -17,11 +17,14 @@ interface PlanSlidersProps {
 
 /**
  * The two sliders that shape the plan ("what matters more" and "how many breaks") -
- * always on screen, not behind a disclosure. Visual hierarchy: result ->
- * country/date-range/PTO-days -> these -> the calendar. "Show alternatives" lives in the
- * "Adjust" disclosure (App.tsx) - unlike these two sliders, it's a secondary/advanced
+ * always on screen, not behind a disclosure. "Show alternatives" lives in the "More
+ * options" disclosure (App.tsx) - unlike these two sliders, it's a secondary/advanced
  * toggle, not how most visitors shape the plan, and sitting here read as a primary
  * control it isn't.
+ *
+ * UI density pass: no longer owns its own full-width row - returns its two slider blocks
+ * directly so App.tsx can lay them out in the SAME shared flex row as PrimaryControls'
+ * fields (country/date-range/PTO-days/reserve), instead of two stacked bands.
  */
 export function PlanSliders({
   w,
@@ -36,11 +39,11 @@ export function PlanSliders({
   budget,
 }: PlanSlidersProps) {
   return (
-    <div className="flex flex-wrap items-start gap-6 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3">
-      <div className="min-w-[16rem] max-w-sm flex-1">
+    <>
+      <div className="min-w-[15rem] max-w-xs flex-1 basis-60">
         <WeightingSlider value={w} onChange={onChangeW} />
       </div>
-      <div className="min-w-[16rem] max-w-sm flex-1">
+      <div className="min-w-[15rem] max-w-xs flex-1 basis-60">
         <BreakCountSlider
           value={manualBreakCount}
           onChange={onChangeManualBreakCount}
@@ -52,6 +55,6 @@ export function PlanSliders({
           budget={budget}
         />
       </div>
-    </div>
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import type { Scores } from '../solver/types';
-import { efficiencyLine, travelLine, ordinal, barFillClass, barFillWidthPercent } from './scoreFormat';
+import { ordinal } from './scoreFormat';
 
 interface HeadlineProps {
   budgetSpent: number;
@@ -10,6 +10,9 @@ interface HeadlineProps {
    * reserve-aware headline (Phase 3.1); omit entirely elsewhere. */
   budget: number;
   reserveDays: number;
+  canPin: boolean;
+  onPin: () => void;
+  pinnedCount: number;
 }
 
 /**
@@ -35,48 +38,47 @@ export function headlineText(budgetSpent: number, budget: number, reserveDays: n
  * three months of calendar before this line - cut off below the fold in small text. This
  * is now the first thing under the tagline, large and sticky (`top-0`, same role the full
  * control bar used to have), so it's never scrolled away while adjusting the plan below.
- * Percentiles and break count are deliberately normal-size supporting detail underneath
- * the headline, not competing with it - same three-channel percentile bar as before
- * (width = real value, colour = reinforcement only, text = the meaning in words).
+ *
+ * UI density pass: the headline number, break count, and Travel/Efficiency percentiles now
+ * sit on ONE flowing line (`items-baseline`, wrapping together as a unit rather than as
+ * separate stacked rows) - the headline stays visually largest, the rest reads as normal-
+ * size supporting detail beside it, not below it. The old per-score percentile bar blocks
+ * (text + a width-coded bar, each its own two-line block) duplicated the exact same numbers
+ * this line already states in words and cost two more rows doing it - removed, not moved;
+ * the percentile itself is still right here.
  */
-function PercentileBar({ percentile }: { percentile: number }) {
-  const width = barFillWidthPercent(percentile);
-  return (
-    <div className="relative h-1 w-16 bg-[var(--score-track)]" aria-hidden>
-      <div className={`h-full ${barFillClass(percentile)}`} style={{ width: `${width}%` }} />
-      <div className="absolute inset-y-0 left-1/2 w-px bg-white mix-blend-difference" />
-    </div>
-  );
-}
-
-function ScoreLine({ text, percentile }: { text: string; percentile: number }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <p className="text-xs text-slate-600 dark:text-slate-300">{text}</p>
-      <PercentileBar percentile={percentile} />
-    </div>
-  );
-}
-
-export function Headline({ budgetSpent, totalDaysOff, breakCountActual, scores, budget, reserveDays }: HeadlineProps) {
+export function Headline({ budgetSpent, totalDaysOff, breakCountActual, scores, budget, reserveDays, canPin, onPin, pinnedCount }: HeadlineProps) {
+  const pinTitle =
+    pinnedCount === 0
+      ? 'Pin up to two plans to compare side by side.'
+      : canPin
+        ? 'Pin this plan'
+        : 'Two pinned — remove one to pin another.';
   return (
     <div
       className="sticky top-0 z-40 border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 px-4 py-3 backdrop-blur"
       role="status"
     >
-      <p className="text-2xl font-bold leading-tight text-slate-900 dark:text-slate-50 sm:text-3xl">
-        {headlineText(budgetSpent, budget, reserveDays, totalDaysOff)}
-      </p>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-        {breakCountActual} break{breakCountActual === 1 ? '' : 's'}
-        {scores ? ` · Travel ${ordinal(scores.travel.percentile)} · Efficiency ${ordinal(scores.efficiency.percentile)}` : ''}
-      </p>
-      {scores && (
-        <div className="mt-2 flex flex-wrap gap-6">
-          <ScoreLine text={travelLine(scores)} percentile={scores.travel.percentile} />
-          <ScoreLine text={efficiencyLine(scores)} percentile={scores.efficiency.percentile} />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <span className="text-2xl font-bold leading-tight text-slate-900 dark:text-slate-50 sm:text-3xl">
+            {headlineText(budgetSpent, budget, reserveDays, totalDaysOff)}
+          </span>
+          <span className="text-sm text-slate-600 dark:text-slate-300">
+            {breakCountActual} break{breakCountActual === 1 ? '' : 's'}
+            {scores ? ` · Travel ${ordinal(scores.travel.percentile)} · Efficiency ${ordinal(scores.efficiency.percentile)}` : ''}
+          </span>
         </div>
-      )}
+        <button
+          type="button"
+          onClick={onPin}
+          disabled={!canPin}
+          title={pinTitle}
+          className="shrink-0 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Pin this plan
+        </button>
+      </div>
     </div>
   );
 }

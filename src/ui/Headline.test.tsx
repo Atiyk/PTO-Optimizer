@@ -28,9 +28,75 @@ describe('headlineText (Phase 3.1: reserve days read as deliberate, never as uns
 describe('Headline render', () => {
   it('shows the reserve-aware headline live when reserveDays > 0', () => {
     const html = renderToStaticMarkup(
-      <Headline budgetSpent={12} totalDaysOff={26} breakCountActual={5} scores={null} budget={15} reserveDays={3} />,
+      <Headline
+        budgetSpent={12}
+        totalDaysOff={26}
+        breakCountActual={5}
+        scores={null}
+        budget={15}
+        reserveDays={3}
+        canPin={true}
+        onPin={() => {}}
+        pinnedCount={0}
+      />,
     );
     expect(html).toContain('12 of 15 days planned');
     expect(html).toContain('3 kept in reserve');
+  });
+
+  it('UI density pass: the result, break count, and Travel/Efficiency percentiles render as one flowing line, no separate percentile-bar rows', () => {
+    const html = renderToStaticMarkup(
+      <Headline
+        budgetSpent={12}
+        totalDaysOff={26}
+        breakCountActual={5}
+        scores={{ travel: { percentile: 70 }, efficiency: { percentile: 100 } }}
+        budget={15}
+        reserveDays={3}
+        canPin={true}
+        onPin={() => {}}
+        pinnedCount={0}
+      />,
+    );
+    expect(html).toContain('5 breaks');
+    expect(html).toContain('Travel 70th');
+    expect(html).toContain('Efficiency 100th');
+    // The old duplicate visual (a second block with a width-coded bar per score) is gone.
+    expect(html).not.toContain('about average for this budget');
+    expect(html).not.toContain('quieter than most weeks');
+  });
+
+  it('renders "Pin this plan" as a small control, disabled once two plans are already pinned', () => {
+    const enabled = renderToStaticMarkup(
+      <Headline
+        budgetSpent={12}
+        totalDaysOff={26}
+        breakCountActual={5}
+        scores={null}
+        budget={15}
+        reserveDays={3}
+        canPin={true}
+        onPin={() => {}}
+        pinnedCount={0}
+      />,
+    );
+    expect(enabled).toContain('Pin this plan');
+    expect(enabled).not.toContain('disabled=""');
+
+    const disabled = renderToStaticMarkup(
+      <Headline
+        budgetSpent={12}
+        totalDaysOff={26}
+        breakCountActual={5}
+        scores={null}
+        budget={15}
+        reserveDays={3}
+        canPin={false}
+        onPin={() => {}}
+        pinnedCount={2}
+      />,
+    );
+    expect(disabled).toContain('disabled=""');
+    expect(disabled).toContain('title="Two pinned');
   });
 });
