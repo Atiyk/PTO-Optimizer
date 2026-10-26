@@ -137,6 +137,7 @@ export interface FullURLState {
   altFridayStart?: string;
   reserveDays: number;
   unlimitedPto: boolean;
+  noticePeriodDays: number;
 }
 
 /** Dates needed by the caller to fill in the viewer-relative fields (rangeStart/rangeEnd
@@ -198,6 +199,10 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
   const reserveDays = Number.isFinite(rvParsed) && rvParsed >= 0 ? rvParsed : 3;
   const unlimitedPto = params.get('up') === '1';
 
+  const npRaw = params.get('np');
+  const npParsed = npRaw !== null ? Number(npRaw) : NaN;
+  const noticePeriodDays = Number.isFinite(npParsed) && npParsed >= 0 ? npParsed : 14;
+
   return {
     country,
     subdivision,
@@ -221,6 +226,7 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
     altFridayStart,
     reserveDays,
     unlimitedPto,
+    noticePeriodDays,
   };
 }
 
@@ -246,6 +252,7 @@ export interface WriteStateInput {
   altFridayStart: string;
   reserveDays: number;
   unlimitedPto: boolean;
+  noticePeriodDays: number;
 }
 
 /** Writes the full app state into `params` in place. `country`/`rangeStart`/`rangeEnd` are
@@ -321,6 +328,9 @@ export function writeFullStateToURL(params: URLSearchParams, state: WriteStateIn
 
   if (state.unlimitedPto) params.set('up', '1');
   else params.delete('up');
+
+  if (state.noticePeriodDays !== 14) params.set('np', String(state.noticePeriodDays));
+  else params.delete('np');
 
   // 'ov' (partner-overlap payload) is a one-shot input signal consumed on load, never part
   // of ongoing state - always stripped once the app re-derives the URL from its own state.

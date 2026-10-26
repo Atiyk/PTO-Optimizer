@@ -48,7 +48,11 @@ function nowToISO(now: Date): string {
 
 export interface ReminderOptions {
   enabled: boolean;
-  leadDays: 7 | 14 | 30;
+  /** Phase 4: used to be a fixed 7|14|30 choice local to this export panel; now always the
+   * same number as the user's own `noticePeriodDays` setting (see useAppState.ts), so the
+   * .ics reminder can never land on a different date than the "Request by" date shown on
+   * each break card - "the request-by date must match the .ics reminder dates" per spec. */
+  leadDays: number;
 }
 
 /** Disabled by default at this level, deliberately - the product default (on, 14 days) is a

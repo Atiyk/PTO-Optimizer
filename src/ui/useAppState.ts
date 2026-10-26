@@ -157,6 +157,7 @@ export function useAppState() {
         altFridayStart: undefined,
         reserveDays: 3,
         unlimitedPto: false,
+        noticePeriodDays: 14,
       };
     }
     return readFullStateFromURL(window.location.search, defaults);
@@ -200,6 +201,12 @@ export function useAppState() {
     setUnlimitedPtoRaw(v);
     if (v) setBudget(15);
   }, []);
+
+  // Phase 4.1: how many days of notice this employer needs - drives the "Request by" date
+  // on every break card AND the .ics reminder's lead time (see ExportBar.tsx), the SAME
+  // number for both, which is what "must match the .ics reminders, not contradict them"
+  // means structurally: one shared source, not two settings that could disagree.
+  const [noticePeriodDays, setNoticePeriodDays] = useState(initial.noticePeriodDays ?? 14);
 
   const [w, setW] = useState(initial.w);
   // breakCount 0 from the URL ("Any", now spelled "let the solver decide") maps to the
@@ -305,6 +312,7 @@ export function useAppState() {
       altFridayStart,
       reserveDays,
       unlimitedPto,
+      noticePeriodDays,
     });
     window.history.replaceState(null, '', url);
   }, [
@@ -329,6 +337,7 @@ export function useAppState() {
     altFridayStart,
     reserveDays,
     unlimitedPto,
+    noticePeriodDays,
   ]);
 
   // Graceful failure: a network/API failure degrades to cached data (if any was already
@@ -843,6 +852,8 @@ export function useAppState() {
     unlimitedPto,
     setUnlimitedPto,
     effectiveBudget,
+    noticePeriodDays,
+    setNoticePeriodDays,
     w,
     setW,
     breakCount,
