@@ -89,8 +89,8 @@ export function ActionButton({
       }}
       className={
         variant === 'primary'
-          ? 'rounded-md bg-slate-800 dark:bg-slate-200 px-3 py-1.5 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-700 dark:hover:bg-slate-300 disabled:cursor-wait disabled:opacity-60'
-          : 'rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:cursor-wait disabled:opacity-60'
+          ? 'rounded-md bg-slate-800 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-wait disabled:opacity-60'
+          : 'rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60'
       }
     >
       {message ?? label}
@@ -169,7 +169,7 @@ export function ExportBar(props: ExportBarProps) {
         />
         <PartnerShareButton buildOverlapLink={props.buildOverlapLink} />
       </div>
-      <label className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+      <label className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
         <input
           type="checkbox"
           checked={remindersEnabled}
@@ -183,7 +183,7 @@ export function ExportBar(props: ExportBarProps) {
           </span>
         )}
       </label>
-      <p className="text-xs text-slate-400 dark:text-slate-500">Free, no sign-up, no email.</p>
+      <p className="text-xs text-slate-400">Free, no sign-up, no email.</p>
     </div>
   );
 }

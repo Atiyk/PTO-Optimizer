@@ -30,11 +30,11 @@ interface WeightingSliderProps {
 export function WeightingSlider({ value, onChange }: WeightingSliderProps) {
   return (
     <div className="flex flex-col gap-1">
-      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
+      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
         What matters more?
         <InfoHint text={TRAVEL_HINT} />
       </h3>
-      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+      <div className="flex items-center justify-between text-xs text-slate-500">
         <span>Most days off</span>
         <span>Cheapest to travel</span>
       </div>
@@ -47,10 +47,10 @@ export function WeightingSlider({ value, onChange }: WeightingSliderProps) {
         onChange={(e) => onChange(Number(e.target.value))}
         aria-label="What matters more?"
         aria-valuetext={`${value}: ${CAPTIONS[value]}`}
-        className="w-full accent-slate-800 dark:accent-slate-300"
+        className="w-full accent-slate-800"
       />
-      <p className="text-xs text-slate-600 dark:text-slate-300">
-        <span className="font-medium text-slate-800 dark:text-slate-100">{value}</span> &middot; {CAPTIONS[value]}
+      <p className="text-xs text-slate-600">
+        <span className="font-medium tabular-nums text-slate-800">{value}</span> &middot; {CAPTIONS[value]}
       </p>
     </div>
   );

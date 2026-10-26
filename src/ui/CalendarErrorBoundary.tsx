@@ -30,16 +30,16 @@ export class CalendarErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.error) {
       return (
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950 p-8 text-center">
-          <p className="text-sm font-medium text-red-800 dark:text-red-200">The calendar couldn&apos;t render.</p>
-          <p className="max-w-sm text-xs text-red-700 dark:text-red-300">
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-8 text-center">
+          <p className="text-sm font-medium text-red-800">The calendar couldn&apos;t render.</p>
+          <p className="max-w-sm text-xs text-red-700">
             Try the button below, or adjust the date range, PTO days, or other settings above - a change there often
             clears it.
           </p>
           <button
             type="button"
             onClick={() => this.setState({ error: null })}
-            className="rounded-md border border-red-300 dark:border-red-700 bg-white dark:bg-red-900 px-3 py-1.5 text-sm font-medium text-red-700 dark:text-red-100 hover:bg-red-50 dark:hover:bg-red-800"
+            className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
           >
             Try again
           </button>

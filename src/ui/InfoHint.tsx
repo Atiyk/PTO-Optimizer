@@ -14,7 +14,7 @@ export function InfoHint({ text }: { text: string }) {
       tabIndex={0}
       title={text}
       aria-label={text}
-      className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full border border-slate-400 dark:border-slate-500 text-[10px] font-semibold leading-none text-slate-500 dark:text-slate-400"
+      className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full border border-slate-400 text-[10px] font-semibold leading-none text-slate-500"
     >
       i
     </span>

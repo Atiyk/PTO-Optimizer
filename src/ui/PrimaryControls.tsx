@@ -19,7 +19,7 @@ interface PrimaryControlsProps {
 }
 
 const DATE_FIELD_CLASS =
-  'h-9 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-sm text-slate-800 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-500';
+  'h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400';
 
 /**
  * Always-visible primary inputs - country, date range, PTO days. Only the state
@@ -55,8 +55,8 @@ export function PrimaryControls({
     <>
       <CountrySelect country={country} onChangeCountry={onChangeCountry} />
 
-      <fieldset className="flex flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
-        <legend className="text-xs font-medium text-slate-600 dark:text-slate-300">Date range</legend>
+      <fieldset className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+        <legend className="text-xs font-medium text-slate-600">Date range</legend>
         <div className="flex items-center gap-2">
           <input
             type="date"
@@ -66,7 +66,7 @@ export function PrimaryControls({
             onChange={(e) => onChangeRangeStart(e.target.value)}
             className={DATE_FIELD_CLASS}
           />
-          <span className="text-slate-400 dark:text-slate-400">&rarr;</span>
+          <span className="text-slate-400">&rarr;</span>
           <input
             type="date"
             lang={locale}
@@ -78,7 +78,7 @@ export function PrimaryControls({
         </div>
       </fieldset>
 
-      <label className="flex flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+      <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
         PTO days available
         <input
           type="number"
@@ -104,7 +104,7 @@ export function PrimaryControls({
           <label htmlFor="unlimited-pto">I have unlimited PTO</label>
         </span>
         {unlimitedPto && (
-          <span className="max-w-[16rem] text-xs font-normal normal-case text-slate-500 dark:text-slate-400">
+          <span className="max-w-[16rem] text-xs font-normal normal-case text-slate-500">
             Most people with unlimited PTO take 15 days or fewer. Adjust if yours differs.
           </span>
         )}
@@ -113,7 +113,7 @@ export function PrimaryControls({
             day would misleadingly look like a solver failure ("add no days off at any
             position"), which is exactly what this warning must never say about a reserve. */}
         {budgetSpent < effectiveBudget && (
-          <span className="text-xs font-normal normal-case text-amber-700 dark:text-amber-400">
+          <span className="text-xs font-normal normal-case text-amber-700">
             Using {budgetSpent} of {effectiveBudget} planned day{effectiveBudget === 1 ? '' : 's'} &mdash; the remaining{' '}
             {effectiveBudget - budgetSpent} day{effectiveBudget - budgetSpent === 1 ? '' : 's'} add no days off at any
             position.
@@ -121,7 +121,7 @@ export function PrimaryControls({
         )}
       </label>
 
-      <label className="flex flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+      <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
         Keep in reserve
         <input
           type="number"

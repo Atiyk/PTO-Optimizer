@@ -67,8 +67,8 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
 
   return (
     <section>
-      <h4 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Import my calendar (.ics)</h4>
-      <p className="mb-2 text-xs text-slate-400 dark:text-slate-400">
+      <h4 className="mb-2 text-sm font-semibold text-slate-700">Import my calendar (.ics)</h4>
+      <p className="mb-2 text-xs text-slate-400">
         Parsed in your browser. Nothing is uploaded. All-day and multi-day events become days you can&apos;t take
         off; short, timed meetings are ignored.
       </p>
@@ -81,21 +81,21 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
           const file = e.target.files?.[0];
           if (file) handleFile(file);
         }}
-        className="block w-full text-xs text-slate-600 dark:text-slate-300 file:mr-2 file:rounded-md file:border-0 file:bg-slate-100 dark:file:bg-slate-700 file:px-2 file:py-1 file:text-xs file:font-medium file:text-slate-700 dark:file:text-slate-200 hover:file:bg-slate-200 dark:hover:file:bg-slate-600"
+        className="block w-full text-xs text-slate-600 file:mr-2 file:rounded-md file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-200"
       />
       {state.kind === 'error' && (
-        <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">
+        <p role="alert" className="mt-2 text-xs text-red-600">
           {state.message}
         </p>
       )}
       {state.kind === 'preview' && (
-        <div className="mt-2 flex flex-col gap-1.5 rounded-md border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 p-2 text-xs text-slate-600 dark:text-slate-300">
+        <div className="mt-2 flex flex-col gap-1.5 rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
           <p>
             Found {state.result.busyDays.length} busy day{state.result.busyDays.length === 1 ? '' : 's'} between{' '}
             {summarizeMonths(state.result.busyDays)} &mdash; add them?
           </p>
           {state.result.cappedAt !== null && (
-            <p className="text-amber-600 dark:text-amber-400">
+            <p className="text-amber-600">
               This file has more than {state.result.cappedAt} events &mdash; only the first {state.result.cappedAt} were read.
             </p>
           )}
@@ -109,14 +109,14 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
             <button
               type="button"
               onClick={confirm}
-              className="rounded-md bg-slate-800 dark:bg-slate-200 px-2 py-1 text-xs font-medium text-white dark:text-slate-900 hover:bg-slate-700 dark:hover:bg-slate-300"
+              className="rounded-md bg-slate-800 px-2 py-1 text-xs font-medium text-white hover:bg-slate-700"
             >
               Add
             </button>
             <button
               type="button"
               onClick={cancel}
-              className="rounded-md border border-slate-300 dark:border-slate-600 px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+              className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
             >
               Cancel
             </button>

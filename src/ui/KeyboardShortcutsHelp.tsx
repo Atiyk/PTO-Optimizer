@@ -20,14 +20,14 @@ export function KeyboardShortcutsHelp({ open, onClose }: KeyboardShortcutsHelpPr
       aria-label="Keyboard shortcuts"
       onClick={onClose}
     >
-      <div className="w-full max-w-sm rounded-lg bg-white dark:bg-slate-800 p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-sm rounded-lg bg-white p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Keyboard shortcuts</h2>
+          <h2 className="text-sm font-semibold text-slate-800">Keyboard shortcuts</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+            className="text-slate-400 hover:text-slate-700"
           >
             &times;
           </button>
@@ -36,11 +36,11 @@ export function KeyboardShortcutsHelp({ open, onClose }: KeyboardShortcutsHelpPr
           {SHORTCUTS.map((s) => (
             <div key={s.keys} className="flex items-center justify-between gap-4">
               <dt>
-                <kbd className="rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-1.5 py-0.5 text-xs font-mono text-slate-700 dark:text-slate-200">
+                <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-xs font-mono text-slate-700">
                   {s.keys}
                 </kbd>
               </dt>
-              <dd className="text-slate-600 dark:text-slate-300">{s.action}</dd>
+              <dd className="text-slate-600">{s.action}</dd>
             </div>
           ))}
         </dl>

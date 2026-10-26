@@ -20,9 +20,9 @@ interface PeakCapBannerProps {
 export function PeakCapBanner({ applied, maxDays, startDate, endDate }: PeakCapBannerProps) {
   if (!applied) return null;
   return (
-    <div role="status" className="border-b border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800">
+    <div role="status" className="border-b border-slate-200 bg-slate-50">
       <Container className="px-4 py-2">
-        <p className="text-xs text-slate-600 dark:text-slate-300">{peakCapMessage(maxDays, startDate, endDate)}</p>
+        <p className="text-xs tabular-nums text-slate-600">{peakCapMessage(maxDays, startDate, endDate)}</p>
       </Container>
     </div>
   );

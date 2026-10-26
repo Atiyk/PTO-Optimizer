@@ -55,14 +55,14 @@ export function App() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+    <div className="min-h-screen bg-white">
+      <div className="border-b border-slate-200 bg-slate-50">
         {/* Deliberately NOT line-length-capped like the longer prose elsewhere on the page -
             it's one short sentence that fits a single line at any width this page supports,
             and wrapping it to two lines would directly work against the header-height target
             the density pass exists to hit. */}
         <Container className="px-4 py-2">
-          <p className="text-sm text-slate-600 dark:text-slate-300">{introText}</p>
+          <p className="text-sm text-slate-600">{introText}</p>
         </Container>
       </div>
 
@@ -91,7 +91,7 @@ export function App() {
       {/* UI density pass: country/date-range/PTO-days/reserve and the two plan-shaping
           sliders share ONE flex row (wrapping to two rows below ~1100px, stacking below
           768px) instead of two stacked full-width bands. */}
-      <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+      <div className="border-b border-slate-200 bg-slate-50">
         <Container className="flex flex-wrap items-start gap-x-6 gap-y-3 px-4 py-4">
           <PrimaryControls
             country={state.country}
@@ -124,17 +124,17 @@ export function App() {
         </Container>
       </div>
 
-      <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+      <div className="border-b border-slate-200 bg-slate-50">
         <Container className="px-4 py-4">
           <button
             type="button"
             onClick={() => setOptionsOpen((v) => !v)}
-            className="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100"
+            className="text-sm font-medium text-slate-500 hover:text-slate-800"
           >
             {optionsOpen ? 'Hide options ↑' : 'More options ↓'}
           </button>
           {!optionsOpen && (
-            <span className="ml-1.5 text-xs text-slate-400 dark:text-slate-400">
+            <span className="ml-1.5 text-xs text-slate-400">
               &mdash; holidays, work week, notice period, days you can&apos;t take off
             </span>
           )}
@@ -142,7 +142,7 @@ export function App() {
       </div>
 
       {optionsOpen && (
-        <div className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+        <div className="border-b border-slate-200 bg-white">
           <Container className="flex flex-col gap-4 px-4 py-4">
             <SubdivisionSelect
               subdivisions={state.discoveredSubdivisions}
@@ -150,7 +150,7 @@ export function App() {
               onChangeSubdivision={state.setSubdivision}
             />
 
-            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-slate-600">
               <input
                 type="checkbox"
                 checked={state.showAlternatives}
@@ -218,9 +218,9 @@ export function App() {
       />
 
       {state.holidaysDegraded && (
-        <div className="border-b border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800">
+        <div className="border-b border-slate-200 bg-slate-50">
           <Container className="px-4 py-2">
-            <p role="status" className="text-xs text-slate-600 dark:text-slate-300">
+            <p role="status" className="text-xs text-slate-600">
               <span className="block max-w-prose">
                 Couldn&apos;t reach public holiday data for this country &mdash; showing weekends and any holidays
                 already cached. You can add known holidays manually below, or try again later.
@@ -256,11 +256,11 @@ export function App() {
             />
           </CalendarErrorBoundary>
 
-          <p className="mt-2 max-w-prose text-xs text-slate-400 dark:text-slate-400">
+          <p className="mt-2 max-w-prose text-xs text-slate-400">
             Click any day to pin it in or rule it out. Hover or focus a day to see what it would gain.
           </p>
 
-          <div className={`${SECTION_GAP} border-t border-slate-200 dark:border-slate-700 pt-4`}>
+          <div className={`${SECTION_GAP} border-t border-slate-200 pt-4`}>
             <Legend />
           </div>
 
@@ -268,7 +268,7 @@ export function App() {
               list - someone shouldn't be asked to download a plan they haven't looked at
               yet. Layout fix: "Share with a partner" is now the fourth button in this same
               row (see ExportBar's own comment), instead of a separate standalone row. */}
-          <div className={`${SECTION_GAP} border-t border-slate-200 dark:border-slate-700 pt-4`}>
+          <div className={`${SECTION_GAP} border-t border-slate-200 pt-4`}>
             <ExportBar
               breaks={state.breaks}
               isSuggestedPto={state.isSuggestedPto}
@@ -287,13 +287,13 @@ export function App() {
 
           <div className={`${SECTION_GAP} flex flex-col gap-3`}>
             {state.breaks.length === 0 && (
-              <p className="max-w-prose text-sm text-slate-500 dark:text-slate-400">
+              <p className="max-w-prose text-sm text-slate-500">
                 No PTO-worthy breaks fit this range and budget yet &mdash; try widening the date range or increasing
                 PTO days.
               </p>
             )}
             {state.breaks.length > 1 && mostContestedIndex !== undefined && (
-              <p className="text-sm text-slate-600 dark:text-slate-300">
+              <p className="text-sm text-slate-600">
                 Request break {mostContestedIndex} first &mdash; it&apos;s the most contested.
               </p>
             )}

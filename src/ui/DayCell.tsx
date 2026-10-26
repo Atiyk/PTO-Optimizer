@@ -161,7 +161,7 @@ export function DayCell({
   // (font-bold, not font-medium - no border-weight change, which DayCell.test.tsx already
   // pins pinned/suggested-pto to sharing exactly, border weight included).
   const categoryClasses = isOutOfRange
-    ? 'text-slate-300 dark:text-slate-600'
+    ? 'text-slate-300'
     : isPtoLike
       ? `${COLORS.ptoBg} border ${COLORS.ptoBorder} ${COLORS.ptoText} font-bold`
       : textColor;
@@ -203,7 +203,7 @@ export function DayCell({
         className={`relative z-10 flex h-12 w-full items-center justify-center rounded text-sm transition-colors ${
           isOutOfRange
             ? 'cursor-default'
-            : `cursor-pointer hover:brightness-95 hover:outline hover:outline-1 hover:outline-offset-1 hover:outline-slate-400 dark:hover:outline-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${COLORS.focusRing}`
+            : `cursor-pointer hover:brightness-95 hover:outline hover:outline-1 hover:outline-offset-1 hover:outline-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${COLORS.focusRing}`
         } ${categoryClasses} ${
           // Noticeably fainter than the solid fill, not equal weight - an alternative is a
           // suggestion about a suggestion, not a second plan.
@@ -212,12 +212,15 @@ export function DayCell({
           // A thin, mid-tone ring, not the old thick near-black/near-white box - that read
           // as a selection state rather than a "today" marker, clearly distinct from any
           // interactive/pressed state a cell can actually be in.
-          isToday && !isOutOfRange ? 'ring-1 ring-inset ring-slate-400 dark:ring-slate-500' : ''
+          isToday && !isOutOfRange ? 'ring-1 ring-inset ring-slate-400' : ''
         } ${
           // `outline`, not `ring` - a separate CSS property from the "today" ring above, so
           // a day that's both today AND part of the hovered break shows both at once
-          // instead of one Tailwind ring utility silently overriding the other.
-          isHighlighted && !isOutOfRange ? 'outline outline-2 outline-teal-400 dark:outline-teal-500 -outline-offset-1' : ''
+          // instead of one Tailwind ring utility silently overriding the other. A darker,
+          // heavier neutral than the "today" ring (slate-700 vs slate-400) - distinguished
+          // by weight, not a second hue; the accent is reserved for suggested PTO, the
+          // primary action, and focus rings only.
+          isHighlighted && !isOutOfRange ? 'outline outline-2 outline-slate-700 -outline-offset-1' : ''
         }`}
       >
         {!isOutOfRange && category === 'pinned' ? (
@@ -237,7 +240,7 @@ export function DayCell({
           // fills - rather than needing one colour choice that only works on some of them.
           <span
             aria-label="Overlaps someone else's time off"
-            className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-slate-900 ring-1 ring-white dark:bg-slate-100 dark:ring-slate-900"
+            className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-slate-900 ring-1 ring-white"
           />
         )}
       </button>

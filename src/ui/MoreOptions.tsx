@@ -7,8 +7,8 @@ import { ImportCalendar } from './ImportCalendar';
 import { todayISO, type HolidayEntry } from './useAppState';
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const H4_CLASS = 'mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200';
-const FIELD_CLASS = 'rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 px-2 py-1 text-sm';
+const H4_CLASS = 'mb-2 text-sm font-semibold text-slate-700';
+const FIELD_CLASS = 'rounded-md border border-slate-200 bg-white text-slate-800 px-2 py-1 text-sm';
 
 interface MoreOptionsProps {
   weekStartOverride: WeekStart | 'auto';
@@ -76,10 +76,10 @@ export function MoreOptions(props: MoreOptionsProps) {
   const [blockNextN, setBlockNextN] = useState(14);
 
   return (
-    <div className="grid grid-cols-1 gap-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-6 border-b border-slate-200 bg-slate-50 p-4 md:grid-cols-2 lg:grid-cols-3">
       <section>
         <h4 className={H4_CLASS}>Accrual</h4>
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <label className="flex items-center gap-2 text-sm text-slate-600">
           <input
             type="checkbox"
             checked={props.accrualEnabled}
@@ -88,7 +88,7 @@ export function MoreOptions(props: MoreOptionsProps) {
           Accrue monthly instead of all-at-once
         </label>
         {props.accrualEnabled && (
-          <label className="mt-2 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <label className="mt-2 flex items-center gap-2 text-sm text-slate-600">
             Days / month
             <input
               type="number"
@@ -104,7 +104,7 @@ export function MoreOptions(props: MoreOptionsProps) {
 
       <section>
         <h4 className={H4_CLASS}>Expiry &amp; carryover</h4>
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <label className="flex items-center gap-2 text-sm text-slate-600">
           <input
             type="checkbox"
             checked={props.expiryEnabled}
@@ -114,7 +114,7 @@ export function MoreOptions(props: MoreOptionsProps) {
         </label>
         {props.expiryEnabled && (
           <div className="mt-2 flex flex-col gap-2">
-            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-slate-600">
               Expiry date
               <input
                 type="date"
@@ -123,7 +123,7 @@ export function MoreOptions(props: MoreOptionsProps) {
                 className={FIELD_CLASS}
               />
             </label>
-            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-slate-600">
               Carryover cap
               <input
                 type="number"
@@ -139,7 +139,7 @@ export function MoreOptions(props: MoreOptionsProps) {
 
       <section>
         <h4 className={H4_CLASS}>Requesting time off</h4>
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <label className="flex items-center gap-2 text-sm text-slate-600">
           My employer&apos;s notice period
           <input
             type="number"
@@ -153,7 +153,7 @@ export function MoreOptions(props: MoreOptionsProps) {
           />
           days
         </label>
-        <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">
+        <p className="mt-1 text-xs text-slate-400">
           Drives the &quot;Request by&quot; date on each break card, and the lead time for the .ics reminder above
           &mdash; the same number for both.
         </p>
@@ -161,7 +161,7 @@ export function MoreOptions(props: MoreOptionsProps) {
 
       <section>
         <h4 className={H4_CLASS}>Peak season limit</h4>
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <label className="flex items-center gap-2 text-sm text-slate-600">
           <input
             type="checkbox"
             checked={props.peakCapEnabled}
@@ -172,7 +172,7 @@ export function MoreOptions(props: MoreOptionsProps) {
         {props.peakCapEnabled && (
           <div className="mt-2 flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
-              <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <label className="flex items-center gap-2 text-sm text-slate-600">
                 From
                 <input
                   type="date"
@@ -181,7 +181,7 @@ export function MoreOptions(props: MoreOptionsProps) {
                   className={FIELD_CLASS}
                 />
               </label>
-              <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <label className="flex items-center gap-2 text-sm text-slate-600">
                 to
                 <input
                   type="date"
@@ -191,7 +191,7 @@ export function MoreOptions(props: MoreOptionsProps) {
                 />
               </label>
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-slate-600">
               No more than
               <input
                 type="number"
@@ -207,7 +207,7 @@ export function MoreOptions(props: MoreOptionsProps) {
             </label>
           </div>
         )}
-        <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">
+        <p className="mt-1 text-xs text-slate-400">
           Off by default. Some employers cap how much leave you can take during a busy season
           &mdash; turn this on if yours does. The rest of your budget still gets used, just moved
           elsewhere in your range.
@@ -234,7 +234,7 @@ export function MoreOptions(props: MoreOptionsProps) {
         <h4 className={H4_CLASS}>Work week</h4>
         <div className="flex gap-2">
           {WEEKDAY_LABELS.map((label, i) => (
-            <label key={label} className="flex flex-col items-center gap-1 text-xs text-slate-600 dark:text-slate-300">
+            <label key={label} className="flex flex-col items-center gap-1 text-xs text-slate-600">
               {label}
               <input
                 type="checkbox"
@@ -252,7 +252,7 @@ export function MoreOptions(props: MoreOptionsProps) {
 
       <section>
         <h4 className={H4_CLASS}>Compressed schedule (9/80)</h4>
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <label className="flex items-center gap-2 text-sm text-slate-600">
           <input
             type="checkbox"
             checked={props.altFridayEnabled}
@@ -261,7 +261,7 @@ export function MoreOptions(props: MoreOptionsProps) {
           Every other Friday off
         </label>
         {props.altFridayEnabled && (
-          <label className="mt-2 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <label className="mt-2 flex items-center gap-2 text-sm text-slate-600">
             Starting Friday
             <input
               type="date"
@@ -271,7 +271,7 @@ export function MoreOptions(props: MoreOptionsProps) {
             />
           </label>
         )}
-        <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">
+        <p className="mt-1 text-xs text-slate-400">
           For a plain 4-day week (off every Friday), just uncheck Friday in Work week above &mdash; this is only
           for a schedule that alternates week to week.
         </p>
@@ -284,13 +284,13 @@ export function MoreOptions(props: MoreOptionsProps) {
 
       <section>
         <h4 className={H4_CLASS}>Days I can&apos;t take off</h4>
-        <p className="mb-2 text-xs text-slate-400 dark:text-slate-400">
+        <p className="mb-2 text-xs text-slate-400">
           Mandatory coverage, notice periods, quarter close, or any week you simply don&apos;t want &mdash; these
           narrow what the solver can pick. They never count against your travel or efficiency scores.
         </p>
         <DateListEditor dates={props.blackouts} onAdd={props.onAddBlackout} onRemove={props.onRemoveBlackout} />
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-slate-500 dark:text-slate-400">Block the next</span>
+          <span className="text-xs text-slate-500">Block the next</span>
           <input
             type="number"
             min={1}
@@ -300,15 +300,15 @@ export function MoreOptions(props: MoreOptionsProps) {
             className={`${FIELD_CLASS} w-16`}
             aria-label="Number of days to block"
           />
-          <span className="text-xs text-slate-500 dark:text-slate-400">days</span>
+          <span className="text-xs text-slate-500">days</span>
           <button
             type="button"
             onClick={() => props.onAddBlackouts(blockNextNDays(todayISO(), blockNextN))}
-            className="rounded-md bg-slate-100 dark:bg-slate-700 px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600"
+            className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200"
           >
             Block
           </button>
-          <span className="text-xs text-slate-400 dark:text-slate-400">for a notice period</span>
+          <span className="text-xs text-slate-400">for a notice period</span>
         </div>
       </section>
 
@@ -318,7 +318,7 @@ export function MoreOptions(props: MoreOptionsProps) {
         <h4 className={H4_CLASS}>Public holidays</h4>
         <div className="flex max-h-56 flex-col gap-1 overflow-auto">
           {props.holidayEntries.map((h) => (
-            <div key={`${h.date}-${h.name}`} className="flex items-center justify-between gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <div key={`${h.date}-${h.name}`} className="flex items-center justify-between gap-2 text-sm text-slate-600">
               <label className="flex min-w-0 items-center gap-2">
                 {h.source === 'state' ? (
                   <input
@@ -331,24 +331,24 @@ export function MoreOptions(props: MoreOptionsProps) {
                 )}
                 <span className="truncate">
                   {h.date} &mdash; {h.name}
-                  {h.source === 'custom' && <span className="ml-1 text-xs text-slate-400 dark:text-slate-400">(custom)</span>}
+                  {h.source === 'custom' && <span className="ml-1 text-xs text-slate-400">(custom)</span>}
                 </span>
               </label>
               <button
                 type="button"
                 onClick={() => props.onRemoveHoliday(h.date, h.name)}
-                className="shrink-0 text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                className="shrink-0 text-slate-400 hover:text-slate-700"
               >
                 &times;
               </button>
             </div>
           ))}
           {props.holidayEntries.some((h) => h.source === 'state') && (
-            <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">
+            <p className="mt-1 text-xs text-slate-400">
               State holiday &mdash; check if your employer observes this.
             </p>
           )}
-          {props.holidayEntries.length === 0 && <span className="text-sm text-slate-400 dark:text-slate-400">None loaded yet.</span>}
+          {props.holidayEntries.length === 0 && <span className="text-sm text-slate-400">None loaded yet.</span>}
         </div>
         <div className="mt-2 flex items-center gap-2">
           <input
@@ -372,7 +372,7 @@ export function MoreOptions(props: MoreOptionsProps) {
               setNewHolidayDate('');
               setNewHolidayName('');
             }}
-            className="rounded-md bg-slate-100 dark:bg-slate-700 px-2 py-1 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600"
+            className="rounded-md bg-slate-100 px-2 py-1 text-sm font-medium text-slate-700 hover:bg-slate-200"
           >
             Add
           </button>
