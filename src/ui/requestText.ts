@@ -1,6 +1,7 @@
-import type { Break } from '../solver/types';
+import type { Break, WorkWeek } from '../solver/types';
 import { mondayIndexedDow } from '../solver/dateUtils';
 import { formatShort, formatCardDateRange } from './dateFormat';
+import { requestByDate, isQuietWindow } from './requestDeadline';
 
 const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -36,24 +37,69 @@ export function formatWorkingDaysList(brk: Break, isPtoDay: (iso: string) => boo
   return `${dates.length} ${dayWord}: ${list}`;
 }
 
-/** A three-sentence manager email draft: the request itself (working days first, calendar
- * span second), the payoff (total days off gained from the surrounding weekend/holiday),
- * and a closing invitation to adjust. */
-export function formatManagerEmail(brk: Break, isPtoDay: (iso: string) => boolean): string {
-  const dates = ptoDatesOf(brk, isPtoDay);
-  const dayWord = dates.length === 1 ? 'working day' : 'working days';
-  const freeDays = Math.max(0, brk.totalDaysOff - dates.length);
+/**
+ * Phase 4.3: rewrote the draft to lead with COVERAGE - the span and total time away a
+ * manager actually needs to plan around - rather than Phase 3's "lead with the raw PTO-day
+ * list" ordering. The granular day-by-day list is still here, just second, because an HR
+ * system still needs the exact days; what changed is which fact the recipient reads first.
+ */
+function coverageSentence(brk: Break, ptoCount: number): string {
+  const dayWord = ptoCount === 1 ? 'day' : 'days';
   const totalWord = brk.totalDaysOff === 1 ? 'day' : 'days';
+  return `I'd like to request time off covering ${formatCardDateRange(brk.start, brk.end)} — ${brk.totalDaysOff} ${totalWord} away from work in total, using ${ptoCount} PTO ${dayWord}.`;
+}
 
+function specificsSentence(dates: string[], freeDays: number): string {
   const list = dates.map(formatWeekdayDate).join(', ');
-  const sentence1 = `I'd like to request ${dates.length} ${dayWord} of PTO: ${list} (calendar span ${formatCardDateRange(brk.start, brk.end)}).`;
-  const sentence2 =
-    freeDays > 0
-      ? `With the surrounding weekend${freeDays === 1 ? '' : 's'}/holiday${freeDays === 1 ? '' : 's'}, this gives me ${brk.totalDaysOff} ${totalWord} off in total.`
-      : `This uses ${dates.length} ${dayWord} from my PTO balance.`;
-  const sentence3 = `Let me know if this works, or if you'd like me to adjust the dates.`;
+  if (freeDays > 0) {
+    return `The PTO days needed are ${list}, with the rest covered by the surrounding weekend${freeDays === 1 ? '' : 's'}/holiday${freeDays === 1 ? '' : 's'}.`;
+  }
+  return `All of this comes from my PTO balance: ${list}.`;
+}
 
+/** Phase 4.3: "mentioning low-demand windows when true" - told plainly, not hedged, since
+ * it's a genuine point in the requester's favour (less likely to collide with a colleague's
+ * request) and the recipient has no other way to know this without checking themselves. */
+function quietWindowSentence(): string {
+  return `This falls in a quieter period for time-off requests, so it shouldn't conflict with coverage.`;
+}
+
+const CLOSING_SENTENCE = `Let me know if this works, or if you'd like me to adjust the dates.`;
+
+/** The short manager email draft: exactly three sentences - coverage, specifics, and a
+ * close (the quiet-window line taking the close's place when it's genuinely true, so the
+ * sentence count never grows past three). */
+export function formatManagerEmailShort(brk: Break, isPtoDay: (iso: string) => boolean): string {
+  const dates = ptoDatesOf(brk, isPtoDay);
+  const freeDays = Math.max(0, brk.totalDaysOff - dates.length);
+  const sentence1 = coverageSentence(brk, dates.length);
+  const sentence2 = specificsSentence(dates, freeDays);
+  const sentence3 = isQuietWindow(brk) ? quietWindowSentence() : CLOSING_SENTENCE;
   return `${sentence1} ${sentence2} ${sentence3}`;
+}
+
+/** The detailed manager email draft: the same coverage/specifics opening as the short
+ * variant, plus the request-by deadline (the exact same noticePeriodDays-driven date shown
+ * on the break card and used by the .ics reminder - see requestDeadline.ts - so the email
+ * can never state a different deadline than the rest of the app), the quiet-window mention
+ * when true, and the closing line. */
+export function formatManagerEmailDetailed(
+  brk: Break,
+  isPtoDay: (iso: string) => boolean,
+  noticePeriodDays: number,
+  workWeek: WorkWeek,
+): string {
+  const dates = ptoDatesOf(brk, isPtoDay);
+  const freeDays = Math.max(0, brk.totalDaysOff - dates.length);
+  const sentence1 = coverageSentence(brk, dates.length);
+  const sentence2 = specificsSentence(dates, freeDays);
+  const deadline = requestByDate(brk.start, noticePeriodDays, workWeek);
+  const sentence3 = `I'd like to confirm this by ${formatShort(deadline)} to stay within our ${noticePeriodDays}-day notice period.`;
+
+  const sentences = [sentence1, sentence2, sentence3];
+  if (isQuietWindow(brk)) sentences.push(quietWindowSentence());
+  sentences.push(CLOSING_SENTENCE);
+  return sentences.join(' ');
 }
 
 export async function copyText(text: string): Promise<boolean> {

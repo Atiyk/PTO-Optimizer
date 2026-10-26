@@ -26,6 +26,9 @@ interface MoreOptionsProps {
   carryoverCap: number;
   onChangeCarryoverCap: (v: number) => void;
 
+  noticePeriodDays: number;
+  onChangeNoticePeriodDays: (v: number) => void;
+
   overlapDays: string[];
   onAddOverlapDay: (d: string) => void;
   onRemoveOverlapDay: (d: string) => void;
@@ -123,6 +126,28 @@ export function MoreOptions(props: MoreOptionsProps) {
             </label>
           </div>
         )}
+      </section>
+
+      <section>
+        <h4 className={H4_CLASS}>Requesting time off</h4>
+        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          My employer&apos;s notice period
+          <input
+            type="number"
+            min={0}
+            max={90}
+            step={1}
+            value={props.noticePeriodDays}
+            onChange={(e) => props.onChangeNoticePeriodDays(Number(e.target.value))}
+            aria-label="Notice period in days"
+            className={`${FIELD_CLASS} w-20`}
+          />
+          days
+        </label>
+        <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">
+          Drives the &quot;Request by&quot; date on each break card, and the lead time for the .ics reminder above
+          &mdash; the same number for both.
+        </p>
       </section>
 
       <section>

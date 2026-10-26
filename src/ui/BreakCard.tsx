@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import type { Break } from '../solver/types';
-import { formatWorkingDaysList, formatManagerEmail, copyText } from './requestText';
+import type { Break, WorkWeek } from '../solver/types';
+import { formatWorkingDaysList, formatManagerEmailShort, formatManagerEmailDetailed, copyText } from './requestText';
 import { formatCardDateRange } from './dateFormat';
+import { requestByText, isContested } from './requestDeadline';
 
 interface BreakCardProps {
   brk: Break;
@@ -11,6 +12,11 @@ interface BreakCardProps {
   highlighted?: boolean;
   isPtoDay: (iso: string) => boolean;
   onHover: (id: string | null) => void;
+  /** Phase 4.2: this card's break is the single most-contested one in the whole plan. */
+  isMostContested: boolean;
+  today: string;
+  noticePeriodDays: number;
+  workWeek: WorkWeek;
 }
 
 type CopyState = 'idle' | 'done';
@@ -59,10 +65,22 @@ function lowValueExplanation(brk: Break): string {
   return 'No extra days off — this uses the full available budget rather than leaving a PTO day unspent.';
 }
 
-export function BreakCard({ brk, index, highlighted = false, isPtoDay, onHover }: BreakCardProps) {
+export function BreakCard({
+  brk,
+  index,
+  highlighted = false,
+  isPtoDay,
+  onHover,
+  isMostContested,
+  today,
+  noticePeriodDays,
+  workWeek,
+}: BreakCardProps) {
   const lowValue = isLowValue(brk);
   const dayWord = brk.totalDaysOff === 1 ? 'day' : 'days';
   const ptoWord = brk.ptoCost === 1 ? 'day' : 'days';
+  const contested = isContested(brk);
+  const requestLine = requestByText(brk.start, noticePeriodDays, workWeek, today);
 
   return (
     <div
@@ -112,15 +130,33 @@ export function BreakCard({ brk, index, highlighted = false, isPtoDay, onHover }
               {tag}
             </span>
           ))}
+          {contested && (
+            <span className="rounded-full bg-rose-50 dark:bg-rose-950 px-3 py-1 text-xs font-medium text-rose-700 dark:text-rose-300">
+              Popular dates
+            </span>
+          )}
         </div>
       </div>
 
       {lowValue && <p className="text-xs text-slate-500 dark:text-slate-400">{lowValueExplanation(brk)}</p>}
 
-      <div className="flex items-center gap-2 border-t border-slate-100 dark:border-slate-700 pt-3">
+      {isMostContested && (
+        <p className="rounded-md bg-rose-50 dark:bg-rose-950 px-3 py-2 text-xs font-medium text-rose-700 dark:text-rose-300">
+          This is the most contested week in your plan &mdash; colleagues are likely to request it too. Request it
+          first.
+        </p>
+      )}
+
+      <p className="text-xs text-slate-500 dark:text-slate-400">{requestLine}</p>
+
+      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 dark:border-slate-700 pt-3">
         <span className="text-xs text-slate-400 dark:text-slate-400">Request this time off:</span>
         <CopyRequestButton label="Copy date list" text={formatWorkingDaysList(brk, isPtoDay)} />
-        <CopyRequestButton label="Copy email draft" text={formatManagerEmail(brk, isPtoDay)} />
+        <CopyRequestButton label="Copy email draft" text={formatManagerEmailShort(brk, isPtoDay)} />
+        <CopyRequestButton
+          label="Copy detailed email draft"
+          text={formatManagerEmailDetailed(brk, isPtoDay, noticePeriodDays, workWeek)}
+        />
       </div>
     </div>
   );

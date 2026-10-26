@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { BreakCard } from './BreakCard';
+import { DEFAULT_WORK_WEEK } from '../solver/types';
 import type { Break } from '../solver/types';
 
 function makeBreak(overrides: Partial<Break> = {}): Break {
@@ -19,7 +20,18 @@ function makeBreak(overrides: Partial<Break> = {}): Break {
 }
 
 function render(brk: Break) {
-  return renderToStaticMarkup(<BreakCard brk={brk} index={1} isPtoDay={() => true} onHover={() => {}} />);
+  return renderToStaticMarkup(
+    <BreakCard
+      brk={brk}
+      index={1}
+      isPtoDay={() => true}
+      onHover={() => {}}
+      isMostContested={false}
+      today="2025-12-01"
+      noticePeriodDays={14}
+      workWeek={DEFAULT_WORK_WEEK}
+    />,
+  );
 }
 
 describe('BreakCard low-value explanation (regression: unconditional "chosen for low travel demand")', () => {

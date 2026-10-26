@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Break } from '../solver/types';
 import type { DayCategory } from './types';
 import type { WeekStart } from './calendarMath';
-import { downloadICS, type ReminderOptions } from './icsExport';
+import { downloadICS } from './icsExport';
 import { copyShareImage, buildShareImageMonths } from './imageExport';
 import { copyText } from './requestText';
 import { track } from './analytics';
@@ -18,6 +18,10 @@ interface ExportBarProps {
   totalDaysOff: number;
   travelPercentile: number | null;
   efficiencyPercentile: number | null;
+  /** Phase 4: drives the .ics reminder's lead time directly - the SAME number as the
+   * "Request by" date on every break card (see requestDeadline.ts), so this panel no
+   * longer owns an independent 7/14/30 choice that could silently disagree with it. */
+  noticePeriodDays: number;
 }
 
 export interface ActionResult {
@@ -98,10 +102,10 @@ export function ActionButton({
 export function ExportBar(props: ExportBarProps) {
   const siteUrl = typeof window !== 'undefined' ? window.location.host : 'pto-optimizer.app';
 
-  // Default on, 14 days - a UI-level default; generateICS/downloadICS themselves default to
-  // disabled (see icsExport.ts) so every other caller is unaffected.
+  // Default on - a UI-level default; generateICS/downloadICS themselves default to
+  // disabled (see icsExport.ts) so every other caller is unaffected. The lead time itself
+  // is no longer a local default: it's always props.noticePeriodDays (see the prop comment).
   const [remindersEnabled, setRemindersEnabled] = useState(true);
-  const [leadDays, setLeadDays] = useState<ReminderOptions['leadDays']>(14);
 
   const isOutOfRange = (iso: string) => iso < props.rangeStart || iso > props.rangeEnd;
 
@@ -113,7 +117,7 @@ export function ExportBar(props: ExportBarProps) {
           label="Add to calendar (.ics)"
           variant="primary"
           onClick={async () => {
-            downloadICS(props.breaks, props.isSuggestedPto, { enabled: remindersEnabled, leadDays });
+            downloadICS(props.breaks, props.isSuggestedPto, { enabled: remindersEnabled, leadDays: props.noticePeriodDays });
             track('ICS downloaded');
             return { ok: true, message: 'Downloaded' };
           }}
@@ -166,19 +170,10 @@ export function ExportBar(props: ExportBarProps) {
         />
         Remind me to request time off
         {remindersEnabled && (
-          <>
-            <select
-              value={leadDays}
-              onChange={(e) => setLeadDays(Number(e.target.value) as ReminderOptions['leadDays'])}
-              className="rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-1 py-0.5 text-xs text-slate-600 dark:text-slate-300"
-              aria-label="Reminder lead time"
-            >
-              <option value={7}>7 days before</option>
-              <option value={14}>14 days before</option>
-              <option value={30}>30 days before</option>
-            </select>
-            <span>&mdash; lands in the .ics file above</span>
-          </>
+          <span>
+            &mdash; {props.noticePeriodDays} {props.noticePeriodDays === 1 ? 'day' : 'days'} before, matching your
+            notice period setting below
+          </span>
         )}
       </label>
       <p className="text-xs text-slate-400 dark:text-slate-500">Free, no sign-up, no email.</p>

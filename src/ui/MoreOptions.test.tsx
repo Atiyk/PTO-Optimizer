@@ -41,6 +41,8 @@ describe('MoreOptions (Phase 3: consolidated "Days I can\'t take off")', () => {
     onChangeExpiryDate: () => {},
     carryoverCap: 0,
     onChangeCarryoverCap: () => {},
+    noticePeriodDays: 14,
+    onChangeNoticePeriodDays: () => {},
     overlapDays: [],
     onAddOverlapDay: () => {},
     onRemoveOverlapDay: () => {},

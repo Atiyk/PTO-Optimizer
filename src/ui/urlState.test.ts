@@ -80,6 +80,7 @@ function fullState(overrides: Partial<WriteStateInput> = {}): WriteStateInput {
     altFridayStart: '',
     reserveDays: 3,
     unlimitedPto: false,
+    noticePeriodDays: 14,
     ...overrides,
   };
 }
@@ -180,6 +181,28 @@ describe('full state URL round-trip (Phase 1A: shareable URL)', () => {
     expect(read.blackouts).toEqual([]);
     expect(read.pinnedDays).toEqual([]);
     expect(read.ruledOutDays).toEqual([]);
+  });
+});
+
+describe('notice period in URL (Phase 4.1: "notice period encoded in the URL")', () => {
+  it('round-trips a non-default notice period', () => {
+    const params = new URLSearchParams();
+    writeFullStateToURL(params, fullState({ noticePeriodDays: 21 }));
+    expect(params.get('np')).toBe('21');
+    const read = readFullStateFromURL(`?${params.toString()}`, defaults);
+    expect(read.noticePeriodDays).toBe(21);
+  });
+
+  it('omits np from the URL when it equals the default (14 days), keeping the URL short', () => {
+    const params = new URLSearchParams();
+    writeFullStateToURL(params, fullState({ noticePeriodDays: 14 }));
+    expect(params.has('np')).toBe(false);
+  });
+
+  it('falls back to 14 when np is missing or garbage, rather than crashing', () => {
+    expect(readFullStateFromURL('', defaults).noticePeriodDays).toBe(14);
+    expect(readFullStateFromURL('?np=garbage', defaults).noticePeriodDays).toBe(14);
+    expect(readFullStateFromURL('?np=-5', defaults).noticePeriodDays).toBe(14);
   });
 });
 

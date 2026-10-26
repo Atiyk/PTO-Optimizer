@@ -17,6 +17,7 @@ import { CalendarErrorBoundary } from './CalendarErrorBoundary';
 import { ValidationBanner } from './ValidationBanner';
 import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
+import { sortByContestedness, mostContestedBreakId } from './requestDeadline';
 import { useAppState, todayISO } from './useAppState';
 import { useHasHover } from './useHasHover';
 import { activeCountryPreset } from '../data/countryPresets';
@@ -35,6 +36,17 @@ export function App() {
     : null;
 
   const introText = activeCountryPreset()?.copy ?? DEFAULT_INTRO;
+
+  // Phase 4.2: the most contested break appears FIRST in the rendered list, not
+  // chronologically - but each card keeps the NUMBER it has in chronological order
+  // (orderedBreaks), the same number the calendar's own badges use, so a card's number
+  // never changes just because of where it's drawn in the list.
+  const mostContestedId = mostContestedBreakId(state.breaks);
+  const chronologicalIndexById = new Map(state.orderedBreaks.map(({ index, brk }) => [brk.id, index]));
+  const breaksByContestedness = sortByContestedness(state.breaks).map((brk) => ({
+    index: chronologicalIndexById.get(brk.id)!,
+    brk,
+  }));
 
   const { showHelp, setShowHelp } = useKeyboardShortcuts({
     onCopyLink: () => document.getElementById('shortcut-copy-link')?.click(),
@@ -80,6 +92,7 @@ export function App() {
           totalDaysOff={state.totalDaysOff}
           travelPercentile={state.scores?.travel.percentile ?? null}
           efficiencyPercentile={state.scores?.efficiency.percentile ?? null}
+          noticePeriodDays={state.noticePeriodDays}
         />
       </div>
 
@@ -165,6 +178,8 @@ export function App() {
               onChangeExpiryDate={state.setExpiryDate}
               carryoverCap={state.carryoverCap}
               onChangeCarryoverCap={state.setCarryoverCap}
+              noticePeriodDays={state.noticePeriodDays}
+              onChangeNoticePeriodDays={state.setNoticePeriodDays}
               overlapDays={state.overlapDays}
               onAddOverlapDay={(d) => state.setOverlapDays([...state.overlapDays, d])}
               onRemoveOverlapDay={(d) => state.setOverlapDays(state.overlapDays.filter((x) => x !== d))}
@@ -247,7 +262,7 @@ export function App() {
               PTO days.
             </p>
           )}
-          {state.orderedBreaks.map(({ index, brk }) => (
+          {breaksByContestedness.map(({ index, brk }) => (
             <BreakCard
               key={brk.id}
               brk={brk}
@@ -255,6 +270,10 @@ export function App() {
               highlighted={state.highlightedBreakIds.has(brk.id) || state.hoveredBreakId === brk.id}
               isPtoDay={state.isSuggestedPto}
               onHover={state.setHoveredBreakId}
+              isMostContested={brk.id === mostContestedId}
+              today={today}
+              noticePeriodDays={state.noticePeriodDays}
+              workWeek={state.workWeek}
             />
           ))}
         </div>
