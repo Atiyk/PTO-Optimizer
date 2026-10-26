@@ -42,7 +42,7 @@ const ITEMS: FAQItem[] = [
 
 export function FAQ() {
   return (
-    <section className="mt-10 border-t border-slate-100 dark:border-slate-800 pt-6 text-sm text-slate-500 dark:text-slate-400">
+    <section className="border-t border-slate-100 dark:border-slate-800 pt-6 text-sm text-slate-500 dark:text-slate-400">
       <h2 className="mb-3 text-sm font-medium text-slate-600 dark:text-slate-300">Questions</h2>
       <div className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
         {ITEMS.map((item) => (

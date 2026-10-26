@@ -6,6 +6,7 @@ import { downloadICS } from './icsExport';
 import { copyShareImage, buildShareImageMonths } from './imageExport';
 import { copyText } from './requestText';
 import { track } from './analytics';
+import { PartnerShareButton } from './PartnerShareButton';
 
 interface ExportBarProps {
   breaks: Break[];
@@ -22,6 +23,10 @@ interface ExportBarProps {
    * "Request by" date on every break card (see requestDeadline.ts), so this panel no
    * longer owns an independent 7/14/30 choice that could silently disagree with it. */
   noticePeriodDays: number;
+  /** Layout fix: "Share with a partner" is the same kind of action as the three export
+   * buttons - previously split out into its own standalone row elsewhere on the page, now
+   * the fourth button in this one row (see the row's own comment below). */
+  buildOverlapLink: () => string;
 }
 
 export interface ActionResult {
@@ -94,10 +99,11 @@ export function ActionButton({
 }
 
 /**
- * The free, no-sign-up export actions - moved directly beneath the result headline
- * (Phase 2 item 3), not buried below the calendar, since this is the actual payoff: take
- * the plan with you. "Share with a partner" (the overlap link) isn't one of these three -
- * it's a separate, secondary action and stays near the calendar (see App.tsx).
+ * The free, no-sign-up export actions, below the calendar/break list - someone shouldn't
+ * be asked to download a plan they haven't looked at yet. Layout fix: all four actions
+ * (.ics, copy image, copy link, share with a partner) now render in this one row - they're
+ * the same kind of action and were previously split across two separate rows in two
+ * different places on the page for no real reason.
  */
 export function ExportBar(props: ExportBarProps) {
   const siteUrl = typeof window !== 'undefined' ? window.location.host : 'pto-optimizer.app';
@@ -161,6 +167,7 @@ export function ExportBar(props: ExportBarProps) {
             return ok ? { ok: true, message: 'Link copied' } : { ok: false, message: "Couldn't copy — try again" };
           }}
         />
+        <PartnerShareButton buildOverlapLink={props.buildOverlapLink} />
       </div>
       <label className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
         <input

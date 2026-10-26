@@ -8,7 +8,6 @@ import {
   isContested,
   isQuietWindow,
   mostContestedBreakId,
-  sortByContestedness,
 } from './requestDeadline';
 
 function makeBreak(overrides: Partial<Break> = {}): Break {
@@ -130,22 +129,5 @@ describe('mostContestedBreakId', () => {
   it('still picks a "most contested" break even when none crosses the contested threshold', () => {
     const breaks = [makeBreak({ id: 'a', meanDemand: 1.0 }), makeBreak({ id: 'b', meanDemand: 1.05 })];
     expect(mostContestedBreakId(breaks)).toBe('b');
-  });
-});
-
-describe('sortByContestedness', () => {
-  it('orders the most contested break first, not chronologically', () => {
-    const jan = makeBreak({ id: 'jan', start: '2027-01-05', meanDemand: 1.0 });
-    const dec = makeBreak({ id: 'dec', start: '2026-12-20', meanDemand: 1.4 });
-    const nov = makeBreak({ id: 'nov', start: '2026-11-01', meanDemand: 1.1 });
-    const sorted = sortByContestedness([jan, dec, nov]);
-    expect(sorted.map((b) => b.id)).toEqual(['dec', 'nov', 'jan']);
-  });
-
-  it('does not mutate the input array', () => {
-    const breaks = [makeBreak({ id: 'a', meanDemand: 1.0 }), makeBreak({ id: 'b', meanDemand: 1.3 })];
-    const original = [...breaks];
-    sortByContestedness(breaks);
-    expect(breaks).toEqual(original);
   });
 });

@@ -1,4 +1,5 @@
 import { ordinal } from './scoreFormat';
+import { Container } from './Container';
 
 export interface PinnedPlanSummary {
   budgetSpent: number;
@@ -36,7 +37,8 @@ function summaryText(s: PinnedPlanSummary): string {
 export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlansStripProps) {
   if (summaries.length === 0) return null;
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2">
+    <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+      <Container className="flex flex-wrap items-center gap-2 px-4 py-4">
       {summaries.map((s, i) => (
         <div
           key={i}
@@ -60,6 +62,7 @@ export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlans
           </button>
         </div>
       ))}
+      </Container>
     </div>
   );
 }
