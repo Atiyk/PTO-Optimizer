@@ -13,7 +13,7 @@ import { PinIcon } from './DayCell';
  */
 export function Legend() {
   return (
-    <div className="flex flex-wrap items-center justify-start gap-4 text-sm text-slate-600 dark:text-slate-300">
+    <div className="flex flex-wrap items-center justify-start gap-4 text-sm text-slate-600">
       <span className="flex items-center gap-2">
         <span className="flex h-5 w-5 items-center justify-center">
           <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${HOLIDAY_DOT}`} />

@@ -121,7 +121,7 @@ describe('barFillWidthPercent', () => {
   });
 });
 
-describe('score intensity contrast (light mode)', () => {
+describe('score intensity contrast', () => {
   const SLATE_50: [number, number, number] = [248, 250, 252];
   const WHITE: [number, number, number] = [255, 255, 255];
 
@@ -129,32 +129,9 @@ describe('score intensity contrast (light mode)', () => {
     expect(contrastRatio([r, g, b], SLATE_50)).toBeGreaterThanOrEqual(4.5);
     expect(contrastRatio([r, g, b], WHITE)).toBeGreaterThanOrEqual(4.5);
   });
-});
 
-describe('score intensity contrast (dark mode) - the ramp is NOT the light-mode one reused', () => {
-  // From index.css's dark `--score-N` values: indigo-300/400/500, not light mode's
-  // indigo-600/700/800, which are themselves too dark to read against a dark page -
-  // indigo-600 only reaches 2.84:1 against the dark page background, short of a
-  // meaningful pop, which is exactly why the ramp shifts three steps lighter, not one.
-  const DARK_RAMP: [number, number, number][] = [
-    [165, 180, 252], // indigo-300
-    [129, 140, 248], // indigo-400
-    [99, 102, 241], // indigo-500
-  ];
-  const BG_PAGE: [number, number, number] = [15, 23, 42]; // slate-900
-  const BG_SURFACE: [number, number, number] = [30, 41, 59]; // slate-800
-
-  it('the dark ramp is distinct from the light ramp - this is a genuine inversion, not a reused palette', () => {
-    expect(DARK_RAMP).not.toEqual(SCORE_INTENSITY.rgb);
-  });
-
-  it.each(DARK_RAMP)('dark intensity [%i, %i, %i] pops against the strip background with a wide margin (not a 4.5:1 text check - this is a fill, nothing is overlaid on it)', (r, g, b) => {
-    expect(contrastRatio([r, g, b], BG_PAGE)).toBeGreaterThanOrEqual(3);
-    expect(contrastRatio([r, g, b], BG_SURFACE)).toBeGreaterThanOrEqual(1.5);
-  });
-
-  it('the three dark bands are distinguishable from each other, same as the light ramp', () => {
-    const lum = DARK_RAMP.map(relativeLuminance);
+  it('the three bands are distinguishable from each other', () => {
+    const lum = SCORE_INTENSITY.rgb.map(relativeLuminance);
     expect(lum[0]).toBeGreaterThan(lum[1]);
     expect(lum[1]).toBeGreaterThan(lum[2]);
   });

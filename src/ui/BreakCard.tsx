@@ -55,14 +55,14 @@ function CopyRequestDropdown({ options }: { options: CopyOption[] }) {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+        className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
       >
         {copied ? 'Copied' : 'Copy request ▾'}
       </button>
       {open && (
         <div
           role="menu"
-          className="absolute left-0 z-10 mt-1 min-w-[12rem] rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 py-1 shadow-lg"
+          className="absolute left-0 z-10 mt-1 min-w-[12rem] rounded-md border border-slate-200 bg-white py-1 shadow-lg"
         >
           {options.map((o) => (
             <button
@@ -77,7 +77,7 @@ function CopyRequestDropdown({ options }: { options: CopyOption[] }) {
                   setTimeout(() => setCopied(false), 2000);
                 }
               }}
-              className="block w-full px-3 py-1.5 text-left text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+              className="block w-full px-3 py-1.5 text-left text-xs text-slate-600 hover:bg-slate-50"
             >
               {o.label}
             </button>
@@ -153,56 +153,51 @@ export function BreakCard({
       onFocus={() => onHover(brk.id)}
       onBlur={() => onHover(null)}
       className={`flex flex-col gap-3 rounded-lg border p-4 transition-colors duration-700 ${
-        highlighted
-          ? 'border-teal-300 dark:border-teal-700 bg-teal-50/60 dark:bg-teal-950/40'
-          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+        // A darker, heavier neutral than the resting border/surface - not a new hue. The
+        // accent is reserved for suggested PTO, the primary action, and focus rings only.
+        highlighted ? 'border-slate-300 bg-slate-100' : 'border-slate-200 bg-slate-50'
       }`}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-600 dark:bg-slate-400 text-[11px] font-semibold leading-none text-white dark:text-slate-900">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-600 text-[11px] font-semibold leading-none tabular-nums text-white">
             {index}
           </span>
-          <span className="min-w-0 truncate font-medium text-slate-800 dark:text-slate-100">
-            {formatCardDateRange(brk.start, brk.end)} &middot; {brk.totalDaysOff} {dayWord} off for {brk.ptoCost} PTO{' '}
-            {ptoWord}
+          <span className="min-w-0 truncate font-medium text-slate-900">
+            {formatCardDateRange(brk.start, brk.end)} &middot;{' '}
+            <span className="tabular-nums">{brk.totalDaysOff}</span> {dayWord} off for{' '}
+            <span className="tabular-nums">{brk.ptoCost}</span> PTO {ptoWord}
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-3">
+          {/* Multiplier: weight and tone carry "this one's good," not a new colour - a
+              category tag needs the same hue every time it appears, which stops being true
+              the moment the hue also means "strong result" here. */}
           <span
             className={
               lowValue
-                ? 'rounded-full bg-slate-100 dark:bg-slate-700 px-3 py-1 text-sm font-medium text-slate-500 dark:text-slate-400'
-                : 'rounded-full bg-teal-50 dark:bg-teal-950 px-3 py-1 text-sm font-semibold text-teal-700 dark:text-teal-300'
+                ? 'rounded-full bg-slate-100 px-3 py-1 text-sm font-medium tabular-nums text-slate-500'
+                : 'rounded-full bg-slate-900 px-3 py-1 text-sm font-semibold tabular-nums text-white'
             }
           >
             {brk.multiplier.toFixed(2)}x
           </span>
+          {/* Every tag - including "Popular dates" below - is the same neutral pill. These
+              are categories, not states: the design system reserves colour for suggested
+              PTO, the primary action, focus rings, and genuine warning/error states, never
+              for labelling a kind of thing. The label text alone carries the meaning. */}
           {brk.tags.map((tag) => (
-            <span
-              key={tag}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${
-                tag === 'Peak travel'
-                  ? 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
-                  : tag === 'Overlaps'
-                    ? 'bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300'
-                    : tag === 'Estimated' || tag === 'Low travel demand'
-                      ? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                      : 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-              }`}
-            >
+            <span key={tag} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
               {tag}
             </span>
           ))}
           {contested && (
-            <span className="rounded-full bg-rose-50 dark:bg-rose-950 px-3 py-1 text-xs font-medium text-rose-700 dark:text-rose-300">
-              Popular dates
-            </span>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">Popular dates</span>
           )}
         </div>
       </div>
 
-      {lowValue && <p className="text-xs text-slate-500 dark:text-slate-400">{lowValueExplanation(brk)}</p>}
+      {lowValue && <p className="text-xs text-slate-500">{lowValueExplanation(brk)}</p>}
 
       {/* Layout fix: this used to be a full-width red bar, which reads as an error - it's
           advice, not a problem with the plan. Red is reserved for actual problems (an
@@ -210,7 +205,7 @@ export function BreakCard({
           directly beneath the card header, in the same neutral/subtle tone the low-value
           explanation above already uses. */}
       {isMostContested && (
-        <p className="text-sm text-slate-600 dark:text-slate-300">
+        <p className="text-sm text-slate-600">
           Most contested week in your plan &mdash; colleagues are likely to want it too.
         </p>
       )}
@@ -220,9 +215,9 @@ export function BreakCard({
           "the request tools," revealed on expand, not permanent chrome on every card. */}
       {expanded ? (
         <>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{requestLine}</p>
-          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 dark:border-slate-700 pt-3">
-            <span className="text-xs text-slate-400 dark:text-slate-400">Request this time off:</span>
+          <p className="text-xs text-slate-500">{requestLine}</p>
+          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+            <span className="text-xs text-slate-400">Request this time off:</span>
             <CopyRequestDropdown
               options={[
                 { label: 'Copy date list', text: formatWorkingDaysList(brk, isPtoDay) },
@@ -233,7 +228,7 @@ export function BreakCard({
             <button
               type="button"
               onClick={() => setUserExpanded(false)}
-              className="text-xs text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              className="text-xs text-slate-400 hover:text-slate-600"
             >
               Hide ↑
             </button>
@@ -243,7 +238,7 @@ export function BreakCard({
         <button
           type="button"
           onClick={() => setUserExpanded(true)}
-          className="self-start border-t border-slate-100 dark:border-slate-700 pt-3 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100"
+          className="self-start border-t border-slate-100 pt-3 text-xs font-medium text-slate-500 hover:text-slate-800"
         >
           Request this time off ↓
         </button>

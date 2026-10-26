@@ -37,18 +37,18 @@ function summaryText(s: PinnedPlanSummary): string {
 export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlansStripProps) {
   if (summaries.length === 0) return null;
   return (
-    <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+    <div className="border-b border-slate-200 bg-slate-50">
       <Container className="flex flex-wrap items-center gap-2 px-4 py-4">
       {summaries.map((s, i) => (
         <div
           key={i}
-          className="flex items-center gap-2 rounded-full bg-slate-100 dark:bg-slate-700 px-3 py-1 text-xs text-slate-700 dark:text-slate-200"
+          className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs text-slate-700"
         >
           <span>{summaryText(s)}</span>
           <button
             type="button"
             onClick={() => onRestore(i)}
-            className="font-medium text-slate-800 dark:text-slate-100 underline underline-offset-2 hover:no-underline"
+            className="font-medium text-slate-800 underline underline-offset-2 hover:no-underline"
           >
             restore
           </button>
@@ -56,7 +56,7 @@ export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlans
             type="button"
             onClick={() => onRemove(i)}
             aria-label="Remove pinned plan"
-            className="text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+            className="text-slate-400 hover:text-slate-700"
           >
             &times;
           </button>

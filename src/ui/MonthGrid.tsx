@@ -84,9 +84,9 @@ export function MonthGrid({
   };
 
   return (
-    <div className="rounded-lg border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-2">
-      <h3 className="mb-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">{monthLabel(descriptor.year, descriptor.month)}</h3>
-      <div className="mb-1 grid grid-cols-7 text-center text-xs text-slate-400 dark:text-slate-400">
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+      <h3 className="mb-1.5 text-sm font-semibold text-slate-700">{monthLabel(descriptor.year, descriptor.month)}</h3>
+      <div className="mb-1 grid grid-cols-7 text-center text-xs text-slate-400">
         {labels.map((l) => (
           <span key={l}>{l}</span>
         ))}
@@ -119,7 +119,7 @@ export function MonthGrid({
                         aria-hidden
                         onMouseEnter={() => onHoverBreak(band.brk.id)}
                         onMouseLeave={() => onHoverBreak(null)}
-                        className="flex h-3.5 w-3.5 cursor-default items-center justify-center rounded-full bg-slate-600 dark:bg-slate-400 text-[9px] font-semibold leading-none text-white dark:text-slate-900"
+                        className="flex h-3.5 w-3.5 cursor-default items-center justify-center rounded-full bg-slate-600 text-[9px] font-semibold leading-none text-white"
                       >
                         {band.index}
                       </button>

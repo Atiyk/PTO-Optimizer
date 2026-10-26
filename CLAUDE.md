@@ -5,7 +5,7 @@
    Also run `npm run build` before pushing: it runs `tsc -b` (a composite build that
    includes test files, unlike plain `tsc --noEmit`), which is what Vercel actually runs.
    A real build-breaking error here was missed by `tsc --noEmit` alone once already.
-3. Screenshot every affected view at 1440px and 375px, before and after.
+3. Screenshot every affected view at 1440px, 768px, and 375px, before and after.
 4. STOP. Show the screenshots and a plain-language summary. Wait for explicit approval.
    Do not push, do not open a PR.
 5. After approval: push the branch, open a PR, give the Vercel preview URL.
@@ -17,6 +17,12 @@ rendered elements) by counting them in the actual DOM output, not by reading the
 Never add a submit button, a "Generate" action, or a multi-step form — the app updates
 live as inputs change, and that immediacy is the main differentiator. Don't gate any
 result behind an explicit action.
+
+Never remove free-form date pickers (no year presets or dropdowns) or URL round-tripping
+for every control — the solver is deterministic and every input reproduces from a link
+alone, which is a real product differentiator (no competitor offers it) and a redesign is
+exactly where it's easy to lose by accident. Grep any diff that touches controls for
+submit-style verbs before calling a phase done.
 
 No backend, no accounts, no stored personal data. Everything stays client-side.
 

@@ -1,6 +1,7 @@
 import type { Scores } from '../solver/types';
 import { ordinal } from './scoreFormat';
 import { Container } from './Container';
+import { ACCENT_BUTTON } from './colorScheme';
 
 interface HeadlineProps {
   budgetSpent: number;
@@ -57,15 +58,15 @@ export function Headline({ budgetSpent, totalDaysOff, breakCountActual, scores, 
         : 'Two pinned — remove one to pin another.';
   return (
     <div
-      className="sticky top-0 z-40 border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur"
+      className="sticky top-0 z-40 border-b border-slate-200 bg-slate-50/95 backdrop-blur"
       role="status"
     >
       <Container className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <span className="text-2xl font-bold leading-tight text-slate-900 dark:text-slate-50 sm:text-3xl">
+          <span className="text-2xl font-bold leading-tight tabular-nums text-slate-900 sm:text-3xl">
             {headlineText(budgetSpent, budget, reserveDays, totalDaysOff)}
           </span>
-          <span className="text-sm text-slate-600 dark:text-slate-300">
+          <span className="text-sm tabular-nums text-slate-600">
             {breakCountActual} break{breakCountActual === 1 ? '' : 's'}
             {scores ? ` · Travel ${ordinal(scores.travel.percentile)} · Efficiency ${ordinal(scores.efficiency.percentile)}` : ''}
           </span>
@@ -75,7 +76,9 @@ export function Headline({ budgetSpent, totalDaysOff, breakCountActual, scores, 
           onClick={onPin}
           disabled={!canPin}
           title={pinTitle}
-          className="shrink-0 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+            canPin ? ACCENT_BUTTON : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+          }`}
         >
           Pin this plan
         </button>

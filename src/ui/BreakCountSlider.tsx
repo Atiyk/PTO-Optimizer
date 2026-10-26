@@ -65,11 +65,11 @@ export function BreakCountSlider({
 }: BreakCountSliderProps) {
   return (
     <div className="flex flex-col gap-1">
-      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
+      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
         How many breaks
         <InfoHint text={BREAK_COUNT_HINT} />
       </h3>
-      <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+      <label className="flex items-center gap-2 text-xs text-slate-600">
         <input
           type="checkbox"
           checked={letSolverDecide}
@@ -85,7 +85,7 @@ export function BreakCountSlider({
         {/* Phase 3.3's full "more disruption/less pile-up" reasoning now lives in the
             InfoHint above - these are short axis labels (matching WeightingSlider's own
             "Most days off"/"Cheapest to travel" pattern), not the explanation itself. */}
-        <div className="flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
+        <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
           <span>One big break</span>
           <span>Many short breaks</span>
         </div>
@@ -99,10 +99,10 @@ export function BreakCountSlider({
           onChange={(e) => onChange(Number(e.target.value))}
           aria-label="How many breaks"
           aria-valuetext={`${positionLabel(value)}${letSolverDecide ? ' (disabled — letting the solver decide)' : ''}`}
-          className={`w-full disabled:cursor-not-allowed ${letSolverDecide ? 'accent-slate-300 dark:accent-slate-600' : 'accent-slate-800 dark:accent-slate-300'}`}
+          className={`w-full disabled:cursor-not-allowed ${letSolverDecide ? 'accent-slate-300' : 'accent-slate-800'}`}
         />
       </div>
-      <p className="text-xs text-slate-600 dark:text-slate-300">{caption(breakCountRequested, breakCountActual, breaks, budget, letSolverDecide)}</p>
+      <p className="text-xs tabular-nums text-slate-600">{caption(breakCountRequested, breakCountActual, breaks, budget, letSolverDecide)}</p>
     </div>
   );
 }
