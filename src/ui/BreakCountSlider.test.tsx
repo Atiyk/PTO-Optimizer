@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { BreakCountSlider } from './BreakCountSlider';
 
 describe('BreakCountSlider (Phase 3.3: captions reframed around workload, mechanism unchanged)', () => {
-  it('reframes the two end labels around workload/recovery instead of just slider position', () => {
+  it('labels the two slider ends around workload/recovery, with the full reasoning in a hover hint', () => {
     const html = renderToStaticMarkup(
       <BreakCountSlider
         value={4}
@@ -16,8 +16,9 @@ describe('BreakCountSlider (Phase 3.3: captions reframed around workload, mechan
         budget={15}
       />,
     );
-    expect(html).toContain('One big break. More disruption, more recovery.');
-    expect(html).toContain('Shorter breaks. Less pile-up when you return.');
+    expect(html).toContain('One big break');
+    expect(html).toContain('Many short breaks');
+    expect(html).toContain('title="One big break means more disruption but more recovery time.');
     // The old, purely structural labels are gone.
     expect(html).not.toContain('All in one</span>');
     expect(html).not.toContain('>As many as possible<');

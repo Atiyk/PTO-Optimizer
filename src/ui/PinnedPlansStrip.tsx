@@ -8,10 +8,7 @@ export interface PinnedPlanSummary {
 }
 
 interface PinnedPlansStripProps {
-  pinnedCount: number;
   summaries: PinnedPlanSummary[];
-  canPin: boolean;
-  onPin: () => void;
   onRestore: (index: number) => void;
   onRemove: (index: number) => void;
 }
@@ -26,28 +23,20 @@ function summaryText(s: PinnedPlanSummary): string {
 /**
  * Phase 3 item 7: moving a slider used to permanently discard whatever plan was on screen
  * before it - the only way to compare two plans was to remember the numbers yourself. "Pin
- * this plan" snapshots the full input state (everything that would be in the shareable URL)
- * so sliders become genuinely explorable: try something, pin it if it's interesting, keep
- * exploring, restore it later if the new direction doesn't pan out. Capped at two, since
- * this is a quick side-by-side comparison strip, not a saved-plans library.
+ * this plan" (now a small control in the Headline itself - see UI density pass) snapshots
+ * the full input state (everything that would be in the shareable URL) so sliders become
+ * genuinely explorable: try something, pin it if it's interesting, keep exploring, restore
+ * it later if the new direction doesn't pan out. Capped at two, since this is a quick
+ * side-by-side comparison strip, not a saved-plans library.
+ *
+ * UI density pass: this component now renders ONLY the pinned-plan chips - the button and
+ * its explanatory text moved into Headline.tsx ("a small control beside the result, not a
+ * row"), so with nothing pinned yet there is nothing here to show at all.
  */
-export function PinnedPlansStrip({ pinnedCount, summaries, canPin, onPin, onRestore, onRemove }: PinnedPlansStripProps) {
+export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlansStripProps) {
+  if (summaries.length === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2">
-      <button
-        type="button"
-        onClick={onPin}
-        disabled={!canPin}
-        className="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        Pin this plan
-      </button>
-      {pinnedCount === 0 && (
-        <span className="text-xs text-slate-400 dark:text-slate-400">Pin up to two plans to compare side by side.</span>
-      )}
-      {!canPin && pinnedCount >= 2 && (
-        <span className="text-xs text-slate-400 dark:text-slate-400">Two pinned &mdash; remove one to pin another.</span>
-      )}
       {summaries.map((s, i) => (
         <div
           key={i}

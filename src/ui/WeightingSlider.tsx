@@ -1,3 +1,10 @@
+import { InfoHint } from './InfoHint';
+
+/** UI density pass: moved off its own permanent line, into a hover/focus hint on the label -
+ * still true, just no longer worth a fourth line of prose above the calendar on every load. */
+const TRAVEL_HINT =
+  "Not travelling? Set this toward 0 — this slider is about demand on your dates, not whether you're going anywhere.";
+
 // Captions for every step (0, 10, 20, ..., 100) of the weighting slider. The 0 and 100
 // wordings match the spec's own definitions verbatim; the rest fill in a legible gradient
 // between them so the midpoints don't read as a jump.
@@ -23,7 +30,10 @@ interface WeightingSliderProps {
 export function WeightingSlider({ value, onChange }: WeightingSliderProps) {
   return (
     <div className="flex flex-col gap-1">
-      <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">What matters more?</h3>
+      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
+        What matters more?
+        <InfoHint text={TRAVEL_HINT} />
+      </h3>
       <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
         <span>Most days off</span>
         <span>Cheapest to travel</span>
@@ -41,14 +51,6 @@ export function WeightingSlider({ value, onChange }: WeightingSliderProps) {
       />
       <p className="text-xs text-slate-600 dark:text-slate-300">
         <span className="font-medium text-slate-800 dark:text-slate-100">{value}</span> &middot; {CAPTIONS[value]}
-      </p>
-      {/* Phase 5.2: "don't assume travel" - this tool is built around real travel-demand
-          data (it's the clearest public signal for how contested/busy a week is), but not
-          every PTO day is a trip: staying home, errands, appointments, rest. Not travelling
-          is a reason to set this toward 0, not a reason the slider doesn't apply. */}
-      <p className="text-xs text-slate-400 dark:text-slate-400">
-        Not travelling? Set this toward 0 &mdash; this slider is about demand on your dates, not whether you&apos;re
-        going anywhere.
       </p>
     </div>
   );

@@ -24,9 +24,14 @@ const DATE_FIELD_CLASS =
 /**
  * Always-visible primary inputs - country, date range, PTO days. Only the state
  * (subdivision) picker and the "More options" panel (accrual, expiry, work week, blackout
- * dates, etc) are collapsed behind the "Adjust" disclosure in App.tsx - the two sliders
- * and "Show alternatives" are always visible too (see `PlanSliders`), since they're how
- * most visitors actually shape the plan, not an advanced/secondary setting.
+ * dates, etc) are collapsed behind the "More options" disclosure in App.tsx - the two
+ * sliders and "Show alternatives" are always visible too (see `PlanSliders`), since they're
+ * how most visitors actually shape the plan, not an advanced/secondary setting.
+ *
+ * UI density pass: no longer owns its own full-width row - returns its fields directly so
+ * App.tsx can lay them out in ONE shared flex row together with PlanSliders' two sliders
+ * ("Country · Date range · PTO days · Reserve · What matters more? · How many breaks", all
+ * one row, wrapping as it runs out of width) instead of two stacked bands.
  */
 export function PrimaryControls({
   country,
@@ -47,7 +52,7 @@ export function PrimaryControls({
   const locale = localeForCountry(country);
 
   return (
-    <div className="flex flex-wrap items-end gap-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3">
+    <>
       <CountrySelect country={country} onChangeCountry={onChangeCountry} />
 
       <fieldset className="flex flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
@@ -129,6 +134,6 @@ export function PrimaryControls({
           className={`${DATE_FIELD_CLASS} w-24`}
         />
       </label>
-    </div>
+    </>
   );
 }
