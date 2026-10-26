@@ -990,6 +990,7 @@ describe('edge cases', () => {
       breakCountRequested: 0,
       breakCountActual: 0,
       budgetSpent: 0,
+      peakCapApplied: false,
     });
   });
 
@@ -1003,5 +1004,97 @@ describe('edge cases', () => {
     expect(() => primary).not.toThrow();
     const totalCost = primary.reduce((sum, b) => sum + b.ptoCost, 0);
     expect(totalCost).toBeLessThanOrEqual(9); // can't exceed workdays actually present in the range
+  });
+});
+
+describe('peakCap (Phase 5.1: employer peak-season leave limit)', () => {
+  // Same fixture as "deterministic tie-breaking" above, whose hand-verified uncapped
+  // result picks exactly two ordinary Friday bridges, both inside January: 2026-01-09
+  // and 2026-01-16 (see that test for the full reasoning on why these two win).
+  const twoJanuaryFridaysInput = baseInput({
+    offDays: ['2026-01-07', '2026-02-04'],
+    rangeStart: '2026-01-03',
+    rangeEnd: '2026-02-08',
+    budget: 2,
+  });
+
+  it('is a no-op (peakCapApplied: false, identical plan) when the natural plan is already under the cap', () => {
+    const uncapped = solve(twoJanuaryFridaysInput);
+    const capped = solve({
+      ...twoJanuaryFridaysInput,
+      peakCap: { enabled: true, startDate: '2026-01-01', endDate: '2026-01-20', maxDays: 5 }, // well above natural spend of 2
+    });
+    expect(capped.peakCapApplied).toBe(false);
+    expect(capped.primary).toEqual(uncapped.primary);
+  });
+
+  it('relocates PTO out of a capped window, still spending the full budget elsewhere in range', () => {
+    const uncapped = solve(twoJanuaryFridaysInput);
+    // Sanity: confirm the cap is actually binding on this fixture, not vacuously satisfied.
+    expect(uncapped.primary.some((b) => b.start >= '2026-01-01' && b.start <= '2026-01-20')).toBe(true);
+
+    const capped = solve({
+      ...twoJanuaryFridaysInput,
+      peakCap: { enabled: true, startDate: '2026-01-01', endDate: '2026-01-20', maxDays: 0 },
+    });
+    expect(capped.peakCapApplied).toBe(true);
+    expect(capped.primary.some((b) => b.start >= '2026-01-01' && b.start <= '2026-01-20')).toBe(false);
+    expect(capped.budgetSpent).toBe(2); // the full budget still gets spent, just moved later in range
+  });
+
+  it('never blacks out a day the user has explicitly pinned, even if it alone exceeds the cap', () => {
+    // budget: 1, matching mustIncludeDays' own reserved cost exactly (see solve()'s
+    // reservedBudget) - so the pinned Tuesday is the ONLY PTO day the solver can possibly
+    // spend anywhere, isolating "the only in-window day is pinned" from "there's also some
+    // other, removable day in the window" (a different, already-covered case).
+    const input = baseInput({
+      rangeStart: '2026-01-03',
+      rangeEnd: '2026-01-11',
+      budget: 1,
+      mustIncludeDays: ['2026-01-06'], // an ordinary pinned Tuesday
+      peakCap: { enabled: true, startDate: '2026-01-01', endDate: '2026-01-10', maxDays: 0 },
+    });
+    const result = solve(input);
+    expect(result.primary.some((b) => b.days.includes('2026-01-06'))).toBe(true);
+    expect(result.peakCapApplied).toBe(false); // nothing could be removed to honour the cap
+  });
+
+  it('removes a non-pinned day from the window while keeping a pinned day in it, when both are present', () => {
+    // budget: 2 - one unit reserved for the pinned Tuesday, one unit free for the solver to
+    // spend as it likes. With no holidays anywhere nearby, budget-maximization (see
+    // betterCell) spends that second unit too, and the best place for it is the ordinary
+    // Friday bridge at 2026-01-09 - also inside the capped window, and NOT pinned, so the
+    // cap should remove it while leaving the pinned Tuesday untouched.
+    const input = baseInput({
+      rangeStart: '2026-01-03',
+      rangeEnd: '2026-01-11',
+      budget: 2,
+      mustIncludeDays: ['2026-01-06'],
+      peakCap: { enabled: true, startDate: '2026-01-01', endDate: '2026-01-10', maxDays: 0 },
+    });
+    const result = solve(input);
+    expect(result.primary.some((b) => b.days.includes('2026-01-06'))).toBe(true); // pinned day kept
+    expect(result.primary.some((b) => b.start === '2026-01-09')).toBe(false); // non-pinned Friday removed
+    expect(result.peakCapApplied).toBe(true);
+  });
+
+  it('treats an invalid window (startDate after endDate) as disabled, leaving the plan unchanged', () => {
+    const uncapped = solve(twoJanuaryFridaysInput);
+    const result = solve({
+      ...twoJanuaryFridaysInput,
+      peakCap: { enabled: true, startDate: '2026-01-20', endDate: '2026-01-01', maxDays: 0 },
+    });
+    expect(result.peakCapApplied).toBe(false);
+    expect(result.primary).toEqual(uncapped.primary);
+  });
+
+  it('a disabled peakCap (enabled: false) never changes the plan', () => {
+    const uncapped = solve(twoJanuaryFridaysInput);
+    const result = solve({
+      ...twoJanuaryFridaysInput,
+      peakCap: { enabled: false, startDate: '2026-01-01', endDate: '2026-01-20', maxDays: 0 },
+    });
+    expect(result.peakCapApplied).toBe(false);
+    expect(result.primary).toEqual(uncapped.primary);
   });
 });

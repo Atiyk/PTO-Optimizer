@@ -81,6 +81,10 @@ function fullState(overrides: Partial<WriteStateInput> = {}): WriteStateInput {
     reserveDays: 3,
     unlimitedPto: false,
     noticePeriodDays: 14,
+    peakCapEnabled: false,
+    peakCapStart: '',
+    peakCapEnd: '',
+    peakCapMaxDays: 5,
     ...overrides,
   };
 }

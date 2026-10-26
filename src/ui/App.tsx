@@ -15,6 +15,7 @@ import { FAQ } from './FAQ';
 import { Footer } from './Footer';
 import { CalendarErrorBoundary } from './CalendarErrorBoundary';
 import { ValidationBanner } from './ValidationBanner';
+import { PeakCapBanner } from './PeakCapBanner';
 import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { sortByContestedness, mostContestedBreakId } from './requestDeadline';
@@ -180,6 +181,14 @@ export function App() {
               onChangeCarryoverCap={state.setCarryoverCap}
               noticePeriodDays={state.noticePeriodDays}
               onChangeNoticePeriodDays={state.setNoticePeriodDays}
+              peakCapEnabled={state.peakCapEnabled}
+              onTogglePeakCap={state.setPeakCapEnabled}
+              peakCapStart={state.peakCapStart}
+              onChangePeakCapStart={state.setPeakCapStart}
+              peakCapEnd={state.peakCapEnd}
+              onChangePeakCapEnd={state.setPeakCapEnd}
+              peakCapMaxDays={state.peakCapMaxDays}
+              onChangePeakCapMaxDays={state.setPeakCapMaxDays}
               overlapDays={state.overlapDays}
               onAddOverlapDay={(d) => state.setOverlapDays([...state.overlapDays, d])}
               onRemoveOverlapDay={(d) => state.setOverlapDays(state.overlapDays.filter((x) => x !== d))}
@@ -207,6 +216,13 @@ export function App() {
       )}
 
       <ValidationBanner issues={state.validationIssues} />
+
+      <PeakCapBanner
+        applied={state.peakCapApplied}
+        maxDays={state.peakCapMaxDays}
+        startDate={state.peakCapStart}
+        endDate={state.peakCapEnd}
+      />
 
       {state.holidaysDegraded && (
         <p

@@ -104,6 +104,10 @@ export interface PlanSnapshot {
   altFridayStart: string;
   reserveDays: number;
   unlimitedPto: boolean;
+  peakCapEnabled: boolean;
+  peakCapStart: string;
+  peakCapEnd: string;
+  peakCapMaxDays: number;
   summary: {
     budgetSpent: number;
     totalDaysOff: number;
@@ -158,6 +162,10 @@ export function useAppState() {
         reserveDays: 3,
         unlimitedPto: false,
         noticePeriodDays: 14,
+        peakCapEnabled: false,
+        peakCapStart: undefined,
+        peakCapEnd: undefined,
+        peakCapMaxDays: 5,
       };
     }
     return readFullStateFromURL(window.location.search, defaults);
@@ -207,6 +215,15 @@ export function useAppState() {
   // number for both, which is what "must match the .ics reminders, not contradict them"
   // means structurally: one shared source, not two settings that could disagree.
   const [noticePeriodDays, setNoticePeriodDays] = useState(initial.noticePeriodDays ?? 14);
+
+  // Phase 5.1: an employer policy cap on how much PTO can be spent inside one window (e.g.
+  // "no more than 5 days between Jun and Aug") - off by default, a soft default for most
+  // visitors, not a limit this tool assumes. See solve.ts's enforcePeakCap for how the
+  // solver honours it (never overriding a day the user has explicitly pinned).
+  const [peakCapEnabled, setPeakCapEnabled] = useState(initial.peakCapEnabled ?? false);
+  const [peakCapStart, setPeakCapStart] = useState(initial.peakCapStart ?? '');
+  const [peakCapEnd, setPeakCapEnd] = useState(initial.peakCapEnd ?? '');
+  const [peakCapMaxDays, setPeakCapMaxDays] = useState(initial.peakCapMaxDays ?? 5);
 
   const [w, setW] = useState(initial.w);
   // breakCount 0 from the URL ("Any", now spelled "let the solver decide") maps to the
@@ -313,6 +330,10 @@ export function useAppState() {
       reserveDays,
       unlimitedPto,
       noticePeriodDays,
+      peakCapEnabled,
+      peakCapStart,
+      peakCapEnd,
+      peakCapMaxDays,
     });
     window.history.replaceState(null, '', url);
   }, [
@@ -338,6 +359,10 @@ export function useAppState() {
     reserveDays,
     unlimitedPto,
     noticePeriodDays,
+    peakCapEnabled,
+    peakCapStart,
+    peakCapEnd,
+    peakCapMaxDays,
   ]);
 
   // Graceful failure: a network/API failure degrades to cached data (if any was already
@@ -485,6 +510,10 @@ export function useAppState() {
       country,
       w,
       breakCount,
+      peakCap:
+        peakCapEnabled && peakCapStart && peakCapEnd
+          ? { enabled: true, startDate: peakCapStart, endDate: peakCapEnd, maxDays: peakCapMaxDays }
+          : undefined,
     }),
     [
       effectiveOffDays,
@@ -503,6 +532,10 @@ export function useAppState() {
       country,
       w,
       breakCount,
+      peakCapEnabled,
+      peakCapStart,
+      peakCapEnd,
+      peakCapMaxDays,
     ],
   );
 
@@ -518,7 +551,14 @@ export function useAppState() {
   );
   const isValidInput = validationIssues.length === 0;
 
-  const EMPTY_RESULT: SolveResult = { primary: [], alternatives: [], breakCountRequested: 0, breakCountActual: 0, budgetSpent: 0 };
+  const EMPTY_RESULT: SolveResult = {
+    primary: [],
+    alternatives: [],
+    breakCountRequested: 0,
+    breakCountActual: 0,
+    budgetSpent: 0,
+    peakCapApplied: false,
+  };
   const lastGoodResultRef = useRef<SolveResult>(EMPTY_RESULT);
   const lastGoodScoresRef = useRef<Scores | null>(null);
 
@@ -755,6 +795,10 @@ export function useAppState() {
         altFridayStart,
         reserveDays,
         unlimitedPto,
+        peakCapEnabled,
+        peakCapStart,
+        peakCapEnd,
+        peakCapMaxDays,
         summary: {
           budgetSpent,
           totalDaysOff,
@@ -768,7 +812,8 @@ export function useAppState() {
     country, subdivision, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
     weekStartOverride, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap,
     overlapDays, blackouts, workWeek, forced, altFridayEnabled, altFridayStart,
-    reserveDays, unlimitedPto, budgetSpent, totalDaysOff, breakCountActual, scores,
+    reserveDays, unlimitedPto, peakCapEnabled, peakCapStart, peakCapEnd, peakCapMaxDays,
+    budgetSpent, totalDaysOff, breakCountActual, scores,
   ]);
 
   // Restores every input the snapshot carries - the raw setters (not `changeCountry`, which
@@ -799,6 +844,10 @@ export function useAppState() {
       setAltFridayStart(snap.altFridayStart);
       setReserveDays(snap.reserveDays);
       setUnlimitedPtoRaw(snap.unlimitedPto);
+      setPeakCapEnabled(snap.peakCapEnabled);
+      setPeakCapStart(snap.peakCapStart);
+      setPeakCapEnd(snap.peakCapEnd);
+      setPeakCapMaxDays(snap.peakCapMaxDays);
     },
     [pinnedPlans],
   );
@@ -854,6 +903,15 @@ export function useAppState() {
     effectiveBudget,
     noticePeriodDays,
     setNoticePeriodDays,
+    peakCapEnabled,
+    setPeakCapEnabled,
+    peakCapStart,
+    setPeakCapStart,
+    peakCapEnd,
+    setPeakCapEnd,
+    peakCapMaxDays,
+    setPeakCapMaxDays,
+    peakCapApplied: solveResult.peakCapApplied,
     w,
     setW,
     breakCount,

@@ -45,6 +45,21 @@ export interface SolveInput {
    * Defaults to 0.
    */
   breakCount?: number;
+  /** Phase 5.1: an optional employer policy cap on PTO spend within one window (e.g. "no
+   * more than 5 days between Jun 1 and Aug 31"). Off unless `enabled` - see solve.ts's
+   * enforcePeakCap for how this is applied (a bounded blackout-and-retry loop around the
+   * ordinary solve, not a new DP dimension - deliberately scoped the same way
+   * solveDualWindow's own comment scopes expiry/carryover, for the same reason: a secondary,
+   * opt-in constraint doesn't justify the cost/risk of widening the core DP). */
+  peakCap?: PeakCapInput;
+}
+
+export interface PeakCapInput {
+  enabled: boolean;
+  startDate: ISODate;
+  endDate: ISODate;
+  /** Max PTO days (not calendar days) that may be spent inside [startDate, endDate]. */
+  maxDays: number;
 }
 
 export type BreakTag = 'Peak travel' | 'Low travel demand' | 'Estimated' | 'Overlaps';
@@ -85,6 +100,10 @@ export interface SolveResult {
    * candidate could absorb the remainder.
    */
   budgetSpent: number;
+  /** Phase 5.1: true only when a peakCap was both enabled AND actually reduced spend inside
+   * its window below what the unconstrained plan would have spent there - never true just
+   * because peakCap was configured if the natural plan was already under the cap. */
+  peakCapApplied: boolean;
 }
 
 /** The percentile IS the score - not an indexed number with a percentile attached. 0-100,
