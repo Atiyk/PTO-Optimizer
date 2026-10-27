@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SiteHeader } from './SiteHeader';
 import { Headline } from './Headline';
 import { SummaryMetrics } from './SummaryMetrics';
 import { PrimaryControls } from './PrimaryControls';
@@ -23,9 +24,6 @@ import { mostContestedBreakId } from './requestDeadline';
 import { breakReason } from './breakReason';
 import { useAppState, todayISO } from './useAppState';
 import { useHasHover } from './useHasHover';
-import { activeCountryPreset } from '../data/countryPresets';
-
-const DEFAULT_INTRO = 'Turn your PTO into more time off — set your dates and budget below, no sign-up needed.';
 
 export function App() {
   // UI density pass: the old two-level "Adjust" (-> nested "More options") disclosure
@@ -40,8 +38,6 @@ export function App() {
   const previewRun = state.hoveredAlternative
     ? { start: state.hoveredAlternative.start, end: state.hoveredAlternative.end }
     : null;
-
-  const introText = activeCountryPreset()?.copy ?? DEFAULT_INTRO;
 
   // Layout fix: cards render in DATE order again - badge #1 is the earliest break in the
   // year. The contested flag stays ON the card it belongs to (BreakCard's own
@@ -58,21 +54,15 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Semantic HTML pass (Phase 5): everything above the workspace - tagline, headline,
-          pinned plans, controls, banners - is genuinely page-header content, not part of
-          <main>. */}
+      <SiteHeader active="pto" />
+      {/* Semantic HTML pass (Phase 5): everything above the workspace - headline, pinned
+          plans, controls, banners - is genuinely page-header content, not part of <main>.
+          Site restructure: the old per-route tagline paragraph is gone - "no page has a
+          subtitle under its h1 except the landing page," and this one only ever restated
+          what the headline below it already says. */}
       <header>
-      <div className="border-b border-slate-200 bg-slate-50">
-        {/* Deliberately NOT line-length-capped like the longer prose elsewhere on the page -
-            it's one short sentence that fits a single line at any width this page supports,
-            and wrapping it to two lines would directly work against the header-height target
-            the density pass exists to hit. */}
-        <Container className="px-4 py-2">
-          <p className="text-sm text-slate-600">{introText}</p>
-        </Container>
-      </div>
 
-      {/* The answer first: large, sticky, directly under the tagline - the most prominent
+      {/* The answer first: large, sticky, directly under the site header - the most prominent
           thing on the page, visible on load with nothing to configure first. Break count
           and Travel/Efficiency percentiles sit on the same line as the headline (see
           Headline.tsx); "Pin this plan" is a small control beside it, not its own row. */}

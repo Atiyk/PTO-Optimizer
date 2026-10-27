@@ -29,7 +29,9 @@ export function requestByDate(breakStart: string, noticePeriodDays: number, work
   return nearestPrecedingWorkday(raw, workWeek);
 }
 
-function weekdayName(iso: string): string {
+/** Exported (landing page): the countdown and holiday list both need a full weekday name -
+ * reused rather than a second WEEKDAY_NAMES table somewhere else. */
+export function weekdayName(iso: string): string {
   return WEEKDAY_NAMES[mondayIndexedDow(iso)];
 }
 

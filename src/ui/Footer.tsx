@@ -1,38 +1,88 @@
 import { Container } from './Container';
 
 interface FooterProps {
-  onShowShortcuts: () => void;
+  /** Only the /pto route has a keyboard-shortcuts modal to open - omitted on the landing
+   * page and /sabbatical, which don't render that link/button at all rather than pointing
+   * it at nothing. */
+  onShowShortcuts?: () => void;
 }
 
-/** One line, per spec: what this is, who made it, a privacy link, plus a keyboard-shortcuts
- * hint (Phase 3 item 8) - the one unobtrusive place to discover "?" opens the shortcut
- * list, for a visitor who'd never otherwise think to try it. No source link - the
- * repository has no public remote configured yet, so linking one would point nowhere.
- *
- * Phase 5 (machine-readability): /docs (the URL parameter contract) and data-sources.json
- * (where the holiday/travel-demand data actually comes from) are linked here - the one
- * place a human visitor would look for "how does this work," and also where llms.txt
- * itself points an agent that wants more than the plain-text summary. */
+const LINK_CLASS = 'hover:text-slate-700';
+
+/**
+ * Site restructure: the footer carries the navigational weight the header deliberately
+ * doesn't - three columns, denser than the header, shared across all three routes. Product
+ * links work from anywhere (not just a "you are here" indicator - the header already does
+ * that); Resources is everything from the machine-readability pass; About is the one line
+ * of attribution plus a real, existing link (the repository's GitHub issues - the only
+ * contact channel that actually exists, never a fabricated email address).
+ */
 export function Footer({ onShowShortcuts }: FooterProps) {
   return (
-    <footer className="mt-8 border-t border-slate-100">
-      <Container className="px-4 py-4 text-center text-xs text-slate-400">
-        PTO Optimizer &mdash; a free, client-side tool for planning time off. Made by Atiyk Ahmeed.{' '}
-        <a href="/privacy.html" className="underline hover:text-slate-600">
-          Privacy
-        </a>
-        {' · '}
-        <a href="/docs" className="underline hover:text-slate-600">
-          URL docs
-        </a>
-        {' · '}
-        <a href="/data-sources.json" className="underline hover:text-slate-600">
-          Data sources
-        </a>
-        {' · '}
-        <button type="button" onClick={onShowShortcuts} className="underline hover:text-slate-600">
-          Keyboard shortcuts (?)
-        </button>
+    <footer className="mt-8 border-t border-slate-200 bg-slate-50">
+      <Container className="grid grid-cols-2 gap-8 px-4 py-8 text-sm text-slate-500 sm:grid-cols-4">
+        <div>
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Product</h2>
+          <ul className="flex flex-col gap-1.5">
+            <li>
+              <a href="/pto" className={LINK_CLASS}>
+                PTO Optimizer
+              </a>
+            </li>
+            <li>
+              <a href="/sabbatical" className={LINK_CLASS}>
+                Sabbatical Planning
+              </a>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Resources</h2>
+          <ul className="flex flex-col gap-1.5">
+            <li>
+              <a href="/pto#questions" className={LINK_CLASS}>
+                FAQ
+              </a>
+            </li>
+            <li>
+              <a href="/docs" className={LINK_CLASS}>
+                URL docs
+              </a>
+            </li>
+            <li>
+              <a href="/data-sources.json" className={LINK_CLASS}>
+                Data sources
+              </a>
+            </li>
+            <li>
+              <a href="/privacy.html" className={LINK_CLASS}>
+                Privacy
+              </a>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">About</h2>
+          <ul className="flex flex-col gap-1.5">
+            <li>Made by Atiyk Ahmeed.</li>
+            <li>
+              <a href="https://github.com/Atiyk/PTO-Optimizer/issues" className={LINK_CLASS} target="_blank" rel="noreferrer">
+                Contact &amp; feedback
+              </a>
+            </li>
+            {onShowShortcuts && (
+              <li>
+                <button type="button" onClick={onShowShortcuts} className={LINK_CLASS}>
+                  Keyboard shortcuts (?)
+                </button>
+              </li>
+            )}
+          </ul>
+        </div>
+        <div>
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Days Off</h2>
+          <p className="text-slate-400">A free, client-side way to make every PTO day count. No sign-up, no account.</p>
+        </div>
       </Container>
     </footer>
   );

@@ -40,26 +40,35 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '..');
 const distDir = resolve(projectRoot, 'dist');
 
+type ComponentKind = 'landing' | 'app' | 'sabbatical';
+
 interface Entry {
   /** Path relative to dist/ of the built HTML file to inject into. */
   file: string;
   /** URL this route is served at, for window.location inside the render. */
   url: string;
+  /** Which top-level component this route mounts. */
+  component: ComponentKind;
   /** Matches the inline `window.__PTO_COUNTRY_PRESET__` each entry's own HTML sets. */
   countryPreset?: string;
-  /** Human-readable name for the BreadcrumbList's second item - undefined on the root route,
-   * which has no second breadcrumb level. */
+  /** Human-readable name for the BreadcrumbList's second item - undefined on routes with no
+   * second breadcrumb level (the landing page, /pto, /sabbatical). */
   countryName?: string;
 }
 
+// Site restructure: "/" is the landing page, the optimizer itself moved to /pto (same
+// App.tsx component it always was), and /sabbatical is new - every country route below is
+// untouched, since none of those links need to move.
 const ENTRIES: Entry[] = [
-  { file: 'index.html', url: 'https://pto-optimizer.app/' },
-  { file: 'uk/index.html', url: 'https://pto-optimizer.app/uk', countryPreset: 'GB', countryName: 'United Kingdom' },
-  { file: 'canada/index.html', url: 'https://pto-optimizer.app/canada', countryPreset: 'CA', countryName: 'Canada' },
-  { file: 'australia/index.html', url: 'https://pto-optimizer.app/australia', countryPreset: 'AU', countryName: 'Australia' },
-  { file: 'germany/index.html', url: 'https://pto-optimizer.app/germany', countryPreset: 'DE', countryName: 'Germany' },
-  { file: 'ireland/index.html', url: 'https://pto-optimizer.app/ireland', countryPreset: 'IE', countryName: 'Ireland' },
-  { file: 'india/index.html', url: 'https://pto-optimizer.app/india', countryPreset: 'IN', countryName: 'India' },
+  { file: 'index.html', url: 'https://pto-optimizer.app/', component: 'landing' },
+  { file: 'pto/index.html', url: 'https://pto-optimizer.app/pto', component: 'app' },
+  { file: 'sabbatical/index.html', url: 'https://pto-optimizer.app/sabbatical', component: 'sabbatical' },
+  { file: 'uk/index.html', url: 'https://pto-optimizer.app/uk', component: 'app', countryPreset: 'GB', countryName: 'United Kingdom' },
+  { file: 'canada/index.html', url: 'https://pto-optimizer.app/canada', component: 'app', countryPreset: 'CA', countryName: 'Canada' },
+  { file: 'australia/index.html', url: 'https://pto-optimizer.app/australia', component: 'app', countryPreset: 'AU', countryName: 'Australia' },
+  { file: 'germany/index.html', url: 'https://pto-optimizer.app/germany', component: 'app', countryPreset: 'DE', countryName: 'Germany' },
+  { file: 'ireland/index.html', url: 'https://pto-optimizer.app/ireland', component: 'app', countryPreset: 'IE', countryName: 'Ireland' },
+  { file: 'india/index.html', url: 'https://pto-optimizer.app/india', component: 'app', countryPreset: 'IN', countryName: 'India' },
 ];
 
 /** Decodes the small, fixed set of HTML entities this project's own <title>/<meta> tags
@@ -101,7 +110,7 @@ function buildJsonLd(entry: Entry, meta: { title: string; description: string; c
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
   };
 
-  const breadcrumbItems = [{ '@type': 'ListItem', position: 1, name: 'PTO Optimizer', item: 'https://pto-optimizer.app/' }];
+  const breadcrumbItems = [{ '@type': 'ListItem', position: 1, name: 'Days Off', item: 'https://pto-optimizer.app/' }];
   if (entry.countryName) {
     breadcrumbItems.push({ '@type': 'ListItem', position: 2, name: entry.countryName, item: meta.canonical });
   }
@@ -111,17 +120,24 @@ function buildJsonLd(entry: Entry, meta: { title: string; description: string; c
     itemListElement: breadcrumbItems,
   };
 
-  const faqPage = {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntity: FAQ_ITEMS.map((item) => ({
-      '@type': 'Question',
-      name: item.question,
-      acceptedAnswer: { '@type': 'Answer', text: item.answer },
-    })),
-  };
+  const result: object[] = [webApplication, breadcrumbList];
 
-  return [webApplication, breadcrumbList, faqPage];
+  // FAQPage only where FAQ.tsx's six questions are actually rendered (the /pto routes) -
+  // the landing page and /sabbatical have no FAQ section to describe (yet, for
+  // /sabbatical - its own short FAQ is a later phase).
+  if (entry.component === 'app') {
+    result.push({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: FAQ_ITEMS.map((item) => ({
+        '@type': 'Question',
+        name: item.question,
+        acceptedAnswer: { '@type': 'Answer', text: item.answer },
+      })),
+    });
+  }
+
+  return result;
 }
 
 /** Node 25+ ships its own non-configurable `navigator` global (the Node runtime's, not a
@@ -143,12 +159,16 @@ function installWindow(url: string, countryPreset?: string): void {
   }
 }
 
-// A window must exist BEFORE App is even imported, in case anything in its import chain
-// touches `window` at module-evaluation time rather than inside a function - using the
-// first entry's own URL/preset rather than a placeholder, so that if it DOES matter, the
-// very first render is still correct.
+// A window must exist BEFORE these are even imported, in case anything in their import
+// chains touches `window` at module-evaluation time rather than inside a function - using
+// the first entry's own URL/preset rather than a placeholder, so that if it DOES matter,
+// the very first render is still correct.
 installWindow(ENTRIES[0].url, ENTRIES[0].countryPreset);
 const { App } = await import('../src/ui/App.tsx');
+const { Landing } = await import('../src/ui/Landing.tsx');
+const { Sabbatical } = await import('../src/ui/Sabbatical.tsx');
+
+const COMPONENTS: Record<ComponentKind, React.ComponentType> = { app: App, landing: Landing, sabbatical: Sabbatical };
 
 async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInjected: number }> {
   // Re-installed per entry (not reused from the bootstrap above) - window/navigator differ
@@ -156,7 +176,7 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
   // geolocateCountry() read them fresh on every call rather than caching at module scope.
   installWindow(entry.url, entry.countryPreset);
 
-  const html = renderToString(React.createElement(App));
+  const html = renderToString(React.createElement(COMPONENTS[entry.component]));
 
   const filePath = resolve(distDir, entry.file);
   if (!existsSync(filePath)) {

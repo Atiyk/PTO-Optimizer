@@ -15,7 +15,12 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
+        // "/" is now the landing page (site restructure); the optimizer itself lives at
+        // /pto, loading the same App.tsx it always has, just from a new path - every
+        // country route below is untouched, since none of those links need to move.
         main: resolve(import.meta.dirname, 'index.html'),
+        pto: resolve(import.meta.dirname, 'pto', 'index.html'),
+        sabbatical: resolve(import.meta.dirname, 'sabbatical', 'index.html'),
         ...Object.fromEntries(
           COUNTRY_SLUGS.map((slug) => [slug, resolve(import.meta.dirname, slug, 'index.html')]),
         ),

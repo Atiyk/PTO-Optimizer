@@ -1,6 +1,7 @@
 import type { Break } from '../solver/types';
 import { parseISO, addDays } from '../solver/dateUtils';
 import { formatDateRange, formatCardDateRange } from './dateFormat';
+import type { Holiday } from '../data/holidays';
 
 /** RFC 5545 TEXT escaping: backslash, comma, semicolon, and newline must be escaped. */
 function escapeText(s: string): string {
@@ -144,6 +145,46 @@ export function downloadICS(
   filename = 'pto-plan.ics',
 ): void {
   const content = generateICS(breaks, isPtoDay, new Date(), reminderOptions);
+  downloadICSContent(content, filename);
+}
+
+/**
+ * Landing page export: "Download all holidays (.ics)" - one all-day VEVENT per public
+ * holiday, titled with its real name. Reuses this file's own RFC 5545 helpers
+ * (escapeText/foldLine/isoToICSDate/addOneDayICS/dtstampNow) rather than a second ICS
+ * writer - a holiday is a different kind of event than a PTO-break (no reminder, no tie to
+ * a solved plan), but the file format underneath it is the one this module already owns.
+ */
+export function generateHolidaysICS(holidays: Holiday[], now: Date = new Date()): string {
+  const lines: string[] = [];
+  lines.push('BEGIN:VCALENDAR');
+  lines.push('VERSION:2.0');
+  lines.push('PRODID:-//PTO Optimizer//EN');
+  lines.push('CALSCALE:GREGORIAN');
+
+  const dtstamp = dtstampNow(now);
+  for (const holiday of holidays) {
+    const dateStart = isoToICSDate(holiday.date);
+    const dateEnd = addOneDayICS(dateStart);
+    lines.push('BEGIN:VEVENT');
+    lines.push(foldLine(`UID:holiday-${dateStart}-${encodeURIComponent(holiday.countryCode)}@pto-optimizer.app`));
+    lines.push(`DTSTAMP:${dtstamp}`);
+    lines.push(`DTSTART;VALUE=DATE:${dateStart}`);
+    lines.push(`DTEND;VALUE=DATE:${dateEnd}`);
+    lines.push(foldLine(`SUMMARY:${escapeText(holiday.name)}`));
+    lines.push('TRANSP:TRANSPARENT');
+    lines.push('END:VEVENT');
+  }
+
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n') + '\r\n';
+}
+
+export function downloadHolidaysICS(holidays: Holiday[], filename = 'holidays.ics'): void {
+  downloadICSContent(generateHolidaysICS(holidays), filename);
+}
+
+function downloadICSContent(content: string, filename: string): void {
   const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

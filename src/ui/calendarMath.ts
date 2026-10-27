@@ -73,8 +73,11 @@ export interface OffRun {
   end: string;
 }
 
-/** Groups a day range into maximal contiguous runs where `isOff` is true. */
-function computeRuns(rangeStart: string, rangeEnd: string, isOff: (iso: string) => boolean): OffRun[] {
+/** Groups a day range into maximal contiguous runs where `isOff` is true. Exported (landing
+ * page): the same grouping logic finds both "off" runs (weekend/holiday, for the longest
+ * stretch ahead) and, with `isOff` inverted, "working" runs (for the longest dry spell) -
+ * reused rather than reimplemented in a second place. */
+export function computeRuns(rangeStart: string, rangeEnd: string, isOff: (iso: string) => boolean): OffRun[] {
   const days = rangeISO(rangeStart, rangeEnd);
   const runs: OffRun[] = [];
   let runStart: string | null = null;
