@@ -29,6 +29,7 @@ function render(brk: Break) {
       isPtoDay={() => true}
       onHover={() => {}}
       isMostContested={false}
+      reason="placeholder reason"
       today="2025-12-01"
       noticePeriodDays={14}
       workWeek={DEFAULT_WORK_WEEK}
@@ -49,6 +50,7 @@ function mountInteractive(props: Partial<ComponentProps<typeof BreakCard>> = {})
     isPtoDay: () => true,
     onHover: () => {},
     isMostContested: false,
+    reason: 'placeholder reason',
     today: '2025-12-01',
     noticePeriodDays: 14,
     workWeek: DEFAULT_WORK_WEEK,
@@ -110,6 +112,7 @@ describe('BreakCard collapse (UI density pass: collapsed by default, request too
         isPtoDay={() => true}
         onHover={() => {}}
         isMostContested={false}
+        reason="placeholder reason"
         today="2025-12-01"
         noticePeriodDays={14}
         workWeek={DEFAULT_WORK_WEEK}
@@ -121,11 +124,6 @@ describe('BreakCard collapse (UI density pass: collapsed by default, request too
     expect(html).not.toContain('Request this time off ↓');
   });
 
-  it('collapsing still shows any warning (low-value explanation, most-contested callout)', () => {
-    const html = render(makeBreak({ multiplier: 1, tags: [] }));
-    expect(html).toContain('uses the full available budget');
-  });
-
   it('a single "Copy request" control replaces the three always-visible copy buttons', () => {
     const html = renderToStaticMarkup(
       <BreakCard
@@ -134,6 +132,7 @@ describe('BreakCard collapse (UI density pass: collapsed by default, request too
         isPtoDay={() => true}
         onHover={() => {}}
         isMostContested={false}
+        reason="placeholder reason"
         today="2025-12-01"
         noticePeriodDays={14}
         workWeek={DEFAULT_WORK_WEEK}
@@ -147,20 +146,21 @@ describe('BreakCard collapse (UI density pass: collapsed by default, request too
   });
 });
 
-describe('BreakCard low-value explanation (regression: unconditional "chosen for low travel demand")', () => {
-  it('BUG FOUND: used to say "chosen for low travel demand" for ANY 1.0x break - even one with no such tag at all (e.g. w=0, or ordinary demand)', () => {
-    const html = render(makeBreak({ multiplier: 1, tags: [] }));
-    expect(html).not.toContain('chosen for low travel demand');
-    expect(html).toContain('uses the full available budget');
-  });
-
-  it('only claims the demand reason when the break actually carries the "Low travel demand" tag', () => {
-    const html = render(makeBreak({ multiplier: 1, tags: ['Low travel demand'] }));
-    expect(html).toContain('chosen for low travel demand');
-  });
-
-  it('shows no low-value explanation at all above 1.0x', () => {
-    const html = render(makeBreak({ multiplier: 2.5, tags: [] }));
-    expect(html).not.toContain('No extra days off');
+describe('BreakCard reason (Phase 3 step 4: "why" line, computed by breakReason.ts and passed in as a prop)', () => {
+  it('renders whatever reason it is given, visibly, on every card - not conditionally, not in a tooltip', () => {
+    const html = renderToStaticMarkup(
+      <BreakCard
+        brk={makeBreak()}
+        index={1}
+        isPtoDay={() => true}
+        onHover={() => {}}
+        isMostContested={false}
+        reason="Bridges Thanksgiving — 1 PTO day for 4 days off."
+        today="2025-12-01"
+        noticePeriodDays={14}
+        workWeek={DEFAULT_WORK_WEEK}
+      />,
+    );
+    expect(html).toContain('Bridges Thanksgiving — 1 PTO day for 4 days off.');
   });
 });

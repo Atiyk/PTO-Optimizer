@@ -14,6 +14,10 @@ interface BreakCardProps {
   onHover: (id: string | null) => void;
   /** Phase 4.2: this card's break is the single most-contested one in the whole plan. */
   isMostContested: boolean;
+  /** Phase 3 step 4: one plain-language sentence on why this break is a good pick - from
+   * breakReason.ts, computed in App.tsx (it needs holidayNameFor, which BreakCard doesn't
+   * otherwise touch). Always present, for every card, not just the low-value ones. */
+  reason: string;
   today: string;
   noticePeriodDays: number;
   workWeek: WorkWeek;
@@ -91,26 +95,11 @@ function CopyRequestDropdown({ options }: { options: CopyOption[] }) {
 /** A break at or below 1.0x gains NO extra days off beyond the PTO day(s) spent - a
  * legitimate trade at a weighting that favours quieter travel, never a bug, but it looks
  * broken with no explanation on screen. Verified empirically (not assumed) that this is a
- * budget-maximization effect independent of w, not a demand-scaling bug - see NOTES.md. */
+ * budget-maximization effect independent of w, not a demand-scaling bug - see NOTES.md.
+ * Still used for the multiplier badge's styling; the explanatory text itself now comes from
+ * breakReason.ts (Phase 3's unified "why" line), which covers this exact case too. */
 function isLowValue(brk: Break): boolean {
   return brk.multiplier <= 1.0;
-}
-
-/**
- * BUG FOUND: this used to unconditionally say "chosen for low travel demand" for EVERY
- * 1.0x-or-below break, regardless of whether that break even carried the "Low travel
- * demand" tag. Confirmed empirically: at w=0 ("not caring about travel" at all) a
- * budget-maximization-forced single day with perfectly ORDINARY demand (meanDemand ~1.0,
- * no tag at all) still showed this exact sentence - flatly false, since demand had zero
- * influence on the choice at w=0 and wasn't even low to begin with. The TRUE, universal
- * reason a 1.0x break exists at all is that the solver always spends the full budget when
- * a valid plan can (see solve.ts's own betterCell comment) - demand is only sometimes
- * ALSO the reason a specific low-value day was picked over another. Only claim the demand
- * reason when the break actually carries that tag (which itself is now gated to w > 0 in
- * solve.ts - see demandTag's comment); otherwise give the honest, universal reason. */
-function lowValueExplanation(brk: Break): string {
-  if (brk.tags.includes('Low travel demand')) return 'No extra days off — chosen for low travel demand.';
-  return 'No extra days off — this uses the full available budget rather than leaving a PTO day unspent.';
 }
 
 export function BreakCard({
@@ -120,6 +109,7 @@ export function BreakCard({
   isPtoDay,
   onHover,
   isMostContested,
+  reason,
   today,
   noticePeriodDays,
   workWeek,
@@ -200,7 +190,9 @@ export function BreakCard({
         </div>
       </div>
 
-      {lowValue && <p className="text-xs text-slate-500">{lowValueExplanation(brk)}</p>}
+      {/* Phase 3 step 4: visible on the card, not a tooltip - every recommendation states
+          its own reasoning, not just the low-value ones. */}
+      <p className="text-sm text-slate-600">{reason}</p>
 
       {/* Layout fix: this used to be a full-width red bar, which reads as an error - it's
           advice, not a problem with the plan. Red is reserved for actual problems (an
