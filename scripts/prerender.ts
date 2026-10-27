@@ -34,6 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
 import { renderToString } from 'react-dom/server';
 import React from 'react';
+import { ITEMS as FAQ_ITEMS } from '../src/ui/FAQ.tsx';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '..');
@@ -46,17 +47,82 @@ interface Entry {
   url: string;
   /** Matches the inline `window.__PTO_COUNTRY_PRESET__` each entry's own HTML sets. */
   countryPreset?: string;
+  /** Human-readable name for the BreadcrumbList's second item - undefined on the root route,
+   * which has no second breadcrumb level. */
+  countryName?: string;
 }
 
 const ENTRIES: Entry[] = [
   { file: 'index.html', url: 'https://pto-optimizer.app/' },
-  { file: 'uk/index.html', url: 'https://pto-optimizer.app/uk', countryPreset: 'GB' },
-  { file: 'canada/index.html', url: 'https://pto-optimizer.app/canada', countryPreset: 'CA' },
-  { file: 'australia/index.html', url: 'https://pto-optimizer.app/australia', countryPreset: 'AU' },
-  { file: 'germany/index.html', url: 'https://pto-optimizer.app/germany', countryPreset: 'DE' },
-  { file: 'ireland/index.html', url: 'https://pto-optimizer.app/ireland', countryPreset: 'IE' },
-  { file: 'india/index.html', url: 'https://pto-optimizer.app/india', countryPreset: 'IN' },
+  { file: 'uk/index.html', url: 'https://pto-optimizer.app/uk', countryPreset: 'GB', countryName: 'United Kingdom' },
+  { file: 'canada/index.html', url: 'https://pto-optimizer.app/canada', countryPreset: 'CA', countryName: 'Canada' },
+  { file: 'australia/index.html', url: 'https://pto-optimizer.app/australia', countryPreset: 'AU', countryName: 'Australia' },
+  { file: 'germany/index.html', url: 'https://pto-optimizer.app/germany', countryPreset: 'DE', countryName: 'Germany' },
+  { file: 'ireland/index.html', url: 'https://pto-optimizer.app/ireland', countryPreset: 'IE', countryName: 'Ireland' },
+  { file: 'india/index.html', url: 'https://pto-optimizer.app/india', countryPreset: 'IN', countryName: 'India' },
 ];
+
+/** Decodes the small, fixed set of HTML entities this project's own <title>/<meta> tags
+ * actually use - JSON-LD is JSON text, not HTML, so "UK Bank Holidays 2027 &mdash; PTO
+ * Optimizer" must become a real em dash, not ship the literal entity string. */
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&mdash;/g, '—')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function extractMeta(html: string, fallbackUrl: string): { title: string; description: string; canonical: string } {
+  const title = decodeEntities(/<title>(.*?)<\/title>/s.exec(html)?.[1] ?? 'PTO Optimizer');
+  const description = decodeEntities(/<meta\s+name="description"\s+content="([^"]*)"/s.exec(html)?.[1] ?? '');
+  const canonical = /<link rel="canonical" href="([^"]*)"/.exec(html)?.[1] ?? fallbackUrl;
+  return { title, description, canonical };
+}
+
+/**
+ * Structured data (Phase 5): WebApplication so a crawler/agent can tell this is a free,
+ * no-signup tool rather than an article; BreadcrumbList for the root->country relationship;
+ * FAQPage built from FAQ.tsx's own exported ITEMS array, not a duplicated copy, so the
+ * structured data can never drift from the six questions a visitor actually sees.
+ */
+function buildJsonLd(entry: Entry, meta: { title: string; description: string; canonical: string }): object[] {
+  const webApplication = {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: meta.title,
+    url: meta.canonical,
+    description: meta.description,
+    applicationCategory: 'BusinessApplication',
+    operatingSystem: 'Any (web browser)',
+    isAccessibleForFree: true,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  };
+
+  const breadcrumbItems = [{ '@type': 'ListItem', position: 1, name: 'PTO Optimizer', item: 'https://pto-optimizer.app/' }];
+  if (entry.countryName) {
+    breadcrumbItems.push({ '@type': 'ListItem', position: 2, name: entry.countryName, item: meta.canonical });
+  }
+  const breadcrumbList = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: breadcrumbItems,
+  };
+
+  const faqPage = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: FAQ_ITEMS.map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: { '@type': 'Answer', text: item.answer },
+    })),
+  };
+
+  return [webApplication, breadcrumbList, faqPage];
+}
 
 /** Node 25+ ships its own non-configurable `navigator` global (the Node runtime's, not a
  * browser's) - plain assignment throws "only a getter". defineProperty with
@@ -101,7 +167,17 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
   if (!original.includes(marker)) {
     throw new Error(`${entry.file}: expected marker ${JSON.stringify(marker)} not found - was it already prerendered, or did the shell HTML change?`);
   }
-  const injected = original.replace(marker, `<div id="root">${html}</div>`);
+  const withRoot = original.replace(marker, `<div id="root">${html}</div>`);
+
+  const meta = extractMeta(original, entry.url);
+  const jsonLdScripts = buildJsonLd(entry, meta)
+    .map((obj) => `    <script type="application/ld+json">${JSON.stringify(obj)}</script>`)
+    .join('\n');
+  const headMarker = '</head>';
+  if (!withRoot.includes(headMarker)) {
+    throw new Error(`${entry.file}: no </head> found - can't inject structured data.`);
+  }
+  const injected = withRoot.replace(headMarker, `${jsonLdScripts}\n  </head>`);
   writeFileSync(filePath, injected, 'utf-8');
 
   return { file: entry.file, bytesInjected: html.length };

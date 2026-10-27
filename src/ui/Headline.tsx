@@ -63,9 +63,13 @@ export function Headline({ budgetSpent, totalDaysOff, breakCountActual, scores, 
     >
       <Container className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <span className="text-2xl font-bold leading-tight tabular-nums text-slate-900 sm:text-3xl">
+          {/* Semantic HTML pass (Phase 5): the one h1 on the page - this sentence genuinely
+              is the page's main heading ("the answer, put first"), just not previously
+              marked as one. m-0 overrides the browser's default h1 margin, which would
+              otherwise add unwanted vertical space inside this flex row. */}
+          <h1 className="m-0 text-2xl font-bold leading-tight tabular-nums text-slate-900 sm:text-3xl">
             {headlineText(budgetSpent, budget, reserveDays, totalDaysOff)}
-          </span>
+          </h1>
           <span className="text-sm tabular-nums text-slate-600">
             {breakCountActual} break{breakCountActual === 1 ? '' : 's'}
             {scores ? ` · Travel ${ordinal(scores.travel.percentile)} · Efficiency ${ordinal(scores.efficiency.percentile)}` : ''}
