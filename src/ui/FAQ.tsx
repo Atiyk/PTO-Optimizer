@@ -1,4 +1,4 @@
-interface FAQItem {
+export interface FAQItem {
   question: string;
   answer: string;
 }
@@ -7,7 +7,10 @@ interface FAQItem {
 // Answers are always in the DOM (native <details> hides content with CSS, not conditional
 // rendering), and each question is a real heading element inside <summary>, so the whole
 // section is indexable even collapsed.
-const ITEMS: FAQItem[] = [
+// Exported (Phase 5): the prerender script's FAQPage JSON-LD reads this same array, so the
+// structured data and the visible FAQ can never drift apart into two different sources of
+// truth for the same six questions.
+export const ITEMS: FAQItem[] = [
   {
     question: 'How does it choose which days to take?',
     answer:

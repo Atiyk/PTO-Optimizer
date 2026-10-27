@@ -58,6 +58,10 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Semantic HTML pass (Phase 5): everything above the workspace - tagline, headline,
+          pinned plans, controls, banners - is genuinely page-header content, not part of
+          <main>. */}
+      <header>
       <div className="border-b border-slate-200 bg-slate-50">
         {/* Deliberately NOT line-length-capped like the longer prose elsewhere on the page -
             it's one short sentence that fits a single line at any width this page supports,
@@ -231,6 +235,7 @@ export function App() {
           </Container>
         </div>
       )}
+      </header>
 
       <main>
         <Container className="p-4">
@@ -317,22 +322,28 @@ export function App() {
                   Request break {mostContestedIndex} first &mdash; it&apos;s the most contested.
                 </p>
               )}
-              {state.orderedBreaks.map(({ index, brk }) => (
-                <BreakCard
-                  key={brk.id}
-                  brk={brk}
-                  index={index}
-                  highlighted={state.highlightedBreakIds.has(brk.id) || state.hoveredBreakId === brk.id}
-                  isPtoDay={state.isSuggestedPto}
-                  onHover={state.setHoveredBreakId}
-                  isMostContested={brk.id === mostContestedId}
-                  reason={breakReason(brk, state.holidayNameFor)}
-                  today={today}
-                  noticePeriodDays={state.noticePeriodDays}
-                  workWeek={state.workWeek}
-                  defaultExpanded={index === 1}
-                />
-              ))}
+              {/* Semantic HTML pass (Phase 5): recommendations are a real list, not div soup -
+                  list-none/p-0/m-0 keep it visually identical to the plain flex column it
+                  replaces. */}
+              <ul className="m-0 flex list-none flex-col gap-3 p-0">
+                {state.orderedBreaks.map(({ index, brk }) => (
+                  <li key={brk.id}>
+                    <BreakCard
+                      brk={brk}
+                      index={index}
+                      highlighted={state.highlightedBreakIds.has(brk.id) || state.hoveredBreakId === brk.id}
+                      isPtoDay={state.isSuggestedPto}
+                      onHover={state.setHoveredBreakId}
+                      isMostContested={brk.id === mostContestedId}
+                      reason={breakReason(brk, state.holidayNameFor)}
+                      today={today}
+                      noticePeriodDays={state.noticePeriodDays}
+                      workWeek={state.workWeek}
+                      defaultExpanded={index === 1}
+                    />
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
 

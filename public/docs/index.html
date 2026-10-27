@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>URL parameter contract &mdash; PTO Optimizer</title>
+    <meta
+      name="description"
+      content="Every query parameter PTO Optimizer reads, with its type, default, and what it does. The solver is deterministic: the same URL always produces the same plan."
+    />
+    <link rel="canonical" href="https://pto-optimizer.app/docs" />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #ffffff;
+        --surface: #f8fafc;
+        --text: #0f172a;
+        --muted: #64748b;
+        --border: #e2e8f0;
+        --accent: #1e3a8a;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      }
+      main {
+        max-width: 48rem;
+        margin: 0 auto;
+        padding: 3rem 1.5rem 4rem;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin-bottom: 0.25rem;
+      }
+      h2 {
+        font-size: 1.125rem;
+        margin-top: 2.5rem;
+        border-top: 1px solid var(--border);
+        padding-top: 1.5rem;
+      }
+      p.lede {
+        color: var(--muted);
+        max-width: 42rem;
+      }
+      p {
+        max-width: 42rem;
+      }
+      code {
+        font: 0.875em ui-monospace, "SF Mono", Menlo, monospace;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 0.25rem;
+        padding: 0.05rem 0.35rem;
+      }
+      a {
+        color: var(--accent);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+        margin-top: 1rem;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      th {
+        color: var(--muted);
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+      }
+      .example {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 0.5rem;
+        padding: 1rem 1.25rem;
+        margin: 1rem 0;
+      }
+      .example p {
+        margin: 0 0 0.5rem;
+        color: var(--muted);
+        font-size: 0.875rem;
+      }
+      .example code {
+        display: block;
+        white-space: pre-wrap;
+        word-break: break-all;
+        background: none;
+        border: none;
+        padding: 0;
+      }
+      .back {
+        display: inline-block;
+        margin-top: 2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>URL parameter contract</h1>
+      <p class="lede">
+        The solver behind PTO Optimizer is deterministic: every control on the page round-trips
+        through the URL's query string, and the exact same URL always produces the exact same
+        plan &mdash; for anyone, at any time. There is no account, no session, and nothing
+        personalised beyond what's in the URL itself. This page documents every parameter it
+        reads, so a URL can be constructed directly instead of reverse-engineered from the UI.
+      </p>
+      <p>
+        A URL with none of these parameters is valid and solves with sensible defaults (today
+        through December 31 this year, a geolocated country guess, a balanced weighting). Every
+        parameter below is optional unless noted.
+      </p>
+
+      <h2>Core</h2>
+      <table>
+        <thead>
+          <tr><th>Param</th><th>Type</th><th>Default</th><th>What it does</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>c</code></td><td>ISO country code, e.g. <code>US</code>, <code>GB</code></td><td>Geolocated guess</td><td>Country used for public holidays.</td></tr>
+          <tr><td><code>sd</code></td><td>string</td><td>&mdash;</td><td>Subdivision (state/province) code for region-specific holidays, where the country supports it.</td></tr>
+          <tr><td><code>s</code></td><td>date, <code>YYYY-MM-DD</code></td><td>Today</td><td>Date range start.</td></tr>
+          <tr><td><code>e</code></td><td>date, <code>YYYY-MM-DD</code></td><td>Dec 31 this year</td><td>Date range end.</td></tr>
+          <tr><td><code>b</code></td><td>number, 0&ndash;400</td><td>A balance guess</td><td>PTO days available (the budget the solver spends).</td></tr>
+          <tr><td><code>w</code></td><td>number, 0&ndash;100, step 10</td><td><code>30</code></td><td>Weighting: <code>0</code> maximises total days off and ignores travel demand; <code>100</code> minimises travel demand and accepts fewer days off.</td></tr>
+          <tr><td><code>count</code></td><td>number, 0&ndash;7</td><td><code>0</code></td><td>Break-count slider position. <code>0</code> lets the solver decide; <code>1</code> is one long break; <code>7</code> is as many short breaks as the calendar allows.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Pinning and excluding specific dates</h2>
+      <table>
+        <thead>
+          <tr><th>Param</th><th>Type</th><th>Default</th><th>What it does</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>p</code></td><td>comma-separated dates</td><td>none</td><td>Days forced in (pinned) regardless of what the solver would otherwise choose.</td></tr>
+          <tr><td><code>r</code></td><td>comma-separated dates</td><td>none</td><td>Days forced out (ruled out) &mdash; never suggested, even if they'd otherwise be chosen.</td></tr>
+          <tr><td><code>bo</code></td><td>comma-separated dates</td><td>none</td><td>Blackout days &mdash; days you can't take off at all (meetings, on-call, etc.).</td></tr>
+          <tr><td><code>od</code></td><td>comma-separated dates</td><td>none</td><td>Overlap days &mdash; someone else's time off, marked on the calendar for reference.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Work pattern and calendar settings</h2>
+      <table>
+        <thead>
+          <tr><th>Param</th><th>Type</th><th>Default</th><th>What it does</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>ws</code></td><td><code>0</code> or <code>1</code></td><td>Auto (by country)</td><td>Week starts on Sunday (<code>0</code>) or Monday (<code>1</code>).</td></tr>
+          <tr><td><code>ww</code></td><td>7-character binary string</td><td><code>1111100</code></td><td>Which days of the week are working days, Monday-first (1 = workday).</td></tr>
+          <tr><td><code>af</code></td><td><code>1</code></td><td>off</td><td>Enables a compressed (9/80) schedule with an alternating day off.</td></tr>
+          <tr><td><code>afs</code></td><td>date</td><td>&mdash;</td><td>Start date the 9/80 pattern anchors to. Read only when <code>af=1</code>.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>PTO policy</h2>
+      <table>
+        <thead>
+          <tr><th>Param</th><th>Type</th><th>Default</th><th>What it does</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>rv</code></td><td>number</td><td><code>3</code></td><td>Days to keep in reserve (not spent by the solver).</td></tr>
+          <tr><td><code>up</code></td><td><code>1</code></td><td>off</td><td>Unlimited PTO toggle &mdash; the budget (<code>b</code>) is ignored and the solver may spend freely.</td></tr>
+          <tr><td><code>np</code></td><td>number</td><td><code>14</code></td><td>Notice period, in days, used to calculate each recommendation's request-by date.</td></tr>
+          <tr><td><code>ac</code></td><td><code>1</code></td><td>off</td><td>Enables monthly accrual modelling.</td></tr>
+          <tr><td><code>am</code></td><td>number</td><td><code>1.25</code></td><td>PTO days accrued per month. Read only when <code>ac=1</code>.</td></tr>
+          <tr><td><code>ex</code></td><td><code>1</code></td><td>off</td><td>Enables an expiry/carryover cap on unused PTO.</td></tr>
+          <tr><td><code>xd</code></td><td>date</td><td>&mdash;</td><td>Expiry date. Read only when <code>ex=1</code>.</td></tr>
+          <tr><td><code>cc</code></td><td>number</td><td><code>0</code></td><td>Maximum PTO days that carry over past expiry. Read only when <code>ex=1</code>.</td></tr>
+          <tr><td><code>pc</code></td><td><code>1</code></td><td>off</td><td>Enables a cap on PTO days usable within a peak-season window.</td></tr>
+          <tr><td><code>pcs</code></td><td>date</td><td>&mdash;</td><td>Peak-season window start. Read only when <code>pc=1</code>.</td></tr>
+          <tr><td><code>pce</code></td><td>date</td><td>&mdash;</td><td>Peak-season window end. Read only when <code>pc=1</code>.</td></tr>
+          <tr><td><code>pcm</code></td><td>number</td><td><code>5</code></td><td>Maximum PTO days spendable inside the peak-season window. Read only when <code>pc=1</code>.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Worked examples</h2>
+
+      <div class="example">
+        <p>Default US plan, 15 PTO days, through the end of 2026:</p>
+        <code>https://pto-optimizer.app/?c=US&amp;s=2026-10-27&amp;e=2026-12-31&amp;b=15</code>
+      </div>
+
+      <div class="example">
+        <p>UK plan weighted toward quieter travel weeks (<code>w=80</code>), with December 25&ndash;26 pinned in and one Friday ruled out:</p>
+        <code>https://pto-optimizer.app/uk?c=GB&amp;s=2026-10-27&amp;e=2027-01-31&amp;b=20&amp;w=80&amp;p=2026-12-25,2026-12-26&amp;r=2026-11-27</code>
+      </div>
+
+      <div class="example">
+        <p>Germany, unlimited PTO, one single long break (<code>count=1</code>), a 4-day blackout window:</p>
+        <code>https://pto-optimizer.app/germany?c=DE&amp;s=2027-06-01&amp;e=2027-08-31&amp;up=1&amp;count=1&amp;bo=2027-07-04,2027-07-05,2027-07-06,2027-07-07</code>
+      </div>
+
+      <p>
+        Every one of these three URLs reproduces the identical plan every time it's opened, by
+        anyone, since nothing outside the parameters themselves (no account, no stored
+        preference) affects the result. See <a href="/data-sources.json">data-sources.json</a>
+        for where the underlying holiday and travel-demand data comes from, and
+        <a href="/privacy.html">the privacy page</a> for what is and isn't collected.
+      </p>
+
+      <a class="back" href="/">&larr; Back to PTO Optimizer</a>
+    </main>
+  </body>
+</html>
