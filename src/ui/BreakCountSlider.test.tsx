@@ -18,7 +18,7 @@ describe('BreakCountSlider (Phase 3.3: captions reframed around workload, mechan
     );
     expect(html).toContain('One big break');
     expect(html).toContain('Many short breaks');
-    expect(html).toContain('title="One big break means more disruption but more recovery time.');
+    expect(html).toContain('aria-label="One big break means more disruption but more recovery time.');
     // The old, purely structural labels are gone.
     expect(html).not.toContain('All in one</span>');
     expect(html).not.toContain('>As many as possible<');
