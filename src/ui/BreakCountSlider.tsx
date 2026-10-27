@@ -65,9 +65,14 @@ export function BreakCountSlider({
 }: BreakCountSliderProps) {
   return (
     <div className="flex flex-col gap-1">
+      {/* Interaction-detail pass: the chosen position shows in the label row itself when the
+          slider is actually the user's own setting - when the solver decides instead, the
+          slider is inert and the caption below already states the result ("Solver chose N
+          breaks..."), so a second number up here would just duplicate it. */}
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
         How many breaks
         <InfoHint text={BREAK_COUNT_HINT} />
+        {!letSolverDecide && <span className="ml-auto tabular-nums text-slate-500">{positionLabel(value)}</span>}
       </h3>
       <label className="flex items-center gap-2 text-xs text-slate-600">
         <input

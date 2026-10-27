@@ -30,9 +30,12 @@ interface WeightingSliderProps {
 export function WeightingSlider({ value, onChange }: WeightingSliderProps) {
   return (
     <div className="flex flex-col gap-1">
+      {/* Interaction-detail pass: the value sits in the label row itself, not only in the
+          caption below - the eye shouldn't have to travel down to see what's currently set. */}
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
         What matters more?
         <InfoHint text={TRAVEL_HINT} />
+        <span className="ml-auto tabular-nums text-slate-500">{value}</span>
       </h3>
       <div className="flex items-center justify-between text-xs text-slate-500">
         <span>Most days off</span>
@@ -49,9 +52,7 @@ export function WeightingSlider({ value, onChange }: WeightingSliderProps) {
         aria-valuetext={`${value}: ${CAPTIONS[value]}`}
         className="w-full accent-slate-800"
       />
-      <p className="text-xs text-slate-600">
-        <span className="font-medium tabular-nums text-slate-800">{value}</span> &middot; {CAPTIONS[value]}
-      </p>
+      <p className="text-xs text-slate-600">{CAPTIONS[value]}</p>
     </div>
   );
 }

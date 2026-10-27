@@ -48,3 +48,19 @@
 body {
   margin: 0;
 }
+
+/* Motion is for comprehension here (showing what changed when a slider moves or a day's
+   state flips), never decoration - every transition in this app is already under 200ms and
+   none run on page load, so this rule doesn't change how anything looks for most visitors.
+   For prefers-reduced-motion it turns all of it off instantly rather than just shortening
+   it, per spec. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

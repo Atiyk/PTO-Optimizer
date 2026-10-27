@@ -142,7 +142,7 @@ export function BreakCard({
       onMouseLeave={() => onHover(null)}
       onFocus={() => onHover(brk.id)}
       onBlur={() => onHover(null)}
-      className={`flex flex-col gap-3 rounded-lg border p-4 transition-colors duration-700 ${
+      className={`flex flex-col gap-3 rounded-lg border p-4 transition-colors duration-150 ease-out ${
         // A darker, heavier neutral than the resting border/surface - not a new hue. The
         // accent is reserved for suggested PTO, the primary action, and focus rings only.
         highlighted ? 'border-slate-300 bg-slate-100' : 'border-slate-200 bg-slate-50'

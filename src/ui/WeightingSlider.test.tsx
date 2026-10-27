@@ -5,7 +5,7 @@ import { WeightingSlider } from './WeightingSlider';
 describe('WeightingSlider (Phase 5.2: "don\'t assume travel")', () => {
   it('carries the "not travelling" clarification as a hover/focus hint on the label, not a standalone line', () => {
     const html = renderToStaticMarkup(<WeightingSlider value={30} onChange={() => {}} />);
-    expect(html).toContain('title="Not travelling?');
+    expect(html).toContain('aria-label="Not travelling?');
     expect(html).toContain('Set this toward 0');
   });
 
