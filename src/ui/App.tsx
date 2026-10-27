@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Headline } from './Headline';
+import { SummaryMetrics } from './SummaryMetrics';
 import { PrimaryControls } from './PrimaryControls';
 import { PlanSliders } from './PlanSliders';
 import { SubdivisionSelect } from './CountrySelect';
@@ -232,36 +233,85 @@ export function App() {
 
       <main>
         <Container className="p-4">
-          <CalendarErrorBoundary>
-            <Calendar
-              rangeStart={state.rangeStart}
-              rangeEnd={state.rangeEnd}
-              weekStart={state.weekStart}
-              today={today}
-              offRuns={state.offRuns}
-              previewRun={previewRun}
-              breakBandByRunIndex={state.breakBandByRunIndex}
-              hoveredBreakDaySet={state.hoveredBreakDaySet}
-              onHoverBreak={state.setHoveredBreakId}
-              categoryOf={state.categoryOf}
-              isBlackoutDay={state.isBlackoutDay}
-              overlapSet={state.overlapSet}
-              marginalValues={state.marginalValues}
-              holidayNameFor={state.holidayNameFor}
-              hasHover={hasHover}
-              onDayClick={state.toggleDay}
-              alternativeForDate={state.alternativeForDate}
-              onSwapAlternative={state.swapAlternative}
-              onHoverAlternative={state.setHoveredAlternativeId}
-            />
-          </CalendarErrorBoundary>
+          <SummaryMetrics
+            budgetSpent={state.budgetSpent}
+            totalDaysOff={state.totalDaysOff}
+            breakCountActual={state.breakCountActual}
+            scores={state.scores}
+          />
 
-          <p className="mt-2 max-w-prose text-xs text-slate-400">
-            Click any day to pin it in or rule it out. Hover or focus a day to see what it would gain.
-          </p>
+          {/* Phase 2: the two-column workspace. Calendar (~60%) and recommendations (~40%)
+              side by side at lg (1024px) and up - both visible at once, which is what reads
+              as a workspace rather than a scroll. Below lg, this collapses to one column
+              (recommendations following the calendar) automatically, since the grid itself
+              doesn't apply until lg:grid. The recommendations column gets its own
+              lg:sticky/overflow-y-auto scroll region so a long list never pushes the
+              calendar out of view - overscroll-behavior is left at its default (auto), so
+              scrolling past either end of that region falls through to the page as normal,
+              never trapped. */}
+          <div className={`${SECTION_GAP} lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start`}>
+            <div className="flex flex-col gap-4 lg:col-span-3">
+              <CalendarErrorBoundary>
+                <Calendar
+                  rangeStart={state.rangeStart}
+                  rangeEnd={state.rangeEnd}
+                  weekStart={state.weekStart}
+                  today={today}
+                  offRuns={state.offRuns}
+                  previewRun={previewRun}
+                  breakBandByRunIndex={state.breakBandByRunIndex}
+                  hoveredBreakDaySet={state.hoveredBreakDaySet}
+                  onHoverBreak={state.setHoveredBreakId}
+                  categoryOf={state.categoryOf}
+                  isBlackoutDay={state.isBlackoutDay}
+                  overlapSet={state.overlapSet}
+                  marginalValues={state.marginalValues}
+                  holidayNameFor={state.holidayNameFor}
+                  hasHover={hasHover}
+                  onDayClick={state.toggleDay}
+                  alternativeForDate={state.alternativeForDate}
+                  onSwapAlternative={state.swapAlternative}
+                  onHoverAlternative={state.setHoveredAlternativeId}
+                />
+              </CalendarErrorBoundary>
 
-          <div className={`${SECTION_GAP} border-t border-slate-200 pt-4`}>
-            <Legend />
+              <p className="max-w-prose text-xs text-slate-400">
+                Click any day to pin it in or rule it out. Hover or focus a day to see what it would gain.
+              </p>
+
+              <div className="border-t border-slate-200 pt-4">
+                <Legend />
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 lg:col-span-2 lg:mt-0 lg:sticky lg:top-16 lg:max-h-[calc(100vh-4.5rem)] lg:overflow-y-auto lg:pb-2 lg:pl-1">
+              {state.breaks.length === 0 && (
+                <p className="max-w-prose text-sm text-slate-500">
+                  No PTO-worthy breaks fit this range and budget yet &mdash; try widening the date range or increasing
+                  PTO days.
+                </p>
+              )}
+              {state.breaks.length > 1 && mostContestedIndex !== undefined && (
+                <p className="text-sm text-slate-600">
+                  Request break {mostContestedIndex} first &mdash; it&apos;s the most contested.
+                </p>
+              )}
+              {state.orderedBreaks.map(({ index, brk }) => (
+                <BreakCard
+                  key={brk.id}
+                  brk={brk}
+                  index={index}
+                  highlighted={state.highlightedBreakIds.has(brk.id) || state.hoveredBreakId === brk.id}
+                  isPtoDay={state.isSuggestedPto}
+                  onHover={state.setHoveredBreakId}
+                  isMostContested={brk.id === mostContestedId}
+                  today={today}
+                  noticePeriodDays={state.noticePeriodDays}
+                  workWeek={state.workWeek}
+                  defaultExpanded={index === 1}
+                />
+              ))}
+            </div>
           </div>
 
           {/* UI density pass: the free export actions sit here, below the calendar/break
@@ -283,35 +333,6 @@ export function App() {
               noticePeriodDays={state.noticePeriodDays}
               buildOverlapLink={state.buildOverlapLink}
             />
-          </div>
-
-          <div className={`${SECTION_GAP} flex flex-col gap-3`}>
-            {state.breaks.length === 0 && (
-              <p className="max-w-prose text-sm text-slate-500">
-                No PTO-worthy breaks fit this range and budget yet &mdash; try widening the date range or increasing
-                PTO days.
-              </p>
-            )}
-            {state.breaks.length > 1 && mostContestedIndex !== undefined && (
-              <p className="text-sm text-slate-600">
-                Request break {mostContestedIndex} first &mdash; it&apos;s the most contested.
-              </p>
-            )}
-            {state.orderedBreaks.map(({ index, brk }) => (
-              <BreakCard
-                key={brk.id}
-                brk={brk}
-                index={index}
-                highlighted={state.highlightedBreakIds.has(brk.id) || state.hoveredBreakId === brk.id}
-                isPtoDay={state.isSuggestedPto}
-                onHover={state.setHoveredBreakId}
-                isMostContested={brk.id === mostContestedId}
-                today={today}
-                noticePeriodDays={state.noticePeriodDays}
-                workWeek={state.workWeek}
-                defaultExpanded={index === 1}
-              />
-            ))}
           </div>
 
           <div className={SECTION_GAP}>

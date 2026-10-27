@@ -2,6 +2,7 @@ import { addDays } from '../solver/dateUtils';
 import type { MarginalValue } from '../solver/marginalValue';
 import { computeBandSegments, monthLabel, type MonthDescriptor, type OffRun, type WeekStart } from './calendarMath';
 import { COLORS } from './colorScheme';
+import { formatCardDateRange } from './dateFormat';
 import { DayCell } from './DayCell';
 import type { Alternative, Break } from '../solver/types';
 import type { DayCategory } from './types';
@@ -115,11 +116,12 @@ export function MonthGrid({
                     <div key={`label-${seg.colStart}`} style={{ gridColumn: seg.colStart + 1 }} className="flex items-center">
                       <button
                         type="button"
-                        tabIndex={-1}
-                        aria-hidden
                         onMouseEnter={() => onHoverBreak(band.brk.id)}
                         onMouseLeave={() => onHoverBreak(null)}
-                        className="flex h-3.5 w-3.5 cursor-default items-center justify-center rounded-full bg-slate-600 text-[9px] font-semibold leading-none text-white"
+                        onFocus={() => onHoverBreak(band.brk.id)}
+                        onBlur={() => onHoverBreak(null)}
+                        aria-label={`Break ${band.index}, ${formatCardDateRange(band.brk.start, band.brk.end)}`}
+                        className="flex h-3.5 w-3.5 cursor-default items-center justify-center rounded-full bg-slate-600 text-[9px] font-semibold leading-none text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]"
                       >
                         {band.index}
                       </button>
