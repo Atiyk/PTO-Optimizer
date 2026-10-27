@@ -208,13 +208,14 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
 export type ShareImageResult = { method: 'clipboard' } | { method: 'download' } | { method: 'failed' };
 
 /**
- * Copies the share image to the clipboard as a PNG. Safari restricts clipboard image
- * writes (ClipboardItem with an async blob factory is required there, and even that can be
- * refused outside a direct user gesture), so any failure - missing API, thrown error,
- * refused permission - falls back to triggering a file download instead of failing silently.
+ * Copies any canvas to the clipboard as a PNG. Safari restricts clipboard image writes
+ * (ClipboardItem with an async blob factory is required there, and even that can be refused
+ * outside a direct user gesture), so any failure - missing API, thrown error, refused
+ * permission - falls back to triggering a file download instead of failing silently. Shared
+ * by every image export in the app (the PTO-plan calendar image below, and the landing
+ * page's countdown/year-strip image) so this cross-browser handling exists exactly once.
  */
-export async function copyShareImage(data: ShareImageData, filename = 'pto-plan.png'): Promise<ShareImageResult> {
-  const canvas = renderShareImageCanvas(data);
+export async function copyCanvasImage(canvas: HTMLCanvasElement, filename: string): Promise<ShareImageResult> {
   const blob = await canvasToBlob(canvas);
   if (!blob) return { method: 'failed' };
 
@@ -240,4 +241,10 @@ export async function copyShareImage(data: ShareImageData, filename = 'pto-plan.
   } catch {
     return { method: 'failed' };
   }
+}
+
+/** The PTO plan's own "Copy as image" export - renders the calendar-grid canvas, then
+ * hands off to the shared copy/download-fallback logic above. */
+export async function copyShareImage(data: ShareImageData, filename = 'pto-plan.png'): Promise<ShareImageResult> {
+  return copyCanvasImage(renderShareImageCanvas(data), filename);
 }

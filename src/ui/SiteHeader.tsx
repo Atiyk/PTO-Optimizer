@@ -1,0 +1,41 @@
+import { Container } from './Container';
+
+export type SiteRoute = 'landing' | 'pto' | 'sabbatical';
+
+interface SiteHeaderProps {
+  active: SiteRoute;
+}
+
+/**
+ * Site restructure: the one piece of chrome shared by all three routes (landing, /pto,
+ * /sabbatical) - a single flat row, no icons, no dropdown, no descriptions, no tagline
+ * (the tagline belongs to the landing page's own h1, once, not repeated here). Current page
+ * marked by weight and an underline, not a filled pill - a pill reads as a button, and this
+ * is navigation. flex-wrap is the full extent of "collapses below 768px": three short items
+ * wrapping to a second line at narrow widths is already compact chrome, not a reason to add
+ * a hamburger icon the spec explicitly rules out.
+ */
+export function SiteHeader({ active }: SiteHeaderProps) {
+  const linkClass = (route: SiteRoute) =>
+    active === route
+      ? 'font-semibold text-slate-900 underline decoration-2 underline-offset-4'
+      : 'text-slate-600 hover:text-slate-900';
+
+  return (
+    <div className="border-b border-slate-200 bg-white">
+      <Container className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3">
+        <a href="/" className={`text-sm font-semibold ${active === 'landing' ? 'text-slate-900' : 'text-slate-700 hover:text-slate-900'}`}>
+          Days Off
+        </a>
+        <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm" aria-label="Main">
+          <a href="/pto" className={linkClass('pto')} aria-current={active === 'pto' ? 'page' : undefined}>
+            PTO Optimizer
+          </a>
+          <a href="/sabbatical" className={linkClass('sabbatical')} aria-current={active === 'sabbatical' ? 'page' : undefined}>
+            Sabbatical Planning
+          </a>
+        </nav>
+      </Container>
+    </div>
+  );
+}

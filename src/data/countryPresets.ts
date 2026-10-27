@@ -11,17 +11,20 @@ export interface CountryPreset {
   slug: string;
   /** ISO country code fed into the solver and holiday lookup, same as the country selector. */
   code: string;
-  /** One line of copy shown above the controls on that route, in place of the generic intro. */
-  copy: string;
 }
 
+// Site restructure: `copy` (a per-route tagline) is gone - the text-economy rule is "no page
+// has a subtitle under its h1 except the landing page," so /uk etc. no longer show one at
+// all. The <title>/meta description in each route's own index.html, plus the country
+// selector defaulting correctly via activeCountryPreset() below, already carry the
+// distinctiveness these routes exist for.
 export const COUNTRY_PRESETS: CountryPreset[] = [
-  { slug: 'uk', code: 'GB', copy: 'Plan your 2027 annual leave around UK bank holidays.' },
-  { slug: 'canada', code: 'CA', copy: 'Plan your 2027 PTO around Canadian statutory holidays.' },
-  { slug: 'australia', code: 'AU', copy: 'Plan your 2027 annual leave around Australian public holidays.' },
-  { slug: 'germany', code: 'DE', copy: 'Plan your 2027 Urlaub around German public holidays.' },
-  { slug: 'ireland', code: 'IE', copy: 'Plan your 2027 annual leave around Irish public holidays.' },
-  { slug: 'india', code: 'IN', copy: 'Plan your 2027 leave around Indian public holidays.' },
+  { slug: 'uk', code: 'GB' },
+  { slug: 'canada', code: 'CA' },
+  { slug: 'australia', code: 'AU' },
+  { slug: 'germany', code: 'DE' },
+  { slug: 'ireland', code: 'IE' },
+  { slug: 'india', code: 'IN' },
 ];
 
 declare global {
