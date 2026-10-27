@@ -20,6 +20,7 @@ import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { Container, SECTION_GAP } from './Container';
 import { mostContestedBreakId } from './requestDeadline';
+import { breakReason } from './breakReason';
 import { useAppState, todayISO } from './useAppState';
 import { useHasHover } from './useHasHover';
 import { activeCountryPreset } from '../data/countryPresets';
@@ -240,6 +241,26 @@ export function App() {
             scores={state.scores}
           />
 
+          {/* Phase 3 step 6: export actions sit directly beneath the metrics now, not below
+              the calendar/break list - "free, no sign-up, no email" is as much a part of
+              the page's first impression as the metrics it sits next to. */}
+          <div className={`${SECTION_GAP} border-t border-slate-200 pt-4`}>
+            <ExportBar
+              breaks={state.breaks}
+              isSuggestedPto={state.isSuggestedPto}
+              categoryOf={state.categoryOf}
+              rangeStart={state.rangeStart}
+              rangeEnd={state.rangeEnd}
+              weekStart={state.weekStart}
+              budgetSpent={state.budgetSpent}
+              totalDaysOff={state.totalDaysOff}
+              travelPercentile={state.scores?.travel.percentile ?? null}
+              efficiencyPercentile={state.scores?.efficiency.percentile ?? null}
+              noticePeriodDays={state.noticePeriodDays}
+              buildOverlapLink={state.buildOverlapLink}
+            />
+          </div>
+
           {/* Phase 2: the two-column workspace. Calendar (~60%) and recommendations (~40%)
               side by side at lg (1024px) and up - both visible at once, which is what reads
               as a workspace rather than a scroll. Below lg, this collapses to one column
@@ -305,6 +326,7 @@ export function App() {
                   isPtoDay={state.isSuggestedPto}
                   onHover={state.setHoveredBreakId}
                   isMostContested={brk.id === mostContestedId}
+                  reason={breakReason(brk, state.holidayNameFor)}
                   today={today}
                   noticePeriodDays={state.noticePeriodDays}
                   workWeek={state.workWeek}
@@ -312,27 +334,6 @@ export function App() {
                 />
               ))}
             </div>
-          </div>
-
-          {/* UI density pass: the free export actions sit here, below the calendar/break
-              list - someone shouldn't be asked to download a plan they haven't looked at
-              yet. Layout fix: "Share with a partner" is now the fourth button in this same
-              row (see ExportBar's own comment), instead of a separate standalone row. */}
-          <div className={`${SECTION_GAP} border-t border-slate-200 pt-4`}>
-            <ExportBar
-              breaks={state.breaks}
-              isSuggestedPto={state.isSuggestedPto}
-              categoryOf={state.categoryOf}
-              rangeStart={state.rangeStart}
-              rangeEnd={state.rangeEnd}
-              weekStart={state.weekStart}
-              budgetSpent={state.budgetSpent}
-              totalDaysOff={state.totalDaysOff}
-              travelPercentile={state.scores?.travel.percentile ?? null}
-              efficiencyPercentile={state.scores?.efficiency.percentile ?? null}
-              noticePeriodDays={state.noticePeriodDays}
-              buildOverlapLink={state.buildOverlapLink}
-            />
           </div>
 
           <div className={SECTION_GAP}>
