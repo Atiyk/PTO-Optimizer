@@ -18,6 +18,7 @@ import { downloadSabbaticalICS } from './icsExport';
 import { copyCanvasImage, SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT } from './imageExport';
 import { copyText } from './requestText';
 import { PinIcon, UnpaidIcon } from './DayCell';
+import { SABBATICAL_FAQ_ITEMS } from './sabbaticalFaqItems';
 import { COLORS } from './colorScheme';
 
 /**
@@ -531,34 +532,16 @@ function SabbaticalExportRow({
 }
 
 function SabbaticalFAQ() {
-  const items = [
-    {
-      q: 'When is the best time to take a sabbatical?',
-      a: 'The placements above rank windows by how many holidays and weekends sit inside or next to the block - a sabbatical started right before a public holiday or a cluster of them buys more total time away for the same number of weeks off.',
-    },
-    {
-      q: 'Can I add PTO days to a sabbatical?',
-      a: 'Often, yes - many employers allow combining ordinary PTO with a sabbatical to extend it. Whether yours does depends entirely on your own employer’s policy; check before counting on it.',
-    },
-    {
-      q: 'How long do sabbaticals usually run?',
-      a: 'Lengths vary widely by employer and industry, from a few weeks to several months - there’s no single standard, so this tool lets you set any length rather than assuming one.',
-    },
-    {
-      q: 'Can my added PTO days land before my eligibility date?',
-      a: 'Yes - PTO days are ordinary PTO, not part of the sabbatical itself, so they can fall before the date you become eligible to start the sabbatical block. The solver places each added day on whichever side of the block buys the most total time off, and the hero above always says which: "N before, M after."',
-    },
-  ];
   return (
     <section id="questions" className="border-t border-slate-100 pt-6 text-sm text-slate-500">
       <h2 className="mb-3 text-sm font-semibold text-slate-700">Questions</h2>
       <div className="flex flex-col divide-y divide-slate-100">
-        {items.map((item) => (
-          <details key={item.q} className="group py-2.5">
+        {SABBATICAL_FAQ_ITEMS.map((item) => (
+          <details key={item.question} className="group py-2.5">
             <summary className="cursor-pointer list-none">
-              <h3 className="inline text-sm font-normal text-slate-600 marker:content-none group-open:text-slate-800">{item.q}</h3>
+              <h3 className="inline text-sm font-normal text-slate-600 marker:content-none group-open:text-slate-800">{item.question}</h3>
             </summary>
-            <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-slate-500">{item.a}</p>
+            <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-slate-500">{item.answer}</p>
           </details>
         ))}
       </div>
