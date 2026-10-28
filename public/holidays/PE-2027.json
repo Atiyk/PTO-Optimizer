@@ -65,6 +65,19 @@
     ]
   },
   {
+    "date": "2027-06-07",
+    "localName": "Batalla de Arica y Día de la Bandera",
+    "name": "Battle of Arica and Flag Day",
+    "countryCode": "PE",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
     "date": "2027-06-29",
     "localName": "Día de San Pedro y San Pablo",
     "name": "Saint Peter and Saint Paul",
@@ -92,7 +105,7 @@
   },
   {
     "date": "2027-07-28",
-    "localName": "Día de la Independencia",
+    "localName": "Fiestas Patrias",
     "name": "Independence Day",
     "countryCode": "PE",
     "fixed": false,
@@ -105,7 +118,7 @@
   },
   {
     "date": "2027-07-29",
-    "localName": "Día de la Independencia",
+    "localName": "Fiestas Patrias",
     "name": "Independence Day",
     "countryCode": "PE",
     "fixed": false,

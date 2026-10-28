@@ -91,6 +91,19 @@
     ]
   },
   {
+    "date": "2027-03-29",
+    "localName": "Easter Monday",
+    "name": "Easter Monday",
+    "countryCode": "SR",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
     "date": "2027-05-01",
     "localName": "Labour Day",
     "name": "Labour Day",

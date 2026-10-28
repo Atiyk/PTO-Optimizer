@@ -170,6 +170,18 @@ async function main(): Promise<void> {
     if (skipped.length > 20) console.log(`    ... and ${skipped.length - 20} more`);
   }
 
+  // Phase 5 (5A hero chip "<N> countries"): the REAL count of countries that actually have
+  // holiday data after this run - written fresh or kept from a prior good run both count;
+  // a country with nothing but 'skipped-no-fallback' outcomes does not. Deliberately not
+  // just countries.json's own length (that's every country Nager supports, not every
+  // country this build actually has data for) - written once, here, as the one place this
+  // number is computed, and imported as a plain JSON module by the client, same pattern as
+  // demandIndex.json.
+  const countriesWithData = new Set(results.filter((r) => r.outcome === 'written' || r.outcome === 'kept-existing').map((r) => r.task.code)).size;
+  const coveragePath = resolve(projectRoot, 'src/data/holidayCoverage.json');
+  writeFileSync(coveragePath, `${JSON.stringify({ countriesWithData, asOf: new Date().toISOString().slice(0, 10) }, null, 2)}\n`, 'utf-8');
+  console.log(`  ${countriesWithData} countries have real holiday data (src/data/holidayCoverage.json updated).`);
+
   // Never fail the build over this - a stale or absent static snapshot degrades to a live
   // fetch at runtime (src/data/holidays.ts), not a broken deploy.
   process.exit(0);
