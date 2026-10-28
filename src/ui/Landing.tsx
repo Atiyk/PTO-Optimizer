@@ -4,12 +4,13 @@ import { Footer } from './Footer';
 import { Container } from './Container';
 import { CountrySelect } from './CountrySelect';
 import { YearStrip } from './YearStrip';
-import { getHolidaysWithStatus, type Holiday } from '../data/holidays';
+import { getHolidaysWithStatus, getPreloadedHolidays, type Holiday } from '../data/holidays';
+import { getPrerenderedAt } from './prerenderedAt';
 import { geolocateCountry } from './geo';
 import { todayISO } from './useAppState';
 import { addDays } from '../solver/dateUtils';
 import { weekdayName } from './requestDeadline';
-import { formatLong } from './dateFormat';
+import { formatLong, formatShort } from './dateFormat';
 import { downloadHolidaysICS } from './icsExport';
 import { copyCanvasImage, SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT } from './imageExport';
 import {
@@ -43,6 +44,7 @@ function Stat({ value, label }: { value: string; label: string }) {
  * above, never reimplemented.
  */
 export function Landing() {
+  const prerenderedAt = useMemo(() => getPrerenderedAt(), []);
   const [country, setCountry] = useState<string>(() => geolocateCountry());
   const today = todayISO();
   const year = Number(today.slice(0, 4));
@@ -50,7 +52,14 @@ export function Landing() {
   const stripEnd = addDays(today, 364);
   const fetchEnd = stripEnd > yearEnd ? stripEnd : yearEnd;
 
-  const [holidayState, setHolidayState] = useState<{ holidays: Holiday[]; degraded: boolean }>({ holidays: [], degraded: false });
+  // Phase 2: starts from this route's own prerendered embed (see holidays.ts's
+  // getPreloadedHolidays) instead of an empty list - the countdown/stats/year strip and
+  // the holiday list below are then real on first paint, not just after the fetch effect
+  // resolves a tick later.
+  const [holidayState, setHolidayState] = useState<{ holidays: Holiday[]; degraded: boolean }>(() => ({
+    holidays: getPreloadedHolidays(country),
+    degraded: false,
+  }));
   useEffect(() => {
     let cancelled = false;
     getHolidaysWithStatus(country, today, fetchEnd).then((result) => {
@@ -150,6 +159,12 @@ export function Landing() {
               <Stat value={stretch ? `${runLength(stretch)}` : '—'} label="Longest stretch ahead (days)" />
               <Stat value={dry ? `${runLength(dry)}` : '—'} label="Longest dry spell (days)" />
             </div>
+
+            {prerenderedAt && (
+              <p className="text-xs text-slate-400">
+                Dates above as of {formatShort(prerenderedAt.slice(0, 10))} — this page recomputes live once it loads in your browser.
+              </p>
+            )}
           </section>
 
           {/* 2. Year strip - the one memorable visual. */}

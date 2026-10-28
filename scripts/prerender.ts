@@ -35,13 +35,44 @@ import { JSDOM } from 'jsdom';
 import { renderToString } from 'react-dom/server';
 import React from 'react';
 import { ITEMS as FAQ_ITEMS } from '../src/ui/FAQ.tsx';
+import { rawHolidaysToHolidays, type Holiday } from '../src/data/holidays.ts';
 import { getSiteUrl } from './siteUrl.ts';
 import { ENTRIES, type Entry } from './routes.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '..');
 const distDir = resolve(projectRoot, 'dist');
+const publicHolidaysDir = resolve(projectRoot, 'public/holidays');
 const SITE_URL = getSiteUrl();
+/** The build date, stamped onto the HTML next to every date-relative claim it makes (the
+ * countdown, "N days away", placement dates) - those numbers are computed once, here, and
+ * go stale every day the site isn't rebuilt. See PROGRESS.md / the Phase 2 PR for the
+ * GitHub Actions workflow that redeploys daily to keep this drift small. */
+const PRERENDERED_AT = new Date().toISOString();
+
+/**
+ * Phase 2 (fixes K1): loads the SAME static files scripts/build-holidays.ts commits,
+ * directly in Node, for the years this route's holiday-dependent UI actually needs -
+ * 3 calendar years from "today" covers both the landing page's 12-month strip and
+ * /sabbatical's ~18-month search window. Missing files (a country the last
+ * build-holidays.ts run couldn't reach and had no prior committed copy for) are skipped
+ * silently - that route's SSR falls back to an empty list for this phase, exactly the
+ * pre-Phase-2 behavior, not a new failure mode.
+ */
+function loadStaticHolidaysForSsr(countryCode: string): Holiday[] {
+  const currentYear = new Date().getUTCFullYear();
+  const years = [currentYear, currentYear + 1, currentYear + 2];
+  const raw = years.flatMap((year) => {
+    const filePath = resolve(publicHolidaysDir, `${countryCode}-${year}.json`);
+    if (!existsSync(filePath)) return [];
+    try {
+      return JSON.parse(readFileSync(filePath, 'utf-8'));
+    } catch {
+      return [];
+    }
+  });
+  return rawHolidaysToHolidays(raw);
+}
 
 /** Decodes the small, fixed set of HTML entities this project's own <title>/<meta> tags
  * actually use - JSON-LD is JSON text, not HTML, so "UK Bank Holidays 2027 &mdash; PTO
@@ -119,6 +150,12 @@ function setGlobal(name: string, value: unknown): void {
   Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
 }
 
+/** The jsdom default navigator.language ("en-US") is what src/ui/geo.ts's
+ * geolocateCountry() resolves to 'US' from - true for every entry with no countryPreset
+ * (landing, /pto, /sabbatical), so that's the country whose holidays those routes need
+ * preloaded for prerendering. */
+const SSR_DEFAULT_COUNTRY = 'US';
+
 function installWindow(url: string, countryPreset?: string): void {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', { url });
   const win = dom.window as unknown as typeof globalThis;
@@ -129,6 +166,11 @@ function installWindow(url: string, countryPreset?: string): void {
   if (countryPreset) {
     (win as unknown as { __PTO_COUNTRY_PRESET__?: string }).__PTO_COUNTRY_PRESET__ = countryPreset;
   }
+  const ssrCountry = countryPreset ?? SSR_DEFAULT_COUNTRY;
+  (win as unknown as { __PTO_PRELOADED_HOLIDAYS__?: Record<string, Holiday[]> }).__PTO_PRELOADED_HOLIDAYS__ = {
+    [ssrCountry]: loadStaticHolidaysForSsr(ssrCountry),
+  };
+  (win as unknown as { __PTO_PRERENDERED_AT__?: string }).__PTO_PRERENDERED_AT__ = PRERENDERED_AT;
 }
 
 // A window must exist BEFORE these are even imported, in case anything in their import
@@ -166,11 +208,21 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
   const jsonLdScripts = buildJsonLd(entry, meta)
     .map((obj) => `    <script type="application/ld+json">${JSON.stringify(obj)}</script>`)
     .join('\n');
+
+  // The exact same data just used for this render's initial state (via
+  // getPreloadedHolidays), re-embedded here so the real browser's FIRST paint - before
+  // hydration, before any fetch effect runs - starts from the identical snapshot instead
+  // of an empty list. Must run before the module script at the end of <body>, so <head>
+  // (same injection point as the JSON-LD above) is the right place.
+  const ssrCountry = entry.countryPreset ?? SSR_DEFAULT_COUNTRY;
+  const preloadedHolidays = loadStaticHolidaysForSsr(ssrCountry);
+  const preloadScript = `    <script>window.__PTO_PRELOADED_HOLIDAYS__ = ${JSON.stringify({ [ssrCountry]: preloadedHolidays })}; window.__PTO_PRERENDERED_AT__ = ${JSON.stringify(PRERENDERED_AT)};</script>`;
+
   const headMarker = '</head>';
   if (!withRoot.includes(headMarker)) {
     throw new Error(`${entry.file}: no </head> found - can't inject structured data.`);
   }
-  const injected = withRoot.replace(headMarker, `${jsonLdScripts}\n  </head>`);
+  const injected = withRoot.replace(headMarker, `${preloadScript}\n${jsonLdScripts}\n  </head>`);
   writeFileSync(filePath, injected, 'utf-8');
 
   return { file: entry.file, bytesInjected: html.length };

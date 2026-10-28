@@ -3,7 +3,7 @@ import { solve, computeScores } from '../solver/solve';
 import { computeMarginalValues } from '../solver/marginalValue';
 import type { Alternative, Break, Scores, SolveInput, SolveResult, WorkWeek } from '../solver/types';
 import { DEFAULT_WORK_WEEK } from '../solver/types';
-import { getHolidays, getHolidaysWithStatus, getSubdivisionCandidates, type Holiday } from '../data/holidays';
+import { getHolidays, getHolidaysWithStatus, getSubdivisionCandidates, getPreloadedHolidays, type Holiday } from '../data/holidays';
 import { getStateHolidaysFallback } from '../data/usStateHolidays';
 import { geolocateCountry } from './geo';
 import { activeCountryPreset } from '../data/countryPresets';
@@ -289,7 +289,11 @@ export function useAppState() {
   const [altFridayEnabled, setAltFridayEnabled] = useState(initial.altFridayEnabled ?? false);
   const [altFridayStart, setAltFridayStart] = useState(initial.altFridayStart ?? '');
 
-  const [nationalHolidays, setNationalHolidays] = useState<Holiday[]>([]);
+  // Phase 2: starts from whatever this route's own prerendered HTML already embedded for
+  // `country` (see holidays.ts's getPreloadedHolidays) instead of an empty list, so the
+  // very first paint already shows real holidays rather than a crawler/first-visitor
+  // seeing "no public holidays" before the fetch effect below has had a chance to run.
+  const [nationalHolidays, setNationalHolidays] = useState<Holiday[]>(() => getPreloadedHolidays(country));
   const [stateHolidayCandidates, setStateHolidayCandidates] = useState<Holiday[]>([]);
   const [removedHolidays, setRemovedHolidays] = useState<Set<string>>(new Set());
   const [checkedStateHolidays, setCheckedStateHolidays] = useState<Set<string>>(new Set());

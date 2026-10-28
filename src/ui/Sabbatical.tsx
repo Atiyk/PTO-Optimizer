@@ -4,7 +4,8 @@ import { Footer } from './Footer';
 import { Container } from './Container';
 import { CountrySelect } from './CountrySelect';
 import { Calendar } from './Calendar';
-import { getHolidaysWithStatus, type Holiday } from '../data/holidays';
+import { getHolidaysWithStatus, getPreloadedHolidays, type Holiday } from '../data/holidays';
+import { getPrerenderedAt } from './prerenderedAt';
 import { geolocateCountry } from './geo';
 import { todayISO } from './useAppState';
 import { addDays, mondayIndexedDow } from '../solver/dateUtils';
@@ -23,6 +24,7 @@ const LENGTH_OPTIONS = [1, 2, 3, 4, 6, 8, 12];
  * the optimizer with different labels.
  */
 export function Sabbatical() {
+  const prerenderedAt = useMemo(() => getPrerenderedAt(), []);
   const [country, setCountry] = useState<string>(() => geolocateCountry());
   const today = todayISO();
   const [eligibleFrom, setEligibleFrom] = useState(today);
@@ -32,7 +34,14 @@ export function Sabbatical() {
 
   const horizonEnd = addDays(eligibleFrom, 540); // ~18 months of search window
 
-  const [holidayState, setHolidayState] = useState<{ holidays: Holiday[]; degraded: boolean }>({ holidays: [], degraded: false });
+  // Phase 2: starts from this route's own prerendered embed (getPreloadedHolidays)
+  // instead of an empty list - this is exactly what fixes K1's "all three placements are
+  // identical, 30 days away, no holidays inside" on the server-rendered HTML, since
+  // bestPlacements() below now has real holidays to rank by on the very first render.
+  const [holidayState, setHolidayState] = useState<{ holidays: Holiday[]; degraded: boolean }>(() => ({
+    holidays: getPreloadedHolidays(country),
+    degraded: false,
+  }));
   useEffect(() => {
     let cancelled = false;
     getHolidaysWithStatus(country, eligibleFrom, horizonEnd).then((result) => {
@@ -172,6 +181,11 @@ export function Sabbatical() {
               {ptoAfter ? ` + ${ptoAfter} PTO day${ptoAfter === 1 ? '' : 's'} after` : ''}
               {holidaysInsideCore ? ` + ${holidaysInsideCore} public holiday${holidaysInsideCore === 1 ? '' : 's'} inside` : ''}.
             </p>
+            {prerenderedAt && (
+              <p className="mt-1 text-xs text-slate-400">
+                Dates above as of {formatShort(prerenderedAt.slice(0, 10))} — this page recomputes live once it loads in your browser.
+              </p>
+            )}
           </Container>
         ) : (
           <Container className="px-4 py-6">

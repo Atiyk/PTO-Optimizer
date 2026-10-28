@@ -1,0 +1,132 @@
+[
+  {
+    "date": "2028-01-07",
+    "localName": "عيد الميلاد المجيد",
+    "name": "Christmas Day (Orthodox)",
+    "countryCode": "EG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-01-25",
+    "localName": "عيد الثورة 25 يناير",
+    "name": "Revolution Day 2011 / National Police Day",
+    "countryCode": "EG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-17",
+    "localName": "Sham El-Nessim",
+    "name": "Easter Monday",
+    "countryCode": "EG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-25",
+    "localName": "عيد تحرير سيناء",
+    "name": "Sinai Liberation Day",
+    "countryCode": "EG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-04",
+    "localName": "عيد العمال",
+    "name": "Labour Day",
+    "countryCode": "EG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-25",
+    "localName": "Islamic New Year",
+    "name": "Islamic New Year",
+    "countryCode": "EG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-06-30",
+    "localName": "ثورة 30 يونيو",
+    "name": "June 30 Revolution",
+    "countryCode": "EG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-07-23",
+    "localName": "عيد ثورة 23 يوليو",
+    "name": "Revolution Day",
+    "countryCode": "EG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-08-03",
+    "localName": "Prophet Muhammad's Birthday (Tentative Date)",
+    "name": "Prophet Muhammad's Birthday (Tentative Date)",
+    "countryCode": "EG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-10-06",
+    "localName": "عيد القوات المسلحة",
+    "name": "Armed Forces Day",
+    "countryCode": "EG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  }
+]

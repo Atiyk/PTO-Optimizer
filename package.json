@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "tsx --tsconfig tsconfig.app.json scripts/build-holidays.ts",
     "build": "tsc -b && vite build",
     "postbuild": "tsx --tsconfig tsconfig.app.json scripts/prerender.ts && tsx --tsconfig tsconfig.app.json scripts/build-seo-files.ts",
     "lint": "oxlint",
