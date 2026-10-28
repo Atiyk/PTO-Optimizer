@@ -10,8 +10,8 @@ after a restart or context compaction.
 |---|---|---|---|
 | 0 — Preflight & baseline | `phase-0-baseline` | done | [#21](https://github.com/Atiyk/PTO-Optimizer/pull/21) |
 | 1 — Canonical domain | `phase-1-domain` | done | [#22](https://github.com/Atiyk/PTO-Optimizer/pull/22) |
-| 2 — Holiday data foundation | `phase-2-holiday-data` | done | (pending) |
-| 3 — Sabbatical correctness | `phase-3-sabbatical-correctness` | not started | |
+| 2 — Holiday data foundation | `phase-2-holiday-data` | done | [#23](https://github.com/Atiyk/PTO-Optimizer/pull/23) |
+| 3 — Sabbatical correctness | `phase-3-sabbatical-correctness` | done | (pending) |
 | 4 — Sabbatical UX & features | `phase-4-sabbatical-ux` | not started | |
 | 5 — Landing page rebuild | `phase-5-landing` | not started | |
 | 6 — Site-wide hygiene | `phase-6-hygiene` | not started | |
@@ -154,6 +154,67 @@ after a restart or context compaction.
   (including the new `prebuild` holiday fetch). `npm test`: 407/408 passed (one new test
   added this phase) - the same K9 baseline timing test failed again
   (`<1000ms`, ~1276ms this run); no solver file touched.
+
+## Phase 3 findings
+
+- **3A (diversity + PTO-aware ranking)**: `bestPlacements` now takes `ptoToAdd` and the
+  full `Holiday[]`/`countryCode` (not just a bare `Set<string>`), ranks candidates by
+  `totalAwayDays` WITH that budget (not the old 0-PTO "natural" total), and picks
+  non-overlapping core blocks only (best, then best that doesn't overlap it, then next).
+  Verified live: three genuinely different placements now - "Jan 4 → 39 days away ·
+  includes Martin Luther King, Jr. Day · quiet travel", "May 31 → 38 days away · includes
+  Memorial Day and Juneteenth National Independence Day", "Nov 16 → 38 days away ·
+  includes Thanksgiving Day". The "no holiday anywhere in the next year" case is a single
+  banner above the cards (`anyHolidayInAnyCandidate`, checked against the FULL search
+  window, not just the top 3 shown) instead of repeating "no holidays inside" on each one.
+  Search window changed from the old ~18-month (540-day) window to 12 months, matching
+  the committed holiday data's own range.
+- **3B (headline/card agreement)**: root cause was structural, not a display bug - the
+  hero called `extendSabbatical` a SECOND time with the real `ptoToAdd`, while the cards'
+  `bestPlacements` always used 0. Fixed by computing `extendedStart`/`extendedEnd`/
+  `totalAwayDays`/`ptoBefore`/`ptoAfter`/`marginal` ONCE per candidate, inside
+  `bestPlacements` itself, with the real budget - `Sabbatical.tsx` no longer calls
+  `extendSabbatical` at all, it just reads the selected candidate's own fields. This
+  makes agreement structural (impossible to drift apart again), not just currently-equal.
+  Verified live: headline "39 consecutive days" now exactly matches the selected card's
+  "39 days away".
+  PTO-before-eligibility decision: Atiyk's recorded preference (ordinary PTO, allowed to
+  land before eligibility) was implemented - the only real floor is `today` (the actual
+  calendar date), not `eligibleFrom`. Added a `minStart` floor to `extendSabbatical` that
+  the left edge can never cross even with budget left unspent (fixes K3b's "5 PTO days
+  landed in the past" bug), explained in a new sabbatical FAQ entry, and covered by a
+  dedicated test. Ties between the two sides now break toward "after" (also tested).
+- **3C (marginal baseline)**: root cause confirmed - `marginal[0]` used to be recorded
+  BEFORE any free-day merging happened in the loop, so it missed free weekend/holiday
+  days immediately adjacent to the block. Fixed by running one full free-only merge pass
+  before recording the baseline (and again after each paid day, so a day that unlocks an
+  adjacent free day gets credit for both). New test confirms the corrected curve for a
+  Monday-start, 4-week, no-nearby-holidays block: baseline is 30 (not 28 - the weekend
+  before start merges in for free), and PTO days 1-5 gain `[1,1,1,1,3]` exactly as K3c
+  predicted. A second test confirms a holiday adjacent to the block changes the curve
+  (the PTO day that reaches it bridges to it for free, gaining 2 instead of 1).
+- **3D (calendar shows every month the trip touches)**: root cause confirmed - the
+  calendar's `rangeStart` was `selected.start` (the core block's own start), so PTO days
+  extending the trip BACKWARD never rendered, and a trip crossing a month boundary only
+  showed its first month. Fixed with new `paddedCalendarRange()`: renders from the trip's
+  real extended start/end, padded one full month either side. Verified live: a
+  placement spanning late December into mid-January now renders November through
+  February (4 months), not just one.
+- **Tests**: new `src/ui/sabbaticalData.test.ts` (sabbaticalData.ts had none before this
+  phase) - 14 tests covering the corrected marginal curve (both the plain and the
+  holiday-adjacent case), the tie-break-toward-after rule, the `minStart` floor, card
+  note formatting, placement diversity (no overlapping core blocks), PTO-aware ranking,
+  and the "no holiday anywhere" flag. All pass.
+- **Test/tsc/build**: `npx tsc --noEmit` clean. `npm run build` clean. `npm test`:
+  421/422 - same K9 baseline timing test (`<1000ms`, ~1103ms this run); no solver file
+  touched.
+- **Deliberately deferred to Phase 4** (not fixed here, to keep this phase to data
+  correctness only): the duplicate "Country" label (K3f, still visible in this phase's
+  screenshots), the fixed 1/2/3/4/6/8/12-week length dropdown (vs. any whole number),
+  the lack of URL round-tripping on this page, and `selectedIndex` being index-based
+  (re-ranking on a `ptoToAdd` change can now reorder which placement index 0 refers to -
+  not a regression from this phase specifically, since ranking was never PTO-aware
+  before, but worth flagging now that it visibly can reorder).
 
 ## Questions for Atiyk
 
