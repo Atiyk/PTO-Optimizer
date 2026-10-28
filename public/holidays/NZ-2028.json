@@ -1,0 +1,330 @@
+[
+  {
+    "date": "2028-01-03",
+    "localName": "New Year's Day",
+    "name": "New Year's Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-01-04",
+    "localName": "Day after New Year's Day",
+    "name": "Day after New Year's Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-01-24",
+    "localName": "Wellington Anniversary Day",
+    "name": "Wellington Anniversary Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": false,
+    "counties": [
+      "NZ-WGN",
+      "NZ-MWT"
+    ],
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-01-31",
+    "localName": "Auckland/Northland Anniversary Day",
+    "name": "Auckland Anniversary Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": false,
+    "counties": [
+      "NZ-AUK",
+      "NZ-NTL",
+      "NZ-WKO",
+      "NZ-GIS",
+      "NZ-BOP"
+    ],
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-01-31",
+    "localName": "Nelson Anniversary Day",
+    "name": "Nelson Anniversary Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": false,
+    "counties": [
+      "NZ-NSN"
+    ],
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-02-07",
+    "localName": "Waitangi Day",
+    "name": "Waitangi Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-03-13",
+    "localName": "Taranaki Anniversary Day",
+    "name": "Taranaki Anniversary Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": false,
+    "counties": [
+      "NZ-TKI"
+    ],
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-03-20",
+    "localName": "Otago Anniversary Day",
+    "name": "Otago Anniversary Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": false,
+    "counties": [
+      "NZ-OTA"
+    ],
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-14",
+    "localName": "Good Friday",
+    "name": "Good Friday",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-17",
+    "localName": "Easter Monday",
+    "name": "Easter Monday",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-18",
+    "localName": "Southland Anniversary Day",
+    "name": "Southland Anniversary Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": false,
+    "counties": [
+      "NZ-STL"
+    ],
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-25",
+    "localName": "Anzac Day",
+    "name": "Anzac Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-06-05",
+    "localName": "King's Birthday",
+    "name": "King's Birthday",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-07-14",
+    "localName": "Matariki",
+    "name": "Matariki",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-09-25",
+    "localName": "Dominion Day",
+    "name": "Canterbury (South) Anniversary Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": false,
+    "counties": [
+      "NZ-CAN"
+    ],
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-10-20",
+    "localName": "Hawke's Bay Anniversary Day",
+    "name": "Hawke's Bay Anniversary Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": false,
+    "counties": [
+      "NZ-HKB"
+    ],
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-10-23",
+    "localName": "Labour Day",
+    "name": "Labour Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-10-30",
+    "localName": "Marlborough Anniversary Day",
+    "name": "Marlborough Anniversary Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": false,
+    "counties": [
+      "NZ-MBH"
+    ],
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-17",
+    "localName": "Canterbury (North & Central) Anniversary Day",
+    "name": "Canterbury Anniversary Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": false,
+    "counties": [
+      "NZ-CAN"
+    ],
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-27",
+    "localName": "Chatham Islands Anniversary Day",
+    "name": "Chatham Islands Anniversary Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": false,
+    "counties": [
+      "NZ-CIT"
+    ],
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-04",
+    "localName": "Westland Anniversary Day",
+    "name": "Westland Anniversary Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": false,
+    "counties": [
+      "NZ-WTC"
+    ],
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-25",
+    "localName": "Christmas Day",
+    "name": "Christmas Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-26",
+    "localName": "Boxing Day",
+    "name": "Boxing Day",
+    "countryCode": "NZ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  }
+]

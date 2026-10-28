@@ -1,0 +1,158 @@
+[
+  {
+    "date": "2028-01-01",
+    "localName": "New Year's Day",
+    "name": "New Year's Day",
+    "countryCode": "DM",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-02-28",
+    "localName": "Carnival Monday",
+    "name": "Carnival Monday",
+    "countryCode": "DM",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-02-29",
+    "localName": "Carnival Tuesday",
+    "name": "Carnival Tuesday",
+    "countryCode": "DM",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-14",
+    "localName": "Good Friday",
+    "name": "Good Friday",
+    "countryCode": "DM",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-17",
+    "localName": "Easter Monday",
+    "name": "Easter Monday",
+    "countryCode": "DM",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-01",
+    "localName": "Labour Day",
+    "name": "Labour Day",
+    "countryCode": "DM",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-06-05",
+    "localName": "Whit Monday",
+    "name": "Whit Monday",
+    "countryCode": "DM",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-08-07",
+    "localName": "Emancipation Day",
+    "name": "Emancipation Day",
+    "countryCode": "DM",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-03",
+    "localName": "Independence Day",
+    "name": "Independence Day",
+    "countryCode": "DM",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-04",
+    "localName": "Community Service Day",
+    "name": "Community Service Day",
+    "countryCode": "DM",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-25",
+    "localName": "Christmas Day",
+    "name": "Christmas Day",
+    "countryCode": "DM",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-26",
+    "localName": "Boxing Day",
+    "name": "St. Stephen's Day",
+    "countryCode": "DM",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  }
+]

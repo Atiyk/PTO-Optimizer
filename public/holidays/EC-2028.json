@@ -1,0 +1,145 @@
+[
+  {
+    "date": "2028-01-01",
+    "localName": "Año Nuevo",
+    "name": "New Year's Day",
+    "countryCode": "EC",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-02-28",
+    "localName": "Carnaval",
+    "name": "Carnival",
+    "countryCode": "EC",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-02-29",
+    "localName": "Carnaval",
+    "name": "Carnival",
+    "countryCode": "EC",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-14",
+    "localName": "Good Friday",
+    "name": "Good Friday",
+    "countryCode": "EC",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-01",
+    "localName": "International Workers' Day",
+    "name": "International Workers' Day",
+    "countryCode": "EC",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-24",
+    "localName": "Batalla de Pichincha",
+    "name": "The Battle of Pichincha",
+    "countryCode": "EC",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-08-10",
+    "localName": "Primer Grito de Independencia",
+    "name": "Declaration of Independence of Quito",
+    "countryCode": "EC",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-10-09",
+    "localName": "Independencia de Guayaquil",
+    "name": "Independence of Guayaquil",
+    "countryCode": "EC",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-02",
+    "localName": "Día de los Difuntos, Día de Muertos",
+    "name": "All Souls' Day",
+    "countryCode": "EC",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-03",
+    "localName": "Independencia de Cuenca",
+    "name": "Independence of Cuenca",
+    "countryCode": "EC",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-25",
+    "localName": "Día de Navidad",
+    "name": "Christmas Day",
+    "countryCode": "EC",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  }
+]

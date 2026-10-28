@@ -1,0 +1,27 @@
+# Phase 2 (staleness): every page's date-relative content (the countdown, "N days away",
+# sabbatical placements) is computed once at build time by scripts/prerender.ts and stamped
+# with that build's own timestamp (see src/ui/prerenderedAt.ts) - it goes stale by exactly
+# how long it's been since the last deploy. This triggers a fresh Vercel deploy daily so
+# that drift never exceeds ~24 hours, without needing a real backend or a cron server.
+#
+# Needs a repository secret named VERCEL_DEPLOY_HOOK_URL (Project Settings -> Git -> Deploy
+# Hooks in the Vercel dashboard - create one for the `main` branch, then paste its URL here
+# as a GitHub Actions secret). See PROGRESS.md's "Questions for Atiyk".
+name: Daily redeploy
+
+on:
+  schedule:
+    - cron: '17 6 * * *' # once a day; the exact minute is arbitrary, chosen off the hour
+  workflow_dispatch: {}
+
+jobs:
+  trigger-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel deploy hook
+        run: |
+          if [ -z "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}" ]; then
+            echo "VERCEL_DEPLOY_HOOK_URL secret is not set - skipping (see PROGRESS.md)." >&2
+            exit 0
+          fi
+          curl -fsS -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}"

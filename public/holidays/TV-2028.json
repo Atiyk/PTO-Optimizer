@@ -1,0 +1,145 @@
+[
+  {
+    "date": "2028-01-01",
+    "localName": "Tausaga Fou",
+    "name": "New Year's Day",
+    "countryCode": "TV",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-03-13",
+    "localName": "Commonwealth Day",
+    "name": "Commonwealth Day",
+    "countryCode": "TV",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-14",
+    "localName": "Good Friday",
+    "name": "Good Friday",
+    "countryCode": "TV",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-17",
+    "localName": "Easter Monday",
+    "name": "Easter Monday",
+    "countryCode": "TV",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-08",
+    "localName": "Te Aso o te Tala Lei",
+    "name": "Gospel Day",
+    "countryCode": "TV",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-08",
+    "localName": "King's Official Birthday",
+    "name": "King's Official Birthday",
+    "countryCode": "TV",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-08-07",
+    "localName": "Aso Tamaliki",
+    "name": "National Children's Day",
+    "countryCode": "TV",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-10-01",
+    "localName": "Tuvalu Day",
+    "name": "Tuvalu Day",
+    "countryCode": "TV",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-10-02",
+    "localName": "Tuvalu Day Holiday",
+    "name": "Tuvalu Day Holiday",
+    "countryCode": "TV",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-25",
+    "localName": "Kilisimasi",
+    "name": "Christmas Day",
+    "countryCode": "TV",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-26",
+    "localName": "Boxing Day",
+    "name": "St. Stephen's Day",
+    "countryCode": "TV",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  }
+]

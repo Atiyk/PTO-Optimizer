@@ -1,0 +1,185 @@
+[
+  {
+    "date": "2028-01-01",
+    "localName": "Año Nuevo",
+    "name": "New Year's Day",
+    "countryCode": "PA",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-01-10",
+    "localName": "Día de los Mártires",
+    "name": "Martyrs' Day",
+    "countryCode": "PA",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-02-28",
+    "localName": "Lunes de Carnaval",
+    "name": "Carnival Monday",
+    "countryCode": "PA",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-02-29",
+    "localName": "Martes de Carnaval",
+    "name": "Carnival Tuesday",
+    "countryCode": "PA",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-14",
+    "localName": "Viernes Santo",
+    "name": "Good Friday",
+    "countryCode": "PA",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-01",
+    "localName": "Día del Trabajo",
+    "name": "Labour Day",
+    "countryCode": "PA",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-03",
+    "localName": "Separación de Panamá de Colombia",
+    "name": "Separation Day",
+    "countryCode": "PA",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-04",
+    "localName": "Día de los Símbolos Patrios",
+    "name": "Flag Day",
+    "countryCode": "PA",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "School",
+      "Authorities"
+    ]
+  },
+  {
+    "date": "2028-11-06",
+    "localName": "Consolidación de la Separación de Panamá de Colombia",
+    "name": "Consolidation of the Separation Day",
+    "countryCode": "PA",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-10",
+    "localName": "Primer Grito de Independencia de la Villa de Los Santos",
+    "name": "Shout in Villa de los Santos",
+    "countryCode": "PA",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-28",
+    "localName": "Independencia de Panamá de España",
+    "name": "Independence Day",
+    "countryCode": "PA",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-08",
+    "localName": "Día de las Madres",
+    "name": "Mother's Day",
+    "countryCode": "PA",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-20",
+    "localName": "Día de Duelo Nacional",
+    "name": "National Day of Mourning",
+    "countryCode": "PA",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-25",
+    "localName": "Navidad",
+    "name": "Christmas Day",
+    "countryCode": "PA",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  }
+]
