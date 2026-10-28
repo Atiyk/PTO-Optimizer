@@ -1,6 +1,6 @@
 [
   {
-    "date": "2028-01-01",
+    "date": "2027-12-31",
     "localName": "New Year's Day",
     "name": "New Year's Day",
     "countryCode": "MP",
@@ -13,7 +13,7 @@
     ]
   },
   {
-    "date": "2028-01-20",
+    "date": "2028-01-17",
     "localName": "Martin Luther King Jr. Day",
     "name": "Martin Luther King Jr. Day",
     "countryCode": "MP",
@@ -26,7 +26,7 @@
     ]
   },
   {
-    "date": "2028-02-17",
+    "date": "2028-02-21",
     "localName": "Presidents' Day",
     "name": "Presidents' Day",
     "countryCode": "MP",
@@ -65,7 +65,7 @@
     ]
   },
   {
-    "date": "2028-05-26",
+    "date": "2028-05-29",
     "localName": "Memorial Day",
     "name": "Memorial Day",
     "countryCode": "MP",
@@ -104,7 +104,7 @@
     ]
   },
   {
-    "date": "2028-09-01",
+    "date": "2028-09-04",
     "localName": "Labor Day",
     "name": "Labour Day",
     "countryCode": "MP",
@@ -117,7 +117,7 @@
     ]
   },
   {
-    "date": "2028-10-13",
+    "date": "2028-10-09",
     "localName": "Commonwealth Cultural Day",
     "name": "Commonwealth Cultural Day",
     "countryCode": "MP",
@@ -143,7 +143,7 @@
     ]
   },
   {
-    "date": "2028-11-11",
+    "date": "2028-11-10",
     "localName": "Veterans Day",
     "name": "Veterans Day",
     "countryCode": "MP",
@@ -156,7 +156,7 @@
     ]
   },
   {
-    "date": "2028-11-27",
+    "date": "2028-11-23",
     "localName": "Thanksgiving",
     "name": "Thanksgiving",
     "countryCode": "MP",

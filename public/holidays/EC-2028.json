@@ -40,7 +40,7 @@
   },
   {
     "date": "2028-04-14",
-    "localName": "Good Friday",
+    "localName": "Viernes Santo",
     "name": "Good Friday",
     "countryCode": "EC",
     "fixed": false,
@@ -53,7 +53,7 @@
   },
   {
     "date": "2028-05-01",
-    "localName": "International Workers' Day",
+    "localName": "Día del Trabajo",
     "name": "International Workers' Day",
     "countryCode": "EC",
     "fixed": false,
@@ -65,7 +65,7 @@
     ]
   },
   {
-    "date": "2028-05-24",
+    "date": "2028-05-26",
     "localName": "Batalla de Pichincha",
     "name": "The Battle of Pichincha",
     "countryCode": "EC",
@@ -78,7 +78,7 @@
     ]
   },
   {
-    "date": "2028-08-10",
+    "date": "2028-08-11",
     "localName": "Primer Grito de Independencia",
     "name": "Declaration of Independence of Quito",
     "countryCode": "EC",
@@ -104,7 +104,7 @@
     ]
   },
   {
-    "date": "2028-11-02",
+    "date": "2028-11-03",
     "localName": "Día de los Difuntos, Día de Muertos",
     "name": "All Souls' Day",
     "countryCode": "EC",
