@@ -7,6 +7,7 @@ import { copyShareImage, buildShareImageMonths } from './imageExport';
 import { copyText } from './requestText';
 import { track } from './analytics';
 import { PartnerShareButton } from './PartnerShareButton';
+import { DEFAULT_SITE_HOST } from './siteUrl';
 
 interface ExportBarProps {
   breaks: Break[];
@@ -106,7 +107,7 @@ export function ActionButton({
  * different places on the page for no real reason.
  */
 export function ExportBar(props: ExportBarProps) {
-  const siteUrl = typeof window !== 'undefined' ? window.location.host : 'pto-optimizer.app';
+  const siteUrl = typeof window !== 'undefined' ? window.location.host : DEFAULT_SITE_HOST;
 
   // Default on - a UI-level default; generateICS/downloadICS themselves default to
   // disabled (see icsExport.ts) so every other caller is unaffected. The lead time itself

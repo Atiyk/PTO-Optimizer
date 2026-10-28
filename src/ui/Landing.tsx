@@ -110,7 +110,7 @@ export function Landing() {
     }
     ctx.font = '400 15px system-ui, sans-serif';
     ctx.fillStyle = '#94a3b8';
-    ctx.fillText('pto-optimizer.app', 48, SHARE_IMAGE_HEIGHT - 32);
+    ctx.fillText(window.location.host, 48, SHARE_IMAGE_HEIGHT - 32);
     await copyCanvasImage(canvas, 'days-off.png');
   };
 
