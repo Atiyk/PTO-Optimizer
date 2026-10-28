@@ -8,8 +8,8 @@ after a restart or context compaction.
 
 | Phase | Branch | Status | PR |
 |---|---|---|---|
-| 0 — Preflight & baseline | `phase-0-baseline` | in progress | (pending) |
-| 1 — Canonical domain | `phase-1-domain` | not started | |
+| 0 — Preflight & baseline | `phase-0-baseline` | done | [#21](https://github.com/Atiyk/PTO-Optimizer/pull/21) |
+| 1 — Canonical domain | `phase-1-domain` | done | (pending) |
 | 2 — Holiday data foundation | `phase-2-holiday-data` | not started | |
 | 3 — Sabbatical correctness | `phase-3-sabbatical-correctness` | not started | |
 | 4 — Sabbatical UX & features | `phase-4-sabbatical-ux` | not started | |
@@ -56,6 +56,57 @@ after a restart or context compaction.
     empty-holiday-set symptom the audit predicted, confirmed by reading the raw
     server-rendered markup rather than just the code.
 
+## Phase 1 findings
+
+- **pto-optimizer.app**: confirmed in Phase 0 — no DNS record at all, not just unreachable.
+  So `SITE_URL` defaults to the real, live `https://pto-optimizer-seven.vercel.app`
+  rather than the custom domain.
+- **One source of truth**: `scripts/siteUrl.ts`'s `getSiteUrl()` (reads `SITE_URL` env var,
+  defaults as above) is the single function every build-time consumer calls:
+  - `vite.config.ts`'s new `siteUrlHtmlPlugin` interpolates `%SITE_URL%`/`%SITE_HOST%`
+    placeholders into all 9 HTML entry files (canonical, og:url, og:image, twitter:image,
+    Plausible `data-domain`).
+  - `scripts/prerender.ts` (ENTRIES moved to new side-effect-free `scripts/routes.ts`, so
+    `build-seo-files.ts` can import the route list without re-running prerender's `main()`
+    a second time — this was a real bug caught on the first build attempt, see below) uses
+    it for the JSON-LD breadcrumb root and each route's own prerender URL.
+  - New `scripts/build-seo-files.ts` (added to the `postbuild` chain after prerender)
+    generates `dist/sitemap.xml` and `dist/robots.txt` from scratch (the old
+    `public/sitemap.xml`/`public/robots.txt` static files are deleted — generating beats
+    maintaining two copies that can drift), rewrites `dist/data-sources.json`'s `$schema`,
+    and rewrites the example URLs in `dist/docs/index.html`.
+  - `.ics` UIDs (`icsExport.ts`) deliberately left untouched — they're identifiers, not
+    URLs; changing them would duplicate every event a user already imported.
+  - `src/ui/ExportBar.tsx`'s pre-hydration SSR fallback and `src/ui/Landing.tsx`'s
+    "Copy as image" canvas text now use the real device - `window.location.host` at
+    runtime where available, with a plain client-safe literal (`src/ui/siteUrl.ts`,
+    deliberately NOT importing `process.env` — that would crash in the browser bundle) as
+    the SSR-only fallback.
+- **Bug caught before it shipped**: a first version of `build-seo-files.ts` imported
+  `ENTRIES` directly from `prerender.ts`, which re-ran that file's whole `main()` as a
+  side effect of the import (since `prerender.ts`'s `main()` executes unconditionally at
+  module load) — the second run then failed because the HTML files were already
+  prerendered once. Fixed by moving `ENTRIES`/`Entry` into their own side-effect-free
+  `scripts/routes.ts`, imported by both scripts.
+- **Verification**: `npm run build` clean; `grep -r pto-optimizer\.app dist/` finds nothing
+  except the (intentionally unchanged) `.ics` UID strings inside the client JS bundle.
+  `/pto` and `/sabbatical` route correctly under `vite preview` only with a trailing
+  slash — a Phase 0 finding, not new; Vercel's `cleanUrls` already handles the real
+  no-trailing-slash production case.
+- **Test/tsc/build status**: `npx tsc --noEmit` clean. `npm test`: 406 passed, 1 failed —
+  this time the OTHER K9 baseline timing test (the `<1000ms` perf budget, at ~1005ms);
+  the 5s-timeout test passed this run. Both are the same pair of known-flaky timing tests
+  recorded in K9/Phase 0; no solver file was touched this phase.
+- **Vercel steps for Atiyk** (not done — needs account access): to actually move to
+  `pto-optimizer.app` later, in the Vercel dashboard: Project → Settings → Domains → Add
+  `pto-optimizer.app`, set it as the Primary domain (this makes Vercel 301 the
+  `pto-optimizer-seven.vercel.app` host to it automatically), then set the `SITE_URL`
+  environment variable (Project → Settings → Environment Variables) to
+  `https://pto-optimizer.app` and redeploy. Until then, nothing else needs to change.
+
 ## Questions for Atiyk
 
-(none yet — will accumulate here as phases proceed)
+- None blocking. One FYI: `pto-optimizer.app` has no DNS record at all right now — not a
+  reachability issue from this sandbox, a genuinely unregistered-or-unconfigured domain.
+  Decided conservatively to default `SITE_URL` to the live Vercel URL (see Phase 1 above);
+  flip it with one env var once the domain is pointed at Vercel.

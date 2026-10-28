@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "postbuild": "tsx --tsconfig tsconfig.app.json scripts/prerender.ts",
+    "postbuild": "tsx --tsconfig tsconfig.app.json scripts/prerender.ts && tsx --tsconfig tsconfig.app.json scripts/build-seo-files.ts",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "NODE_OPTIONS=--no-experimental-webstorage vitest run",

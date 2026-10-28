@@ -13,7 +13,7 @@
       name="description"
       content="See your next day off, every holiday left this year, and the closest long weekend &mdash; then plan ordinary time off or a sabbatical. Free, no sign-up."
     />
-    <link rel="canonical" href="https://pto-optimizer.app/" />
+    <link rel="canonical" href="%SITE_URL%/" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Days Off" />
@@ -22,8 +22,8 @@
       property="og:description"
       content="See your next day off, every holiday left this year, and the closest long weekend &mdash; then plan ordinary time off or a sabbatical. Free, no sign-up."
     />
-    <meta property="og:url" content="https://pto-optimizer.app/" />
-    <meta property="og:image" content="https://pto-optimizer.app/og-image.png" />
+    <meta property="og:url" content="%SITE_URL%/" />
+    <meta property="og:image" content="%SITE_URL%/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="A calendar showing 15 PTO days turned into 32 days off, with suggested PTO days highlighted around weekends and holidays." />
@@ -34,7 +34,7 @@
       name="twitter:description"
       content="See your next day off, every holiday left this year, and the closest long weekend &mdash; then plan ordinary time off or a sabbatical. Free, no sign-up."
     />
-    <meta name="twitter:image" content="https://pto-optimizer.app/og-image.png" />
+    <meta name="twitter:image" content="%SITE_URL%/og-image.png" />
 
     <!-- Migration (site restructure): the optimizer used to live at "/" - every link anyone
          has ever shared points here, carrying its state in the query string. The landing
@@ -65,7 +65,7 @@
 
     <!-- Cookieless analytics (Plausible) - no cookies, no cross-site identifiers, no
          consent banner required. See src/ui/analytics.ts for the six tracked events. -->
-    <script defer data-domain="pto-optimizer.app" src="https://plausible.io/js/script.js"></script>
+    <script defer data-domain="%SITE_HOST%" src="https://plausible.io/js/script.js"></script>
   </head>
   <body>
     <div id="root"></div>
