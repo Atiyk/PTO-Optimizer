@@ -13,7 +13,7 @@ after a restart or context compaction.
 | 2 — Holiday data foundation | `phase-2-holiday-data` | done | [#23](https://github.com/Atiyk/PTO-Optimizer/pull/23) |
 | 3 — Sabbatical correctness | `phase-3-sabbatical-correctness` | done | [#24](https://github.com/Atiyk/PTO-Optimizer/pull/24) |
 | 4 — Sabbatical UX & features | `phase-4-sabbatical-ux` | done | [#25](https://github.com/Atiyk/PTO-Optimizer/pull/25) |
-| 5 — Landing page rebuild | `phase-5-landing` | done | (pending) |
+| 5 — Landing page rebuild | `phase-5-landing` | done | [#26](https://github.com/Atiyk/PTO-Optimizer/pull/26) |
 | 6 — Site-wide hygiene | `phase-6-hygiene` | not started | |
 | 7 — PWA (if time remains) | `phase-7-pwa` | not started | |
 
