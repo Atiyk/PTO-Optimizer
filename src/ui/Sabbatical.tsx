@@ -11,9 +11,9 @@ import { todayISO } from './useAppState';
 import { addDays, mondayIndexedDow } from '../solver/dateUtils';
 import { formatLong, formatShort } from './dateFormat';
 import { DEFAULT_WORK_WEEK } from '../solver/types';
-import { daysBetween, isOffDay } from './landingData';
+import { isOffDay } from './landingData';
 import type { DayCategory } from './types';
-import { bestPlacements, extendSabbatical, type SabbaticalPlacement } from './sabbaticalData';
+import { bestPlacements, placementNote, paddedCalendarRange, type SabbaticalPlacement } from './sabbaticalData';
 
 const LENGTH_OPTIONS = [1, 2, 3, 4, 6, 8, 12];
 
@@ -32,7 +32,9 @@ export function Sabbatical() {
   const [ptoToAdd, setPtoToAdd] = useState(5);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const horizonEnd = addDays(eligibleFrom, 540); // ~18 months of search window
+  // 3A: 12 months from the eligible date - consistent with the committed holiday data's
+  // own range (scripts/build-holidays.ts fetches the current year plus the next two).
+  const horizonEnd = addDays(eligibleFrom, 364);
 
   // Phase 2: starts from this route's own prerendered embed (getPreloadedHolidays)
   // instead of an empty list - this is exactly what fixes K1's "all three placements are
@@ -54,9 +56,12 @@ export function Sabbatical() {
 
   const holidaySet = useMemo(() => new Set(holidayState.holidays.map((h) => h.date)), [holidayState.holidays]);
 
-  const placements = useMemo(
-    () => bestPlacements(eligibleFrom, horizonEnd, lengthWeeks, holidaySet, DEFAULT_WORK_WEEK),
-    [eligibleFrom, horizonEnd, lengthWeeks, holidaySet],
+  // 3A/3B: ranking now uses the SAME ptoToAdd (and the SAME today floor) the hero and
+  // calendar use below - the headline and the cards can no longer disagree, because
+  // there is only one extendSabbatical call per placement, not two different budgets.
+  const { placements, anyHolidayInAnyCandidate } = useMemo(
+    () => bestPlacements(eligibleFrom, horizonEnd, lengthWeeks, ptoToAdd, holidayState.holidays, country, DEFAULT_WORK_WEEK, today),
+    [eligibleFrom, horizonEnd, lengthWeeks, ptoToAdd, holidayState.holidays, country, today],
   );
 
   useEffect(() => {
@@ -64,11 +69,6 @@ export function Sabbatical() {
   }, [eligibleFrom, lengthWeeks, country]);
 
   const selected: SabbaticalPlacement | undefined = placements[selectedIndex] ?? placements[0];
-
-  const extended = useMemo(() => {
-    if (!selected) return undefined;
-    return extendSabbatical(selected.start, selected.coreEnd, ptoToAdd, holidaySet, DEFAULT_WORK_WEEK);
-  }, [selected, ptoToAdd, holidaySet]);
 
   const coreSet = useMemo(() => {
     if (!selected) return new Set<string>();
@@ -83,20 +83,24 @@ export function Sabbatical() {
   // still plain weekends/holidays that simply happened to sit inside the wider range.
   const extendedRangeSet = useMemo(() => {
     const set = new Set<string>();
-    if (!extended || !selected) return set;
-    for (let d = extended.start; d < selected.start; d = addDays(d, 1)) set.add(d);
-    for (let d = addDays(selected.coreEnd, 1); d <= extended.end; d = addDays(d, 1)) set.add(d);
+    if (!selected) return set;
+    for (let d = selected.extendedStart; d < selected.start; d = addDays(d, 1)) set.add(d);
+    for (let d = addDays(selected.coreEnd, 1); d <= selected.extendedEnd; d = addDays(d, 1)) set.add(d);
     return set;
-  }, [extended, selected]);
+  }, [selected]);
 
   const ptoSpentSet = useMemo(
     () => new Set([...extendedRangeSet].filter((d) => !isOffDay(d, holidaySet))),
     [extendedRangeSet, holidaySet],
   );
 
-  const ptoBefore = selected ? [...ptoSpentSet].filter((d) => d < selected.start).length : 0;
-  const ptoAfter = selected ? [...ptoSpentSet].filter((d) => d > selected.coreEnd).length : 0;
-  const holidaysInsideCore = selected?.holidaysInside ?? 0;
+  // 3D/K3e: every month the trip (selected.extendedStart..extendedEnd, not just the core
+  // block) touches, plus one month of context either side - previously rangeStart was the
+  // core block's own start, so PTO days extending backward never rendered at all.
+  const calendarRange = useMemo(() => {
+    if (!selected) return null;
+    return paddedCalendarRange(selected.extendedStart, selected.extendedEnd);
+  }, [selected]);
 
   const categoryOf = (iso: string): DayCategory => {
     if (coreSet.has(iso)) return 'pinned';
@@ -169,17 +173,20 @@ export function Sabbatical() {
           </Container>
         </div>
 
-        {selected && extended ? (
+        {selected ? (
           <Container className="px-4 py-6">
+            {/* 3B: the SAME totalAwayDays the selected card shows - previously this read
+                extended.start/end from a second, independently-ptoToAdd'd extendSabbatical
+                call, so it could (and did) disagree with the card. Now there is only one
+                number, computed once, inside bestPlacements. */}
             <p className="text-2xl font-bold tabular-nums leading-snug text-slate-900 sm:text-3xl">
-              Take it from {formatLong(selected.start)} and you&apos;re away for{' '}
-              {extended ? daysBetween(extended.start, extended.end) + 1 : selected.naturalAwayDays} consecutive days.
+              Take it from {formatLong(selected.start)} and you&apos;re away for {selected.totalAwayDays} consecutive days.
             </p>
             <p className="mt-1 text-sm tabular-nums text-slate-600">
               {lengthWeeks} week{lengthWeeks === 1 ? '' : 's'} of sabbatical
-              {ptoBefore ? ` + ${ptoBefore} PTO day${ptoBefore === 1 ? '' : 's'} before` : ''}
-              {ptoAfter ? ` + ${ptoAfter} PTO day${ptoAfter === 1 ? '' : 's'} after` : ''}
-              {holidaysInsideCore ? ` + ${holidaysInsideCore} public holiday${holidaysInsideCore === 1 ? '' : 's'} inside` : ''}.
+              {selected.ptoBefore ? ` + ${selected.ptoBefore} PTO day${selected.ptoBefore === 1 ? '' : 's'} before` : ''}
+              {selected.ptoAfter ? ` + ${selected.ptoAfter} PTO day${selected.ptoAfter === 1 ? '' : 's'} after` : ''}
+              {selected.holidayNames.length ? ` + ${selected.holidayNames.length} public holiday${selected.holidayNames.length === 1 ? '' : 's'} inside` : ''}.
             </p>
             {prerenderedAt && (
               <p className="mt-1 text-xs text-slate-400">
@@ -199,41 +206,50 @@ export function Sabbatical() {
           {/* 1. Best placements. */}
           <section>
             <h2 className="mb-2 text-sm font-semibold text-slate-700">Best placements</h2>
+            {/* 3A: said once, here, rather than on every card - a card with no holidays
+                inside next to one that has some would otherwise read as a missing feature
+                rather than an honest "no holiday happens to fall in THIS window." */}
+            {!anyHolidayInAnyCandidate && placements.length > 0 && (
+              <p className="mb-2 text-xs text-slate-500">
+                No window in the next year puts a public holiday inside a {lengthWeeks}-week block. These are ranked by what sits next to
+                it instead.
+              </p>
+            )}
             <div className="flex flex-col gap-2 sm:flex-row">
               {placements.map((p, i) => (
                 <button
                   key={p.start}
                   type="button"
                   onClick={() => setSelectedIndex(i)}
+                  aria-pressed={i === selectedIndex}
                   className={`flex-1 rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
                     i === selectedIndex ? 'border-slate-900 bg-slate-50' : 'border-slate-200 bg-white hover:bg-slate-50'
                   }`}
                 >
-                  <span className="block font-medium tabular-nums text-slate-900">
-                    {formatShort(p.start)} &rarr; {p.naturalAwayDays} days away
-                  </span>
-                  <span className="mt-0.5 block text-xs text-slate-500">{p.note}</span>
+                  <span className="block font-medium tabular-nums text-slate-900">{formatShort(p.start)}</span>
+                  <span className="mt-0.5 block text-xs text-slate-500">{placementNote(p)}</span>
                 </button>
               ))}
             </div>
           </section>
 
           {/* 3. The extension tradeoff - marginal return. */}
-          {extended && (
+          {selected && (
             <section className="border-t border-slate-200 pt-6">
               <h2 className="mb-1 text-sm font-semibold text-slate-700">What each added PTO day buys</h2>
-              <p className="text-sm text-slate-600">{marginalReturnText(extended.marginal)}</p>
+              <p className="text-sm text-slate-600">{marginalReturnText(selected.marginal)}</p>
             </section>
           )}
 
           {/* 2. Calendar - the same component as /pto, the block rendered distinctly
               ('pinned', the same treatment /pto uses for a forced-in day) from the PTO days
-              extending it ('suggested-pto'). */}
-          {selected && (
+              extending it ('suggested-pto'). 3D: every month the trip touches, plus one
+              month either side (calendarRange), not just the core block's own start. */}
+          {selected && calendarRange && (
             <section className="border-t border-slate-200 pt-6">
               <Calendar
-                rangeStart={selected.start}
-                rangeEnd={extended ? extended.end : selected.coreEnd}
+                rangeStart={calendarRange.start}
+                rangeEnd={calendarRange.end}
                 weekStart={1}
                 today={today}
                 offRuns={[]}
@@ -308,6 +324,10 @@ function SabbaticalFAQ() {
     {
       q: 'How long do sabbaticals usually run?',
       a: 'Lengths vary widely by employer and industry, from a few weeks to several months - there’s no single standard, so this tool lets you set any length rather than assuming one.',
+    },
+    {
+      q: 'Can my added PTO days land before my eligibility date?',
+      a: 'Yes - PTO days are ordinary PTO, not part of the sabbatical itself, so they can fall before the date you become eligible to start the sabbatical block. The solver places each added day on whichever side of the block buys the most total time off, and the hero above always says which: "N before, M after."',
     },
   ];
   return (
