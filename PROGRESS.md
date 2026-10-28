@@ -12,7 +12,7 @@ after a restart or context compaction.
 | 1 — Canonical domain | `phase-1-domain` | done | [#22](https://github.com/Atiyk/PTO-Optimizer/pull/22) |
 | 2 — Holiday data foundation | `phase-2-holiday-data` | done | [#23](https://github.com/Atiyk/PTO-Optimizer/pull/23) |
 | 3 — Sabbatical correctness | `phase-3-sabbatical-correctness` | done | [#24](https://github.com/Atiyk/PTO-Optimizer/pull/24) |
-| 4 — Sabbatical UX & features | `phase-4-sabbatical-ux` | not started | |
+| 4 — Sabbatical UX & features | `phase-4-sabbatical-ux` | done | (pending) |
 | 5 — Landing page rebuild | `phase-5-landing` | not started | |
 | 6 — Site-wide hygiene | `phase-6-hygiene` | not started | |
 | 7 — PWA (if time remains) | `phase-7-pwa` | not started | |
@@ -215,6 +215,71 @@ after a restart or context compaction.
   (re-ranking on a `ptoToAdd` change can now reorder which placement index 0 refers to -
   not a regression from this phase specifically, since ranking was never PTO-aware
   before, but worth flagging now that it visibly can reorder).
+
+## Phase 4 findings
+
+- **4A (visual marginal bars)**: new `MarginalBars` component - one bar per budget day
+  (1-15 shown), height-encoded (not colour-encoded, greyscale-legible), the bar at the
+  CURRENT PTO+unpaid slider position rendered darkest. The data-driven callout text
+  (`marginalReturnText`, grouping contiguous equal gains into sentences like "Day 1 adds 1
+  day away. ... Day 5 adds 3 days away.") already existed from Phase 3 and needed no
+  rewrite - it was already computed from data, never fixed copy; only its field name
+  changed (`ptoUsed` → `daysUsed`, since a "day" can now be PTO or unpaid).
+- **4B smaller items**:
+  - K3f fixed: removed the second "Country" label wrapping `CountrySelect` (it renders
+    its own).
+  - Sabbatical length is now a number input with steppers, 1-52 weeks, no submit, live.
+  - Placement cards are a real `role="radiogroup"`/`role="radio"` with `aria-checked` -
+    verified live, selecting one visibly updates the hero/calendar and the correct card
+    shows `aria-checked="true"`.
+  - Full URL round-trip: new `src/ui/sabbaticalUrlState.ts` (`c`, `len`, `s`, `pto`,
+    `unpaid`, `sel`), wired the same way `useAppState.ts` syncs `/pto`'s URL. Verified
+    live: changing any control updates the address bar; `sel` is the placement's own
+    start DATE, not a list index, so re-ranking (e.g. moving the PTO or unpaid slider)
+    can't silently point the selection at a different window than the one actually
+    picked - it falls back to the top-ranked placement instead when the previously
+    selected date drops out of the top 3 (verified live: switching to 2 weeks unpaid
+    re-ranked the list and correctly fell back). 8 new tests in
+    `sabbaticalUrlState.test.ts`.
+  - Export row added: "Add to calendar (.ics)" (new `generateSabbaticalICS`/
+    `downloadSabbaticalICS` in `icsExport.ts`, reusing that file's own RFC 5545 helpers -
+    one event spanning the whole trip, not per-day, since a sabbatical is booked as a
+    single block), "Copy as image" (reuses `copyCanvasImage`/`SHARE_IMAGE_WIDTH/HEIGHT`
+    from `imageExport.ts`), "Copy link" (reuses `copyText` from `requestText.ts`).
+    **Scoped down, flagged**: this is NOT the `ExportBar` component reused wholesale -
+    that component is built around /pto's `Break[]`/budget-spent/percentile model, which
+    doesn't fit one contiguous block. Reused the underlying correctness primitives
+    instead of the component. Verified live: ICS download and image-copy trigger with no
+    console errors; "Copy link"'s clipboard write couldn't be definitively confirmed in
+    the headless browser (no visible "Copied!" flash within the check window) - likely a
+    sandboxed-browser clipboard-permission limitation (the identical `copyText` helper is
+    already used, unmodified, by `/pto`'s own working "Copy link"/"Share with a partner"
+    buttons), not a new bug, but flagged rather than assumed.
+- **4C (unpaid leave)**: new input "Unpaid leave to add: [ N ] weeks". `extendSabbatical`
+  now takes both `ptoToAdd` and `unpaidToAdd`, spends PTO first (the limited/precious
+  resource) then unpaid, and returns `spentDays: {date, kind}[]` so the calendar can mark
+  each day exactly. New `DayCategory` value `'unpaid-leave'`, rendered with its own glyph
+  (`UnpaidIcon`, an open ring) beside the numeral - same fill/border as PTO, NOT a third
+  colour, matching this calendar's own documented two-colour-role design constraint
+  (see `DayCell.tsx`'s comment on `isPtoLike`). Verified live end to end via the DOM's own
+  `aria-label`s, not just a screenshot: with 5 PTO + 2 unpaid weeks selected, the hero
+  correctly read "4 weeks of sabbatical + 2 weeks unpaid + 4 PTO days before + 1 PTO day
+  after + 14 unpaid days after + 1 public holiday inside", and the calendar's individual
+  days matched exactly (PTO spent first immediately after the core block, unpaid only
+  once PTO ran out). New `SabbaticalLegend` (reuses `PinIcon`/`UnpaidIcon`/`COLORS`
+  directly, so it can never describe a treatment the calendar doesn't have).
+- **Tests**: `sabbaticalData.test.ts` extended with unpaid-leave cases (PTO-spent-first
+  ordering, unpaid-only budget). New `sabbaticalUrlState.test.ts`. All pass.
+- **Test/tsc/build**: `npx tsc -b --force` (the REAL composite check - plain
+  `tsc --noEmit` on this repo's root tsconfig checks nothing at all, since it has
+  `files: []`; this was a mistake caught mid-phase by actually reading the exit code
+  rather than assuming a clean run, consistent with CLAUDE.md's own documented warning
+  about this exact gotcha) clean. `npm run build` clean. `npm test`: 429/429 - every test
+  passed this run, including the K9 baseline timing tests (they're flaky, not reliably
+  failing - this run simply didn't trip them).
+- **Screenshots**: `docs/screenshots/phase-4/` - default, PTO 0/5/10, and unpaid-leave-set,
+  at 1440/768/375px. Mobile layout checked directly via `resize_window` + screenshot, not
+  assumed from the desktop layout.
 
 ## Questions for Atiyk
 
