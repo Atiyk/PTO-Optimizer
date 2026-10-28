@@ -42,6 +42,17 @@ export function PinIcon({ className }: { className?: string }) {
   );
 }
 
+/** Phase 4C: marks an 'unpaid-leave' day beside its numeral, the same way PinIcon marks
+ * 'pinned' - a shape, not a third fill colour (see the comment above categoryClasses). An
+ * open ring reads distinctly from the solid pin glyph at cell size. */
+export function UnpaidIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <circle cx="8" cy="8" r="5.25" />
+    </svg>
+  );
+}
+
 function formatMonthDay(iso: string): string {
   const MONTHS = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -67,6 +78,8 @@ function stateLabel(category: DayCategory, isAlternative: boolean, isBlackout: b
       return 'suggested PTO day';
     case 'pinned':
       return 'pinned by you';
+    case 'unpaid-leave':
+      return 'unpaid leave day';
     case 'public-holiday':
       return 'public holiday';
     case 'weekend':
@@ -155,7 +168,7 @@ export function DayCell({
   // Lighthouse, not by inspection). Outside a band, weekends stay muted; everything else
   // (holiday not in a band, working) stays TEXT_PRIMARY, matching the original intent.
   const textColor = inBand ? BAND_TEXT : category === 'weekend' ? TEXT_MUTED : TEXT_PRIMARY;
-  const isPtoLike = category === 'suggested-pto' || category === 'pinned';
+  const isPtoLike = category === 'suggested-pto' || category === 'pinned' || category === 'unpaid-leave';
   // Suggested PTO is the thing the user must act on - the strongest, most saturated
   // treatment on the page, deliberately heavier than the quiet "days off" band behind it
   // (font-bold, not font-medium - no border-weight change, which DayCell.test.tsx already
@@ -227,6 +240,11 @@ export function DayCell({
           <span className="flex items-center gap-0.5">
             {dayOfMonth}
             <PinIcon className="h-3 w-3" />
+          </span>
+        ) : !isOutOfRange && category === 'unpaid-leave' ? (
+          <span className="flex items-center gap-0.5">
+            {dayOfMonth}
+            <UnpaidIcon className="h-3 w-3" />
           </span>
         ) : (
           dayOfMonth

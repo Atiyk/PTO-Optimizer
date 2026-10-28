@@ -34,19 +34,21 @@ export interface SabbaticalPlacement {
    * after" (3B). */
   ptoBefore: number;
   ptoAfter: number;
-  /** The same per-PTO-day marginal curve extendSabbatical returns, carried through so
-   * Sabbatical.tsx's "what each added day buys" section never needs its own second
-   * extendSabbatical call (which would risk computing a different number than the one
-   * that drove this placement's own totalAwayDays). */
-  marginal: { ptoUsed: number; awayDays: number }[];
-}
-
-function countWorkingDays(start: string, end: string, holidaySet: ReadonlySet<string>, workWeek: WorkWeek): number {
-  let count = 0;
-  for (let d = start; d <= end; d = addDays(d, 1)) {
-    if (!isOffDay(d, holidaySet, workWeek)) count++;
-  }
-  return count;
+  /** Phase 4C: how many of the user's UNPAID leave days land before/after the core
+   * block - tracked separately from PTO because the tradeoff is financial, not budget. */
+  unpaidBefore: number;
+  unpaidAfter: number;
+  /** Every individual working day the extension actually spent (PTO budget first, then
+   * unpaid - see extendSabbatical), with which budget paid for it - Sabbatical.tsx reads
+   * this directly to categorize each calendar day exactly, rather than re-deriving
+   * pto-vs-unpaid from counts alone. */
+  spentDays: { date: string; kind: 'pto' | 'unpaid' }[];
+  /** The same per-day marginal curve extendSabbatical returns (budget days used, PTO
+   * then unpaid, combined), carried through so Sabbatical.tsx's "what each added day
+   * buys" section never needs its own second extendSabbatical call (which would risk
+   * computing a different number than the one that drove this placement's own
+   * totalAwayDays). */
+  marginal: { daysUsed: number; awayDays: number }[];
 }
 
 function travelTagFor(start: string, end: string, countryCode: string | undefined): SabbaticalPlacement['travelTag'] {
@@ -62,17 +64,30 @@ function travelTagFor(start: string, end: string, countryCode: string | undefine
   return null;
 }
 
+export interface ExtendSabbaticalResult {
+  start: string;
+  end: string;
+  marginal: { daysUsed: number; awayDays: number }[];
+  spentDays: { date: string; kind: 'pto' | 'unpaid' }[];
+}
+
 /**
- * Extends `[start, end]` outward using up to `ptoToAdd` PTO days, always taking a free
- * (already-off) day before spending a PTO day on a working one, and - once PTO must be
- * spent - preferring whichever side's next working-day run is shorter (reaches its next
- * free day soonest). On a tie, prefers the RIGHT (after) side (3B) - near-term PTO stays
- * unspent unless the left side genuinely buys more. This greedy is optimal for this
- * problem shape: each side is an independent, monotonically-ordered sequence of
- * free/costed days, so always taking the cheapest available next day across both
- * sequences can never do worse than any other spending order.
+ * Extends `[start, end]` outward using up to `ptoToAdd` PTO days plus `unpaidToAdd`
+ * unpaid-leave days (Phase 4C - PTO is spent first, since it's the limited/precious
+ * resource; unpaid leave only gets spent once the PTO budget is exhausted, tracked
+ * separately in `spentDays` purely for display, since the greedy choice of WHICH side to
+ * extend doesn't care why a day costs something), always taking a free (already-off) day
+ * before spending a budgeted one, and - once a day must be spent - preferring whichever
+ * side's next working-day run is shorter (reaches its next free day soonest). On a tie,
+ * prefers the RIGHT (after) side (3B) - near-term days stay unspent unless the left side
+ * genuinely buys more. This greedy is optimal for TOTAL days away for this problem shape:
+ * each side is an independent, monotonically-ordered sequence of free/costed days, so
+ * always taking the cheapest available next day across both sequences can never do worse
+ * than any other spending order - labeling the first `ptoToAdd` of those spent days as
+ * 'pto' and the rest as 'unpaid' doesn't change which days get spent, only how they're
+ * accounted for afterward.
  *
- * `minStart`, when given, is a hard floor the left edge may never cross - even with PTO
+ * `minStart`, when given, is a hard floor the left edge may never cross - even with
  * budget still unspent (3B/K3b: extension used to be able to walk left past both
  * eligibility and the real calendar date "today", landing partly in the past). Atiyk's
  * call: PTO is allowed to land before `eligibleFrom` (it's ordinary PTO), so callers pass
@@ -82,19 +97,22 @@ export function extendSabbatical(
   start: string,
   end: string,
   ptoToAdd: number,
+  unpaidToAdd: number,
   holidaySet: ReadonlySet<string>,
   workWeek: WorkWeek = DEFAULT_WORK_WEEK,
   minStart?: string,
   maxLookahead = 400,
-): { start: string; end: string; marginal: { ptoUsed: number; awayDays: number }[] } {
+): ExtendSabbaticalResult {
   let left = start;
   let right = end;
-  let ptoUsed = 0;
+  let daysUsed = 0;
+  const totalBudget = ptoToAdd + unpaidToAdd;
+  const spentDays: { date: string; kind: 'pto' | 'unpaid' }[] = [];
   const totalDays = () => daysBetween(left, right) + 1;
   const free = (iso: string) => isOffDay(iso, holidaySet, workWeek);
 
   /** How many consecutive working (non-free) days sit immediately beyond `edge`, in
-   * `direction`, before the first free day - the PTO cost to "break through" to it. */
+   * `direction`, before the first free day - the budget cost to "break through" to it. */
   function runCost(edge: string, direction: 1 | -1): number {
     let d = edge;
     let cost = 0;
@@ -108,8 +126,9 @@ export function extendSabbatical(
 
   /** Absorbs every immediately-adjacent free day on both sides, spending no budget,
    * until neither side has one left - run once before the baseline is recorded (so the
-   * 0-PTO baseline reflects the block's TRUE natural extent, 3C/K3c) and again after each
-   * paid day (so a day that unlocks a free day right next to it gets credit for both). */
+   * 0-budget baseline reflects the block's TRUE natural extent, 3C/K3c) and again after
+   * each paid day (so a day that unlocks a free day right next to it gets credit for
+   * both). */
   function mergeFree(): void {
     for (let i = 0; i < maxLookahead; i++) {
       const leftNext = addDays(left, -1);
@@ -129,22 +148,28 @@ export function extendSabbatical(
   }
 
   mergeFree();
-  const marginal: { ptoUsed: number; awayDays: number }[] = [{ ptoUsed: 0, awayDays: totalDays() }];
+  const marginal: { daysUsed: number; awayDays: number }[] = [{ daysUsed: 0, awayDays: totalDays() }];
 
   for (let i = 0; i < maxLookahead; i++) {
-    if (ptoUsed >= ptoToAdd) break;
+    if (daysUsed >= totalBudget) break;
     const leftNext = addDays(left, -1);
     const leftBlocked = minStart !== undefined && leftNext < minStart;
     const leftCost = leftBlocked ? Infinity : runCost(left, -1);
     const rightCost = runCost(right, 1);
-    if (rightCost <= leftCost) right = addDays(right, 1);
-    else left = leftNext;
-    ptoUsed++;
+    const kind = daysUsed < ptoToAdd ? 'pto' : 'unpaid';
+    if (rightCost <= leftCost) {
+      right = addDays(right, 1);
+      spentDays.push({ date: right, kind });
+    } else {
+      left = leftNext;
+      spentDays.push({ date: left, kind });
+    }
+    daysUsed++;
     mergeFree();
-    marginal.push({ ptoUsed, awayDays: totalDays() });
+    marginal.push({ daysUsed, awayDays: totalDays() });
   }
 
-  return { start: left, end: right, marginal };
+  return { start: left, end: right, marginal, spentDays };
 }
 
 function firstOfMonth(iso: string): string {
@@ -209,6 +234,7 @@ export function bestPlacements(
   eligibleTo: string,
   lengthWeeks: number,
   ptoToAdd: number,
+  unpaidWeeksToAdd: number,
   holidays: Holiday[],
   countryCode: string | undefined,
   workWeek: WorkWeek = DEFAULT_WORK_WEEK,
@@ -216,6 +242,7 @@ export function bestPlacements(
 ): BestPlacementsResult {
   const holidaySet = new Set(holidays.map((h) => h.date));
   const lengthDays = lengthWeeks * 7;
+  const unpaidToAdd = unpaidWeeksToAdd * 7;
   const candidates: SabbaticalPlacement[] = [];
   let d = eligibleFrom;
   // Walk to the first Monday at or after eligibleFrom.
@@ -230,10 +257,10 @@ export function bestPlacements(
       if (match) holidayNames.push(match.name);
     }
 
-    const extended = extendSabbatical(d, coreEnd, ptoToAdd, holidaySet, workWeek, minStart);
+    const extended = extendSabbatical(d, coreEnd, ptoToAdd, unpaidToAdd, holidaySet, workWeek, minStart);
     const totalAwayDays = daysBetween(extended.start, extended.end) + 1;
-    const ptoBefore = extended.start < d ? countWorkingDays(extended.start, addDays(d, -1), holidaySet, workWeek) : 0;
-    const ptoAfter = extended.end > coreEnd ? countWorkingDays(addDays(coreEnd, 1), extended.end, holidaySet, workWeek) : 0;
+    const before = extended.spentDays.filter((s) => s.date < d);
+    const after = extended.spentDays.filter((s) => s.date > coreEnd);
 
     candidates.push({
       start: d,
@@ -244,8 +271,11 @@ export function bestPlacements(
       travelTag: travelTagFor(d, coreEnd, countryCode),
       extendedStart: extended.start,
       extendedEnd: extended.end,
-      ptoBefore,
-      ptoAfter,
+      ptoBefore: before.filter((s) => s.kind === 'pto').length,
+      ptoAfter: after.filter((s) => s.kind === 'pto').length,
+      unpaidBefore: before.filter((s) => s.kind === 'unpaid').length,
+      unpaidAfter: after.filter((s) => s.kind === 'unpaid').length,
+      spentDays: extended.spentDays,
       marginal: extended.marginal,
     });
     d = addDays(d, 7);

@@ -14,7 +14,7 @@ const MONDAY = '2026-11-02';
 describe('extendSabbatical (3C: marginal baseline)', () => {
   it('for a Monday-start 4-week block with no nearby holidays, the baseline already absorbs the free weekend before it, and PTO days 1-5 gain [1,1,1,1,3]', () => {
     const coreEnd = addDays(MONDAY, 27); // Sunday 2026-11-29
-    const { marginal } = extendSabbatical(MONDAY, coreEnd, 5, new Set());
+    const { marginal } = extendSabbatical(MONDAY, coreEnd, 5, 0, new Set());
     expect(marginal[0].awayDays).toBe(30); // 28 core days + the Sat/Sun absorbed for free
     const gains = marginal.slice(1).map((m, i) => m.awayDays - marginal[i].awayDays);
     expect(gains).toEqual([1, 1, 1, 1, 3]);
@@ -23,14 +23,14 @@ describe('extendSabbatical (3C: marginal baseline)', () => {
   it('a holiday adjacent to the block changes the curve - the PTO day that reaches it bridges to it for free', () => {
     const coreEnd = addDays(MONDAY, 27); // Sunday 2026-11-29
     const holidaySet = new Set(['2026-12-01']); // Tuesday, one workday beyond the natural end
-    const { marginal } = extendSabbatical(MONDAY, coreEnd, 1, holidaySet);
+    const { marginal } = extendSabbatical(MONDAY, coreEnd, 1, 0, holidaySet);
     const gain = marginal[1].awayDays - marginal[0].awayDays;
     expect(gain).toBe(2); // Monday (paid) + Tuesday's holiday (free bridge)
   });
 
   it('breaks ties toward the right/after side (3B)', () => {
     const coreEnd = addDays(MONDAY, 27);
-    const { start, end } = extendSabbatical(MONDAY, coreEnd, 1, new Set());
+    const { start, end } = extendSabbatical(MONDAY, coreEnd, 1, 0, new Set());
     expect(start).toBe(addDays(MONDAY, -2)); // left only ever absorbs the free weekend, never spends
     expect(end).toBe(addDays(coreEnd, 1)); // the 1 paid day went to the right
   });
@@ -39,8 +39,28 @@ describe('extendSabbatical (3C: marginal baseline)', () => {
     const start = '2026-11-09'; // Monday
     const coreEnd = addDays(start, 6); // Sunday 2026-11-15, a 1-week block
     const floor = '2026-11-05'; // Thursday - 4 days before start
-    const { start: extStart } = extendSabbatical(start, coreEnd, 10, new Set(), DEFAULT_WORK_WEEK, floor);
+    const { start: extStart } = extendSabbatical(start, coreEnd, 10, 0, new Set(), DEFAULT_WORK_WEEK, floor);
     expect(extStart >= floor).toBe(true);
+  });
+});
+
+describe('extendSabbatical (4C: unpaid leave)', () => {
+  it('spends PTO first, then unpaid, for the days actually extended', () => {
+    const coreEnd = addDays(MONDAY, 27); // Sunday 2026-11-29
+    // Baseline already absorbs the weekend before (left edge at MONDAY-2); 1 PTO + 2
+    // unpaid days are then spent, all on the right (ties break right, nothing blocks it).
+    const { spentDays } = extendSabbatical(MONDAY, coreEnd, 1, 2, new Set());
+    expect(spentDays).toHaveLength(3);
+    expect(spentDays[0].kind).toBe('pto');
+    expect(spentDays[1].kind).toBe('unpaid');
+    expect(spentDays[2].kind).toBe('unpaid');
+  });
+
+  it('unpaid-only budget still extends the block when ptoToAdd is 0', () => {
+    const coreEnd = addDays(MONDAY, 27);
+    const { marginal, spentDays } = extendSabbatical(MONDAY, coreEnd, 0, 2, new Set());
+    expect(spentDays.every((s) => s.kind === 'unpaid')).toBe(true);
+    expect(marginal[marginal.length - 1].awayDays).toBeGreaterThan(marginal[0].awayDays);
   });
 });
 
@@ -56,6 +76,9 @@ describe('placementNote (3A)', () => {
     extendedEnd: '2027-01-19',
     ptoBefore: 2,
     ptoAfter: 1,
+    unpaidBefore: 0,
+    unpaidAfter: 0,
+    spentDays: [],
     marginal: [],
   };
 
@@ -78,8 +101,8 @@ describe('bestPlacements (3A: diversity and PTO-aware ranking)', () => {
   it('ranks by total away days WITH the given PTO budget, not the 0-PTO natural total', () => {
     const eligibleFrom = '2026-11-01';
     const eligibleTo = addDays(eligibleFrom, 364);
-    const zeroPto = bestPlacements(eligibleFrom, eligibleTo, 4, 0, [], undefined);
-    const fivePto = bestPlacements(eligibleFrom, eligibleTo, 4, 5, [], undefined);
+    const zeroPto = bestPlacements(eligibleFrom, eligibleTo, 4, 0, 0, [], undefined);
+    const fivePto = bestPlacements(eligibleFrom, eligibleTo, 4, 5, 0, [], undefined);
     // Same candidate set, but the ranked totals must differ once a PTO budget is applied -
     // this is the structural fix for the headline/card mismatch (K3a/K3b): both numbers
     // come from the exact same extendSabbatical call now, not two different budgets.
@@ -89,7 +112,7 @@ describe('bestPlacements (3A: diversity and PTO-aware ranking)', () => {
   it('never returns placements with overlapping core blocks', () => {
     const eligibleFrom = '2026-11-01';
     const eligibleTo = addDays(eligibleFrom, 364);
-    const { placements } = bestPlacements(eligibleFrom, eligibleTo, 4, 5, [], undefined);
+    const { placements } = bestPlacements(eligibleFrom, eligibleTo, 4, 5, 0, [], undefined);
     for (let i = 0; i < placements.length; i++) {
       for (let j = i + 1; j < placements.length; j++) {
         const a = placements[i];
@@ -103,7 +126,7 @@ describe('bestPlacements (3A: diversity and PTO-aware ranking)', () => {
   it('anyHolidayInAnyCandidate is false when nothing in the whole search window has a holiday inside', () => {
     const eligibleFrom = '2026-11-01';
     const eligibleTo = addDays(eligibleFrom, 364);
-    const { anyHolidayInAnyCandidate } = bestPlacements(eligibleFrom, eligibleTo, 4, 0, [], undefined);
+    const { anyHolidayInAnyCandidate } = bestPlacements(eligibleFrom, eligibleTo, 4, 0, 0, [], undefined);
     expect(anyHolidayInAnyCandidate).toBe(false);
   });
 
@@ -111,9 +134,20 @@ describe('bestPlacements (3A: diversity and PTO-aware ranking)', () => {
     const eligibleFrom = '2026-11-01';
     const eligibleTo = addDays(eligibleFrom, 364);
     const holidays = [holiday('2026-12-25', 'Christmas Day')];
-    const { anyHolidayInAnyCandidate, placements } = bestPlacements(eligibleFrom, eligibleTo, 4, 0, holidays, 'US');
+    const { anyHolidayInAnyCandidate, placements } = bestPlacements(eligibleFrom, eligibleTo, 4, 0, 0, holidays, 'US');
     expect(anyHolidayInAnyCandidate).toBe(true);
     expect(placements.some((p) => p.holidayNames.includes('Christmas Day'))).toBe(true);
+  });
+
+  it('(4C) an unpaid-leave budget extends placements further, and unpaidBefore/After count only unpaid days', () => {
+    const eligibleFrom = '2026-11-01';
+    const eligibleTo = addDays(eligibleFrom, 364);
+    const noUnpaid = bestPlacements(eligibleFrom, eligibleTo, 4, 0, 0, [], undefined);
+    const twoWeeksUnpaid = bestPlacements(eligibleFrom, eligibleTo, 4, 0, 2, [], undefined);
+    expect(twoWeeksUnpaid.placements[0].totalAwayDays).toBeGreaterThan(noUnpaid.placements[0].totalAwayDays);
+    const top = twoWeeksUnpaid.placements[0];
+    expect(top.unpaidBefore + top.unpaidAfter).toBeGreaterThan(0);
+    expect(top.ptoBefore + top.ptoAfter).toBe(0); // ptoToAdd was 0 - nothing should be PTO
   });
 });
 
