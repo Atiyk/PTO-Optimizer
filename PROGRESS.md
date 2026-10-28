@@ -11,7 +11,7 @@ after a restart or context compaction.
 | 0 — Preflight & baseline | `phase-0-baseline` | done | [#21](https://github.com/Atiyk/PTO-Optimizer/pull/21) |
 | 1 — Canonical domain | `phase-1-domain` | done | [#22](https://github.com/Atiyk/PTO-Optimizer/pull/22) |
 | 2 — Holiday data foundation | `phase-2-holiday-data` | done | [#23](https://github.com/Atiyk/PTO-Optimizer/pull/23) |
-| 3 — Sabbatical correctness | `phase-3-sabbatical-correctness` | done | (pending) |
+| 3 — Sabbatical correctness | `phase-3-sabbatical-correctness` | done | [#24](https://github.com/Atiyk/PTO-Optimizer/pull/24) |
 | 4 — Sabbatical UX & features | `phase-4-sabbatical-ux` | not started | |
 | 5 — Landing page rebuild | `phase-5-landing` | not started | |
 | 6 — Site-wide hygiene | `phase-6-hygiene` | not started | |
