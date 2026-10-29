@@ -612,7 +612,18 @@ export function useAppState() {
   // render that updates the calendar and break list - the score line may lag the rest of
   // the UI by a moment on a large range, which is a far better trade than the whole page
   // feeling unresponsive. The computation itself is untouched; only when it runs changed.
-  const [scores, setScores] = useState<Scores | null>(null);
+  // Stage 5G fix (Feature 1, PR-C): computed synchronously on the very first render ONLY
+  // when __PTO_SSR__ is set (scripts/prerender.ts's own jsdom window, never present in the
+  // deployed HTML a real visitor's browser executes) - fixes the Travel/Efficiency scores
+  // rendering blank in every prerendered page, without touching the deferred-effect
+  // computation below that a real click still goes through. See prerender.ts's
+  // installWindow() for the full root-cause comment.
+  const [scores, setScores] = useState<Scores | null>(() => {
+    if (typeof window !== 'undefined' && (window as unknown as { __PTO_SSR__?: boolean }).__PTO_SSR__) {
+      return computeScores(solveInput, solveResult);
+    }
+    return null;
+  });
   useEffect(() => {
     if (!isValidInput) {
       setScores(lastGoodScoresRef.current);

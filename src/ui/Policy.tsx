@@ -7,7 +7,6 @@ import { DateListEditor } from './DateListEditor';
 import { Term } from './Term';
 import { track } from './analytics';
 import { geolocateCountry } from './geo';
-import { todayISO } from './useAppState';
 import { projectBalance } from '../policy/projection';
 import { generateAlerts } from '../policy/alerts';
 import { generatePolicySummary } from '../policy/summary';
@@ -84,8 +83,6 @@ function BalanceChart({ series, cap }: { series: { date: string; balance: number
  * chart) - this is the simple accrual/forfeiture timeline instead. */
 
 export function Policy() {
-  const today = todayISO();
-
   // Stage 4A follow-through (PR-C): every input below is read from the URL once on mount
   // (readPolicyStateFromURL) and written back on every change (the useEffect further down),
   // using the same conventions as src/ui/urlState.ts - a /policy link now reproduces the
