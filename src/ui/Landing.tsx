@@ -23,6 +23,10 @@ import {
   remainingHolidays,
   runLength,
 } from './landingData';
+import { projectBalance } from '../policy/projection';
+import { generatePolicySummary } from '../policy/summary';
+import { generateAlerts } from '../policy/alerts';
+import type { TimeOffPolicy } from '../policy/model';
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (
@@ -95,6 +99,33 @@ export function Landing() {
   );
 
   const ptoHref = (date?: string) => `/pto?c=${encodeURIComponent(country)}${date ? `&p=${date}` : ''}`;
+
+  // Stage 5D (Feature 1, PR-C): a real, computed plain-English summary + its top alert for
+  // a representative default policy (20 days front-loaded, capped carryover) - the same
+  // "real UI fragment, not a mock-up" pattern every other landing section already follows.
+  const understandPolicy: TimeOffPolicy = useMemo(
+    () => ({
+      unit: 'days',
+      hoursPerDay: 8,
+      accrual: { kind: 'front-loaded', amount: 20, grantDate: `${year}-01-01` },
+      planYear: { kind: 'calendar' },
+      accrualCap: 20,
+      carryover: { mode: 'capped', cap: 5 },
+      negativeBalanceAllowance: 0,
+      payoutOnLeaving: 'not-sure',
+      currentBalance: 12,
+      balanceAsOf: today,
+      plannedDays: [],
+    }),
+    [year, today],
+  );
+  const understandHorizonEnd = addDays(today, 450);
+  const understandProjection = useMemo(() => projectBalance(understandPolicy, understandHorizonEnd), [understandPolicy, understandHorizonEnd]);
+  const understandSummary = useMemo(() => generatePolicySummary(understandPolicy), [understandPolicy]);
+  const understandAlert = useMemo(
+    () => generateAlerts(understandPolicy, understandProjection.events, today, country)[0],
+    [understandPolicy, understandProjection, today, country],
+  );
 
   const exportImage = async () => {
     const canvas = document.createElement('canvas');
@@ -199,6 +230,25 @@ export function Landing() {
             <p className="mt-4 text-sm text-slate-500">
               Taking a longer break? <a href="/sabbatical" className="underline hover:text-slate-700">Sabbatical Planning &rarr;</a>
             </p>
+          </section>
+
+          {/* 3.5. Understand - Stage 5D (Feature 1, PR-C): small label, heading, one or two
+              sentences, a REAL computed UI fragment (not a mock-up), same pattern as every
+              other section here. */}
+          <section className="flex flex-col gap-2 border-t border-slate-200 pt-6">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Understand</p>
+            <h2 className="text-sm font-semibold text-slate-700">Know what your policy actually means.</h2>
+            <p className="text-sm text-slate-600">
+              Describe your PTO policy once, in plain terms, and see exactly how fast you earn days, when you&apos;d
+              hit a cap, and what you&apos;d lose at reset.
+            </p>
+            <div className="mt-1 rounded-md border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm text-slate-800">{understandSummary[0]}</p>
+              {understandAlert && <p className="mt-2 text-sm text-amber-800">{understandAlert.text}</p>}
+            </div>
+            <a href="/policy" className="w-fit text-sm font-medium text-slate-900 underline">
+              Your Policy, in plain English &rarr;
+            </a>
           </section>
 
           {/* 4. Every remaining day off. */}
