@@ -210,6 +210,17 @@ function installWindow(url: string, countryPreset?: string): void {
     [ssrCountry]: loadStaticHolidaysForSsr(ssrCountry),
   };
   (win as unknown as { __PTO_PRERENDERED_AT__?: string }).__PTO_PRERENDERED_AT__ = PRERENDERED_AT;
+  // Stage 5G fix (Feature 1, PR-C): the Travel/Efficiency scores rendered blank ("—") in
+  // every prerendered /pto page. Root cause: useAppState.ts deliberately computes them in a
+  // useEffect, deferred past first paint (a real Phase 5 performance fix - computing them
+  // synchronously on every input change made a full-year calendar feel frozen on a real
+  // click). renderToString runs no effects at all, so the deferred computation never ran -
+  // the prerendered snapshot always showed the pre-effect "null" state. This flag, set ONLY
+  // here (never present in the deployed HTML's own script, so a real visitor's browser never
+  // sees it), lets useAppState.ts compute them synchronously just for this one-time Node
+  // render - a one-off blocking cost that's irrelevant outside a live browser click, and
+  // never present for a real user's actual interaction.
+  (win as unknown as { __PTO_SSR__?: boolean }).__PTO_SSR__ = true;
 }
 
 // A window must exist BEFORE these are even imported, in case anything in their import
