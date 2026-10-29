@@ -85,7 +85,9 @@ export function writeSliderStateToURL(params: URLSearchParams, state: SliderURLS
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Rejects malformed strings and calendar dates that don't round-trip (e.g. month 13, Feb 30). */
-function isValidISODate(s: string): boolean {
+/** Exported (Feature 1, PR-C): src/ui/policyUrlState.ts reuses this instead of a second
+ * ISO-date validity check. */
+export function isValidISODate(s: string): boolean {
   if (!DATE_RE.test(s)) return false;
   const [y, m, d] = s.split('-').map(Number);
   if (m < 1 || m > 12 || d < 1 || d > 31) return false;
