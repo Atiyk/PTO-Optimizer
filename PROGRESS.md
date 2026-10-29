@@ -173,6 +173,9 @@ Separate run, started 2026-10-29. RUN MODE per this file's own CLAUDE.md "Unatte
 section (never merge/push-to-main/delete branches/force-push; conservative choices logged
 here under this section's own "Questions for Atiyk"). Re-read this section first if resumed.
 
+**PR-A**: [#28](https://github.com/Atiyk/PTO-Optimizer/pull/28) (draft, base
+`phase-2-holiday-data`). PR-B and PR-C not yet opened — Stages 3–6 not started.
+
 ## Base branch decision
 
 Run 1's PRs (#21–#27, phases 0–6) are **not yet merged** to `main` as of this run's start —
