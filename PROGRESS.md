@@ -726,8 +726,8 @@ section (never merge/push-to-main/delete branches/force-push; conservative choic
 here under this section's own "Questions for Atiyk"). Re-read this section first if resumed.
 
 **PR-A**: [#28](https://github.com/Atiyk/PTO-Optimizer/pull/28) (draft, base
-`phase-2-holiday-data`). **PR-B**: (being opened now, base `feature1-a-foundation`).
-PR-C not yet opened — Stage 5/6 not started.
+`phase-2-holiday-data`). **PR-B**: [#29](https://github.com/Atiyk/PTO-Optimizer/pull/29)
+(draft, base `feature1-a-foundation`). PR-C not yet opened — Stage 5/6 not started.
 
 ## Base branch decision
 
