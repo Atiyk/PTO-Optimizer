@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { SiteHeader } from './SiteHeader';
 import { Footer } from './Footer';
 import { Container } from './Container';
@@ -15,6 +15,7 @@ import { generateHRQuestions, hrQuestionsMessage } from '../policy/hrQuestions';
 import { decodeParagraph, uniqueMatchedTerms } from '../policy/decode';
 import type { AccrualMethod, CarryoverRule, PlanYear, TimeOffPolicy } from '../policy/model';
 import { copyText } from './requestText';
+import { readPolicyStateFromURL, writePolicyStateToURL, defaultPolicyURLState, type PolicyURLState } from './policyUrlState';
 
 const HORIZON_MONTHS = 18;
 
@@ -84,43 +85,52 @@ function BalanceChart({ series, cap }: { series: { date: string; balance: number
 
 export function Policy() {
   const today = todayISO();
-  const [country, setCountry] = useState<string>(() => geolocateCountry());
 
-  // Inputs — Stage 4A, grouped in handbook-reading order. No URL round-trip for these yet
-  // (flagged in PROGRESS.md as a gap: see this file's own header comment and the PR body).
-  const [accrualKind, setAccrualKind] = useState<AccrualMethod['kind']>('per-pay-period');
-  const [amount, setAmount] = useState(1.25);
-  const [frequency, setFrequency] = useState<'weekly' | 'biweekly' | 'semi-monthly' | 'monthly'>('monthly');
-  const [payDateAnchor, setPayDateAnchor] = useState(today);
-  const [grantDate, setGrantDate] = useState(today);
-  const [hourlyRate, setHourlyRate] = useState(0.0577);
-  const [typicalWeeklyHours, setTypicalWeeklyHours] = useState(40);
-  const [expectedDaysPerYear, setExpectedDaysPerYear] = useState(15);
+  // Stage 4A follow-through (PR-C): every input below is read from the URL once on mount
+  // (readPolicyStateFromURL) and written back on every change (the useEffect further down),
+  // using the same conventions as src/ui/urlState.ts - a /policy link now reproduces the
+  // exact policy described, same as every /pto link already does.
+  const initial = useMemo(
+    () => (typeof window === 'undefined' ? null : readPolicyStateFromURL(window.location.search, geolocateCountry())),
+    [],
+  );
+  const d = useMemo(() => initial ?? { ...defaultPolicyURLState(), country: geolocateCountry() }, [initial]);
 
-  const [planYearKind, setPlanYearKind] = useState<PlanYear['kind']>('calendar');
-  const [anniversaryStart, setAnniversaryStart] = useState(today);
-  const [customResetDate, setCustomResetDate] = useState(`${today.slice(0, 4)}-12-31`);
+  const [country, setCountry] = useState<string>(d.country);
 
-  const [accrualCapEnabled, setAccrualCapEnabled] = useState(true);
-  const [accrualCap, setAccrualCap] = useState(20);
+  const [accrualKind, setAccrualKind] = useState<AccrualMethod['kind']>(d.accrualKind);
+  const [amount, setAmount] = useState(d.amount);
+  const [frequency, setFrequency] = useState<'weekly' | 'biweekly' | 'semi-monthly' | 'monthly'>(d.frequency);
+  const [payDateAnchor, setPayDateAnchor] = useState(d.payDateAnchor);
+  const [grantDate, setGrantDate] = useState(d.grantDate);
+  const [hourlyRate, setHourlyRate] = useState(d.hourlyRate);
+  const [typicalWeeklyHours, setTypicalWeeklyHours] = useState(d.typicalWeeklyHours);
+  const [expectedDaysPerYear, setExpectedDaysPerYear] = useState(d.expectedDaysPerYear);
 
-  const [carryoverMode, setCarryoverMode] = useState<CarryoverRule['mode']>('capped');
-  const [carryoverCap, setCarryoverCap] = useState(5);
-  const [carryoverUseByEnabled, setCarryoverUseByEnabled] = useState(false);
-  const [carryoverUseBy, setCarryoverUseBy] = useState(`${today.slice(0, 4)}-03-31`);
+  const [planYearKind, setPlanYearKind] = useState<PlanYear['kind']>(d.planYearKind);
+  const [anniversaryStart, setAnniversaryStart] = useState(d.anniversaryStart);
+  const [customResetDate, setCustomResetDate] = useState(d.customResetDate);
 
-  const [waitingPeriodEnabled, setWaitingPeriodEnabled] = useState(false);
-  const [waitingPeriodDays, setWaitingPeriodDays] = useState(90);
+  const [accrualCapEnabled, setAccrualCapEnabled] = useState(d.accrualCapEnabled);
+  const [accrualCap, setAccrualCap] = useState(d.accrualCap);
 
-  const [negativeBalanceAllowance, setNegativeBalanceAllowance] = useState(0);
-  const [payoutOnLeaving, setPayoutOnLeaving] = useState<TimeOffPolicy['payoutOnLeaving']>('not-sure');
+  const [carryoverMode, setCarryoverMode] = useState<CarryoverRule['mode']>(d.carryoverMode);
+  const [carryoverCap, setCarryoverCap] = useState(d.carryoverCap);
+  const [carryoverUseByEnabled, setCarryoverUseByEnabled] = useState(d.carryoverUseByEnabled);
+  const [carryoverUseBy, setCarryoverUseBy] = useState(d.carryoverUseBy);
 
-  const [currentBalance, setCurrentBalance] = useState(12);
-  const [balanceAsOf, setBalanceAsOf] = useState(today);
-  const [plannedDays, setPlannedDays] = useState<string[]>([]);
+  const [waitingPeriodEnabled, setWaitingPeriodEnabled] = useState(d.waitingPeriodEnabled);
+  const [waitingPeriodDays, setWaitingPeriodDays] = useState(d.waitingPeriodDays);
 
-  const [unit, setUnit] = useState<'days' | 'hours'>('days');
-  const [hoursPerDay, setHoursPerDay] = useState(8);
+  const [negativeBalanceAllowance, setNegativeBalanceAllowance] = useState(d.negativeBalanceAllowance);
+  const [payoutOnLeaving, setPayoutOnLeaving] = useState<TimeOffPolicy['payoutOnLeaving']>(d.payoutOnLeaving);
+
+  const [currentBalance, setCurrentBalance] = useState(d.currentBalance);
+  const [balanceAsOf, setBalanceAsOf] = useState(d.balanceAsOf);
+  const [plannedDays, setPlannedDays] = useState<string[]>(d.plannedDays);
+
+  const [unit, setUnit] = useState<'days' | 'hours'>(d.unit);
+  const [hoursPerDay, setHoursPerDay] = useState(d.hoursPerDay);
 
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pastedText, setPastedText] = useState('');
@@ -169,6 +179,28 @@ export function Policy() {
       balanceAsOf, plannedDays,
     ],
   );
+
+  // Sync every input into the shareable URL whenever it changes - same pattern
+  // useAppState.ts already uses for /pto.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    const state: PolicyURLState = {
+      unit, hoursPerDay, accrualKind, amount, frequency, payDateAnchor, grantDate, hourlyRate,
+      typicalWeeklyHours, expectedDaysPerYear, planYearKind, anniversaryStart, customResetDate,
+      accrualCapEnabled, accrualCap, carryoverMode, carryoverCap, carryoverUseByEnabled,
+      carryoverUseBy, waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance,
+      payoutOnLeaving, currentBalance, balanceAsOf, plannedDays, country,
+    };
+    writePolicyStateToURL(url.searchParams, state);
+    window.history.replaceState(null, '', url);
+  }, [
+    unit, hoursPerDay, accrualKind, amount, frequency, payDateAnchor, grantDate, hourlyRate,
+    typicalWeeklyHours, expectedDaysPerYear, planYearKind, anniversaryStart, customResetDate,
+    accrualCapEnabled, accrualCap, carryoverMode, carryoverCap, carryoverUseByEnabled,
+    carryoverUseBy, waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance,
+    payoutOnLeaving, currentBalance, balanceAsOf, plannedDays, country,
+  ]);
 
   const horizonEnd = useMemo(() => addMonthsISO(balanceAsOf, HORIZON_MONTHS), [balanceAsOf]);
   const { series, events } = useMemo(() => projectBalance(policy, horizonEnd), [policy, horizonEnd]);
