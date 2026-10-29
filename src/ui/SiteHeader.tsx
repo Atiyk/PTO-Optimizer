@@ -1,6 +1,6 @@
 import { Container } from './Container';
 
-export type SiteRoute = 'landing' | 'pto' | 'sabbatical';
+export type SiteRoute = 'landing' | 'pto' | 'sabbatical' | 'policy' | 'glossary';
 
 interface SiteHeaderProps {
   active: SiteRoute;
@@ -33,6 +33,14 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           </a>
           <a href="/sabbatical" className={linkClass('sabbatical')} aria-current={active === 'sabbatical' ? 'page' : undefined}>
             Sabbatical Planning
+          </a>
+          {/* Feature 1, PR-B: added so /policy and /glossary are reachable at all - not yet
+           * grouped into "Plan"/"Understand" sections (Stage 5C, PR-C's own nav work). */}
+          <a href="/policy" className={linkClass('policy')} aria-current={active === 'policy' ? 'page' : undefined}>
+            Your Policy
+          </a>
+          <a href="/glossary" className={linkClass('glossary')} aria-current={active === 'glossary' ? 'page' : undefined}>
+            Glossary
           </a>
         </nav>
       </Container>
