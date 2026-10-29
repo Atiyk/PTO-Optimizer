@@ -149,7 +149,15 @@ export function toLegacySolverFields(
   // falls) — not yet needed by any case handled today.
   _rangeStart: ISODate,
 ): { budget: number; accrualPerMonth?: number; expiryDate?: ISODate; carryoverCap?: number } {
-  const budget =
+  // /pto's `budget` is a CAP the balance accrues toward, independent of the accrual rate
+  // (a user can set accrualPerMonth=1.25 with budget=20 even though 1.25*12=15 — the extra
+  // headroom is real: a starting balance, a mid-year bump, etc.). So when the policy states
+  // an explicit accrualCap, that IS /pto's budget; only fall back to deriving a figure from
+  // the accrual method itself (amount * periods/year) when no cap was given at all — found
+  // this distinction while actually wiring /pto onto this function (see useAppState.ts);
+  // the earlier version of this function always derived budget from the accrual amount,
+  // which silently discarded the cap whenever the two weren't equal.
+  const derivedBudget =
     policy.accrual.kind === 'front-loaded'
       ? policy.accrual.amount
       : policy.accrual.kind === 'per-pay-period'
@@ -157,6 +165,7 @@ export function toLegacySolverFields(
         : policy.accrual.kind === 'per-hour-worked'
           ? (policy.accrual.rate * policy.accrual.typicalWeeklyHours * 52) / policy.hoursPerDay
           : policy.accrual.expectedDaysPerYear;
+  const budget = policy.accrualCap ?? derivedBudget;
 
   const accrualPerMonth =
     policy.accrual.kind === 'per-pay-period'
@@ -169,6 +178,43 @@ export function toLegacySolverFields(
   const carryoverCap = policy.carryover.mode === 'capped' ? policy.carryover.cap : policy.carryover.mode === 'all' ? undefined : 0;
 
   return { budget, accrualPerMonth, expiryDate, carryoverCap };
+}
+
+/**
+ * The reverse direction (Stage 2A follow-through, PR-B): builds the TimeOffPolicy shape
+ * that today's flat /pto accrual fields (urlState.ts's ac/am/ex/xd/cc, read into
+ * useAppState.ts's accrualEnabled/accrualPerMonth/expiryEnabled/expiryDate/carryoverCap)
+ * already describe, so useAppState.ts can route its solver-input construction through this
+ * shared model instead of its own parallel ternary logic. `budget` becomes the policy's
+ * `accrualCap` (not the accrual amount — see the comment on `derivedBudget` above), so
+ * `toLegacySolverFields(policyFromLegacyPtoState(...), rangeStart).budget` always equals
+ * the `budget` passed in here, for every combination of these fields. Verified by
+ * `src/ui/pto-policy-regression.test.ts`.
+ */
+export function policyFromLegacyPtoState(fields: {
+  budget: number;
+  accrualEnabled: boolean;
+  accrualPerMonth: number;
+  expiryEnabled: boolean;
+  expiryDate?: ISODate;
+  carryoverCap: number;
+  rangeStart: ISODate;
+}): TimeOffPolicy {
+  return {
+    unit: 'days',
+    hoursPerDay: 8,
+    accrual: fields.accrualEnabled
+      ? { kind: 'per-pay-period', amount: fields.accrualPerMonth, frequency: 'monthly', payDateAnchor: fields.rangeStart }
+      : { kind: 'front-loaded', amount: fields.budget, grantDate: fields.rangeStart },
+    accrualCap: fields.budget,
+    planYear: fields.expiryEnabled && fields.expiryDate ? { kind: 'custom', resetDate: fields.expiryDate } : { kind: 'calendar' },
+    carryover: fields.expiryEnabled ? { mode: 'capped', cap: fields.carryoverCap } : { mode: 'none' },
+    negativeBalanceAllowance: 0,
+    payoutOnLeaving: 'not-sure',
+    currentBalance: fields.budget,
+    balanceAsOf: fields.rangeStart,
+    plannedDays: [],
+  };
 }
 
 function periodsPerYear(frequency: 'weekly' | 'biweekly' | 'semi-monthly' | 'monthly'): number {
