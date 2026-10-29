@@ -3,7 +3,9 @@
  * import from anywhere) between scripts/prerender.ts and scripts/build-seo-files.ts, so a
  * route can't exist in the sitemap but not be prerendered, or vice versa.
  */
-export type ComponentKind = 'landing' | 'app' | 'sabbatical';
+import { GLOSSARY_TERMS } from '../src/content/glossary/terms.ts';
+
+export type ComponentKind = 'landing' | 'app' | 'sabbatical' | 'policy' | 'glossary' | 'glossary-term';
 
 export interface Entry {
   /** Path relative to dist/ of the built HTML file to inject into. */
@@ -18,6 +20,8 @@ export interface Entry {
   /** Human-readable name for the BreadcrumbList's second item - undefined on routes with no
    * second breadcrumb level (the landing page, /pto, /sabbatical). */
   countryName?: string;
+  /** Only for component === 'glossary-term': which glossary term this page renders. */
+  termId?: string;
   /** sitemap.xml priority (scripts/build-seo-files.ts) - kept on the same entry as every
    * other per-route fact so the sitemap can never list a route this file doesn't know
    * about, or vice versa. */
@@ -37,4 +41,18 @@ export const ENTRIES: Entry[] = [
   { file: 'germany/index.html', path: '/germany', component: 'app', countryPreset: 'DE', countryName: 'Germany', sitemapPriority: 0.8 },
   { file: 'ireland/index.html', path: '/ireland', component: 'app', countryPreset: 'IE', countryName: 'Ireland', sitemapPriority: 0.8 },
   { file: 'india/index.html', path: '/india', component: 'app', countryPreset: 'IN', countryName: 'India', sitemapPriority: 0.8 },
+  // Feature 1: /policy (Stage 4) and /glossary + one page per term (Stage 3C). Generated
+  // from the same GLOSSARY_TERMS array vite.config.ts and scripts/generate-glossary-html.ts
+  // read, so a term can't exist in one without existing in all three.
+  { file: 'policy/index.html', path: '/policy', component: 'policy', sitemapPriority: 0.8 },
+  { file: 'glossary/index.html', path: '/glossary', component: 'glossary', sitemapPriority: 0.6 },
+  ...GLOSSARY_TERMS.map(
+    (t): Entry => ({
+      file: `glossary/${t.id}/index.html`,
+      path: `/glossary/${t.id}`,
+      component: 'glossary-term',
+      termId: t.id,
+      sitemapPriority: 0.4,
+    }),
+  ),
 ];
