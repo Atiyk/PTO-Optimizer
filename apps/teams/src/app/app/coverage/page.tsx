@@ -99,6 +99,10 @@ export default async function CoveragePage({ searchParams }: { searchParams: Pro
               <Link className="text-accent underline" href={`/app/coverage/cover?${new URLSearchParams({ site: week.site.id, date: start }).toString()}`}>
                 Cover requests this week
               </Link>
+              {' · '}
+              <Link className="text-accent underline" href={`/app/coverage/forecast?${new URLSearchParams({ site: week.site.id }).toString()}`}>
+                Forecast, next 8 weeks
+              </Link>
             </p>
           )}
           <p className="text-xs text-muted">

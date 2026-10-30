@@ -12,6 +12,7 @@ import { findCover, getCoverRequests, getMySchedule, reportCallOff, requestCover
 import { draftRulePackFromText, explainCoverInWords, parseCoverText, saveRulePack } from './actions/coverAi';
 import { getCoverage, getCoverageSetup, getCredentials, getSickLeave, importHoursWorked, listRulePacks, manageCredentials, manageSchedule } from './actions/coverage';
 import { listMyProposals, respondToProposal, runTeamPlan, sendPlanProposals } from './actions/planner';
+import { getCoverageForecast } from './actions/forecast';
 import { decideLeaveRequest, listPendingApprovals } from './actions/approvals';
 import { explainBalance, getMyBalance } from './actions/balance';
 import { listHolidays, whoIsOut } from './actions/calendar';
@@ -79,6 +80,7 @@ export const CAPABILITIES = {
   saveRulePack,
   explainCoverInWords,
   parseCoverText,
+  getCoverageForecast,
 } as const satisfies Record<string, CapabilityDef>;
 
 export type CapabilityName = keyof typeof CAPABILITIES;

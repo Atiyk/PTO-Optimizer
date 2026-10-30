@@ -113,6 +113,7 @@ const attacks = (): [CapabilityName, unknown][] => [
   ['findCover', { locationId: A.location.id, roomId: bRoomId, date: '2026-11-09', start: '08:00', end: '12:00' }],
   ['explainCoverInWords', { locationId: B.location.id, roomId: bRoomId, date: '2026-11-09', start: '08:00', end: '12:00' }],
   ['explainCoverInWords', { locationId: A.location.id, roomId: bRoomId, date: '2026-11-09', start: '08:00', end: '12:00' }],
+  ['getCoverageForecast', { locationId: B.location.id }],
   ['requestCover', { op: 'create', locationId: B.location.id, roomId: bRoomId, date: '2026-11-09', start: '08:00', end: '12:00', idempotencyKey: 'a-attack-001' }],
   ['requestCover', { op: 'create', locationId: A.location.id, roomId: bRoomId, date: '2026-11-09', start: '08:00', end: '12:00', idempotencyKey: 'a-attack-002' }],
   ['requestCover', { op: 'create', locationId: A.location.id, roomId: bRoomId, date: '2026-11-09', start: '08:00', end: '12:00', absentMemberId: B.emp.id, idempotencyKey: 'a-attack-003' }],

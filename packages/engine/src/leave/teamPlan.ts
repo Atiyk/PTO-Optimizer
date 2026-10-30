@@ -225,6 +225,11 @@ function blocksFor(m: PlannerMember, days: readonly ISODate[]): PlannedBlock[] {
 
 // ── planner ──────────────────────────────────────────────────────────────────
 
+/** Blocks and bookable ranges for a set of planned days, for callers that drop days after planning. */
+export function planShape(m: PlannerMember, days: readonly ISODate[]): Pick<MemberPlan, 'blocks' | 'requests'> {
+  return { blocks: blocksFor(m, days), requests: requestRanges(m, days) };
+}
+
 export function planTeam(input: TeamPlanInput): TeamPlanResult {
   const clock = input.clock ?? (() => Date.now());
   const t0 = clock();
