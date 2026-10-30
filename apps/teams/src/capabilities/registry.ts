@@ -1,0 +1,77 @@
+import { z } from 'zod';
+import { auditLog } from '@/db/schema';
+import { getMyBalance } from './actions/getMyBalance';
+import { CapabilityError } from './errors';
+import type { CapabilityContext, CapabilityDef } from './types';
+
+/**
+ * R1: the single registry every surface calls (web UI server actions, REST, MCP, Slack,
+ * the in-app assistant). No surface touches the DB for business actions directly.
+ */
+export const CAPABILITIES = {
+  getMyBalance,
+} as const satisfies Record<string, CapabilityDef>;
+
+export type CapabilityName = keyof typeof CAPABILITIES;
+export type CapabilityInput<N extends CapabilityName> = z.input<(typeof CAPABILITIES)[N]['input']>;
+export type CapabilityOutput<N extends CapabilityName> = z.infer<(typeof CAPABILITIES)[N]['output']>;
+
+export function getCapability(name: string): CapabilityDef | undefined {
+  return Object.hasOwn(CAPABILITIES, name) ? (CAPABILITIES as Record<string, CapabilityDef>)[name] : undefined;
+}
+
+/**
+ * Validate → authorize → run → validate output → audit. Every surface goes through here, so
+ * agents and humans get identical permission checks, visibility rules and audit rows (R4).
+ */
+export async function invokeCapability<N extends CapabilityName>(
+  name: N,
+  ctx: CapabilityContext,
+  rawInput: unknown,
+): Promise<CapabilityOutput<N>> {
+  const cap = CAPABILITIES[name] as unknown as CapabilityDef;
+  const { actor } = ctx;
+
+  if (!actor.scopes.includes(cap.scope) || (cap.roles && (!actor.role || !cap.roles.includes(actor.role)))) {
+    await writeAudit(ctx, cap, 'denied', `Denied ${cap.name}: missing scope ${cap.scope} or role`);
+    throw new CapabilityError('forbidden', `${cap.name} requires the "${cap.scope}" scope.`);
+  }
+
+  const parsed = cap.input.safeParse(rawInput ?? {});
+  if (!parsed.success) {
+    throw new CapabilityError('invalid_input', describeZodError(cap.name, parsed.error), z.treeifyError(parsed.error));
+  }
+
+  const result = await cap.handler(ctx, parsed.data);
+  const out = cap.output.parse(result) as CapabilityOutput<N>;
+
+  if (cap.audit) await writeAudit(ctx, cap, 'ok', cap.audit(parsed.data, out));
+  return out;
+}
+
+function describeZodError(capName: string, err: z.ZodError): string {
+  const parts = err.issues.map((i) => `${i.path.join('.') || '(input)'}: ${i.message}`);
+  return `Invalid input for ${capName}. ${parts.join('; ')}`;
+}
+
+async function writeAudit(
+  ctx: CapabilityContext,
+  cap: CapabilityDef,
+  outcome: 'ok' | 'denied' | 'error',
+  summary: string,
+): Promise<void> {
+  const { actor } = ctx;
+  await ctx.db.insert(auditLog).values({
+    orgId: actor.orgId,
+    at: ctx.now,
+    actorType: actor.type,
+    actorMemberId: actor.memberId,
+    clientId: actor.clientId,
+    onBehalfOfMemberId: actor.onBehalfOfMemberId,
+    scopes: [...actor.scopes],
+    capability: cap.name,
+    effect: cap.effect,
+    outcome,
+    summary,
+  });
+}

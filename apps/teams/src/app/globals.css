@@ -1,0 +1,56 @@
+@import 'tailwindcss';
+
+/*
+ * Same visual language as Days Off (src/index.css at the repo root): two neutrals plus one
+ * deep-blue accent, light theme only, every text/background pair at WCAG AA 4.5:1 or
+ * better. Data viz must stay legible in greyscale, so state is never carried by hue alone.
+ */
+:root {
+  --bg-page: #ffffff;
+  --bg-surface: #f8fafc;
+  --bg-surface-alt: #f1f5f9;
+  --border-default: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-muted: #64748b;
+  --focus-ring: #1e3a8a;
+  --accent: #1e3a8a;
+  --accent-strong: #172554;
+  --accent-text: #ffffff;
+  --band-bg: #fef3c7;
+  --band-text: #1e293b;
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-page: var(--bg-page);
+  --color-surface: var(--bg-surface);
+  --color-surface-alt: var(--bg-surface-alt);
+  --color-line: var(--border-default);
+  --color-ink: var(--text-primary);
+  --color-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-band: var(--band-bg);
+}
+
+body {
+  margin: 0;
+  background: var(--bg-page);
+  color: var(--text-primary);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

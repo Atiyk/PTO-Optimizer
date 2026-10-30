@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 // Country landing pages (Phase 2B): each is a real static HTML file at the project root
 // (uk/index.html, canada/index.html, ...), loading the same app bundle as / but with its
@@ -30,5 +30,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: false,
+    // apps/* run their own test suites (npm run test:all); the root run is Days Off + engine.
+    exclude: [...configDefaults.exclude, 'apps/**'],
   },
 })

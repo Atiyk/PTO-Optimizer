@@ -11,3 +11,4 @@ export * from './data/usStateHolidays';
 export * from './calendar/calendarMath';
 export * from './calendar/dateFormat';
 export * from './calendar/requestDeadline';
+export * from './ledger/fixedPoint';
