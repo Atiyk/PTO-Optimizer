@@ -1882,3 +1882,52 @@ is day-level, tags instead of expiring credentials, no non-Slack staff sign-in.
 ### MVP defects fixed in this phase
 None needed. Nothing in the MVP blocks the coverage work; the gaps above are extensions,
 handled additively in Phase 1.
+
+## Phase 1: spec and domain model (`claude/rc-p1-spec`)
+
+- `docs/teams/COVERAGE-SPEC.md`: personas, entities, the required-staff computation and cover
+  ranking written out with hand-verified examples (each is a test), sick-leave accrual
+  examples, visibility, child-data and pay-rate rules, capability catalog (MCP 17 → 24),
+  acceptance, out of scope.
+- Engine (`packages/engine/src/coverage/`, pure): `timeBlocks` (DST via real UTC instants,
+  midnight-crossing shifts, part-day leave), `requiredStaff` (ratio by mixed-age method
+  youngest / majority / TX core child / proportional, group size, role-present per room or
+  site, credential-gated counting, demand templates + exceptions), `ranking` (hard filters
+  H1–H10 each with a failing test, integer score, member-id tie-break, cost band only),
+  `sickLeave` (pack rule → ordinary `LeavePolicy`; `projectBalance` gained imported hours,
+  `hoursPerUnit`, `annualAccrualCap`, `annualUseCap`; MVP policies unchanged).
+- Seed packs (`packages/engine/rulepacks/`): childcare CA, TX, NY; clinic template (org
+  policy only); labour CA, WA, NYS, NYC, CO (sick leave + overtime flags). One test per cited
+  number (`rulepacks.test.ts`).
+- Schema: migration `0005_regulated_coverage.sql` (15 new tables, 7 new defaulted/nullable
+  columns), hand-written down script, an up → down → up test, and the child-data deny-list
+  test over every column.
+
+### Research log (retrieved 2026-10-30)
+| Topic | Source used | Publisher | Status |
+|---|---|---|---|
+| CA infants 1:4 | 22 CCR § 101416.5(b) (Justia) | mirror | cited |
+| CA toddlers 1:6, group 12 | H&S Code § 1596.955(a)(3)–(4), AB 762 (2015) enrolled text | enacted bill | cited; check the current statute |
+| CA preschool 1:12 | 22 CCR § 101216.3(a) (Justia) | mirror | cited |
+| CA school age 1:14 / 28 | 22 CCR § 101516.5(b)(1) (Justia) | mirror | cited |
+| CA mixed ages | § 101516.5(c) (school-age centres) applied to general centres | mirror | **needs verification** |
+| TX ratios and group sizes | 26 TAC §§ 746.1601, 746.1609 charts (Justia PDFs), § 746.1603 core child (Cornell) | mirror | cited |
+| NY ratios, group sizes, mixed ages | 18 NYCRR § 418-1.8(k), (l) (Cornell) | mirror | cited |
+| CA sick leave | Lab. Code § 246 (california.public.law), DLSE FAQ | mirror | cited |
+| WA sick leave, overtime | RCW 49.46.210, 49.46.130 (app.leg.wa.gov) | official | cited |
+| NYS sick leave | ny.gov guidance on Labor Law § 196-b | agency guidance | **carryover needs verification** (statute not fetchable) |
+| NYC sick leave | DCWP FAQs | agency guidance | cited |
+| CO sick leave | C.R.S. § 8-13.3-403 (colorado.public.law) | mirror | cited |
+| Overtime CA / NY / CO | Lab. Code § 510(a); 12 NYCRR § 142-2.2; 7 CCR 1103-1 Rule 4.1.1 | mirror | cited |
+
+The official CA (CDSS/Westlaw), TX (SOS) and NY State sites refused the sandbox's fetches,
+so most childcare numbers come from mirrors of the official text. The UI labels the
+publisher on every rule; verify against the official publisher before a customer relies on
+them (Questions for Atiyk).
+
+### Gate
+- Typecheck clean; lint clean (warnings pre-existing); `npm run build -w apps/teams` passes;
+  `npm run verify:dist`: identical, 690 files.
+- Root + engine: 587 passed, the same 2 Days Off solver timing tests fail (environment).
+- Teams: 131 passed, 2 skipped.
+- No screens changed (no screenshots this phase).
