@@ -36,7 +36,7 @@ export const manageWebhooks = defineCapability({
   name: 'manageWebhooks',
   description:
     'Admin only. Webhook endpoints that receive signed events (leave.requested, leave.decided, ' +
-    'balance.expiring, plan.proposed): list endpoints with their health and the recent delivery log, add ' +
+    'balance.expiring, plan.proposed, coverage.gap_detected, cover.requested, cover.filled, credential.expiring): list endpoints with their health and the recent delivery log, add ' +
     'one (signing secret shown once), pause or resume it, delete it, send a test event, or retry a delivery now.',
   input: z.discriminatedUnion('op', [
     z.object({ op: z.literal('list') }),

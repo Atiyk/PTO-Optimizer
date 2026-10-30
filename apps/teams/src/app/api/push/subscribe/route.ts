@@ -5,6 +5,7 @@ import { pushSubscriptions } from '@/db/schema';
 import { humanActorFromSession } from '@/lib/actor';
 import { sameOrigin } from '@/lib/sameOrigin';
 import { SESSION_COOKIE } from '@/lib/session';
+import { pushEndpointAllowed } from '@/server/messaging';
 
 /** Save (POST) or remove (DELETE) this device's Web Push subscription for cover offers. */
 export async function POST(request: NextRequest) {
@@ -20,7 +21,7 @@ async function handle(request: NextRequest, op: 'save' | 'remove') {
   const actor = await humanActorFromSession(db, request.cookies.get(SESSION_COOKIE)?.value);
   if (!actor?.memberId) return NextResponse.json({ error: 'Sign in first.' }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } };
-  const endpoint = typeof body.endpoint === 'string' && /^https:\/\//.test(body.endpoint) ? body.endpoint.slice(0, 1000) : null;
+  const endpoint = typeof body.endpoint === 'string' && body.endpoint.length <= 1000 && pushEndpointAllowed(body.endpoint) ? body.endpoint : null;
   if (!endpoint) return NextResponse.json({ error: 'Bad subscription.' }, { status: 400 });
   if (op === 'remove') {
     await db.delete(pushSubscriptions).where(and(eq(pushSubscriptions.orgId, actor.orgId), eq(pushSubscriptions.memberId, actor.memberId), eq(pushSubscriptions.endpoint, endpoint)));

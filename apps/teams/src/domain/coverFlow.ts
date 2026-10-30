@@ -11,6 +11,8 @@ const formatDay = (iso: string) =>
 import { deliver, type OutboundMessage } from '@/server/messaging';
 import { appUrl } from '@/lib/appUrl';
 import type { GapWindow } from './coverage';
+import { coverEventData, memberName } from '@/server/coverageEvents';
+import { emitWebhook, kickWebhooks } from '@/server/webhooks';
 
 /*
  * The cover workflow's writes: create a request, send offers in waves, accept (first
@@ -56,6 +58,7 @@ export async function createCoverRequest(db: Db, orgId: string, input: CreateCov
   const eligible = ranking.ranked.filter((c) => c.eligible);
   await ev('ranked', { eligible: eligible.length, excluded: ranking.ranked.length - eligible.length, order: eligible.map((c) => c.memberId) });
   const sent = await sendWave(db, req!, ranking, 1, by, now);
+  if ((await emitWebhook(db, orgId, 'cover.requested', await coverEventData(db, req!), now, { dedupeKey: `cover:${req!.id}` })).length) kickWebhooks(db, orgId);
   return { request: req!, ranking, sent };
 }
 
@@ -143,6 +146,8 @@ export async function acceptOffer(db: Db, orgId: string, offerId: string, member
     if (again.status === 'filled') return { status: 'filled', requestId: req.id };
     throw e;
   }
+  const filled = await coverEventData(db, req, await memberName(db, orgId, memberId));
+  if ((await emitWebhook(db, orgId, 'cover.filled', filled, now, { dedupeKey: `filled:${req.id}` })).length) kickWebhooks(db, orgId);
   return { status: 'filled', requestId: req.id };
 }
 

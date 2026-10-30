@@ -76,6 +76,23 @@ export function smsChannel(): SmsChannel | null {
   return null;
 }
 
+/*
+ * The browser hands us the push endpoint, so a signed-in person could otherwise point it at
+ * any https URL and make this server POST there (SSRF). Only the browsers' own push services
+ * are allowed: Chrome/FCM, Firefox/Mozilla autopush, Safari/APNs (Apple says to allow
+ * https://*.push.apple.com) and Edge/WNS (*.notify.windows.com). Checked 2026-10-30.
+ */
+const PUSH_HOSTS = [/^fcm\.googleapis\.com$/, /^android\.googleapis\.com$/, /^updates\.push\.services\.mozilla\.com$/, /^([a-z0-9-]+\.)*push\.apple\.com$/, /^[a-z0-9-]+\.notify\.windows\.com$/];
+
+export function pushEndpointAllowed(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    return u.protocol === 'https:' && !u.username && !u.password && (u.port === '' || u.port === '443') && PUSH_HOSTS.some((h) => h.test(u.hostname));
+  } catch {
+    return false;
+  }
+}
+
 export interface PushSender {
   send(sub: { endpoint: string; p256dh: string; auth: string }, payload: string): Promise<{ ok: boolean; gone?: boolean }>;
 }
@@ -120,6 +137,7 @@ export async function deliver(db: Db, orgId: string, msgs: OutboundMessage[]): P
     const subs = await db.select().from(pushSubscriptions).where(and(eq(pushSubscriptions.orgId, orgId), inArray(pushSubscriptions.memberId, ids)));
     for (const m of msgs) {
       for (const s of subs.filter((x) => x.memberId === m.memberId)) {
+        if (!pushEndpointAllowed(s.endpoint)) continue;
         const r = await push.send(s, JSON.stringify({ title: 'Cover offer', body: m.text, url: m.url, tag: m.dedupeKey }));
         if (r.ok) used.set(m.memberId, 'push');
         else if (r.gone) await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, s.id));

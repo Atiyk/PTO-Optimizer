@@ -1,4 +1,6 @@
 import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
+import { scanCoverageGaps } from '@/server/coverageEvents';
+import { kickWebhooks } from '@/server/webhooks';
 import { z } from 'zod';
 import { addDays, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { hhmm, parseHhmm } from '@daysoff/engine/coverage/timeBlocks';
@@ -261,6 +263,10 @@ export const reportCallOff = defineCapability({
       );
       covers.push({ requestId: request.id, roomName: g.roomName, start: g.start, end: g.end, offersSent: sent.length });
     }
+    // Gap events now rather than at the next daily scan: today and tomorrow at the sites it hits.
+    let gapEvents = 0;
+    for (const siteId of new Set(gaps.map((g) => g.siteId))) gapEvents += await scanCoverageGaps(db, actor.orgId, now, { locationId: siteId, days: 2 });
+    if (gapEvents) kickWebhooks(db, actor.orgId);
     return { requestId: req!.id, date, deducted: deduct, balanceNote, coverRequests: covers };
   },
 });

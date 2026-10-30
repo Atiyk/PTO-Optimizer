@@ -22,6 +22,10 @@ const EVENTS = [
   { event: 'leave.decided', description: 'a request is approved or declined' },
   { event: 'balance.expiring', description: 'leave will be lost in 30 or 7 days' },
   { event: 'plan.proposed', description: 'a manager sends leave suggestions' },
+  { event: 'coverage.gap_detected', description: 'a room breaks a staffing rule in the next 14 days (daily, and at once after a call-off)' },
+  { event: 'cover.requested', description: 'cover is requested for a gap or a call-off' },
+  { event: 'cover.filled', description: 'someone accepts a cover offer' },
+  { event: 'credential.expiring', description: 'a credential expires in 30, 14 or 7 days, or has just expired' },
 ];
 
 const KIND: Record<string, string> = { pat: 'Personal', api_key: 'API key', access: 'OAuth token' };

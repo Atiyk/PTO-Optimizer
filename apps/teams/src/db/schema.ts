@@ -467,7 +467,16 @@ export const rateCounters = pgTable('rate_counters', {
   count: integer('count').notNull().default(0),
 });
 
-export const WEBHOOK_EVENTS = ['leave.requested', 'leave.decided', 'balance.expiring', 'plan.proposed'] as const;
+export const WEBHOOK_EVENTS = [
+  'leave.requested',
+  'leave.decided',
+  'balance.expiring',
+  'plan.proposed',
+  'coverage.gap_detected',
+  'cover.requested',
+  'cover.filled',
+  'credential.expiring',
+] as const;
 
 export const webhookEndpoints = pgTable(
   'webhook_endpoints',

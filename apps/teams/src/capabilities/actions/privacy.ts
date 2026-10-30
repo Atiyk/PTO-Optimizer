@@ -1,6 +1,21 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { apiTokens, drafts, leaveRequests, members, organizations, webhookDeliveries } from '@/db/schema';
+import {
+  apiTokens,
+  drafts,
+  leaveRequests,
+  loginCodes,
+  memberCoverPrefs,
+  memberCredentials,
+  memberPayRates,
+  members,
+  organizations,
+  passkeys,
+  pushSubscriptions,
+  shiftExceptions,
+  shiftTemplates,
+  webhookDeliveries,
+} from '@/db/schema';
 import { getMember } from '@/domain/leave';
 import { CapabilityError } from '../errors';
 import { defineCapability } from '../types';
@@ -13,8 +28,10 @@ export const eraseMember = defineCapability({
   name: 'eraseMember',
   description:
     'Admin only. Erases a person’s personal data: name, email, Slack link, tags, request notes, their agent ' +
-    'tokens, drafts addressed to them and webhook deliveries that named them. Leave dates and balance entries ' +
-    'stay, attached to "Former member", so the organisation keeps its leave records. Cannot be undone.',
+    'tokens, drafts addressed to them, webhook deliveries that named them, and for coverage their passkeys, sign-in ' +
+    'codes, phone number and cover preferences, push devices, credentials, pay rates and rota. Leave dates, balance ' +
+    'entries, hours worked and past cover events stay, attached to "Former member", so the organisation keeps its ' +
+    'records. Cannot be undone.',
   input: z.object({ memberId: z.uuid() }),
   output: z.object({ erased: z.literal(true), memberId: z.uuid() }),
   scope: 'admin',
@@ -42,6 +59,12 @@ export const eraseMember = defineCapability({
       await tx.delete(apiTokens).where(and(eq(apiTokens.orgId, orgId), eq(apiTokens.memberId, target.id)));
       await tx.delete(drafts).where(and(eq(drafts.orgId, orgId), eq(drafts.addressedToMemberId, target.id)));
       await tx.delete(webhookDeliveries).where(and(eq(webhookDeliveries.orgId, orgId), sql`${webhookDeliveries.payload}::text like ${`%${target.id}%`}`));
+      // Regulated coverage: sign-in keys and codes, phone number and cover preferences, push
+      // devices, credentials, pay rates and their rota. Hours worked and past cover events stay
+      // (sick-leave records and the fairness ledger), attached to "Former member".
+      for (const t of [passkeys, loginCodes, pushSubscriptions, memberCoverPrefs, memberCredentials, memberPayRates, shiftTemplates, shiftExceptions] as const) {
+        await tx.delete(t).where(and(eq(t.orgId, orgId), eq(t.memberId, target.id)));
+      }
     });
     return { erased: true as const, memberId: target.id };
   },

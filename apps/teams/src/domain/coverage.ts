@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNull, lte, ne, or } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, isNull, lte, ne, or } from 'drizzle-orm';
 import { addDays, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import {
   coverageForDay,
@@ -150,16 +150,25 @@ export async function siteContext(db: Db, orgId: string, locationId: string, sta
     .from(shiftExceptions)
     .where(and(eq(shiftExceptions.orgId, orgId), gte(shiftExceptions.date, from), lte(shiftExceptions.date, end)));
   const off = new Set(sx.filter((x) => x.kind === 'off').map((x) => `${x.memberId}|${x.date}`));
+  // Someone removed from the org no longer works here from the day they were removed: their
+  // weekly shifts must not keep counting toward ratios.
+  const gone = new Map(
+    (await db.select({ id: members.id, at: members.deletedAt }).from(members).where(and(eq(members.orgId, orgId), isNotNull(members.deletedAt)))).map((m) => [
+      m.id,
+      new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(m.at!),
+    ]),
+  );
+  const working = (memberId: string, d: string) => !gone.has(memberId) || d < gone.get(memberId)!;
   for (const d of rangeISO(from, end)) {
     const dow = mondayIndexedDow(d);
     for (const t of tpl) {
       if (t.weekday !== dow || (t.effectiveFrom && t.effectiveFrom > d) || (t.effectiveTo && t.effectiveTo < d)) continue;
-      if (off.has(`${t.memberId}|${d}`)) continue;
+      if (off.has(`${t.memberId}|${d}`) || !working(t.memberId, d)) continue;
       ctx.shifts.push({ memberId: t.memberId, roomId: t.roomId, date: d, interval: localInterval(d, t.startMinute, t.endMinute, tz) });
     }
   }
   for (const x of sx) {
-    if (x.kind !== 'shift' || !x.roomId || !roomIds.includes(x.roomId) || x.startMinute == null || x.endMinute == null) continue;
+    if (x.kind !== 'shift' || !x.roomId || !roomIds.includes(x.roomId) || x.startMinute == null || x.endMinute == null || !working(x.memberId, x.date)) continue;
     ctx.shifts.push({ memberId: x.memberId, roomId: x.roomId, date: x.date, interval: localInterval(x.date, x.startMinute, x.endMinute, tz) });
   }
 

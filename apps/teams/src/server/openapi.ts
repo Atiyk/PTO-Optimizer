@@ -3,6 +3,7 @@ import { CAPABILITIES } from '@/capabilities/registry';
 import type { CapabilityDef } from '@/capabilities/types';
 import { SCOPES } from '@/capabilities/scopes';
 import { PRODUCT_NAME } from '@/lib/brand';
+import { WEBHOOK_DATA } from './webhookSchemas';
 
 /** OpenAPI 3.1 generated from the capability registry (R9). One POST operation per REST capability. */
 export function buildOpenApi(baseUrl: string) {
@@ -62,6 +63,28 @@ export function buildOpenApi(baseUrl: string) {
       security: [{ bearer: [] }],
     },
   };
+  // OpenAPI 3.1 `webhooks`: what an endpoint receives for each event (Standard Webhooks signed).
+  const webhooks = Object.fromEntries(
+    Object.entries(WEBHOOK_DATA).map(([event, data]) => [
+      event,
+      {
+        post: {
+          operationId: `webhook_${event.replace('.', '_')}`,
+          summary: data.description ?? event,
+          description: 'Signed per the Standard Webhooks spec: verify webhook-id, webhook-timestamp and webhook-signature with your whsec_ secret before trusting the body.',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { type: 'object', properties: { type: { const: event }, timestamp: { type: 'string', format: 'date-time' }, data: z.toJSONSchema(data, { io: 'output', unrepresentable: 'any' }) }, required: ['type', 'timestamp', 'data'] },
+              },
+            },
+          },
+          responses: { '2XX': { description: 'Received. Anything else is retried with backoff.' } },
+        },
+      },
+    ]),
+  );
   return {
     openapi: '3.1.0',
     info: {
@@ -74,6 +97,7 @@ export function buildOpenApi(baseUrl: string) {
     },
     servers: [{ url: baseUrl }],
     paths,
+    webhooks,
     components: {
       schemas: { Error: errorSchema, Confirmation: confirmation },
       securitySchemes: {

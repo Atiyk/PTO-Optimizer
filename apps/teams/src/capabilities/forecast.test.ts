@@ -118,6 +118,17 @@ describe('getCoverageForecast', () => {
   });
 });
 
+describe('people removed from the org', () => {
+  it('their weekly shifts stop counting from the day they are removed (Phase 6 security pass)', async () => {
+    const gapsMon = async () => (await run(await actor(1), 'getCoverage', { date: '2026-11-02', days: 1 })).days[0]!.gaps.filter((g) => g.roomName === 'Toddlers').map((g) => `${g.start}-${g.end}`);
+    expect(await gapsMon()).toEqual(['15:30-16:30']);
+    await run(await actor(0), 'manageMembers', { op: 'remove', memberId: id(9) }); // Ava, the other late toddler teacher
+    expect(await gapsMon()).toEqual(['15:30-16:30', '16:30-18:00']); // nobody left on the late shift
+    const f = await run(await actor(1), 'getCoverageForecast', { weeks: 2 });
+    expect(f.sites[0]!.weeks[1]!.hoursShort.schedule).toBeGreaterThan(0); // the rota itself is now short
+  });
+});
+
 describe('runTeamPlan at a regulated site', () => {
   it('never plans a day that opens a ratio gap, re-plans around it, and says why', async () => {
     const plan = await run(await actor(1), 'runTeamPlan', {});

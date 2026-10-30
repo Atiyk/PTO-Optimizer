@@ -14,6 +14,7 @@ import {
   leaveTypes,
   locations,
   memberCredentials,
+  memberPayRates,
   members,
   organizations,
   rooms,
@@ -240,6 +241,8 @@ export const manageSchedule = defineCapability({
           .update(organizations)
           .set({ vertical: input.vertical, ...(input.costAwareRanking != null ? { costAwareRanking: input.costAwareRanking } : {}) })
           .where(eq(organizations.id, orgId));
+        // Pay rates exist only while cost-aware ranking is on: turning it off deletes them.
+        if (input.costAwareRanking === false) await db.delete(memberPayRates).where(eq(memberPayRates.orgId, orgId));
         return { ok: true as const, op: input.op, id: null };
       }
       case 'upsertRoom': {
