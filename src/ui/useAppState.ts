@@ -16,6 +16,7 @@ import { classifyDay } from './dayCategory';
 import { alternativeForDate as alternativeForDateImpl } from './alternativeForDate';
 import { track } from './analytics';
 import { validateInputs } from './validation';
+import { policyFromLegacyPtoState, toLegacySolverFields } from '../policy/model';
 
 /** The slider's own stored position while unchecked - also what it falls back to showing
  * (disabled) when "let the solver decide" is checked. The middle of the 1-7 range, so
@@ -498,15 +499,27 @@ export function useAppState() {
   // balance just means nothing is planned, not a negative budget).
   const effectiveBudget = Math.max(0, budget - reserveDays);
 
+  // Feature 1 Stage 2A follow-through: routed through the shared policy model
+  // (src/policy/model.ts) instead of this file's own parallel ternary logic, so /policy and
+  // /pto describe a policy's accrual/reset/carryover the same way. `effectiveBudget` (the
+  // reserve-days subtraction) stays a separate, UI-level step applied after - the policy
+  // model doesn't know about "reserve days", which isn't a policy concept, it's a planning
+  // preference. Equivalence with the old ternary logic, for every combination of these
+  // fields, is locked down by src/ui/pto-policy-regression.test.ts.
+  const policyAccrualFields = useMemo(
+    () => toLegacySolverFields(policyFromLegacyPtoState({ budget, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap, rangeStart }), rangeStart),
+    [budget, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap, rangeStart],
+  );
+
   const solveInput: SolveInput = useMemo(
     () => ({
       offDays: effectiveOffDays,
       rangeStart,
       rangeEnd,
       budget: effectiveBudget,
-      accrualPerMonth: accrualEnabled ? accrualPerMonth : undefined,
-      expiryDate: expiryEnabled ? expiryDate : undefined,
-      carryoverCap: expiryEnabled ? carryoverCap : undefined,
+      accrualPerMonth: policyAccrualFields.accrualPerMonth,
+      expiryDate: policyAccrualFields.expiryDate,
+      carryoverCap: policyAccrualFields.carryoverCap,
       blackouts: effectiveBlackouts,
       mustIncludeDays,
       overlapDays,
@@ -599,7 +612,18 @@ export function useAppState() {
   // render that updates the calendar and break list - the score line may lag the rest of
   // the UI by a moment on a large range, which is a far better trade than the whole page
   // feeling unresponsive. The computation itself is untouched; only when it runs changed.
-  const [scores, setScores] = useState<Scores | null>(null);
+  // Stage 5G fix (Feature 1, PR-C): computed synchronously on the very first render ONLY
+  // when __PTO_SSR__ is set (scripts/prerender.ts's own jsdom window, never present in the
+  // deployed HTML a real visitor's browser executes) - fixes the Travel/Efficiency scores
+  // rendering blank in every prerendered page, without touching the deferred-effect
+  // computation below that a real click still goes through. See prerender.ts's
+  // installWindow() for the full root-cause comment.
+  const [scores, setScores] = useState<Scores | null>(() => {
+    if (typeof window !== 'undefined' && (window as unknown as { __PTO_SSR__?: boolean }).__PTO_SSR__) {
+      return computeScores(solveInput, solveResult);
+    }
+    return null;
+  });
   useEffect(() => {
     if (!isValidInput) {
       setScores(lastGoodScoresRef.current);
