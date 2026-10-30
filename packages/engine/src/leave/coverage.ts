@@ -38,7 +38,7 @@ export interface CoverageViolation {
   present: number;
 }
 
-function ruleApplies(rule: CoverageRuleInput, date: ISODate): boolean {
+export function ruleApplies(rule: CoverageRuleInput, date: ISODate): boolean {
   if (rule.weekdays[mondayIndexedDow(date)] !== '1') return false;
   if (rule.effectiveFrom && date < rule.effectiveFrom) return false;
   if (rule.effectiveTo && date > rule.effectiveTo) return false;
