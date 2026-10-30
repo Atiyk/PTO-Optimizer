@@ -1,6 +1,7 @@
 import { and, asc, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import { z } from 'zod';
-import { leaveRequests, leaveTypes, members, teams } from '@/db/schema';
+import { extraClosures, leaveRequests, leaveTypes, locations, members, teams } from '@/db/schema';
+import { holidayMap } from '@/domain/holidays';
 import { getOrg } from '@/domain/leave';
 import { CapabilityError } from '../errors';
 import { isAdmin } from '../helpers';
@@ -102,5 +103,37 @@ export const whoIsOut = defineCapability({
       });
     }
     return { teams: [...groups.values()].sort((a, b) => a.teamName.untrusted_text.localeCompare(b.teamName.untrusted_text)) };
+  },
+});
+
+export const listHolidays = defineCapability({
+  name: 'listHolidays',
+  description:
+    'Public holidays (and org closures) for each of the org’s locations between two dates, from the engine’s ' +
+    'per-country data with observed-date rules. Holidays are never deducted from leave.',
+  input: z.object({ from: z.iso.date(), to: z.iso.date() }),
+  output: z.object({
+    locations: z.array(z.object({ locationId: z.uuid(), name: z.string(), countryCode: z.string(), holidays: z.array(z.object({ date: z.string(), name: z.string() })) })),
+  }),
+  scope: 'leave:read',
+  effect: 'read',
+  idempotent: true,
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+  rateLimit: 'read',
+  surfaces: ['ui', 'rest', 'mcp', 'assistant'],
+  audit: null,
+  async handler({ db, actor }, input) {
+    if (input.to < input.from || Date.parse(input.to) - Date.parse(input.from) > 400 * 86_400_000) {
+      throw new CapabilityError('invalid_input', 'Use a range of at most about 13 months, with to on or after from.');
+    }
+    const locs = await db.select().from(locations).where(eq(locations.orgId, actor.orgId));
+    const closures = await db.select().from(extraClosures).where(and(eq(extraClosures.orgId, actor.orgId), gte(extraClosures.date, input.from), lte(extraClosures.date, input.to)));
+    const out = [];
+    for (const l of locs) {
+      const map = await holidayMap(l.countryCode, l.subdivisionCode, input.from, input.to);
+      for (const c of closures) if (!c.locationId || c.locationId === l.id) map.set(c.date, c.name);
+      out.push({ locationId: l.id, name: l.name, countryCode: l.countryCode, holidays: [...map].sort().map(([date, name]) => ({ date, name })) });
+    }
+    return { locations: out };
   },
 });
