@@ -8,7 +8,7 @@ import { adjustBalance, exportData, getAuditLog, getOrgSetup, listMembers, manag
 import { explainBalanceInWords, getAiUsage, importHandbook, parseLeaveRequestText } from './actions/ai';
 import { importCsv } from './actions/importCsv';
 import { manageStaffSignIn, setMyCoverPrefs } from './actions/staff';
-import { findCover, getCoverRequests, reportCallOff, requestCover, respondToCover } from './actions/cover';
+import { findCover, getCoverRequests, getMySchedule, reportCallOff, requestCover, respondToCover } from './actions/cover';
 import { getCoverage, getCoverageSetup, getCredentials, getSickLeave, importHoursWorked, listRulePacks, manageCredentials, manageSchedule } from './actions/coverage';
 import { listMyProposals, respondToProposal, runTeamPlan, sendPlanProposals } from './actions/planner';
 import { decideLeaveRequest, listPendingApprovals } from './actions/approvals';
@@ -73,6 +73,7 @@ export const CAPABILITIES = {
   getCoverRequests,
   manageStaffSignIn,
   setMyCoverPrefs,
+  getMySchedule,
 } as const satisfies Record<string, CapabilityDef>;
 
 export type CapabilityName = keyof typeof CAPABILITIES;

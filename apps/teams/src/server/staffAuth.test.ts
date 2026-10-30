@@ -3,6 +3,7 @@ import type { Db } from '@/db/client';
 import { loginCodes } from '@/db/schema';
 import { buildOrg, humanActor, NOW, run } from '@/test/fixtures';
 import { freshDb } from '@/test/db';
+import { localDate } from '@/domain/cover';
 import { authenticationOptions, readChallenge, redeemLoginCode, registrationOptions, signChallenge } from './staffAuth';
 
 let db: Db;
@@ -59,7 +60,15 @@ describe('passkeys', () => {
 describe('cover preferences', () => {
   it('a member sets their own; the phone is never echoed back', async () => {
     const out = await run(db, humanActor(A.emp), 'setMyCoverPrefs', { optIn: 'yes', smsOptIn: true, smsPhone: '+15551234567' });
-    expect(out).toEqual({ optIn: 'yes', allowedLocationIds: [], smsOptIn: true, smsPhoneSet: true });
+    expect(out).toEqual({ optIn: 'yes', allowedLocationIds: [], smsOptIn: true, smsPhoneSet: true, passkeyCount: 0 });
     expect(JSON.stringify(await run(db, humanActor(A.emp), 'setMyCoverPrefs', {}))).not.toContain('5551234567');
+  });
+});
+
+describe('local today', () => {
+  it('a 6 pm call-off in California is still today there, though UTC has moved on', () => {
+    const sixPm = new Date('2026-11-02T02:00:00Z'); // Sun Nov 1, 18:00 PST
+    expect(localDate(sixPm, 'America/Los_Angeles')).toBe('2026-11-01');
+    expect(localDate(sixPm, 'UTC')).toBe('2026-11-02');
   });
 });

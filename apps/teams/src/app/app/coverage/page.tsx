@@ -75,6 +75,14 @@ export default async function CoveragePage({ searchParams }: { searchParams: Pro
                             ) : g.basis === 'org_policy' ? ' · your policy' : ''}
                           </span>
                           {g.needsVerification && <Badge tone="warn">needs verification</Badge>}
+                          {!staff && g.roomId && g.kind !== 'group_size' && (
+                            <Link
+                              className="text-accent underline"
+                              href={`/app/coverage/cover?${new URLSearchParams({ site: week.site.id, room: g.roomId, date: d.date, start: g.start, end: g.end }).toString()}`}
+                            >
+                              Find cover
+                            </Link>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -86,6 +94,13 @@ export default async function CoveragePage({ searchParams }: { searchParams: Pro
           <Card title={`By room, ${formatRange(day, day)}`}>
             {grid ? <CoverageHeatmap rooms={detail.rooms} grid={grid} date={day} /> : <p className="text-sm text-muted">No rules on this date.</p>}
           </Card>
+          {!staff && (
+            <p className="text-sm">
+              <Link className="text-accent underline" href={`/app/coverage/cover?${new URLSearchParams({ site: week.site.id, date: start }).toString()}`}>
+                Cover requests this week
+              </Link>
+            </p>
+          )}
           <p className="text-xs text-muted">
             Rule packs: {week.packs.map((p) => `${p.name} (v${p.version})`).join(', ')}. {week.notice}
           </p>

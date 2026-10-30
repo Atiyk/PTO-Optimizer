@@ -1,5 +1,6 @@
 import { CapabilityForm } from '@/components/CapabilityForm';
 import { ActionButton } from '@/components/ActionButton';
+import { IssueSignInCode } from '@/components/IssueSignInCode';
 import { Badge, Card } from '@/components/ui';
 import { appUrl } from '@/lib/appUrl';
 import { call, requireActor } from '@/server/page';
@@ -76,6 +77,11 @@ export default async function People({ searchParams }: { searchParams: Promise<{
           </table>
         </div>
       </Card>
+      {actor.role !== 'manager' && (
+        <Card title="Staff app sign-in (no Slack needed)">
+          <IssueSignInCode people={members.map((m) => ({ id: m.id, name: m.name }))} staffUrl={`${appUrl()}/m`} />
+        </Card>
+      )}
       <Card title="Edit a person">
         <CapabilityForm
           capability="manageMembers"

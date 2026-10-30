@@ -1,9 +1,9 @@
 import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { z } from 'zod';
-import { addDays } from '@daysoff/engine/solver/dateUtils';
+import { addDays, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { hhmm, parseHhmm } from '@daysoff/engine/coverage/timeBlocks';
-import { balanceLedger, coverOffers as offersTable, coverRequests, leaveRequests, members, rooms } from '@/db/schema';
-import { coverStatus, rankForTarget } from '@/domain/cover';
+import { balanceLedger, coverOffers as offersTable, coverRequests, leaveRequests, locations, members, rooms, shiftExceptions, shiftTemplates } from '@/db/schema';
+import { coverStatus, memberToday, rankForTarget } from '@/domain/cover';
 import { acceptOffer, advanceWaves, cancelCoverRequest, createCoverRequest, declineOffer, offersFor } from '@/domain/coverFlow';
 import { blockImpact, coverageDays, gapWindows, getLocation, siteContext, type GapWindow } from '@/domain/coverage';
 import { evaluateRequest, getLeaveTypeByKey, getMember, isoDate } from '@/domain/leave';
@@ -206,8 +206,9 @@ export const reportCallOff = defineCapability({
   audit: (_i, o) => `Call-off for ${o.date}: ${o.coverRequests.length} cover requests`,
   async handler({ db, actor, now }, input) {
     const member = await subjectMember(db, actor);
-    const date = input.date ?? isoDate(now);
-    if (date < isoDate(now) || date > addDays(isoDate(now), 1)) throw new CapabilityError('invalid_input', 'A call-off is for today or tomorrow. Use a leave request for other dates.');
+    const today = await memberToday(db, actor.orgId, member.id, now);
+    const date = input.date ?? today;
+    if (date < today || date > addDays(today, 1)) throw new CapabilityError('invalid_input', 'A call-off is for today or tomorrow. Use a leave request for other dates.');
     const [existing] = await db.select().from(leaveRequests).where(and(eq(leaveRequests.orgId, actor.orgId), eq(leaveRequests.idempotencyKey, input.idempotencyKey)));
     if (existing) {
       if (existing.memberId !== member.id) throw new CapabilityError('conflict', 'That idempotency key was already used.');
@@ -368,5 +369,58 @@ export const getCoverRequests = defineCapability({
       }
     }
     return { myOffers, requests };
+  },
+});
+
+export const getMySchedule = defineCapability({
+  name: 'getMySchedule',
+  description: 'Your shifts for the next days (including cover you took) with room and site, and any leave you have booked on them. Reads only.',
+  input: z.object({ days: z.number().int().min(1).max(28).default(14) }),
+  output: z.object({
+    /** Today at your site (its time zone), so "today" and "tomorrow" mean what you expect. */
+    today: z.string(),
+    shifts: z.array(z.object({ date: z.string(), start: z.string(), end: z.string(), roomName: z.string(), siteName: z.string(), cover: z.boolean(), onLeave: z.boolean() })),
+  }),
+  scope: 'coverage:read',
+  effect: 'read',
+  idempotent: true,
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+  rateLimit: 'read',
+  surfaces: ['ui', 'rest'],
+  audit: null,
+  async handler({ db, actor, now }, input) {
+    const me = actingMemberId(actor);
+    if (!me) throw new CapabilityError('forbidden', 'Only a member has a schedule.');
+    const today = await memberToday(db, actor.orgId, me, now);
+    const end = addDays(today, input.days - 1);
+    const roomRows = await db
+      .select({ id: rooms.id, name: rooms.name, site: locations.name })
+      .from(rooms)
+      .innerJoin(locations, eq(locations.id, rooms.locationId))
+      .where(eq(rooms.orgId, actor.orgId));
+    const room = (id: string | null) => roomRows.find((x) => x.id === id);
+    const tpl = await db.select().from(shiftTemplates).where(and(eq(shiftTemplates.orgId, actor.orgId), eq(shiftTemplates.memberId, me)));
+    const ex = await db
+      .select()
+      .from(shiftExceptions)
+      .where(and(eq(shiftExceptions.orgId, actor.orgId), eq(shiftExceptions.memberId, me), gte(shiftExceptions.date, today), lte(shiftExceptions.date, end)));
+    const offDays = new Set(ex.filter((x) => x.kind === 'off').map((x) => x.date));
+    const leave = await db
+      .select()
+      .from(leaveRequests)
+      .where(and(eq(leaveRequests.orgId, actor.orgId), eq(leaveRequests.memberId, me), inArray(leaveRequests.status, ['approved', 'pending']), lte(leaveRequests.startDate, end), gte(leaveRequests.endDate, today)));
+    const onLeave = (d: string) => leave.some((l) => l.startDate <= d && l.endDate >= d);
+    const out: { date: string; start: string; end: string; roomName: string; siteName: string; cover: boolean; onLeave: boolean }[] = [];
+    for (const d of rangeISO(today, end)) {
+      for (const t of tpl) {
+        if (t.weekday !== mondayIndexedDow(d) || offDays.has(d) || (t.effectiveFrom && t.effectiveFrom > d) || (t.effectiveTo && t.effectiveTo < d)) continue;
+        out.push({ date: d, start: hhmm(t.startMinute), end: hhmm(t.endMinute), roomName: room(t.roomId)?.name ?? '', siteName: room(t.roomId)?.site ?? '', cover: false, onLeave: onLeave(d) });
+      }
+    }
+    for (const c of ex.filter((x) => x.kind === 'shift' && x.startMinute != null && x.endMinute != null)) {
+      out.push({ date: c.date, start: hhmm(c.startMinute!), end: hhmm(c.endMinute!), roomName: room(c.roomId)?.name ?? '', siteName: room(c.roomId)?.site ?? '', cover: true, onLeave: onLeave(c.date) });
+    }
+    out.sort((a, b) => (a.date + a.start < b.date + b.start ? -1 : 1));
+    return { today, shifts: out };
   },
 });

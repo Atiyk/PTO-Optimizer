@@ -229,3 +229,23 @@ export const offerCount = (db: Db, requestId: string) =>
     .from(coverOffers)
     .where(eq(coverOffers.coverRequestId, requestId))
     .then((r) => r[0]?.n ?? 0);
+
+/** The calendar date at `now` in a time zone (en-CA formats as YYYY-MM-DD). */
+export function localDate(now: Date, tz: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+}
+
+/**
+ * "Today" for a member: at their site's time zone, else the org's first site's, else UTC.
+ * A call-off at 6 pm in California is still today there, though it is tomorrow in UTC.
+ */
+export async function memberToday(db: Db, orgId: string, memberId: string, now: Date): Promise<string> {
+  const [m] = await db
+    .select({ tz: locations.timezone })
+    .from(members)
+    .innerJoin(locations, eq(locations.id, members.locationId))
+    .where(and(eq(members.orgId, orgId), eq(members.id, memberId)));
+  if (m) return localDate(now, m.tz);
+  const [l] = await db.select({ tz: locations.timezone }).from(locations).where(eq(locations.orgId, orgId)).orderBy(locations.createdAt).limit(1);
+  return localDate(now, l?.tz ?? 'UTC');
+}

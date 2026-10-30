@@ -56,7 +56,13 @@ export const manageStaffSignIn = defineCapability({
   },
 });
 
-const prefsOut = z.object({ optIn: z.enum(['yes', 'no', 'ask']), allowedLocationIds: z.array(z.string()), smsOptIn: z.boolean(), smsPhoneSet: z.boolean() });
+const prefsOut = z.object({
+  optIn: z.enum(['yes', 'no', 'ask']),
+  allowedLocationIds: z.array(z.string()),
+  smsOptIn: z.boolean(),
+  smsPhoneSet: z.boolean(),
+  passkeyCount: z.number().describe('How many passkeys you have for the staff app.'),
+});
 
 export const setMyCoverPrefs = defineCapability({
   name: 'setMyCoverPrefs',
@@ -97,6 +103,7 @@ export const setMyCoverPrefs = defineCapability({
       .values({ orgId: actor.orgId, memberId: me, ...set })
       .onConflictDoUpdate({ target: [memberCoverPrefs.orgId, memberCoverPrefs.memberId], set: Object.keys(set).length ? set : { optIn: memberCoverPrefs.optIn } })
       .returning();
-    return { optIn: row!.optIn, allowedLocationIds: row!.allowedLocationIds, smsOptIn: row!.smsOptIn, smsPhoneSet: !!row!.smsPhone };
+    const keys = await db.select({ id: passkeys.id }).from(passkeys).where(and(eq(passkeys.orgId, actor.orgId), eq(passkeys.memberId, me)));
+    return { optIn: row!.optIn, allowedLocationIds: row!.allowedLocationIds, smsOptIn: row!.smsOptIn, smsPhoneSet: !!row!.smsPhone, passkeyCount: keys.length };
   },
 });
