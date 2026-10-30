@@ -1004,6 +1004,30 @@ Scheduled, resumable run. Resumable state: GitHub issue #32 "SMB MVP: build log"
   whoIsOut month 11 ms, pending approvals 59 ms, runTeamPlan 62 ms, MCP tools/list 113 ms; engine
   planner 50 people × 60 days 100 ms (26 ms when coverage is tight).
 
+## Phase 7: Slack app (`claude/smb-p7-slack`)
+
+- **Manifest** `apps/teams/slack/manifest.yml` (schema v2: `/daysoff`, interactivity, `message.im`,
+  `app_uninstalled`, `tokens_revoked`, bot + user scopes) and click-path in `apps/teams/slack/README.md`.
+- **Routes** `/api/slack/{commands,interactivity,events,install,oauth}`: signature checked first
+  (HMAC v0, 5-minute window, constant-time compare); ack immediately (7 ms measured locally) and do
+  the work after the response with `next/server` `after()` (Vercel `waitUntil`); events deduped by
+  `event_id`, clicks by message + action, and requests carry an idempotency key.
+- **Thin adapter**: requests in words go through `parseLeaveRequestText` → engine evaluation →
+  confirm message (uses N days, leaves M, holidays not deducted, warnings) → `submitLeaveRequest`.
+  Approvals are DMed to the manager with the same impact facts as the web queue
+  (`listPendingApprovals`) and decided with `decideLeaveRequest`; the person is told the outcome.
+  `/daysoff who` / `who week`: one line per team, names and dates only. `/daysoff balance`.
+- **Linking**: Slack user id saved at Sign in with Slack, else matched once by work email
+  (`users.info`). People act as humans with client `slack` in the audit log and the web's limits.
+- **Status (optional)**: each person allows it under My agents; generic "Out of office until …",
+  "Out this afternoon", "Out for 3 h today", expiring by itself; set on approval and daily.
+- **Slackbot + MCP**: Slack's Slackbot MCP client (Streamable HTTP, 60 s, per-call allow prompts,
+  "Slack identity" auth) could cover questions and drafting through our MCP server, not push
+  approvals or status. Recommendation: keep both (in the README and PR).
+- **Tests**: 8 tests against payloads in Slack's documented shapes (`slack/fixtures/`). No Slack
+  secrets were available, so no live workspace smoke test; the live routes were smoke-tested
+  locally with a signed URL check, a forged signature (401) and a signed command (200 in 7 ms).
+
 ## Questions for Atiyk (SMB)
 - Q1. ~~main lacks the old stack~~ Resolved: you merged it. But main's build is broken by
   a merge artifact. Recommended: merge #41 first, then this stack.
@@ -1024,3 +1048,6 @@ Scheduled, resumable run. Resumable state: GitHub issue #32 "SMB MVP: build log"
   Recommended: leave off until a customer asks.
 - Q8. The privacy policy and DPA summary are engineering drafts marked "needs legal review", with
   bracketed blanks (entity, regions, Anthropic retention terms, transfer mechanism).
+- Q9. Slack: create the app from `apps/teams/slack/manifest.yml` and add the three Slack env vars
+  (click-path in `apps/teams/slack/README.md`), then run the live smoke test: `/daysoff help`,
+  `/daysoff Friday afternoon off` → Request, approve from the manager DM.
