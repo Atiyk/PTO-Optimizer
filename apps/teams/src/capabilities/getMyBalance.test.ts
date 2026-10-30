@@ -37,7 +37,7 @@ describe('getMyBalance: server action and REST return identical results (R1)', (
     const rest = (await res.json()) as { data: unknown };
     expect(action).toEqual({ ok: true, data: rest.data });
     // 10.5 + 0.5769 - 2 = 9.0769, summed in fixed point (no float drift).
-    expect(rest.data).toEqual({ memberId: seed.emp.id, leaveType: 'vacation', unit: 'days', balance: 9.0769, entryCount: 3 });
+    expect(rest.data).toMatchObject({ memberId: seed.emp.id, leaveType: 'vacation', unit: 'days', unlimited: false, balance: 9.0769, entryCount: 3 });
   });
 
   it('both reject a missing or forged session the same way', async () => {

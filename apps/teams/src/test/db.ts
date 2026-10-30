@@ -1,5 +1,5 @@
 import { openPglite, setDb, type Db } from '@/db/client';
-import { balanceLedger, leaveTypes, members, organizations } from '@/db/schema';
+import { balanceLedger, leavePolicies, leaveTypes, members, organizations } from '@/db/schema';
 import { encodeSession } from '@/lib/session';
 
 /** Fresh in-memory Postgres with migrations applied, installed as the app's DB. */
@@ -15,6 +15,14 @@ export async function seedOrg(db: Db, name = 'Acme') {
   const [emp] = await db.insert(members).values({ orgId: org!.id, name: 'Eve Employee', role: 'employee' }).returning();
   const [vacation] = await db.insert(leaveTypes).values({ orgId: org!.id, key: 'vacation', name: 'Vacation' }).returning();
   const leaveTypeId = vacation!.id;
+  // A policy that grants nothing, so the balance is exactly the seeded ledger rows.
+  await db.insert(leavePolicies).values({
+    orgId: org!.id,
+    leaveTypeId,
+    name: 'Seed',
+    effectiveFrom: '2026-01-01',
+    policy: { unit: 'days', accrual: { method: 'front_loaded', annualAllowance: 0 }, planYear: { type: 'calendar' }, carryover: { type: 'all' } },
+  });
   await db.insert(balanceLedger).values([
     { orgId: org!.id, memberId: emp!.id, leaveTypeId, kind: 'import', amount: '10.5', effectiveDate: '2026-01-01' },
     { orgId: org!.id, memberId: emp!.id, leaveTypeId, kind: 'accrual', amount: '0.5769', effectiveDate: '2026-01-15' },

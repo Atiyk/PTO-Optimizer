@@ -11,7 +11,8 @@ describe('capability registry', () => {
       expect(cap.name).toBe(key);
       expect(cap.description.length).toBeGreaterThan(60);
       expect(['read', 'draft', 'commit']).toContain(cap.effect);
-      if (cap.effect === 'commit') expect(cap.idempotent).toBe(true);
+      // Commit actions reachable by agents must be safe to retry.
+      if (cap.effect === 'commit' && (cap.surfaces as readonly string[]).includes('mcp')) expect(cap.idempotent).toBe(true);
       expect(cap.annotations.readOnlyHint).toBe(cap.effect === 'read');
     }
   });

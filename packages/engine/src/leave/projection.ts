@@ -408,9 +408,9 @@ export function projectBalance(input: ProjectionInput): Projection {
     }
     s.balance += units;
     if (s.carried > Math.max(0, s.balance)) s.carried = Math.max(0, s.balance);
-    // A zero-amount scheduled event is still worth showing when it explains something
-    // (cap reached, nothing to forfeit), but year-boundary no-ops are skipped.
-    if (units === 0 && ev.source === 'scheduled' && ev.kind === 'forfeiture') continue;
+    // Zero-amount scheduled events are noise, except a paused accrual, which explains why
+    // the balance stopped growing.
+    if (units === 0 && ev.source === 'scheduled' && !note.includes('accrual paused')) continue;
     const entry: TimelineEntry = {
       key: ev.key,
       date: ev.date,

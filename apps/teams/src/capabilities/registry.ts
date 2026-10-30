@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { auditLog } from '@/db/schema';
-import { getMyBalance } from './actions/getMyBalance';
+import { adjustBalance, exportData, getAuditLog, getOrgSetup, listMembers, manageMembers, manageOrgSetup } from './actions/admin';
+import { decideLeaveRequest, listPendingApprovals } from './actions/approvals';
+import { explainBalance, getMyBalance } from './actions/balance';
+import { whoIsOut } from './actions/calendar';
+import { cancelLeaveRequest, draftLeaveRequest, listMyRequests, submitLeaveRequest } from './actions/requests';
 import { CapabilityError } from './errors';
 import type { CapabilityContext, CapabilityDef } from './types';
 
@@ -10,6 +14,21 @@ import type { CapabilityContext, CapabilityDef } from './types';
  */
 export const CAPABILITIES = {
   getMyBalance,
+  explainBalance,
+  draftLeaveRequest,
+  submitLeaveRequest,
+  cancelLeaveRequest,
+  listMyRequests,
+  whoIsOut,
+  listPendingApprovals,
+  decideLeaveRequest,
+  getOrgSetup,
+  manageOrgSetup,
+  listMembers,
+  manageMembers,
+  adjustBalance,
+  exportData,
+  getAuditLog,
 } as const satisfies Record<string, CapabilityDef>;
 
 export type CapabilityName = keyof typeof CAPABILITIES;
