@@ -1,0 +1,150 @@
+import { eq } from 'drizzle-orm';
+import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
+import type { Db } from '@/db/client';
+import { leaveRequests, leaveTypes, locations, members } from '@/db/schema';
+import { invokeCapability, type CapabilityName } from '@/capabilities/registry';
+import { ROLE_SCOPES } from '@/capabilities/scopes';
+import type { Actor } from '@/capabilities/types';
+import { evaluateRequest, getMember } from '@/domain/leave';
+import { createOrganization } from './bootstrap';
+
+/*
+ * Demo: a licensed childcare centre in California with three rooms and 18 staff. All
+ * numbers on screen come from the engine and the CA pack; children are counts per age group
+ * only. Deterministic for a given `today`. Used by screenshots, the demo and RC tests.
+ */
+
+const STAFF: [name: string, role: 'owner' | 'admin' | 'manager' | 'employee', room: 'Infants' | 'Toddlers' | 'Preschool' | null, shift: 'early' | 'late' | 'office'][] = [
+  ['Dana Whitfield', 'owner', null, 'office'],
+  ['Marisol Ortega', 'manager', null, 'office'],
+  ['Priya Raman', 'employee', 'Infants', 'early'],
+  ['Lena Vogel', 'employee', 'Infants', 'early'],
+  ['Tomás Ibarra', 'employee', 'Infants', 'late'],
+  ['Grace Kim', 'employee', 'Infants', 'late'],
+  ['Hannah Moore', 'employee', 'Toddlers', 'early'],
+  ['Kwame Mensah', 'employee', 'Toddlers', 'early'],
+  ['Sofia Russo', 'employee', 'Toddlers', 'late'],
+  ['Ava Bennett', 'employee', 'Toddlers', 'late'],
+  ['Noah Fischer', 'employee', 'Preschool', 'early'],
+  ['Isla Campbell', 'employee', 'Preschool', 'early'],
+  ['Mateo Alvarez', 'employee', 'Preschool', 'late'],
+  ['Zoe Laurent', 'employee', 'Preschool', 'late'],
+  ['Ethan Park', 'employee', null, 'early'],
+  ['Maya Haddad', 'employee', null, 'late'],
+  ['Owen Gallagher', 'employee', null, 'early'],
+  ['Lucy Tran', 'employee', null, 'late'],
+];
+
+const SHIFT = { early: ['07:00', '15:30'], late: ['09:30', '18:00'] } as const;
+
+export async function seedChildcareCentre(db: Db, today: string, opts: { orgName?: string } = {}) {
+  const { org, owner, team, location } = await createOrganization(
+    db,
+    { provider: 'dev', subject: `childcare-owner-${opts.orgName ?? 'sunbeam'}`, name: STAFF[0]![0], email: null, slackTeamId: null, issuedAt: 0 },
+    { orgName: opts.orgName ?? 'Sunbeam Early Learning', countryCode: 'US', subdivisionCode: 'US-CA', teamName: 'Classroom staff', today },
+  );
+  const orgId = org.id;
+  await db.update(locations).set({ name: 'Sunbeam Oakland' }).where(eq(locations.id, location.id));
+  await db.update(members).set({ startDate: '2019-08-01', employmentType: 'salaried' }).where(eq(members.id, owner.id));
+  const actor: Actor = { type: 'human', orgId, memberId: owner.id, role: 'owner', clientId: null, onBehalfOfMemberId: null, scopes: ROLE_SCOPES.owner };
+  const now = new Date(`${today}T16:00:00Z`);
+  const run = <N extends CapabilityName>(name: N, input: unknown) => invokeCapability(name, { db, actor, now }, input);
+
+  const ids: string[] = [owner.id];
+  for (const [i, [name, role]] of STAFF.entries()) {
+    if (i === 0) continue;
+    const [m] = await db
+      .insert(members)
+      .values({
+        orgId,
+        name,
+        role,
+        teamId: team.id,
+        locationId: location.id,
+        startDate: `${2020 + (i % 5)}-${String((i % 12) + 1).padStart(2, '0')}-01`,
+        tags: role === 'manager' ? ['director'] : ['teacher'],
+        employmentType: role === 'employee' ? 'hourly' : 'salaried',
+        hoursPerDay: '8',
+      })
+      .returning();
+    ids.push(m!.id);
+  }
+  for (const id of ids.slice(2)) await db.update(members).set({ managerId: ids[1] }).where(eq(members.id, id));
+
+  await run('manageSchedule', { op: 'setTimezone', locationId: location.id, timezone: 'America/Los_Angeles' });
+  await run('manageSchedule', { op: 'selectRulePack', locationId: location.id, packKey: 'childcare-us-ca', sickPolicy: 'none', effectiveFrom: '2026-01-01' });
+  await run('manageSchedule', { op: 'selectRulePack', locationId: location.id, packKey: 'labor-us-ca', sickPolicy: 'accrue', effectiveFrom: '2026-01-01' });
+
+  const room: Record<string, string> = {};
+  for (const [name, groupKey] of [
+    ['Infants', 'infant'],
+    ['Toddlers', 'toddler'],
+    ['Preschool', 'preschool'],
+  ] as const) {
+    room[name] = (await run('manageSchedule', { op: 'upsertRoom', locationId: location.id, name, groupKey })).id!;
+  }
+  // Children expected, Mon–Fri (counts only). CA: infants 1:4, toddlers 1:6, preschool 1:12.
+  const weekdays = [0, 1, 2, 3, 4];
+  const demand: Record<string, [start: string, end: string, count: number][]> = {
+    Infants: [['07:00', '09:30', 4], ['09:30', '15:30', 8], ['15:30', '18:00', 4]],
+    Toddlers: [['07:00', '09:30', 6], ['09:30', '16:30', 12], ['16:30', '18:00', 6]],
+    Preschool: [['07:00', '09:30', 12], ['09:30', '15:30', 24], ['15:30', '18:00', 12]],
+  };
+  const group = { Infants: 'infant', Toddlers: 'toddler', Preschool: 'preschool' } as const;
+  for (const [name, rows] of Object.entries(demand)) {
+    await run('manageSchedule', {
+      op: 'setDemand',
+      roomId: room[name],
+      rows: weekdays.flatMap((weekday) => rows.map(([start, end, count]) => ({ weekday, start, end, group: group[name as keyof typeof group], count }))),
+    });
+  }
+  // Floaters back up the infant and preschool rooms.
+  const floaterRoom = ['Infants', 'Preschool', 'Infants', 'Preschool'];
+  let f = 0;
+  for (const [i, [, , r, shift]] of STAFF.entries()) {
+    if (shift === 'office') continue;
+    const target = r ?? floaterRoom[f++ % floaterRoom.length]!;
+    const [start, end] = SHIFT[shift];
+    await run('manageSchedule', { op: 'setShifts', memberId: ids[i], rows: weekdays.map((weekday) => ({ roomId: room[target], weekday, start, end })) });
+  }
+
+  // Credentials: pediatric CPR for everyone; a few lapsing soon, one already lapsed.
+  await run('manageCredentials', { op: 'define', key: 'pediatric_cpr', name: 'Pediatric CPR and first aid' });
+  await run('manageCredentials', { op: 'define', key: 'ece_12_units', name: '12 ECE units (teacher qualified)', needsExpiry: false });
+  for (const [i, id] of ids.entries()) {
+    const expiresOn = i === 4 ? addDays(today, -3) : i === 7 ? addDays(today, 6) : i === 11 ? addDays(today, 12) : i === 14 ? addDays(today, 25) : `${Number(today.slice(0, 4)) + 1}-0${(i % 9) + 1}-15`;
+    await run('manageCredentials', { op: 'grant', memberId: id, credentialKey: 'pediatric_cpr', issuedOn: '2025-01-15', expiresOn, verified: i % 3 !== 0 });
+    if (STAFF[i]![2]) await run('manageCredentials', { op: 'grant', memberId: id, credentialKey: 'ece_12_units', issuedOn: '2021-06-01', verified: true });
+  }
+
+  // Hours worked for hourly staff since January (two-week periods, 76–80 h).
+  const rows: { member: string; periodStart: string; periodEnd: string; hours: number }[] = [];
+  for (const [i, id] of ids.entries()) {
+    if (STAFF[i]![1] !== 'employee') continue;
+    for (let p = `${today.slice(0, 4)}-01-01`; addDays(p, 13) < today; p = addDays(p, 14)) rows.push({ member: id, periodStart: p, periodEnd: addDays(p, 13), hours: 76 + ((i + p.charCodeAt(6)) % 5) });
+  }
+  await run('importHoursWorked', { stage: 'commit', rows });
+
+  // Next Monday a toddler teacher is on approved leave: the early shift leaves at 15:30 and
+  // 12 toddlers stay until 16:30, so 15:30–16:30 is one short (CA 1:6). Wednesday's pending
+  // request would open the same gap ("likely" view).
+  const nextMonday = addDays(today, 7 - mondayIndexedDow(today));
+  const [vac] = (await db.select().from(leaveTypes).where(eq(leaveTypes.orgId, orgId))).filter((t) => t.key === 'vacation');
+  for (const [idx, start, status] of [
+    [8, nextMonday, 'approved'],
+    [9, addDays(nextMonday, 2), 'pending'],
+  ] as const) {
+    const member = await getMember(db, orgId, ids[idx]!);
+    const ev = await evaluateRequest(db, orgId, member, { leaveTypeKey: 'vacation', start, end: start, part: 'full' }, today);
+    await db.insert(leaveRequests).values({
+      orgId,
+      memberId: member.id,
+      leaveTypeId: vac!.id,
+      status,
+      startDate: start,
+      endDate: start,
+      engineSnapshot: { amount: ev.cost.amount, unit: ev.unit, chargedDates: ev.cost.chargedDates, excluded: ev.cost.excluded },
+    });
+  }
+  return { org, ownerId: owner.id, managerId: ids[1]!, staffIds: ids, locationId: location.id, rooms: room, nextMonday };
+}

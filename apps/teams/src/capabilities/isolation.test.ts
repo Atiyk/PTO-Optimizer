@@ -89,6 +89,7 @@ const attacks = (): [CapabilityName, unknown][] => [
   ['manageSchedule', { op: 'upsertRoom', locationId: B.location.id, name: 'pwned', kind: 'room', groupKey: 'infant' }],
   ['manageSchedule', { op: 'upsertRoom', roomId: bRoomId, locationId: A.location.id, name: 'pwned', kind: 'room', groupKey: 'infant' }],
   ['manageSchedule', { op: 'archiveRoom', roomId: bRoomId }],
+  ['manageSchedule', { op: 'setTimezone', locationId: B.location.id, timezone: 'UTC' }],
   ['manageSchedule', { op: 'selectRulePack', locationId: B.location.id, packKey: 'childcare-us-tx', sickPolicy: 'none' }],
   ['manageSchedule', { op: 'setDemand', roomId: bRoomId, rows: [{ weekday: 0, start: '08:00', end: '12:00', group: 'infant', count: 9 }] }],
   ['manageSchedule', { op: 'addDemandException', roomId: bRoomId, date: '2026-11-02', closed: true }],

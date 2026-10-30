@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { addDays } from '@daysoff/engine/solver/dateUtils';
 import { hhmm, parseHhmm } from '@daysoff/engine/coverage/timeBlocks';
@@ -174,6 +174,7 @@ export const manageSchedule = defineCapability({
       groupKey: z.string().max(40).nullable().default(null),
     }),
     z.object({ op: z.literal('archiveRoom'), roomId: z.uuid() }),
+    z.object({ op: z.literal('setTimezone'), locationId: z.uuid(), timezone: z.string().min(1).max(64).describe('IANA time zone, e.g. "America/Los_Angeles".') }),
     z.object({
       op: z.literal('selectRulePack'),
       locationId: z.uuid(),
@@ -254,6 +255,16 @@ export const manageSchedule = defineCapability({
         await room(input.roomId);
         await db.update(rooms).set({ archivedAt: now }).where(and(eq(rooms.orgId, orgId), eq(rooms.id, input.roomId)));
         return { ok: true as const, op: input.op, id: input.roomId };
+      }
+      case 'setTimezone': {
+        await getLocation(db, orgId, input.locationId);
+        try {
+          new Intl.DateTimeFormat('en-US', { timeZone: input.timezone });
+        } catch {
+          throw new CapabilityError('invalid_input', `"${input.timezone}" is not a time zone (try "America/Los_Angeles").`);
+        }
+        await db.update(locations).set({ timezone: input.timezone }).where(and(eq(locations.orgId, orgId), eq(locations.id, input.locationId)));
+        return { ok: true as const, op: input.op, id: input.locationId };
       }
       case 'selectRulePack': {
         await getLocation(db, orgId, input.locationId);
@@ -672,11 +683,91 @@ export const listRulePacks = defineCapability({
   },
 });
 
-/** Used by the setup page: sites with room counts. */
-export async function sitesWithRooms(db: Db, orgId: string) {
-  const locs = await db.select().from(locations).where(eq(locations.orgId, orgId)).orderBy(locations.name);
-  const rs = locs.length ? await db.select().from(rooms).where(and(eq(rooms.orgId, orgId), inArray(rooms.locationId, locs.map((l) => l.id)), isNull(rooms.archivedAt))) : [];
-  return locs.map((l) => ({ ...l, rooms: rs.filter((r) => r.locationId === l.id) }));
-}
+export const getCoverageSetup = defineCapability({
+  name: 'getCoverageSetup',
+  description:
+    'Coverage setup for the admin screens: sites with their rooms, linked rule packs, weekly demand (children ' +
+    'per age group, counts only) and weekly staff schedules. Managers and admins. Reads only.',
+  input: z.object({}),
+  output: z.object({
+    vertical: z.string(),
+    costAwareRanking: z.boolean(),
+    sites: z.array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        timezone: z.string(),
+        packs: z.array(z.object({ key: z.string(), version: z.number(), name: z.string(), effectiveFrom: z.string(), effectiveTo: z.string().nullable() })),
+        groups: z.array(z.object({ key: z.string(), label: z.string() })),
+        rooms: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            kind: z.string(),
+            groupKey: z.string().nullable(),
+            demand: z.array(z.object({ weekday: z.number(), start: z.string(), end: z.string(), group: z.string(), count: z.number() })),
+          }),
+        ),
+      }),
+    ),
+    shifts: z.array(z.object({ memberId: z.string(), roomId: z.string(), weekday: z.number(), start: z.string(), end: z.string() })),
+    seedPacks: z.array(z.object({ key: z.string(), name: z.string(), vertical: z.string(), jurisdiction: z.string() })),
+  }),
+  scope: 'coverage:read',
+  roles: ['owner', 'admin', 'manager'],
+  effect: 'read',
+  idempotent: true,
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+  rateLimit: 'read',
+  surfaces: ['ui', 'rest'],
+  audit: null,
+  async handler({ db, actor }) {
+    const orgId = actor.orgId;
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, orgId));
+    const locs = await db.select().from(locations).where(eq(locations.orgId, orgId)).orderBy(locations.createdAt);
+    const rs = await db.select().from(rooms).where(and(eq(rooms.orgId, orgId), isNull(rooms.archivedAt))).orderBy(rooms.name);
+    const dem = await db.select().from(demandTemplates).where(eq(demandTemplates.orgId, orgId)).orderBy(demandTemplates.weekday, demandTemplates.startMinute);
+    const links = await db
+      .select({ link: siteRulePacks, key: rulePacks.key, version: rulePacks.version, pack: rulePacks.pack })
+      .from(siteRulePacks)
+      .innerJoin(rulePacks, eq(rulePacks.id, siteRulePacks.rulePackId))
+      .where(eq(siteRulePacks.orgId, orgId))
+      .orderBy(siteRulePacks.effectiveFrom);
+    const shifts = await db
+      .select({ s: shiftTemplates })
+      .from(shiftTemplates)
+      .innerJoin(members, and(eq(members.id, shiftTemplates.memberId), isNull(members.deletedAt)))
+      .where(eq(shiftTemplates.orgId, orgId))
+      .orderBy(shiftTemplates.weekday, shiftTemplates.startMinute);
+    const end = (m: number) => (m === 1440 ? '24:00' : hhmm(m));
+    return {
+      vertical: org!.vertical,
+      costAwareRanking: org!.costAwareRanking,
+      sites: locs.map((l) => {
+        const mine = links.filter((x) => x.link.locationId === l.id);
+        const groups = new Map<string, string>();
+        for (const x of mine) if (!x.link.effectiveTo) for (const g of (x.pack as RulePack).ageGroups ?? []) groups.set(g.key, g.label);
+        return {
+          id: l.id,
+          name: l.name,
+          timezone: l.timezone,
+          packs: mine.map((x) => ({ key: x.key, version: x.version, name: (x.pack as RulePack).name, effectiveFrom: x.link.effectiveFrom, effectiveTo: x.link.effectiveTo })),
+          groups: [...groups].map(([key, label]) => ({ key, label })),
+          rooms: rs
+            .filter((r) => r.locationId === l.id)
+            .map((r) => ({
+              id: r.id,
+              name: r.name,
+              kind: r.kind,
+              groupKey: r.groupKey,
+              demand: dem.filter((d) => d.roomId === r.id).map((d) => ({ weekday: d.weekday, start: hhmm(d.startMinute), end: end(d.endMinute), group: d.groupKey, count: d.count })),
+            })),
+        };
+      }),
+      shifts: shifts.map(({ s: x }) => ({ memberId: x.memberId, roomId: x.roomId, weekday: x.weekday, start: hhmm(x.startMinute), end: hhmm(x.endMinute) })),
+      seedPacks: SEED_PACKS.map((p) => ({ key: p.key, name: p.name, vertical: p.vertical, jurisdiction: [p.jurisdiction.city, p.jurisdiction.state, p.jurisdiction.country].filter(Boolean).join(', ') })),
+    };
+  },
+});
 
 export { hhmm, isAdmin };
