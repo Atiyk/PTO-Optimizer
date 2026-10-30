@@ -4,8 +4,9 @@ import { and, eq, gte, sql } from 'drizzle-orm';
 import type { Db } from '@/db/client';
 import { aiCache, aiUsage } from '@/db/schema';
 import { monthlyTokenBudget, orgDailyTokenBudget, taskConfig } from './config';
-import { AiProviderError, currentProvider } from './provider';
+import { AiProviderError, currentProvider, mockProvider } from './provider';
 import type { AiTask } from './task';
+import { demoKind } from '@/demo/isDemo';
 
 export type AiUnavailableReason = 'disabled' | 'org_budget' | 'monthly_budget' | 'input_too_long' | 'provider_error' | 'invalid_output';
 
@@ -66,7 +67,9 @@ export async function runAiTask<I, O>(
   input: I,
   now: Date,
 ): Promise<AiResult<O>> {
-  const provider = currentProvider();
+  // "Try the demo" copies swap the paid model for the deterministic stand-in, so anyone can click around for free.
+  const base = currentProvider();
+  const provider = base?.name === 'anthropic' && (await demoKind(db, orgId)) === 'sandbox' ? mockProvider : base;
   if (!provider) throw new AiUnavailableError('disabled', 'AI features are turned off.');
   const cfg = taskConfig(task.name);
 

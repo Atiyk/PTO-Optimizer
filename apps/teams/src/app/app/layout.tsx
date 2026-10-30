@@ -1,7 +1,10 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { and, eq } from 'drizzle-orm';
+import { AppNav, type NavGroup } from '@/components/AppNav';
 import { getOrg } from '@/domain/leave';
 import { getDb } from '@/db/client';
+import { members } from '@/db/schema';
 import { PRODUCT_NAME } from '@/lib/brand';
 import { requireActor } from '@/server/page';
 
@@ -9,36 +12,35 @@ export const dynamic = 'force-dynamic';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const actor = await requireActor();
-  const org = await getOrg(await getDb(), actor.orgId);
-  const links: [string, string][] = [
-    ['/app', 'My leave'],
-    ['/app/calendar', 'Calendar'],
+  const db = await getDb();
+  const org = await getOrg(db, actor.orgId);
+  const [me] = await db.select({ name: members.name }).from(members).where(and(eq(members.orgId, actor.orgId), eq(members.id, actor.memberId!)));
+  const manager = actor.role !== 'employee';
+  const regulated = org.vertical !== 'general';
+  const groups: NavGroup[] = [
+    { title: 'You', links: [['/app', 'My leave'], ...(regulated ? ([['/app/sick', 'Sick leave']] as [string, string][]) : []), ['/app/calendar', 'Calendar']] },
   ];
-  if (org.vertical !== 'general') links.push(['/app/coverage', 'Coverage'], ['/app/sick', 'Sick leave']);
-  if (actor.role !== 'employee') links.push(['/app/approvals', 'Approvals'], ['/app/planner', 'Planner']);
-  links.push(['/app/agents', 'My agents']);
-  if (actor.role === 'owner' || actor.role === 'admin') links.push(['/app/admin', 'Admin']);
+  if (manager || regulated) {
+    const team: [string, string][] = [];
+    if (regulated) team.push(['/app/coverage', 'Coverage']);
+    if (manager) team.push(['/app/approvals', 'Approvals'], ['/app/planner', 'Planner']);
+    groups.push({ title: 'Team', links: team });
+  }
+  const settings: [string, string][] = [['/app/agents', 'My agents']];
+  if (actor.role === 'owner' || actor.role === 'admin') settings.push(['/app/admin', 'Admin']);
+  groups.push({ title: 'Settings', links: settings });
   return (
     <div className="min-h-screen bg-surface">
-      <header className="border-b border-line bg-page">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
-          <div className="text-sm">
-            <span className="font-semibold text-ink">{PRODUCT_NAME}</span>
-            <span className="text-muted"> · {org.name}</span>
-          </div>
-          <nav aria-label="Main" className="flex flex-wrap items-center gap-1 text-sm">
-            {links.map(([href, text]) => (
-              <Link key={href} href={href} className="rounded px-2 py-1 text-ink hover:bg-surface-alt">
-                {text}
-              </Link>
-            ))}
-            <form action="/api/auth/signout" method="post">
-              <button className="rounded px-2 py-1 text-muted hover:bg-surface-alt">Sign out</button>
-            </form>
-          </nav>
-        </div>
-      </header>
-      <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+      <AppNav product={PRODUCT_NAME} org={org.name} person={me?.name ?? 'you'} groups={groups} demo={org.isDemo} />
+      <div className="lg:pl-60">
+        {org.isDemo && (
+          <p className="border-b border-line bg-band px-4 py-2 text-sm text-ink sm:px-8">
+            <span className="font-semibold">Demo copy.</span> Everyone here is made up, nothing reaches a real person, and this copy is deleted after a day.{' '}
+            <Link href="/signin" className="font-medium underline underline-offset-2">Use your own workspace</Link>
+          </p>
+        )}
+        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">{children}</main>
+      </div>
     </div>
   );
 }

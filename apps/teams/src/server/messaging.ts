@@ -1,6 +1,7 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from '@/db/client';
 import { memberCoverPrefs, pushSubscriptions } from '@/db/schema';
+import { isDemoOrg } from '@/demo/isDemo';
 
 /*
  * Outbound messages to staff (cover offers). Three channels behind one interface:
@@ -131,6 +132,8 @@ export async function pushSender(): Promise<PushSender | null> {
 export async function deliver(db: Db, orgId: string, msgs: OutboundMessage[]): Promise<Map<string, string>> {
   const used = new Map<string, string>(msgs.map((m) => [m.memberId, 'in_app']));
   if (msgs.length === 0) return used;
+  // Demo orgs are made up: their offers stay in the app and never reach a phone.
+  if (await isDemoOrg(db, orgId)) return used;
   const ids = msgs.map((m) => m.memberId);
   const push = await pushSender();
   if (push) {

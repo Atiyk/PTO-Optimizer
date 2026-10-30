@@ -18,6 +18,11 @@
   --accent-text: #ffffff;
   --band-bg: #fef3c7;
   --band-text: #1e293b;
+  /* Marketing and app chrome: a soft accent wash, and text on the deep-blue hero (9:1 or better). */
+  --accent-soft: #eef2ff;
+  --hero-bg: #0f1b3d;
+  --on-hero: #ffffff;
+  --on-hero-muted: #c7d2fe;
   /* Coverage states. Each pairs with a pattern or border too, so none relies on hue alone. */
   --ok-bg: #ecfdf5;
   --ok-fill: #d1fae5;
@@ -40,6 +45,10 @@
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
   --color-band: var(--band-bg);
+  --color-accent-soft: var(--accent-soft);
+  --color-hero: var(--hero-bg);
+  --color-on-hero: var(--on-hero);
+  --color-on-hero-muted: var(--on-hero-muted);
   --color-ok-bg: var(--ok-bg);
   --color-ok-fill: var(--ok-fill);
   --color-ok-line: var(--ok-line);
@@ -59,6 +68,15 @@ body {
 :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+
+/* On the dark hero the default ring would vanish. */
+.on-hero :focus-visible {
+  outline-color: var(--on-hero);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 @media (prefers-reduced-motion: reduce) {

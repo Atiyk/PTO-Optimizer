@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { COUNTRIES } from '@daysoff/engine/data/countries';
-import { getDb } from '@/db/client';
+import { dbMode, getDb } from '@/db/client';
 import { btnPrimary, input, label } from '@/components/ui';
 import { PRODUCT_NAME } from '@/lib/brand';
 import { cookieOptions, decodeIdentity, encodeSession, IDENTITY_COOKIE, SESSION_COOKIE, SESSION_MAX_AGE_SEC } from '@/lib/session';
@@ -12,6 +12,7 @@ async function create(formData: FormData) {
   const jar = await cookies();
   const identity = decodeIdentity(jar.get(IDENTITY_COOKIE)?.value);
   if (!identity) redirect('/signin');
+  if (dbMode() === 'demo-only') redirect('/signin?error=demo_only');
   const orgName = String(formData.get('orgName') ?? '').trim().slice(0, 120);
   const countryCode = String(formData.get('countryCode') ?? '');
   if (!orgName || !COUNTRIES.some((c) => c.code === countryCode)) redirect('/onboarding?error=1');

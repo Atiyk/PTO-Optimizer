@@ -2,9 +2,12 @@ import { randomBytes } from 'node:crypto';
 import { NextResponse, type NextRequest } from 'next/server';
 import { appUrl } from '@/lib/appUrl';
 import { cookieOptions } from '@/lib/session';
+import { dbMode } from '@/db/client';
 
 /** Sign in with Slack (OpenID Connect): https://docs.slack.dev/authentication/sign-in-with-slack/ */
 export async function GET(request: NextRequest) {
+  // Without a database, a real workspace would vanish on the next deploy: demo only.
+  if (dbMode() === 'demo-only') return NextResponse.redirect(new URL('/signin?error=demo_only', request.url));
   const clientId = process.env.SLACK_CLIENT_ID;
   if (!clientId) return NextResponse.redirect(new URL('/signin?error=slack_not_configured', request.url));
   const state = randomBytes(16).toString('base64url');

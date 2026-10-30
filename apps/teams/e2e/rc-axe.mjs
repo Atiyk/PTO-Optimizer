@@ -1,5 +1,5 @@
 // Regulated coverage accessibility check (node e2e/rc-axe.mjs <baseUrl> <out.json>): axe (WCAG 2.2 AA)
-// on every coverage page at 1440 and 375, for the manager/owner and for a staff member's phone app.
+// on the public pages and every coverage page at 1440 and 375, for the manager/owner and for a staff member's phone app.
 import { chromium } from 'playwright';
 import { AxeBuilder } from '@axe-core/playwright';
 import { writeFileSync } from 'node:fs';
@@ -18,6 +18,8 @@ async function axe(label, url) {
     report[`${label}@${w}`] = r.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, sample: v.nodes[0]?.target.join(' '), summary: v.nodes[0]?.failureSummary }));
   }
 }
+// Public pages first (signed out): landing, try the demo, sign-in, status.
+for (const [label, url] of [['landing', '/'], ['try', '/try'], ['signin', '/signin'], ['status', '/status'], ['demo-coverage', '/demo/coverage']]) await axe(label, url);
 await page.goto(`${base}/dev/login`);
 await page.getByRole('button', { name: /childcare centre/ }).click();
 await page.waitForURL(/\/app\/coverage/, { timeout: 120000 });
@@ -26,6 +28,7 @@ const d = new Date(`${today}T00:00:00Z`);
 d.setUTCDate(d.getUTCDate() + 7 - ((d.getUTCDay() + 6) % 7));
 const monday = d.toISOString().slice(0, 10);
 for (const [label, url] of [
+  ['app-home', '/app'],
   ['coverage', `/app/coverage?date=${monday}&day=${monday}`],
   ['forecast', '/app/coverage/forecast'],
   ['cover-requests', '/app/coverage/cover'],
@@ -37,7 +40,8 @@ for (const [label, url] of [
 ]) await axe(label, url);
 // A staff member on the phone app.
 await page.goto(`${base}/dev/login`);
-await page.locator('li').filter({ hasText: 'Hannah Moore' }).getByRole('button', { name: 'Sign in' }).click();
+// The last Hannah Moore: the centre created above (the /demo/coverage sample has one too).
+await page.locator('li').filter({ hasText: 'Hannah Moore' }).getByRole('button', { name: 'Sign in' }).last().click();
 await page.waitForURL(/\/app/);
 for (const [label, url] of [['m-today', '/m'], ['m-offers', '/m/offers'], ['m-leave', '/m/leave'], ['m-me', '/m/me']]) await axe(label, url);
 await page.goto(`${base}/api/auth/signout?to=m`).catch(() => {});
