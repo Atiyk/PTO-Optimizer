@@ -171,6 +171,10 @@ describe('reportCallOff', () => {
     expect(Object.keys(CAPABILITIES.reportCallOff.input.shape).sort()).toEqual(['date', 'idempotencyKey']);
     const again = await run(ava, 'reportCallOff', { date: MON, idempotencyKey: 'calloff-ava-1' });
     expect(again.requestId).toBe(out.requestId);
+    // Her own schedule now shows that shift as off.
+    const sched = await run(ava, 'getMySchedule', { days: 3 });
+    expect(sched.shifts.filter((x) => x.date === MON).every((x) => x.onLeave)).toBe(true);
+    expect(sched.shifts.some((x) => x.date === MON)).toBe(true);
     // The opted-in SMS recipient got a message with no reason, child data or pay.
     expect(sms.outbox.length).toBeGreaterThan(0);
     for (const m of sms.outbox) {

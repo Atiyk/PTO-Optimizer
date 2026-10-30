@@ -2020,4 +2020,90 @@ Phase 7.
 
 ## Phase 3: cover workflow and employee PWA (`claude/rc-p3-cover`)
 
-In progress.
+### What's in it
+- **Cover workflow** (`src/domain/cover.ts`, `coverFlow.ts`):
+  - A cover request's state is a fold over append-only `cover_events` (created, ranked,
+    offers_sent, declined, rule_recheck_failed, filled, reverted, cancelled).
+  - Offers go out in waves (default 3 people, 15 minutes apart) in the engine's ranking
+    order. The next wave goes as soon as everyone in the last one declines.
+  - First eligible "yes" wins. Every hard rule is re-checked at that moment, and a unique
+    partial index allows one `filled` event per request, so a race has exactly one winner.
+  - Accepting adds the cover shift to the person's schedule; cancelling a filled request
+    removes it again.
+  - Fairness ledger: covers taken, holiday covers and short-notice covers over 90 days, read
+    from `filled` events. Pay rates are never loaded; ranking sees only the overtime band.
+- **Capabilities**: `findCover`, `requestCover` (create needs an idempotency key; cancel),
+  `respondToCover` (accept is human-only; an agent can't take a shift for someone),
+  `reportCallOff`, `getCoverRequests`, `getMySchedule`, `setMyCoverPrefs`,
+  `manageStaffSignIn`. MCP now has 22 tools.
+- **Call-off** (two taps, no reason): today or tomorrow at the person's site time zone.
+  It records approved sick leave with `source: call_off` and no note. It deducts sick
+  hours only if the balance covers it (otherwise a note for the manager), then asks for
+  cover for each new gap. A `reason` sent anyway is dropped by the schema, never stored.
+- **Messages** (`src/server/messaging.ts`): in-app always; Web Push when VAPID keys exist
+  and the person turned it on; SMS/WhatsApp behind an adapter. The mock records what would
+  have been sent. The Twilio implementation is written and documented but OFF, and it
+  throws if it is ever reached in tests. Message text is room, date, times and site only.
+- **Staff sign-in without email or SMS**: passkeys (`@simplewebauthn/server` 14,
+  discoverable credentials, challenge in a signed 5-minute cookie, public keys only) and an
+  admin-issued one-time code (10 characters, 15 minutes, single use, stored hashed,
+  rate-limited per IP). Slack OIDC is unchanged.
+- **Staff app `/m`** (installable PWA, 375px first, 48px+ tap targets, a bottom tab bar):
+  Today (next 7 days, offer banner, "I can't come in"), Offers ("Take it" / "Can't"),
+  Leave (balances, sick hours, the same request form with its gap warning), Me (add a
+  passkey, notifications on/off, cover preference, texts only when the employer turned
+  texts on, own certifications, sign out), and `/m/signin`. The service worker only shows
+  notifications; it caches nothing.
+- **Manager pages**: "Find cover" on every fixable gap opens `/app/coverage/cover`: who
+  can take it in fair order with "why this order", who can't and the rule that stops them,
+  one button to ask the top 3, and the week's cover requests with cancel. All inputs are
+  in the URL. The People page gains "Get a sign-in code".
+- **Backstop for waves**: lazy advance on every cover read and decline, the daily cron, and
+  `/api/cron/cover` (needs `CRON_SECRET`).
+- **Fix found while building**: "today" was UTC everywhere in the cover flow, so a 6 pm call-off
+  in California counted as tomorrow. Call-off and the schedule now use the site's time zone
+  (`memberToday`), with a test.
+
+### Tests
+- `cover.test.ts` (10): ranking reasons, wave → fill → already_filled, a concurrent race
+  with one winner, re-check at accept, wave advance, agents can't accept, the fairness
+  ledger, call-off end to end (SMS mock outbox, schedule shows the shift as off), the
+  reason being dropped.
+- `staffAuth.test.ts` (7): code issue/redeem/expiry/single use, passkey options, the signed
+  challenge, cover prefs never echo the phone, site-local today.
+- The isolation test covers every new id-taking capability; migration 0006 goes up, down
+  and up again.
+
+### Gate
+- Typecheck clean (root and teams). Lint: warnings only (the existing `Date` purity
+  pattern, plus browser feature detection in effects).
+- Root `npm run build` passes; `verify:dist` identical (690 files).
+- Teams: 159 passed, 2 skipped.
+- Root: 587 passed, with the same 2 Days Off solver timing tests failing (Q1; the solver is
+  untouched by this branch).
+- Screenshots in `docs/screenshots/rc-p3/`, an end-to-end run on the demo centre: a gap's
+  Find cover link, ranked candidates, offers sent, the sign-in code, then on a 375px
+  phone: sign in with the code, Today with the offer banner, Offers, take it, the cover
+  shift on Today, Leave, Me, call-off confirm and done, and the manager's list showing
+  "Filled by". No horizontal overflow at any width. The coverage page "before" is in
+  `rc-p2/`; the other views are new.
+
+### Questions for Atiyk (Phase 3)
+- Q6: Waves only advance when someone opens the app, declines, or a cron runs. Vercel Hobby
+  crons run once a day, so a 15-minute wave needs an external pinger. *Recommendation:* a
+  free cron-job.org job every 5 minutes calling `GET https://<your-domain>/api/cron/cover`
+  with header `Authorization: Bearer <CRON_SECRET>`. Click-path: cron-job.org → Sign up →
+  Create cronjob → URL as above → Every 5 minutes → Advanced → Headers → add
+  `Authorization` → Save. Or move to Vercel Pro and change the cron schedule.
+- Q7: Turning on Web Push (free). Run `npx web-push generate-vapid-keys` locally, then
+  Vercel → project → Settings → Environment Variables → add `VAPID_PUBLIC_KEY`,
+  `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` (`mailto:you@yourdomain`) → Redeploy. On iPhone,
+  staff must add the app to the Home Screen first (iOS 16.4+).
+- Q8: Turning on texts (paid, off by default). Twilio Console → buy a number (or set up
+  the WhatsApp sender) → copy Account SID and Auth Token → Vercel → Environment Variables →
+  `MESSAGING_PROVIDER=twilio`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM`
+  (E.164, or `whatsapp:+1…`) → Redeploy. US numbers need A2P 10DLC registration first.
+  *Recommendation:* stay on push plus in-app until a customer asks.
+- Q9: Call-off deducts sick hours only when the balance covers the whole shift, and
+  otherwise leaves a note for the manager rather than going negative. Confirm that's the
+  policy you want.
