@@ -110,7 +110,7 @@ export default async function Setup() {
               { name: 'start', label: 'From', type: 'date', required: true },
               { name: 'end', label: 'To', type: 'date', required: true },
               { name: 'reason', label: 'Reason', type: 'text', required: true, placeholder: 'Year-end close' },
-              { name: 'teamId', label: 'Team (blank = everyone)', type: 'select', options: teamOpts, nullable: true },
+              { name: 'teamId', label: 'Team', type: 'select', options: teamOpts, emptyLabel: 'Everyone' },
               { name: 'hard', label: 'Block requests (not just warn)', type: 'checkbox' },
             ]}
             submitLabel="Add blackout"

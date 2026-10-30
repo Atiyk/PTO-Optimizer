@@ -31,10 +31,11 @@ async function open(): Promise<Db> {
     // prepare:false keeps it compatible with Neon's pooled (PgBouncer) endpoint.
     return drizzle(postgres(url, { prepare: false, max: 5 }), { schema }) as unknown as Db;
   }
-  if (process.env.NODE_ENV === 'production') {
+  // ALLOW_PGLITE=1 lets a production build run on in-process PGlite for demos and e2e tests.
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_PGLITE !== '1') {
     throw new Error('DATABASE_URL is required in production');
   }
-  return openPglite(path.join(process.cwd(), '.pglite'));
+  return openPglite(process.env.PGLITE_DIR ?? path.join(process.cwd(), '.pglite'));
 }
 
 /** In-process Postgres. `dataDir` undefined = in-memory (tests). Runs migrations. */

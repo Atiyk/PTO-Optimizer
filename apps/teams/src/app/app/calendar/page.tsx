@@ -74,12 +74,15 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
       <Card title="Days">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[22rem] border-collapse text-xs">
+          <table className="w-full table-fixed border-collapse text-xs">
             <caption className="sr-only">People out per day</caption>
             <thead>
               <tr className="text-muted">
                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
-                  <th key={d} scope="col" className="p-1 text-left font-medium">{d}</th>
+                  <th key={d} scope="col" className="p-1 text-left font-medium">
+                    <span aria-hidden="true" className="sm:hidden">{d[0]}</span>
+                    <span className="max-sm:sr-only">{d}</span>
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -94,9 +97,16 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                       <td key={d} className={`h-16 border border-line p-1 align-top ${weekend ? 'bg-surface-alt' : 'bg-page'} ${d === today ? 'outline-2 outline-accent' : ''}`}>
                         <div className="text-muted">{Number(d.slice(8))}</div>
                         {hols.map((h) => (
-                          <div key={h} className="truncate italic text-ink" title={h}>◆ {h}</div>
+                          <div key={h} className="truncate italic text-ink" title={h}>
+                            ◆<span className="max-sm:sr-only"> {h}</span>
+                          </div>
                         ))}
-                        {out.length > 0 && <div className="font-semibold text-ink">{out.length} out</div>}
+                        {out.length > 0 && (
+                          <div className="font-semibold text-ink">
+                            {out.length}
+                            <span className="max-sm:sr-only"> out</span>
+                          </div>
+                        )}
                       </td>
                     );
                   })}

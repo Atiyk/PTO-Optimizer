@@ -819,6 +819,52 @@ Scheduled, resumable run. Resumable state: GitHub issue #32 "SMB MVP: build log"
   identical to main+#41 (652 files); teams build OK; oxlint 0 errors. No UI changed in
   this phase, so no new screenshots.
 
+## Phase 2: core web product (`claude/smb-p2-core`)
+
+- Every business action is a registry capability (18): getMyBalance, explainBalance,
+  draftLeaveRequest, submitLeaveRequest, cancelLeaveRequest, listMyRequests, whoIsOut,
+  listHolidays, listPendingApprovals, decideLeaveRequest, getOrgSetup, manageOrgSetup,
+  listMembers, manageMembers, adjustBalance, exportData, getAuditLog, importCsv. The UI
+  calls them through one server action (`runCapability`), REST through
+  `POST /api/v1/actions/{name}` (session cookie for now; tokens in Phase 5).
+- Bootstrap (create org, accept invite) is the one documented exception outside the
+  registry (no org-scoped actor exists yet); it writes the same audit rows.
+- Auth: Sign in with Slack (OIDC; authorize → token → userInfo, state cookie), dev login
+  (non-production or `DEV_LOGIN=1`). Signed session cookie bound to member + org.
+  Invite links: random token shown once, SHA-256 hash stored, max uses, expiry, revoke.
+- Domain (`apps/teams/src/domain/`): server-side holidays from the committed
+  `public/holidays/` snapshot (traced into the deployment), falling back to Nager.Date;
+  `evaluateRequest` is the single function for live validation, submit and (Phase 3)
+  auto-approval: cost (engine), lowest balance from start to plan-year end, blackouts,
+  coverage (new engine `leave/coverage.ts`), overlaps, retroactive limit (30 days), health
+  notes.
+- Balance semantics: `balance` = ledger today; `usable` = balance minus leave booked later
+  this plan year (approved + pending). The UI shows usable as "Available now" and the
+  year-end outlook ("you'll have 8 on Dec 31; 3 above what carries over").
+- Visibility: org/team setting; names and dates only; leave type only if the org shows
+  it and never for health-related types. Service agents in team-visibility orgs see nobody.
+- CSV import: auto-maps Timetastic / Vacation Tracker / spreadsheet headers, preview with
+  per-row errors, all-or-nothing commit in one transaction; remaining balances become an
+  `import` ledger row that makes the engine's balance equal the file's number. Samples in
+  `apps/teams/samples/`. CSV export neutralises spreadsheet formulas.
+- Setup speed (e2e `apps/teams/e2e/walkthrough.mjs`): new owner → workspace → import 12
+  people with balances, managers and teams → coverage rule = **8 clicks** (plus typing the
+  org name), 5.1 s automated. Defaults: one location, one team, Vacation (20 days, carry 5),
+  Sick (tracked, no balance, no notes), Personal, Unpaid.
+- Tests (teams 37): tenant isolation across 18 attack inputs on every id-taking capability
+  plus list reads and export (asserts the other org is unchanged, and fails if a new
+  id-taking capability lacks an attack), RBAC per role, request lifecycle (holiday not
+  deducted, idempotent submit, approve/decline/cancel with append-only ledger, overlaps,
+  over-balance, retroactive, half days/hours, coverage warnings, sick-note minimisation,
+  visibility), CSV import (auto-map, all-or-nothing, rollback mid-transaction, leave
+  import), onboarding defaults, invites (use count, expiry, revoke, hashed).
+- Known gaps: whoIsOut counts weekend days inside a range as "out" on the calendar grid;
+  per-member location history is stored but holidays use the current location; no email.
+- Gate: root 468 pass / 2 known-flaky; teams 37/37; typecheck clean; Days Off dist
+  identical to main+#41; teams build OK; lint 0 errors. Screenshots:
+  `docs/screenshots/smb-p2/` (signin, onboarding, import preview, setup, people,
+  employee request, approvals, calendar × 1440/768/375).
+
 ## Questions for Atiyk (SMB)
 - Q1. ~~main lacks the old stack~~ Resolved: you merged it. But main's build is broken by
   a merge artifact. Recommended: merge #41 first, then this stack.

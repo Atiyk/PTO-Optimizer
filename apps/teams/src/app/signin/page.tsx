@@ -11,6 +11,8 @@ const ERRORS: Record<string, string> = {
   userinfo: 'Could not read your Slack profile. Please try again.',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function SignIn({ searchParams }: { searchParams: Promise<{ error?: string; next?: string }> }) {
   const { error, next } = await searchParams;
   const nextQs = next?.startsWith('/') ? `?next=${encodeURIComponent(next)}` : '';

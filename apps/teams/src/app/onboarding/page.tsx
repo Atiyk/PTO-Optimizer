@@ -27,6 +27,8 @@ async function create(formData: FormData) {
   redirect('/app/admin?welcome=1');
 }
 
+export const dynamic = 'force-dynamic';
+
 export default async function Onboarding({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const identity = decodeIdentity((await cookies()).get(IDENTITY_COOKIE)?.value);
   if (!identity) redirect('/signin?next=/onboarding');

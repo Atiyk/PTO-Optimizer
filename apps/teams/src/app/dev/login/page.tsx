@@ -40,6 +40,8 @@ async function seed() {
   redirect('/app');
 }
 
+export const dynamic = 'force-dynamic';
+
 export default async function DevLogin({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   if (!devLoginEnabled()) notFound();
   const { next } = await searchParams;

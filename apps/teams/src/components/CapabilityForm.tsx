@@ -8,7 +8,17 @@ import { btnPrimary, input, label } from './ui';
 
 export type Field =
   | { name: string; label: string; type: 'text' | 'date' | 'number'; required?: boolean; placeholder?: string; step?: string; defaultValue?: string | number }
-  | { name: string; label: string; type: 'select'; options: { value: string; label: string }[]; defaultValue?: string; nullable?: boolean }
+  | {
+      name: string;
+      label: string;
+      type: 'select';
+      options: { value: string; label: string }[];
+      defaultValue?: string;
+      /** Edit forms: offer "(no change)" and "None" (null). */
+      nullable?: boolean;
+      /** Create forms: a single empty choice with this label, sent as "not set". */
+      emptyLabel?: string;
+    }
   | { name: string; label: string; type: 'checkbox'; defaultValue?: boolean }
   | { name: string; label: string; type: 'tags'; placeholder?: string };
 
@@ -80,6 +90,7 @@ export function CapabilityForm({
                 <label className={label} htmlFor={`${id}-${f.name}`}>{f.label}</label>
                 {f.type === 'select' ? (
                   <select id={`${id}-${f.name}`} name={f.name} defaultValue={f.defaultValue} className={`${input} mt-1`}>
+                    {f.emptyLabel && <option value="">{f.emptyLabel}</option>}
                     {f.nullable && (
                       <>
                         <option value="">(no change)</option>

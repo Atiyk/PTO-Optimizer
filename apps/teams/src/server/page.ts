@@ -9,8 +9,10 @@ import { SESSION_COOKIE } from '@/lib/session';
 
 /** For server components: the signed-in human, or a redirect to sign in. */
 export async function requireActor(): Promise<Actor> {
+  // Read the cookie first: it marks the route dynamic before any DB access.
+  const session = (await cookies()).get(SESSION_COOKIE)?.value;
   const db = await getDb();
-  const actor = await humanActorFromSession(db, (await cookies()).get(SESSION_COOKIE)?.value);
+  const actor = await humanActorFromSession(db, session);
   if (!actor) redirect('/signin');
   return actor;
 }

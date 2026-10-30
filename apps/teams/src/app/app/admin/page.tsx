@@ -30,7 +30,7 @@ export default async function People({ searchParams }: { searchParams: Promise<{
           fixed={{ op: 'createInvite' }}
           fields={[
             { name: 'role', label: 'Joins as', type: 'select', options: [{ value: 'employee', label: 'Employee' }, { value: 'manager', label: 'Manager' }, { value: 'admin', label: 'Admin' }], defaultValue: 'employee' },
-            { name: 'teamId', label: 'Team', type: 'select', options: teamOpts, nullable: true },
+            { name: 'teamId', label: 'Team', type: 'select', options: teamOpts, emptyLabel: 'No team' },
             { name: 'maxUses', label: 'How many people can use it', type: 'number', defaultValue: 25, step: '1' },
           ]}
           submitLabel="Create invite link"

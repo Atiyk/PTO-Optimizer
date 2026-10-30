@@ -25,6 +25,8 @@ async function join(formData: FormData) {
   redirect('/app');
 }
 
+export const dynamic = 'force-dynamic';
+
 export default async function Join({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ error?: string }> }) {
   const { token } = await params;
   const { error } = await searchParams;

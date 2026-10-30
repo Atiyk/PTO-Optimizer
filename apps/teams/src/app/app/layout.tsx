@@ -5,6 +5,8 @@ import { getDb } from '@/db/client';
 import { PRODUCT_NAME } from '@/lib/brand';
 import { requireActor } from '@/server/page';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const actor = await requireActor();
   const org = await getOrg(await getDb(), actor.orgId);

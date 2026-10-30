@@ -84,7 +84,9 @@ export async function acceptInvite(db: Db, token: string, identity: Identity, no
     .select()
     .from(invites)
     .where(and(eq(invites.tokenHash, hashToken(token)), isNull(invites.revokedAt), gt(invites.expiresAt, now)));
-  if (!inv || inv.uses >= inv.maxUses) throw new CapabilityError('not_found', 'This invite link is invalid, used up or expired.');
+  const invalid = () => new CapabilityError('not_found', 'This invite link is invalid, used up or expired.');
+  if (!inv) throw invalid();
+  // Following the same link again (same Slack user) is not a new use.
   if (identity.provider === 'slack') {
     const [existing] = await db
       .select()
@@ -92,6 +94,7 @@ export async function acceptInvite(db: Db, token: string, identity: Identity, no
       .where(and(eq(members.orgId, inv.orgId), eq(members.slackUserId, identity.subject), isNull(members.deletedAt)));
     if (existing) return existing;
   }
+  if (inv.uses >= inv.maxUses) throw invalid();
   return db.transaction(async (tx) => {
     const [loc] = await tx.select({ id: locations.id }).from(locations).where(eq(locations.orgId, inv.orgId)).limit(1);
     const [m] = await tx
