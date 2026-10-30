@@ -790,6 +790,35 @@ Scheduled, resumable run. Resumable state: GitHub issue #32 "SMB MVP: build log"
   Typecheck clean. Holiday prefetch from date.nager.at fails from this sandbox; the build
   falls back to committed data (same on main).
 
+## Phase 1: spec and domain model (`claude/smb-p1-spec`)
+
+- `docs/teams/SPEC.md` committed before feature code.
+- Schema (`apps/teams/src/db/schema.ts`): 18 tables per SPEC §2. Migrations regenerated as
+  a single `0000_init.sql` (nothing has been deployed; drizzle-kit's rename prompt needs a
+  TTY). `getMyBalance` now resolves the leave type by key within the org.
+- Engine `packages/engine/src/leave/` (pure, no DB):
+  - `policy.ts`: policy model (front-loaded / per pay period / per hour worked / unlimited;
+    calendar / anniversary / custom plan year; cap; carryover none/all/upTo + use-by;
+    waiting period no_accrual|locked; negative allowance) + `validatePolicy`.
+  - `calendar.ts`: plan years (Feb 29 anniversaries reset Feb 28 in non-leap years),
+    addMonths with clamping, use-by dates.
+  - `requestCost.ts`: working days only; holidays and non-working days listed, never
+    deducted; half days, hours, part-time weeks.
+  - `projection.ts`: replays posted ledger rows + scheduled events (accruals, year-end
+    carryover/forfeiture, use-by expiry) in date order, integer 1/10000 units. Per-period
+    accrual uses cumulative rounding so a year sums to exactly the allowance. Scheduled
+    events have deterministic keys; posted rows with that key win (history is stable when
+    a policy changes). Returns timeline with running balance (the explanation facts),
+    `duePostings` for the posting job, year-end outlook (carry/forfeit).
+  - Decisions: usage spends carried-over leave first (FIFO); negative balances carry as
+    debt, nothing forfeited; cap applies to front-loaded grants too; per-hour accrual uses
+    scheduled hours (work week × hours/day, minus holidays) since there is no timesheet
+    input in the MVP; a partial first pay period is pro-rated by days employed.
+- Tests: 28 in `leave.test.ts`, every required case with the arithmetic in comments.
+- Gate: root 464 pass / 2 known-flaky; teams 10/10; typecheck clean; Days Off dist
+  identical to main+#41 (652 files); teams build OK; oxlint 0 errors. No UI changed in
+  this phase, so no new screenshots.
+
 ## Questions for Atiyk (SMB)
 - Q1. ~~main lacks the old stack~~ Resolved: you merged it. But main's build is broken by
   a merge artifact. Recommended: merge #41 first, then this stack.
