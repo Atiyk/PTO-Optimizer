@@ -2635,3 +2635,80 @@ waived review. Before/after screens: `docs/screenshots/rc-ui/before/` and `after
 Gate: teams 200 passed (3 skipped); typecheck clean; lint 0 errors; `npm run build` passes and
 Days Off dist is identical (690 files); axe 0 violations on 26 page-widths; RC1 browser setup
 still 28 clicks (6.2 min); RC5 call-off still 2 taps; no overflow or page errors.
+
+## Live setup, try-the-demo and redesign (`claude/teams-live-redesign`)
+Prompt: `/mnt/project-files/prompts/teams-live-setup-and-redesign-prompt.md`. Run unattended;
+Atiyk waived review. Before/after screens: `docs/screenshots/teams-redesign/before/` and `after/`.
+Design references: the patterns in vezadigital.com's "best HR tech website design examples":
+- Address both buyer and employee.
+- One tagline.
+- Product visuals instead of stock photos.
+- Compliance as a differentiator.
+- Named integrations.
+- A short nav.
+- A free demo as the way in.
+- No invented social proof.
+
+**It works on a fresh deploy**
+- **Migrations run themselves.** With `DATABASE_URL` set, the first database open in each
+  process applies pending migrations under a Postgres advisory lock. When nothing is pending it
+  is a no-op. `AUTO_MIGRATE=0` turns it off; `npm run db:migrate` still works by hand.
+- **The bundle carries what it reads.** `drizzle/` and PGlite's WASM and data files are now in
+  `outputFileTracingIncludes`. Before this, a Vercel function could not find them.
+- **No database means demo-only, not a crash.** Production without `DATABASE_URL` used to throw
+  "DATABASE_URL is required in production". It now runs on in-memory PGlite:
+  - The demo works.
+  - Sign in with Slack and onboarding are off, with a plain explanation, because a workspace
+    would vanish.
+  - In this mode only, a missing `SESSION_SECRET` falls back to a per-process random one.
+  - Checked end to end with `e2e/demo-only-smoke.mjs` against `next start` with no env at all.
+- **Try the demo (`/try`).** One click gives a visitor a private copy of a made-up org, already
+  signed in:
+  - Choices: the childcare centre as director, the centre's staff app as Ava, or Northwind Labs
+    as owner.
+  - Copies are named "… (demo)", deleted after 24 hours (on each new start and in the daily
+    job), and capped at 200 live copies.
+  - In every demo org, SMS and push are skipped, and webhooks, Slack install, agent keys and
+    personal tokens are refused (listing still works).
+  - Copies swap a configured paid model for the mock, so a visitor costs nothing. The shared
+    `/demo` samples keep the real model within its budget, as before.
+- **Status (`/status`, `/api/health`).** Shows the database mode, migrations applied out of the
+  total, and which integrations are configured. It shows booleans only, never values.
+  `/api/health` returns 503 until the database is reachable and current.
+
+**Redesign**
+- **Landing.**
+  - A sticky header with four links and a "Try the demo" button.
+  - A dark hero with one tagline, two CTAs, and a rendered product visual: the coverage window
+    plus the staff phone.
+  - "For managers and owners" and "For your team", each with its own example card.
+  - The staff-cover section with its citation.
+  - Integrations: Slack, phone app, MCP, REST and webhooks, CSV.
+  - "Built to be checked", a closing CTA and a real footer.
+  - Every visual is labelled "Example". There are no prices and no customer claims.
+- **Tagline.** It is now "Time off and staff cover for small teams, with numbers you can trust."
+  It is changed only in `lib/brand.ts`, see Q25.
+- **App shell.**
+  - A sidebar from 1024 px, grouped into You, Team and Settings, with `aria-current` on the
+    current page, the org name, who is signed in, and Sign out.
+  - Below 1024 px, a top bar with a Menu button that closes after you navigate.
+  - Content is now `max-w-6xl`.
+  - Demo orgs show a yellow "Demo copy" banner and "Leave the demo".
+- **Sign-in.** A split layout with the tagline panel, a staff phone-app link, and "Try the demo".
+
+Gate:
+- Teams tests: 205 passed, 3 skipped (5 new in `src/demo/sandbox.test.ts`).
+- Typecheck clean; lint 0 errors.
+- `npm run build` passes, and the Days Off dist is identical (690 files).
+- axe: 0 violations on 38 page-widths. Landing, /try, /signin, /status and /app are now
+  covered too.
+- RC1 is still 28 clicks; RC5 is still 2 taps.
+- No overflow and no page errors.
+
+Not verified here: auto-migration against a real Neon database. The sandbox can't reach one.
+The migrator call is the same one `scripts/migrate.ts` uses; `/status` will show the result.
+
+- **Q25: Tagline.** I broadened it to cover staff cover. Change `PRODUCT_TAGLINE` if you
+  prefer the old one.
+- **Q26: Demo-only on production.** This is the right default until Neon is connected. Once
+  `DATABASE_URL` is set, it disappears on its own.

@@ -4,6 +4,7 @@ import { manageWebhooks } from './actions/webhooks';
 import { deleteWorkspace, eraseMember } from './actions/privacy';
 import { getSlackConnection, manageSlack } from './actions/slack';
 import { auditLog } from '@/db/schema';
+import { isDemoOrg } from '@/demo/isDemo';
 import { adjustBalance, exportData, getAuditLog, getOrgSetup, listMembers, manageMembers, manageOrgSetup } from './actions/admin';
 import { explainBalanceInWords, getAiUsage, importHandbook, parseLeaveRequestText } from './actions/ai';
 import { importCsv } from './actions/importCsv';
@@ -103,6 +104,7 @@ export async function invokeCapability<N extends CapabilityName>(
   const cap = CAPABILITIES[name] as unknown as CapabilityDef;
 
   await authorize(ctx, cap);
+  if (DEMO_BLOCKED.has(cap.name) && (rawInput as { op?: unknown } | null)?.op !== 'list') await refuseInDemo(ctx);
 
   const parsed = cap.input.safeParse(rawInput ?? {});
   if (!parsed.success) {
@@ -114,6 +116,16 @@ export async function invokeCapability<N extends CapabilityName>(
 
   if (cap.audit) await writeAudit(ctx, cap, 'ok', cap.audit(parsed.data, out));
   return out;
+}
+
+/**
+ * Things a "Try the demo" visitor must not do from a made-up org: send data to outside URLs,
+ * connect a real Slack workspace, or hand out agent keys. Listing (op 'list') still works.
+ */
+const DEMO_BLOCKED = new Set(['manageWebhooks', 'manageSlack', 'manageAgentAccess', 'managePersonalTokens']);
+
+async function refuseInDemo(ctx: CapabilityContext): Promise<void> {
+  if (await isDemoOrg(ctx.db, ctx.actor.orgId)) throw new CapabilityError('forbidden', 'This is turned off in the demo. Sign in with your own workspace to use it.');
 }
 
 export function describeZodError(capName: string, err: z.ZodError): string {

@@ -35,13 +35,16 @@ const nextConfig: NextConfig = {
   },
   // The engine ships TypeScript source (no build step); Next compiles it.
   transpilePackages: ['@daysoff/engine'],
-  // PGlite is a WASM build used in dev/tests only; keep it out of the server bundle graph.
+  // PGlite is a WASM build for dev, tests and demo-only deploys (no DATABASE_URL); keep it out of the server bundle graph.
   serverExternalPackages: ['@electric-sql/pglite'],
   poweredByHeader: false,
   // Monorepo: trace from the repo root so the engine package and the committed holiday
-  // snapshots (read with fs at runtime) ship with the deployment.
+  // snapshots (read with fs at runtime) ship with the deployment. The SQL migrations are read
+  // at runtime too (auto-migration, /status), and PGlite loads its WASM and data files by path.
   outputFileTracingRoot: path.join(import.meta.dirname, '..', '..'),
-  outputFileTracingIncludes: { '/**': ['../../public/holidays/**', './samples/**'] },
+  outputFileTracingIncludes: {
+    '/**': ['../../public/holidays/**', './samples/**', './drizzle/**', '../../node_modules/@electric-sql/pglite/dist/*.{js,cjs,wasm,data}'],
+  },
 };
 
 export default nextConfig;

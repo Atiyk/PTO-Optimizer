@@ -1,6 +1,7 @@
 import { and, eq, isNotNull, lt } from 'drizzle-orm';
 import type { Db } from '@/db/client';
 import { apiTokens, drafts, rateCounters, slackReceipts, webhookDeliveries } from '@/db/schema';
+import { removeExpiredSandboxes } from '@/demo/sandbox';
 
 /** Prunes rows that only matter for a short time. Run daily by the cron route. */
 export async function housekeeping(db: Db, now: Date) {
@@ -20,5 +21,7 @@ export async function housekeeping(db: Db, now: Date) {
     .returning({ id: drafts.id });
   const deliveries = await db.delete(webhookDeliveries).where(lt(webhookDeliveries.createdAt, ninetyDays)).returning({ id: webhookDeliveries.id });
   const receipts = await db.delete(slackReceipts).where(lt(slackReceipts.receivedAt, dayAgo)).returning({ k: slackReceipts.key });
-  return { slackReceipts: receipts.length, rateWindows: rate.length, accessTokens: access.length, draftsExpired: expired.length, deliveries: deliveries.length };
+  // "Try the demo" copies live a day; starting a new one also clears them, this catches quiet days.
+  const demoSandboxes = await removeExpiredSandboxes(db, now);
+  return { demoSandboxes, slackReceipts: receipts.length, rateWindows: rate.length, accessTokens: access.length, draftsExpired: expired.length, deliveries: deliveries.length };
 }

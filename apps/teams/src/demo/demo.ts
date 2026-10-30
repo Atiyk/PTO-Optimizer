@@ -19,14 +19,16 @@ import { DEMO_HANDBOOK } from './handbookText';
 
 export { DEMO_HANDBOOK };
 
+export const DEMO_COMPANY = 'Northwind Labs';
+
 let pending: Promise<string> | null = null;
 
 async function demoOrgId(db: Db, today: string): Promise<string> {
-  const [org] = await db.select({ id: organizations.id }).from(organizations).where(eq(organizations.isDemo, true)).orderBy(asc(organizations.createdAt)).limit(1);
+  const [org] = await db.select({ id: organizations.id }).from(organizations).where(and(eq(organizations.isDemo, true), eq(organizations.name, DEMO_COMPANY))).orderBy(asc(organizations.createdAt)).limit(1);
   if (org) return org.id;
   // One seed per process at a time; a second instance racing us just leaves an unused org.
   pending ??= (async () => {
-    const { org: created } = await seedDemoOrg(db, today, { orgName: 'Northwind Labs' });
+    const { org: created } = await seedDemoOrg(db, today, { orgName: DEMO_COMPANY });
     await db.update(organizations).set({ isDemo: true, agentAccessEnabled: false }).where(eq(organizations.id, created.id));
     return created.id;
   })().finally(() => {

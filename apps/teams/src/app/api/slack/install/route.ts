@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getDb } from '@/db/client';
 import { humanActorFromSession } from '@/lib/actor';
 import { appUrl } from '@/lib/appUrl';
+import { isDemoOrg } from '@/demo/isDemo';
 import { cookieOptions, SESSION_COOKIE } from '@/lib/session';
 import { BOT_SCOPES, STATE_COOKIE, USER_SCOPES } from '@/slack/config';
 
@@ -16,6 +17,7 @@ export async function GET(request: NextRequest) {
   if (!clientId) return NextResponse.redirect(new URL('/app?slack=not_configured', request.url));
   const actor = await humanActorFromSession(await getDb(), request.cookies.get(SESSION_COOKIE)?.value);
   if (!actor) return NextResponse.redirect(new URL('/signin', request.url));
+  if (await isDemoOrg(await getDb(), actor.orgId)) return NextResponse.redirect(new URL('/app?slack=demo', request.url));
   if (kind === 'workspace' && actor.role !== 'owner' && actor.role !== 'admin') return NextResponse.redirect(new URL('/app?slack=admins_only', request.url));
   const state = randomBytes(16).toString('base64url');
   const url = new URL('https://slack.com/oauth/v2/authorize');

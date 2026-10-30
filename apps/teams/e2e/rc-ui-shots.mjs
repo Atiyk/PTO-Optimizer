@@ -1,6 +1,6 @@
 // Screens for the regulated-coverage UI pass (node e2e/rc-ui-shots.mjs <baseUrl> <shotsDir>), against a
 // production build with DEV_LOGIN=1: landing, coverage, find cover, forecast (1440/768/375) and the
-// staff app (375, plus 768). Fails on a page error or a horizontal overflow.
+// staff app (375, plus 768), sign-in, app home, and the try-the-demo flow. Fails on a page error or a horizontal overflow.
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 
@@ -31,6 +31,8 @@ const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push(`desk: ${e.message}`));
 await page.goto(base, { waitUntil: 'networkidle' });
 await shoot(page, 'landing');
+await page.goto(`${base}/signin`, { waitUntil: 'networkidle' });
+await shoot(page, 'signin');
 await page.goto(`${base}/dev/login`);
 await page.getByRole('button', { name: /childcare centre/ }).click();
 await page.waitForURL(/\/app\/coverage/, { timeout: 120000 });
@@ -42,6 +44,8 @@ await page.waitForURL(/coverage\/cover/);
 await shoot(page, 'find-cover');
 await page.goto(`${base}/app/coverage/forecast`, { waitUntil: 'networkidle' });
 await shoot(page, 'forecast');
+await page.goto(`${base}/app`, { waitUntil: 'networkidle' });
+await shoot(page, 'app-home');
 
 await page.goto(`${base}/app/admin`, { waitUntil: 'networkidle' });
 await page.getByLabel('Person').first().selectOption({ label: 'Ava Bennett' });
@@ -65,6 +69,19 @@ await m.screenshot({ path: `${out}/staff-calloff-done-375.png`, fullPage: true }
 if (taps !== 2) errors.push(`call-off took ${taps} taps`);
 await m.goto(`${base}/m/offers`, { waitUntil: 'networkidle' });
 await m.screenshot({ path: `${out}/staff-offers-375.png`, fullPage: true });
+
+// "Try the demo": one click from /try lands a visitor in their own copy, signed in, no Slack.
+if (process.env.SHOT_TRY !== '0') {
+  const v = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+  v.on('pageerror', (e) => errors.push(`visitor: ${e.message}`));
+  await v.goto(`${base}/try`, { waitUntil: 'networkidle' });
+  await shoot(v, 'try');
+  await v.getByRole('button', { name: 'Open as the director' }).click();
+  await v.waitForURL(/\/app\/coverage/, { timeout: 120000 });
+  await shoot(v, 'demo-coverage');
+  await v.goto(`${base}/status`, { waitUntil: 'networkidle' });
+  await shoot(v, 'status');
+}
 
 console.log(JSON.stringify({ taps, errors }));
 await browser.close();

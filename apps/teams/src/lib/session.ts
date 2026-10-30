@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 /**
  * Signed session cookie: "<memberId>.<orgId>.<issuedAtSec>.<hmac>". Phase 2 adds Slack
@@ -13,10 +13,16 @@ export interface Session {
   issuedAt: number;
 }
 
+// A demo-only deploy (production, no DATABASE_URL) keeps nothing, so a per-process secret is
+// enough there: the worst case is a visitor starting the demo again. Everywhere else it is required.
+let ephemeral: string | undefined;
 function secret(): string {
   const s = process.env.SESSION_SECRET;
-  if (!s) throw new Error('SESSION_SECRET is not set');
-  return s;
+  if (s) return s;
+  if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL && process.env.ALLOW_PGLITE !== '1') {
+    return (ephemeral ??= randomBytes(32).toString('base64url'));
+  }
+  throw new Error('SESSION_SECRET is not set');
 }
 
 function sign(payload: string): string {
