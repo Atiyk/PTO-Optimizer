@@ -224,3 +224,34 @@ describe('agents over MCP (official client SDK)', () => {
     expect(await db.select().from(drafts)).toHaveLength(0);
   });
 });
+
+describe('tool schemas work in the strictest clients', () => {
+  // Copilot Studio drops $ref, truncates schemas at type arrays (["string","null"]) and treats
+  // enums as plain strings; Agentforce limits tool names. Keep every tool inside those limits.
+  it('no $ref, no type arrays, names match ^[a-zA-Z][a-zA-Z0-9_]{0,63}$; X-API-Key works too', async () => {
+    const owner = await run(db, humanActor(A.owner), 'managePersonalTokens', { op: 'create', name: 'schemas', scopes: ['leave:read', 'leave:request', 'leave:approve', 'policy:read', 'policy:draft', 'planner:run'] });
+    const client = new Client({ name: 'copilot-like', version: '1.0.0' });
+    const transport = new StreamableHTTPClientTransport(new URL('http://teams.test/api/mcp'), {
+      requestInit: { headers: { 'X-API-Key': owner.created!.token } },
+      fetch: (url, init) => mcpPost(new NextRequest(url as string, init as never)),
+    });
+    await client.connect(transport);
+    clients.push(client);
+    const { tools } = await client.listTools();
+    const problems: string[] = [];
+    const walk = (tool: string, where: string, node: unknown) => {
+      if (Array.isArray(node)) return node.forEach((n, i) => walk(tool, `${where}[${i}]`, n));
+      if (!node || typeof node !== 'object') return;
+      const o = node as Record<string, unknown>;
+      if ('$ref' in o) problems.push(`${tool} ${where}: $ref`);
+      if (Array.isArray(o.type)) problems.push(`${tool} ${where}: type array ${JSON.stringify(o.type)}`);
+      for (const [k, v] of Object.entries(o)) walk(tool, `${where}.${k}`, v);
+    };
+    for (const t of tools) {
+      if (!/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/.test(t.name)) problems.push(`${t.name}: name`);
+      walk(t.name, 'input', t.inputSchema);
+      walk(t.name, 'output', t.outputSchema);
+    }
+    expect(problems).toEqual([]);
+  });
+});

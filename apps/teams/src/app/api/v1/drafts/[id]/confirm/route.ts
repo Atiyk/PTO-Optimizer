@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getDb } from '@/db/client';
 import { CapabilityError } from '@/capabilities/errors';
-import { authenticateBearer } from '@/lib/agentAuth';
+import { authenticateBearer, credentialHeader } from '@/lib/agentAuth';
 import { errorResponse } from '@/lib/http';
 import { confirmDraftAsAgent } from '@/server/agentGateway';
 
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (typeof body.confirmationToken !== 'string') throw new CapabilityError('invalid_input', 'confirmationToken is required.');
     if (!/^[0-9a-f-]{36}$/i.test(id)) throw new CapabilityError('not_found', 'Draft not found.');
     const db = await getDb();
-    const auth = await authenticateBearer(db, request.headers.get('authorization'), new Date());
+    const auth = await authenticateBearer(db, credentialHeader(request.headers), new Date());
     const r = await confirmDraftAsAgent(db, auth, id, body.confirmationToken, new Date());
     return NextResponse.json({ data: r.result });
   } catch (err) {

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getDb } from '@/db/client';
 import { CapabilityError } from '@/capabilities/errors';
 import { getCapability, type CapabilityName } from '@/capabilities/registry';
-import { authenticateBearer } from '@/lib/agentAuth';
+import { authenticateBearer, credentialHeader } from '@/lib/agentAuth';
 import { errorResponse } from '@/lib/http';
 import { bearerChallenge } from '@/lib/resourceMetadata';
 import { SESSION_COOKIE } from '@/lib/session';
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         throw new CapabilityError('invalid_input', 'Body must be JSON.');
       }
     }
-    const authz = request.headers.get('authorization');
+    const authz = credentialHeader(request.headers);
     if (authz) {
       const db = await getDb();
       let auth;

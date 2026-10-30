@@ -20,6 +20,17 @@ export interface AgentAuth {
  * client-credentials tokens are service agents with no member identity. The org's kill
  * switch refuses every agent token at once; humans are unaffected.
  */
+/**
+ * The credential an agent sent: `Authorization: Bearer <token>`, or `X-API-Key: <token>` for
+ * platforms whose API-key setting only names a header (Copilot Studio). Never the query string.
+ */
+export function credentialHeader(headers: Headers): string | null {
+  const authz = headers.get('authorization');
+  if (authz) return authz;
+  const key = headers.get('x-api-key')?.trim();
+  return key ? `Bearer ${key}` : null;
+}
+
 export async function authenticateBearer(db: Db, header: string | null, now: Date): Promise<AgentAuth> {
   const m = header?.match(/^Bearer\s+(\S+)$/i);
   if (!m) throw new CapabilityError('unauthenticated', 'Send an access token: Authorization: Bearer <token>.');

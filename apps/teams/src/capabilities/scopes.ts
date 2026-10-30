@@ -22,3 +22,14 @@ export const ROLE_SCOPES: Record<Role, readonly Scope[]> = {
   admin: ADMIN,
   owner: ADMIN,
 };
+
+/** Plain-language meaning of each scope, for consent screens, token settings and agent docs. */
+export const SCOPE_DESCRIPTIONS: Record<Scope, string> = {
+  'leave:read': 'See balances, requests, who is out and public holidays (what the person could see in the app).',
+  'leave:request': 'Draft and submit leave requests, cancel them and answer leave suggestions.',
+  'leave:approve': 'Approve or decline requests from the people this person manages.',
+  'policy:read': 'Read leave policies and explain balances.',
+  'policy:draft': 'Draft leave policies from a handbook for an admin to confirm.',
+  'planner:run': 'Run the team planner and send leave suggestions.',
+  admin: 'Change workspace settings, people and policies.',
+};
