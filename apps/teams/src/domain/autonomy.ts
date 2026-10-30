@@ -58,6 +58,8 @@ export function autoApprovalCheck(ev: Evaluation): AutoApprovalCheck {
   if (ev.problems.length) blockers.push(...ev.problems);
   if (ev.retroactive) blockers.push('Starts in the past.');
   if (ev.coverage.length) blockers.push('Would leave the team below its coverage minimum.');
+  // D4: a new ratio or required-role gap at a regulated site is a hard fail, never auto-approved.
+  if (ev.blockCoverage.length) blockers.push('Would break a staffing ratio or required-role rule.');
   if (ev.blackouts.length) blockers.push('Overlaps a blackout period.');
   if (ev.countsAgainstBalance && ev.balanceAfter != null && ev.balanceAfter < 0) blockers.push('Would take the balance below zero.');
   const basis =

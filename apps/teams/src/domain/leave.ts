@@ -20,6 +20,7 @@ import {
   organizations,
 } from '@/db/schema';
 import { CapabilityError } from '@/capabilities/errors';
+import { blockImpact, type GapWindow } from './coverage';
 import { holidayMap } from './holidays';
 import { parseWorkWeek } from './workWeek';
 
@@ -239,8 +240,13 @@ export interface RequestInput {
   end: string;
   part: RequestPart;
   hours?: number;
+  /** Local time window for part = 'hours' (minutes after midnight), used for block-level coverage. */
+  startMinute?: number;
+  endMinute?: number;
   note?: string | null;
 }
+
+export type BlockGap = GapWindow & { siteId: string; roomName: string | null };
 
 export interface Evaluation {
   leaveType: LeaveTypeRow;
@@ -252,6 +258,8 @@ export interface Evaluation {
   yearEndAfter: { yearEnd: string; balance: number; wouldForfeit: number } | null;
   blackouts: { start: string; end: string; reason: string; hard: boolean }[];
   coverage: CoverageViolation[];
+  /** Regulated sites only: ratio/role gaps (per 30-minute block, merged) this absence would open. */
+  blockCoverage: BlockGap[];
   overlaps: { id: string; start: string; end: string; status: string }[];
   retroactive: boolean;
   /** Blocking problems; empty = can be submitted. */
@@ -278,6 +286,18 @@ export async function evaluateRequest(
   if (input.note && leaveType.isHealthRelated && !org.sickNotesEnabled) {
     problems.push(`Notes are not stored for ${leaveType.name.toLowerCase()} requests. Remove the note.`);
   }
+
+  const window = input.startMinute != null && input.endMinute != null ? { startMinute: input.startMinute, endMinute: input.endMinute } : null;
+  if ((input.startMinute == null) !== (input.endMinute == null)) problems.push('Give both a start and an end time.');
+  if (window) {
+    if (input.part !== 'hours') problems.push('Start and end times are only for part-day requests in hours.');
+    else if (input.start !== input.end) problems.push('A request in hours covers one day.');
+    else if (window.endMinute <= window.startMinute) problems.push('The end time must be after the start time.');
+    else if (input.hours != null && Math.abs(input.hours - (window.endMinute - window.startMinute) / 60) > 0.01) {
+      problems.push(`${input.hours} hours does not match the times given (${(window.endMinute - window.startMinute) / 60} hours).`);
+    }
+  }
+  if (window && input.hours == null && window.endMinute > window.startMinute) input = { ...input, hours: (window.endMinute - window.startMinute) / 60 };
 
   const holidays = await memberHolidays(db, orgId, member, input.start, input.end);
   const cost = requestCost(
@@ -383,6 +403,17 @@ export async function evaluateRequest(
   const coverage = await coverageImpact(db, orgId, member, finalCost.chargedDates, opts.excludeRequestId);
   for (const v of coverage) warnings.push(`On ${v.date} the team would have ${v.present} of the ${v.required} needed${v.tag ? ` (${v.tag})` : ''}.`);
 
+  // Regulated sites: the engine's block-level check (ratios, required roles) against the schedule.
+  const blockCoverage = (
+    await blockImpact(db, orgId, member.id, finalCost.chargedDates.length ? finalCost.chargedDates : [], input.part, window, { excludeRequestId: opts.excludeRequestId })
+  ).filter((g) => g.kind !== 'group_size');
+  for (const g of blockCoverage) {
+    warnings.push(
+      `On ${g.date} ${g.start}–${g.end}${g.roomName ? ` in ${g.roomName}` : ''}: ${g.present} of ${g.required} required staff (${g.label}` +
+        `${g.citation ? `, ${g.citation.section}` : g.needsVerification ? ', needs verification' : ''}).`,
+    );
+  }
+
   return {
     leaveType,
     cost: finalCost,
@@ -393,6 +424,7 @@ export async function evaluateRequest(
     yearEndAfter,
     blackouts: bl.map((b) => ({ start: b.startDate, end: b.endDate, reason: b.reason, hard: b.hard })),
     coverage,
+    blockCoverage,
     overlaps: overlapsRows,
     retroactive,
     problems,
