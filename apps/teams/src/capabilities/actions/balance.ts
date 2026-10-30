@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { getLeaveTypeByKey, balanceView, isoDate } from '@/domain/leave';
+import { bookedAhead, getLeaveTypeByKey, balanceView, isoDate } from '@/domain/leave';
 import { defineCapability } from '../types';
 import { subjectMember, untrusted } from '../helpers';
 
@@ -24,7 +24,11 @@ export const getMyBalance = defineCapability({
     unit: z.enum(['days', 'hours']),
     unlimited: z.boolean(),
     balance: z.number().describe('Engine-computed balance today.'),
-    usable: z.number().nullable().describe('What can be booked now (0 during a locked waiting period). Null when unlimited.'),
+    usable: z
+      .number()
+      .nullable()
+      .describe('What can still be booked: balance today minus leave already booked later this plan year (0 during a locked waiting period). Null when unlimited.'),
+    bookedAhead: z.number().describe('Approved and pending leave dated after today, this plan year.'),
     carried: z.number(),
     carriedExpiresOn: z.string().nullable(),
     yearEnd: z
@@ -51,7 +55,8 @@ export const getMyBalance = defineCapability({
       unit: p.unit,
       unlimited: p.unlimited,
       balance: p.unlimited ? 0 : p.asOf.balance,
-      usable: p.unlimited ? null : p.asOf.usable,
+      usable: p.unlimited ? null : p.asOf.lockedUntil ? 0 : Math.round((p.asOf.balance - bookedAhead(p, isoDate(now))) * 10_000) / 10_000,
+      bookedAhead: bookedAhead(p, isoDate(now)),
       carried: p.asOf.carried,
       carriedExpiresOn: p.asOf.carriedExpiresOn,
       yearEnd: p.yearEnd ? { date: p.yearEnd.yearEnd, balance: p.yearEnd.balance, wouldCarry: p.yearEnd.wouldCarry, wouldForfeit: p.yearEnd.wouldForfeit } : null,

@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
   // Monorepo: trace from the repo root so the engine package and the committed holiday
   // snapshots (read with fs at runtime) ship with the deployment.
   outputFileTracingRoot: path.join(import.meta.dirname, '..', '..'),
-  outputFileTracingIncludes: { '/**': ['../../public/holidays/**'] },
+  outputFileTracingIncludes: { '/**': ['../../public/holidays/**', './samples/**'] },
 };
 
 export default nextConfig;

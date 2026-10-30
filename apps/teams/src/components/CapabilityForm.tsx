@@ -47,7 +47,7 @@ export function CapabilityForm({
       if (f.type === 'checkbox') payload[f.name] = raw === 'on';
       else if (f.type === 'number') payload[f.name] = raw === '' || raw == null ? undefined : Number(raw);
       else if (f.type === 'tags') payload[f.name] = String(raw ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-      else if (f.type === 'select' && f.nullable && raw === '') payload[f.name] = null;
+      else if (f.type === 'select' && raw === '__null') payload[f.name] = null;
       else payload[f.name] = raw === '' ? undefined : String(raw);
     }
     const form = e.currentTarget;
@@ -80,7 +80,12 @@ export function CapabilityForm({
                 <label className={label} htmlFor={`${id}-${f.name}`}>{f.label}</label>
                 {f.type === 'select' ? (
                   <select id={`${id}-${f.name}`} name={f.name} defaultValue={f.defaultValue} className={`${input} mt-1`}>
-                    {f.nullable && <option value="">—</option>}
+                    {f.nullable && (
+                      <>
+                        <option value="">(no change)</option>
+                        <option value="__null">None</option>
+                      </>
+                    )}
                     {f.options.map((o) => (
                       <option key={o.value} value={o.value}>{o.label}</option>
                     ))}

@@ -175,6 +175,25 @@ export async function balanceView(
   return { projection, leaveType, hasPolicy };
 }
 
+/** Minimum running balance over [from, to], starting from the balance at `from`. */
+export function lowestBalance(p: Projection, from: string, to: string): number {
+  let low = p.asOf.balance;
+  for (const t of p.timeline) {
+    if (t.date < from) continue;
+    if (t.date > to) break;
+    low = Math.min(low, t.balanceAfter);
+  }
+  return low;
+}
+
+/** Usage booked after `today` within the plan year (approved in the ledger, plus pending). */
+export function bookedAhead(p: Projection, today: string): number {
+  const end = p.yearEnd?.yearEnd ?? today;
+  let sum = 0;
+  for (const t of p.timeline) if (t.kind === 'usage' && t.date > today && t.date <= end) sum += t.amount;
+  return Math.round(-sum * 10_000) / 10_000 || 0;
+}
+
 // ── Request evaluation: one function for live validation, submit and auto-approval ──
 
 export interface RequestInput {
@@ -267,8 +286,11 @@ export async function evaluateRequest(
         [{ id: 'this-request', kind: 'usage', amount: -finalCost.amount, effectiveDate: input.start }],
         { includePending: true, excludeRequestId: opts.excludeRequestId },
       );
-      balanceBefore = before.projection.asOf.balance;
-      balanceAfter = after.projection.asOf.balance;
+      // The lowest the balance gets from the request's start to the plan-year end, so leave
+      // already booked later in the year is respected (D1: engine numbers only).
+      const yearEnd = after.projection.yearEnd?.yearEnd ?? input.end;
+      balanceBefore = lowestBalance(before.projection, input.start, yearEnd);
+      balanceAfter = lowestBalance(after.projection, input.start, yearEnd);
       const usable = before.projection.asOf;
       if (usable.lockedUntil) problems.push(`Leave can be used from ${usable.lockedUntil} (waiting period).`);
       const floor = -after.projection.negativeAllowance;
