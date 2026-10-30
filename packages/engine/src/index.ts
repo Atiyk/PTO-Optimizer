@@ -16,3 +16,4 @@ export * from './leave/policy';
 export * from './leave/calendar';
 export * from './leave/requestCost';
 export * from './leave/projection';
+export * from './leave/coverage';
