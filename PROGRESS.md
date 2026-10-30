@@ -4,6 +4,36 @@
 just localhost). Phase 7 (PWA) not attempted - explicitly lowest priority per spec
 ("only if time remains"), and this run's time budget was fully spent on Phases 0-6.**
 
+## MERGED — 2026-10-29/30, with explicit user authorization to merge
+
+All 10 PRs across both runs (phases 0-6, a hotfix, and Feature 1's A/B/C stack) are merged
+into `main`, in order, via the Terminal panel. Final `main` commit: `30631e9`.
+
+Since every PR was stacked on the previous one's branch, squash-merging + deleting each base
+branch auto-CLOSED the next PR in the chain (not auto-retargeted, contrary to the original
+plan) every single time. Each closed PR was recreated fresh (same branch content, rebased
+onto `main` with `git rebase -X ours origin/main`, force-pushed, re-opened as a new PR
+targeting `main` directly) rather than fought via GitHub's reopen/retarget API, which refuses
+to reopen a PR whose base branch no longer exists. New PR numbers: #31 (was #22), #33 (was
+#23), #35 (was #24), #36 (was #25), #37 (was #26), #38 (was #27), #42 (was #28), #43 (was
+#29), #44 (was #30). PRs #21, #29(orig-B stays #29→closed/rebuilt), #40 are the ones that
+merged under their original or a hotfix number - see the PR list above for exact mapping.
+
+Two real problems found and fixed before continuing the chain (not merged broken):
+1. **Duplicate `firstOfMonth`** in `sabbaticalData.ts` (three phase branches independently
+   added the same helper at different insertion points - no textual conflict, so three
+   silent duplicates). Fixed in PR #40.
+2. **`/policy` and `/glossary` silently dropped** from `vite.config.ts`/`scripts/routes.ts`/
+   `scripts/prerender.ts` when Feature 1's PR-C was rebased onto a `main` that now also had
+   run-1 Phase 6's own additions to those same files - `-X ours` conflict resolution kept
+   Phase 6's side wherever both sides touched a file, even on non-conflicting-but-related
+   hunks. Caught by actually running `npm run build` locally before merging (not trusting a
+   clean `git rebase`), fixed in PR #44's own final commit before merging it.
+
+Final verification on merged `main`: `npm test -- --run` 488/490 passed (the two known K9
+timing-flake tests, nothing else - confirmed clean of both merge-artifact bugs above).
+`npx tsc --noEmit` clean. `npm run build` clean - 42 routes built and prerendered.
+
 ## PR list (merge order - each stacks on the previous; merge in this order)
 
 | # | Phase | Branch | Preview URL |
