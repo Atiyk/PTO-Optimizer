@@ -37,3 +37,23 @@ tests + typecheck + build before pushing, screenshots at 1440/768/375) apply her
 ## Commands
 - `npm run test -w apps/teams`, `npm run typecheck -w apps/teams`, `npm run build -w apps/teams`
 - `npm run db:generate -w apps/teams` after editing `src/db/schema.ts` (commit the SQL).
+
+## Regulated coverage rules (childcare, clinics)
+Read `docs/teams/COVERAGE-ARCHITECTURE.md` and `docs/teams/COVERAGE-SPEC.md` first.
+- **D1 for rules.** Ratios, headcounts, gaps, eligibility, rest/hours checks, rankings and
+  sick-leave accruals come from `packages/engine/src/coverage/`. The LLM drafts and
+  explains; every number in an explanation must appear in the engine facts it was given.
+- **Citations.** Every rule shown to a customer carries `{regulation, section, url,
+  retrievedOn}` or is labelled "needs verification". Never invent a ratio, rest rule or
+  accrual rate. Each cited number in `packages/engine/rulepacks/` has a test. Wherever rules
+  appear in the UI, say "Not legal advice".
+- **No child data.** Demand is counts per age group per room per time block. Never store
+  or accept child names, birthdays, addresses or any child identifier. A schema/API test
+  enforces this.
+- **Pay rates.** Stored only while the org has cost-aware ranking on; visible to
+  owner/admin only (`payrates:read`, never grantable to tokens); never sent to the LLM,
+  webhooks, logs or exports to non-admins. Ranking outputs a cost band, not a rate.
+- **Call-off reasons** are not stored by default (health-data minimisation).
+- **Messaging.** Business logic lives in capabilities; adapters (mock, Slack, Web Push,
+  Twilio-off) only deliver. Tests use the mock. Never send a real SMS or push.
+- **MCP tool budget ≤ 25.** Count before adding a tool; prefer extending a capability.

@@ -1228,3 +1228,53 @@ None of these were tried live: the app isn't deployed, and these are your accoun
   `/daysoff Friday afternoon off` → Request, approve from the manager DM.
 - Q10–Q14 (product name, pricing, moving Days Off into `apps/`, Microsoft Teams timing, the
   teams URL for the Days Off link): see the final report at the top of this section.
+
+
+# Regulated coverage
+
+Build log: issue #54 ("Regulated coverage: build log", label `rc-run`). Strategy background:
+`/mnt/project-files/strategy/coverage-and-scheduling.md` (the strategy thread's branch
+`claude/strategy-coverage-scheduling` was not pushed when this run started, so the doc is
+not copied into this branch).
+
+**Base:** `claude/smb-p8-launch` (the SMB MVP's final branch). The MVP PRs #34–#52 are not
+merged into `main`, so Phase 0 stacks on the MVP stack. Merge order: the MVP stack first,
+then `claude/rc-p0-audit` and up.
+
+## Phase 0: audit and reconcile (`claude/rc-p0-audit`)
+
+### What exists (read 2026-10-30)
+- `packages/engine`: solver (Days Off), holidays, ledger fixed point, policy model
+  (`front_loaded`, `per_pay_period`, `per_hour_worked`, `unlimited`; caps, carryover,
+  use-by, waiting period, negative allowance), balance projection, day-level coverage
+  (`coverage.ts`), team planner (min-cost max-flow + local search, `teamPlan.ts`).
+- `apps/teams`: Next.js 16, Drizzle + PGlite tests, 35 capabilities in the registry, 17 of
+  them on MCP, REST + OpenAPI, MCP server, webhooks with outbox, OAuth client credentials,
+  personal tokens, autonomy levels, AI module with budgets and evals, Slack app, demo org.
+- Docs: SPEC, ARCHITECTURE, PLANNER, SECURITY, PRIVACY, AGENT-AUTH, ACCEPTANCE.
+
+### What the MVP final report says failed or was skipped
+- A8 (Slack) passes on fixtures only; never run live.
+- Per-person OAuth for agents (Q4) designed, not built.
+- Security gaps: sessions not revocable, webhook secrets derived from `SESSION_SECRET`,
+  DNS-rebinding window on webhooks, CSP allows inline scripts, no MFA/SSO beyond Slack.
+- Privacy policy and DPA are drafts needing legal review.
+
+### Baseline on `claude/smb-p8-launch` in this sandbox (4 vCPU)
+- Typecheck: clean (root + all workspaces).
+- Build: `npm run build:all` passes; `npm run verify:dist`: identical, 652 files.
+- Teams tests: 125 passed, 2 skipped (live-only).
+- Root + engine tests: 474 passed, **1–2 failed: `solve.test.ts` "performance" (a full-year
+  solve took 1.16–1.66 s against a 1 s wall-clock budget) and once "every count works…"
+  timed out at 5 s.** These are Days Off solver timing tests and fail only because this
+  sandbox is slower; no logic failure. Not touched (Days Off is out of scope, and the
+  root CLAUDE.md protects its build). Recorded as an environment flake; every gate below
+  reports it separately.
+
+### Known gaps that touch this work
+See `docs/teams/COVERAGE-ARCHITECTURE.md` §6: hourly accrual uses scheduled hours, coverage
+is day-level, tags instead of expiring credentials, no non-Slack staff sign-in.
+
+### MVP defects fixed in this phase
+None needed. Nothing in the MVP blocks the coverage work; the gaps above are extensions,
+handled additively in Phase 1.
