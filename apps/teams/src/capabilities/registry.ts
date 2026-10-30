@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { auditLog } from '@/db/schema';
 import { adjustBalance, exportData, getAuditLog, getOrgSetup, listMembers, manageMembers, manageOrgSetup } from './actions/admin';
+import { getAiUsage, parseLeaveRequestText } from './actions/ai';
 import { importCsv } from './actions/importCsv';
 import { decideLeaveRequest, listPendingApprovals } from './actions/approvals';
 import { explainBalance, getMyBalance } from './actions/balance';
@@ -32,6 +33,8 @@ export const CAPABILITIES = {
   exportData,
   getAuditLog,
   importCsv,
+  parseLeaveRequestText,
+  getAiUsage,
 } as const satisfies Record<string, CapabilityDef>;
 
 export type CapabilityName = keyof typeof CAPABILITIES;

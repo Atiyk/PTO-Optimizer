@@ -25,7 +25,7 @@ export const requestInput = z.object({
     .describe('Optional note for the approver. Not allowed on sick/health leave unless the org enabled notes.'),
 });
 
-const evaluationOutput = z.object({
+export const evaluationOutput = z.object({
   leaveType: z.string(),
   unit: z.enum(['days', 'hours']),
   deducts: z.number().describe('Engine-computed amount this request deducts.'),

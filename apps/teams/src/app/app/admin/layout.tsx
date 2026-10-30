@@ -10,6 +10,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     ['/app/admin/setup', 'Setup'],
     ['/app/admin/import', 'Import'],
     ['/app/admin/data', 'Balances, export & audit'],
+    ['/app/admin/ai', 'AI usage'],
   ];
   return (
     <div className="space-y-4">

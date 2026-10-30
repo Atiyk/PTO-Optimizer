@@ -3,7 +3,7 @@
 import { useEffect, useId, useMemo, useState, useTransition } from 'react';
 import { runCapability } from '@/app/actions';
 import type { CapabilityOutput } from '@/capabilities/registry';
-import { Badge, btnPrimary, fmt, input, label } from './ui';
+import { Badge, btnPrimary, btnSecondary, fmt, input, label } from './ui';
 
 type Draft = CapabilityOutput<'draftLeaveRequest'>;
 type Part = 'full' | 'am' | 'pm' | 'hours';
@@ -25,6 +25,31 @@ export function RequestForm({ leaveTypes, today }: { leaveTypes: { key: string; 
   const [result, setResult] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [idemKey, setIdemKey] = useState(() => crypto.randomUUID());
+  const [sentence, setSentence] = useState('');
+  const [parseNote, setParseNote] = useState<string | null>(null);
+  const [parsing, startParsing] = useTransition();
+
+  /** Fills the form from one sentence. It never submits: the person checks and presses Request. */
+  function fillFromSentence(e: React.FormEvent) {
+    e.preventDefault();
+    if (!sentence.trim()) return;
+    startParsing(async () => {
+      const r = await runCapability('parseLeaveRequestText', { text: sentence });
+      if (!r.ok) {
+        setParseNote(r.error.message);
+        return;
+      }
+      const f = r.data.fields;
+      if (f.leaveType && leaveTypes.some((t) => t.key === f.leaveType)) setLeaveType(f.leaveType);
+      setPart(f.part);
+      if (f.hours != null) setHours(f.hours);
+      if (f.start) setStart(f.start);
+      if (f.end) setEnd(f.end);
+      if (f.note) setNote(f.note);
+      setResult(null);
+      setParseNote(f.clarifyingQuestion ?? (f.start ? 'Filled in below. Check it, then press Request.' : null));
+    });
+  }
 
   const effectiveEnd = part === 'full' ? end || start : start;
   const payload = useMemo(
@@ -71,6 +96,23 @@ export function RequestForm({ leaveTypes, today }: { leaveTypes: { key: string; 
 
   return (
     <div className="space-y-4">
+      <form onSubmit={fillFromSentence} className="space-y-1">
+        <label className={label} htmlFor={`${id}-say`}>Say it in your own words <span className="font-normal text-muted">(optional)</span></label>
+        <div className="flex gap-2">
+          <input
+            id={`${id}-say`}
+            className={input}
+            value={sentence}
+            maxLength={500}
+            placeholder="e.g. Friday afternoon off, or Dec 22 to Jan 2"
+            onChange={(e) => setSentence(e.target.value)}
+          />
+          <button type="submit" className={`${btnSecondary} shrink-0`} disabled={parsing || !sentence.trim()}>
+            {parsing ? 'Reading…' : 'Fill in'}
+          </button>
+        </div>
+        {parseNote && <p className="text-sm text-muted" aria-live="polite">{parseNote}</p>}
+      </form>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label className={label} htmlFor={`${id}-type`}>Type</label>
