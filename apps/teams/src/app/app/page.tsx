@@ -1,5 +1,6 @@
 import { ActionButton } from '@/components/ActionButton';
 import { RequestForm } from '@/components/RequestForm';
+import { ExplainBalance } from '@/components/ExplainBalance';
 import { Badge, Card, fmt, formatRange, Stat } from '@/components/ui';
 import { call, requireActor } from '@/server/page';
 
@@ -41,6 +42,7 @@ export default async function MyLeave() {
                     )}
                   </p>
                 )}
+                <ExplainBalance leaveType={type.key} />
               </div>
             )}
           </Card>

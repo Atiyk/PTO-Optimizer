@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { auditLog } from '@/db/schema';
 import { adjustBalance, exportData, getAuditLog, getOrgSetup, listMembers, manageMembers, manageOrgSetup } from './actions/admin';
-import { getAiUsage, importHandbook, parseLeaveRequestText } from './actions/ai';
+import { explainBalanceInWords, getAiUsage, importHandbook, parseLeaveRequestText } from './actions/ai';
 import { importCsv } from './actions/importCsv';
 import { decideLeaveRequest, listPendingApprovals } from './actions/approvals';
 import { explainBalance, getMyBalance } from './actions/balance';
@@ -35,6 +35,7 @@ export const CAPABILITIES = {
   importCsv,
   parseLeaveRequestText,
   importHandbook,
+  explainBalanceInWords,
   getAiUsage,
 } as const satisfies Record<string, CapabilityDef>;
 

@@ -3,10 +3,11 @@ import { z } from 'zod';
 import { aiMode, estimateCostUsd } from '@/ai/config';
 import { AiUnavailableError, budgetStatus, runAiTask } from '@/ai/run';
 import { verifyHandbookProposal } from '@/ai/handbook';
+import { explainBalanceTask, templateExplanation, untracedNumbers, type BalanceFacts } from '@/ai/tasks/explainBalance';
 import { importHandbookTask } from '@/ai/tasks/importHandbook';
 import { parsedRequestSchema, parseLeaveRequestTask } from '@/ai/tasks/parseLeaveRequest';
 import { aiUsage, leaveTypes } from '@/db/schema';
-import { evaluateRequest, isoDate } from '@/domain/leave';
+import { balanceView, bookedAhead, evaluateRequest, getLeaveTypeByKey, isoDate } from '@/domain/leave';
 import { subjectMember, untrusted } from '../helpers';
 import { defineCapability } from '../types';
 import { evaluationOutput, evaluationToOutput } from './requests';
@@ -196,5 +197,74 @@ export const importHandbook = defineCapability({
       questions: v.questions,
       source,
     };
+  },
+});
+
+export const explainBalanceInWords = defineCapability({
+  name: 'explainBalanceInWords',
+  description:
+    "Explains the member's balance for one leave type in a few plain sentences, optionally answering a " +
+    'question about it. Every number in the text is checked against the engine\'s facts; if any number ' +
+    'cannot be traced, a fixed template is returned instead. The structured facts are returned too.',
+  input: z.object({
+    leaveType: z.string().min(1).max(64).default('vacation'),
+    question: z.string().max(300).optional().describe('Optional question in the member\'s words, e.g. "why did it drop in March?"'),
+  }),
+  output: z.object({
+    text: z.string(),
+    facts: z.unknown().describe('The engine facts the text was written from.'),
+    source: aiStatus,
+  }),
+  scope: 'leave:read',
+  effect: 'read',
+  idempotent: true,
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+  rateLimit: 'ai',
+  surfaces: ['ui', 'rest', 'mcp', 'slack', 'assistant'],
+  audit: null,
+  async handler({ db, actor, now }, input) {
+    const member = await subjectMember(db, actor);
+    const type = await getLeaveTypeByKey(db, actor.orgId, input.leaveType);
+    const today = isoDate(now);
+    const { projection: p } = await balanceView(db, actor.orgId, member, type, today, [], { includePending: true });
+    if (p.unlimited) {
+      return {
+        text: `${type.name} is unlimited, so there is no balance. You have taken ${p.usedThisPlanYear} ${p.unit} this plan year.`,
+        facts: { unlimited: true, usedThisPlanYear: p.usedThisPlanYear },
+        source: { used: 'rules' as const, unavailableReason: null },
+      };
+    }
+    const ahead = bookedAhead(p, today);
+    const facts: BalanceFacts = {
+      leaveTypeName: type.name,
+      unit: p.unit,
+      today,
+      balance: p.asOf.balance,
+      usable: p.asOf.lockedUntil ? 0 : Math.round((p.asOf.balance - ahead) * 10_000) / 10_000,
+      bookedAhead: ahead,
+      carried: p.asOf.carried,
+      carriedExpiresOn: p.asOf.carriedExpiresOn,
+      yearEnd: p.yearEnd ? { date: p.yearEnd.yearEnd, balance: p.yearEnd.balance, wouldCarry: p.yearEnd.wouldCarry, wouldForfeit: p.yearEnd.wouldForfeit } : null,
+      usedThisPlanYear: p.usedThisPlanYear,
+      // Admin-typed reasons are left out: they are free text, and their numbers are not engine facts.
+      recent: p.timeline
+        .filter((t) => t.date <= today)
+        .slice(-8)
+        .map((t) => ({ date: t.date, kind: t.kind, amount: t.amount, balanceAfter: t.balanceAfter, note: t.source === 'scheduled' ? t.note : '' })),
+      question: input.question ?? null,
+    };
+    try {
+      const r = await runAiTask(db, actor.orgId, explainBalanceTask, facts, now);
+      const bad = untracedNumbers(r.output.text, facts);
+      if (bad.length === 0) return { text: r.output.text, facts, source: { used: 'ai' as const, unavailableReason: null } };
+      return {
+        text: templateExplanation(facts).text,
+        facts,
+        source: { used: 'rules' as const, unavailableReason: `The AI wrote numbers that are not in the balance facts (${bad.slice(0, 3).join(', ')}).` },
+      };
+    } catch (err) {
+      if (!(err instanceof AiUnavailableError)) throw err;
+      return { text: templateExplanation(facts).text, facts, source: { used: 'rules' as const, unavailableReason: err.message } };
+    }
   },
 });
