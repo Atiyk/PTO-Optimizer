@@ -24,7 +24,7 @@ describe('balance explanations (3C): number provenance', () => {
   it('every number and date in the explanation is an engine fact', async () => {
     setAiProvider(mockProvider);
     const r = await run(db, humanActor(A.emp), 'explainBalanceInWords', { leaveType: 'vacation' });
-    expect(r.source.used).toBe('ai');
+    expect(r.source.used).toBe('demo');
     expect(r.text).toMatch(/20 days/); // 20 granted, 2 pending later this year
     expect(untracedNumbers(r.text, r.facts as BalanceFacts)).toEqual([]);
   });

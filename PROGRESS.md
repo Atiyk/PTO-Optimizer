@@ -865,6 +865,52 @@ Scheduled, resumable run. Resumable state: GitHub issue #32 "SMB MVP: build log"
   `docs/screenshots/smb-p2/` (signin, onboarding, import preview, setup, people,
   employee request, approvals, calendar × 1440/768/375).
 
+## Phase 3: AI layer (`claude/smb-p3-ai`)
+
+- One server-side AI module (`apps/teams/src/ai/`): provider interface (Anthropic SDK
+  implementation + deterministic mock), per-task model map (parsing and explanations on
+  `claude-haiku-5-5`, handbook import on `claude-sonnet-5-5`, overridable with
+  `AI_MODEL_*`), max tokens and max input size per task, per-org daily token budget
+  (`AI_ORG_DAILY_TOKEN_BUDGET`, default 200k), global `AI_MONTHLY_TOKEN_BUDGET` (default 5M;
+  0 turns AI off), handbook results cached by content hash (task + prompt version + model +
+  text), usage recorded per org and feature (`ai_usage`), admin page **Admin → AI usage**.
+  Modes: off (default without a key; every form still works), `AI_MOCK=1` demo mode
+  (labelled "Demo" in the UI, never "AI"), live. Tests always run off or mock.
+- Every AI answer is validated against its schema (one retry), then re-checked by code:
+  unknown leave types and reversed dates are dropped (3A), handbook quotes must be verbatim
+  in the document, mention their number, sit inside sane bounds and not read like an
+  instruction (3B), every number in an explanation must be an engine fact (3C). When AI is
+  off, over budget or fails, the built-in rules answer instead and say so.
+- 3A `parseLeaveRequestText`: one sentence fills the request form ("Say it in your own
+  words" → Fill in). Never submits; asks a clarifying question when unsure.
+- 3B `importHandbook` (Admin → Handbook): proposal with a quote per value, questions for
+  what the handbook doesn't say, listed assumptions; Save stores the policy with its
+  citations. Injection tests: a fooled model quoting the injected text cannot get 365 days
+  or unlimited carry-over through; handbook text cannot close its data block.
+- 3C `explainBalanceInWords` ("Why this number?" on the balance card).
+- 3D auto-approval: engine-decided eligibility (type opted in, within its limit, balance
+  stays ≥ 0, no coverage gap, no blackout, not retroactive, no overlap). Autonomy levels
+  per org × capability × actor class: L0 off (default), L1 suggest (badge on Approvals),
+  L2 approve with an undo window (default 48 h, Undo button for the manager), L3 approve.
+  Audited as a service agent with the rule basis.
+- 3E evals (`apps/teams/evals/`): 46 parsing cases, 6 handbooks (incl. an injection one).
+  CI runs them on the mock provider (rules: 45/46, 100% fields; a regression floor, since
+  the rules were written next to the cases). **One live run** on this session's Claude
+  credits via the Claude Code CLI (Atiyk's instruction; no API key here): parsing **44/46**
+  on Haiku 5.5 (~$0.0005 per request), handbook fields **100%** on Sonnet 5.5; ~$0.07 total.
+  The first live run caught two prompt gaps (no default leave type; front-loaded accrual
+  never quoted), fixed in prompt versions p2/h2. Results: `evals/results/latest.json`.
+- Also fixed: the request form now refreshes balances and "My requests" after submitting;
+  the engine package's own `npm test` runs in jsdom like the root (some Days Off data
+  modules read browser globals).
+- Gate: root 468 pass / 2 known-flaky timing tests; engine 204/206 (same 2); teams 64 pass
+  (+1 live eval skipped); typecheck clean; Days Off dist identical; teams build OK; lint 0
+  errors. Screenshots: `docs/screenshots/smb-p3/` (NL request, explanation, handbook,
+  auto-approval setup, approvals with undo, AI usage × 1440/768/375). Before = smb-p2.
+
 ## Questions for Atiyk (SMB)
 - Q1. ~~main lacks the old stack~~ Resolved: you merged it. But main's build is broken by
   a merge artifact. Recommended: merge #41 first, then this stack.
+- Q3. ~~No API key for the live eval~~ Resolved: ran on this session's credits via the
+  Claude Code CLI (`EVAL_PROVIDER=claude-cli npm run eval:live -w apps/teams`). For
+  production: set an Anthropic spend limit first, then add `ANTHROPIC_API_KEY` in Vercel.

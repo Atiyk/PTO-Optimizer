@@ -12,9 +12,14 @@ import { subjectMember, untrusted } from '../helpers';
 import { defineCapability } from '../types';
 import { evaluationOutput, evaluationToOutput } from './requests';
 
+/** Demo mode (mock provider) is labelled honestly: no model was involved. */
+const usedFor = (model: string) => (model === 'mock' ? ('demo' as const) : ('ai' as const));
+
 const aiStatus = z
   .object({
-    used: z.enum(['ai', 'rules']).describe('"ai" = the model answered; "rules" = the built-in parser did (AI off, over budget or failed).'),
+    used: z
+      .enum(['ai', 'demo', 'rules'])
+      .describe('"ai" = the model answered; "demo" = demo mode, built-in rules standing in for the model; "rules" = the built-in rules answered because AI was off, over budget or failed.'),
     unavailableReason: z.string().nullable(),
   })
   .describe('Which path produced the answer.');
@@ -51,8 +56,9 @@ export const parseLeaveRequestText = defineCapability({
     let fields: z.infer<typeof parsedRequestSchema>;
     let source: z.infer<typeof aiStatus>;
     try {
-      fields = (await runAiTask(db, actor.orgId, parseLeaveRequestTask, taskInput, now)).output;
-      source = { used: 'ai', unavailableReason: null };
+      const r = await runAiTask(db, actor.orgId, parseLeaveRequestTask, taskInput, now);
+      fields = r.output;
+      source = { used: usedFor(r.model), unavailableReason: null };
     } catch (err) {
       if (!(err instanceof AiUnavailableError) || err.reason === 'input_too_long') throw err;
       fields = parseLeaveRequestTask.heuristic(taskInput);
@@ -182,7 +188,7 @@ export const importHandbook = defineCapability({
     try {
       const r = await runAiTask(db, actor.orgId, importHandbookTask, { text: input.text }, now);
       proposal = r.output;
-      source = { used: 'ai', unavailableReason: null, cached: r.cached };
+      source = { used: usedFor(r.model), unavailableReason: null, cached: r.cached };
     } catch (err) {
       if (!(err instanceof AiUnavailableError) || err.reason === 'input_too_long') throw err;
       proposal = importHandbookTask.heuristic({ text: input.text });
@@ -256,7 +262,7 @@ export const explainBalanceInWords = defineCapability({
     try {
       const r = await runAiTask(db, actor.orgId, explainBalanceTask, facts, now);
       const bad = untracedNumbers(r.output.text, facts);
-      if (bad.length === 0) return { text: r.output.text, facts, source: { used: 'ai' as const, unavailableReason: null } };
+      if (bad.length === 0) return { text: r.output.text, facts, source: { used: usedFor(r.model), unavailableReason: null } };
       return {
         text: templateExplanation(facts).text,
         facts,

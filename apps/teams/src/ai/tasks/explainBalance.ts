@@ -38,7 +38,7 @@ export function templateExplanation(f: BalanceFacts): Explanation {
     );
   }
   const last = f.recent.at(-1);
-  if (last) parts.push(`The last change was ${last.kind} of ${n(last.amount)} on ${last.date}.`);
+  if (last) parts.push(`The last entry was ${last.kind} (${last.amount > 0 ? '+' : ''}${n(last.amount)} ${u}) on ${last.date}.`);
   return { text: parts.join(' ') };
 }
 

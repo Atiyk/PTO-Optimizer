@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useEffect, useId, useMemo, useState, useTransition } from 'react';
 import { runCapability } from '@/app/actions';
 import type { CapabilityOutput } from '@/capabilities/registry';
@@ -14,6 +15,7 @@ type Part = 'full' | 'am' | 'pm' | 'hours';
  */
 export function RequestForm({ leaveTypes, today }: { leaveTypes: { key: string; name: string }[]; today: string }) {
   const id = useId();
+  const router = useRouter();
   const [leaveType, setLeaveType] = useState(leaveTypes[0]?.key ?? 'vacation');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
@@ -89,7 +91,10 @@ export function RequestForm({ leaveTypes, today }: { leaveTypes: { key: string; 
         setEnd('');
         setNote('');
         setDraft(null);
+        setSentence('');
+        setParseNote(null);
         setIdemKey(crypto.randomUUID());
+        router.refresh(); // balances and "My requests" are server-rendered
       } else setError(r.error.message);
     });
   }

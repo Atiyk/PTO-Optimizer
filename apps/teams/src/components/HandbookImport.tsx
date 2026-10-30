@@ -15,6 +15,20 @@ const LABELS: Record<string, string> = {
   accrualCap: 'Balance cap', waitingPeriodDays: 'Waiting period (days)',
 };
 
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const VALUE_TEXT: Record<string, string> = {
+  front_loaded: 'Full amount at the start of the year', per_pay_period: 'Builds up each pay period', per_hour_worked: 'Per hour worked',
+  unlimited: 'Unlimited', calendar: 'Calendar year', anniversary: 'Start-date anniversary', custom: 'Starts on a set date',
+  none: 'None', all: 'All of it', upTo: 'Up to a limit', biweekly: 'Every two weeks', semimonthly: 'Twice a month',
+};
+function show(v: string | number | null): string {
+  if (v == null) return '';
+  if (typeof v === 'number') return String(v);
+  const md = /^(\d{2})-(\d{2})$/.exec(v);
+  if (md) return `${Number(md[2])} ${MONTHS[Number(md[1]) - 1]}`;
+  return VALUE_TEXT[v] ?? v;
+}
+
 /** Draft → confirm (R2): reading never saves; the admin checks each quote, then saves. */
 export function HandbookImport({ leaveTypes, today }: { leaveTypes: { key: string; name: string }[]; today: string }) {
   const id = useId();
@@ -70,7 +84,7 @@ export function HandbookImport({ leaveTypes, today }: { leaveTypes: { key: strin
       {result && (
         <div className="space-y-3">
           <p className="text-sm text-muted">
-            {result.source.used === 'ai' ? 'Read by AI' : 'Read by the built-in rules (AI unavailable)'}
+            {result.source.used === 'ai' ? 'Read by AI' : result.source.used === 'demo' ? 'Demo mode: read by the built-in rules' : 'Read by the built-in rules (AI unavailable)'}
             {result.source.cached ? ' · from cache, no cost' : ''}. Nothing is saved until you press Save.
           </p>
           <ul className="divide-y divide-line rounded-md border border-line">
@@ -78,9 +92,9 @@ export function HandbookImport({ leaveTypes, today }: { leaveTypes: { key: strin
               <li key={k} className="space-y-1 p-2 text-sm">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-ink">{LABELS[k] ?? k}</span>
-                  {f.status === 'verified' && <Badge tone="accent">{String(f.value)}</Badge>}
+                  {f.status === 'verified' && <Badge tone="accent">{show(f.value)}</Badge>}
                   {f.status === 'not_stated' && <span className="text-muted">Not stated</span>}
-                  {f.status === 'rejected' && <Badge tone="bad">Needs you</Badge>}
+                  {f.status === 'rejected' && <><Badge tone="bad">Needs you</Badge> <span className="text-muted">{show(f.value)} not used</span></>}
                 </div>
                 {f.quote && <blockquote className="border-l-2 border-line pl-2 text-muted break-words">“{f.quote.untrusted_text}”</blockquote>}
                 {f.reason && <p className="text-ink">{f.reason}</p>}

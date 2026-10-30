@@ -35,10 +35,10 @@ describe('AI module', () => {
     expect(await db.select().from(aiUsage)).toHaveLength(0);
   });
 
-  it('mock provider: answers as "ai", records usage per org and feature', async () => {
+  it('mock provider: answers as "demo", records usage per org and feature', async () => {
     setAiProvider(mockProvider);
     const r = await run(db, humanActor(A.emp), 'parseLeaveRequestText', { text: 'Dec 22 to Jan 2' });
-    expect(r.source.used).toBe('ai');
+    expect(r.source.used).toBe('demo');
     expect(r.fields).toMatchObject({ start: '2026-12-22', end: '2027-01-02' });
     const usage = await db.select().from(aiUsage);
     expect(usage).toHaveLength(1);
