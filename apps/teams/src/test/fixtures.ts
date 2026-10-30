@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '@/db/client';
-import { apiTokens, blackouts, coverageRules, drafts, invites, leaveRequests, leaveTypes, members, oauthClients, teams, webhookDeliveries, webhookEndpoints } from '@/db/schema';
+import { apiTokens, blackouts, coverageRules, drafts, invites, leaveRequests, leaveTypes, members, oauthClients, teams, webhookDeliveries, webhookEndpoints, rooms, siteRulePacks, demandTemplates, shiftTemplates, shiftExceptions, memberCredentials, hoursWorked } from '@/db/schema';
 import { invokeCapability, type CapabilityName } from '@/capabilities/registry';
 import { ROLE_SCOPES } from '@/capabilities/scopes';
 import type { Actor } from '@/capabilities/types';
@@ -51,5 +51,12 @@ export async function snapshotOrg(db: Db, orgId: string) {
     clients: await db.select().from(oauthClients).where(eq(oauthClients.orgId, orgId)),
     webhooks: await db.select().from(webhookEndpoints).where(eq(webhookEndpoints.orgId, orgId)),
     deliveries: await db.select().from(webhookDeliveries).where(eq(webhookDeliveries.orgId, orgId)),
+    rooms: await db.select().from(rooms).where(eq(rooms.orgId, orgId)),
+    siteRulePacks: await db.select().from(siteRulePacks).where(eq(siteRulePacks.orgId, orgId)),
+    demand: await db.select().from(demandTemplates).where(eq(demandTemplates.orgId, orgId)),
+    shifts: await db.select().from(shiftTemplates).where(eq(shiftTemplates.orgId, orgId)),
+    shiftExceptions: await db.select().from(shiftExceptions).where(eq(shiftExceptions.orgId, orgId)),
+    memberCredentials: await db.select().from(memberCredentials).where(eq(memberCredentials.orgId, orgId)),
+    hoursWorked: await db.select().from(hoursWorked).where(eq(hoursWorked.orgId, orgId)),
   };
 }

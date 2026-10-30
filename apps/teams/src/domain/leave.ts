@@ -10,6 +10,7 @@ import {
   balanceLedger,
   blackouts,
   coverageRules,
+  hoursWorked,
   extraClosures,
   leavePolicies,
   leaveRequests,
@@ -166,9 +167,19 @@ export async function balanceView(
     ...(opts.includePending ? await pendingUsage(db, orgId, member.id, leaveType.id, opts.excludeRequestId) : []),
     ...extraUsage,
   ];
+  // Hours actually worked (imported) feed `per_hour_worked` policies with hoursSource 'imported'.
+  const imported = (hasPolicy ? policies : []).some((v) => v.policy.accrual.method === 'per_hour_worked' && v.policy.accrual.hoursSource === 'imported');
+  const hoursWorkedRows = imported
+    ? (
+        await db
+          .select({ periodStart: hoursWorked.periodStart, periodEnd: hoursWorked.periodEnd, hours: hoursWorked.hours })
+          .from(hoursWorked)
+          .where(and(eq(hoursWorked.orgId, orgId), eq(hoursWorked.memberId, member.id), isNull(hoursWorked.voidedAt)))
+      ).map((r) => ({ periodStart: r.periodStart, periodEnd: r.periodEnd, hours: Number(r.hours) }))
+    : undefined;
   const projection = projectBalance({
     policies: hasPolicy ? policies : fallback,
-    member: { startDate: member.startDate, workWeek: parseWorkWeek(member.workWeek), hoursPerDay: Number(member.hoursPerDay), holidays },
+    member: { startDate: member.startDate, workWeek: parseWorkWeek(member.workWeek), hoursPerDay: Number(member.hoursPerDay), holidays, hoursWorked: hoursWorkedRows },
     ledger,
     asOf,
   });

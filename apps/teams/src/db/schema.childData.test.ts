@@ -1,5 +1,6 @@
 import { getTableColumns, getTableName, is } from 'drizzle-orm';
 import { PgTable } from 'drizzle-orm/pg-core';
+import { CHILD_DATA_DENY } from './childData';
 import { describe, expect, it } from 'vitest';
 import * as schema from './schema';
 
@@ -7,7 +8,6 @@ import * as schema from './schema';
  * The child-data rule (COVERAGE-SPEC §6): demand is counts per group only. No column anywhere
  * may hold child-identifying data. Capability schemas get the same check in Phase 2.
  */
-export const CHILD_DATA_DENY = /child.?(name|first|last|dob|birth|id\b|address|guardian|parent|allerg|medical)|birth.?date|date.?of.?birth|\bdob\b|guardian|allerg|enrol+ee|student.?name|kid.?name|pupil/i;
 
 describe('no child data in the schema', () => {
   const tables = (Object.values(schema) as unknown[]).filter((t): t is PgTable => is(t, PgTable));

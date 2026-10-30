@@ -21,6 +21,9 @@ let bClientRowId: string;
 let bDraftId: string;
 let bHookId: string;
 let bDeliveryId: string;
+let bRoomId: string;
+let bMemberCredId: string;
+let bHoursBatch: string;
 
 beforeAll(async () => {
   db = await freshDb();
@@ -41,6 +44,13 @@ beforeAll(async () => {
   bHookId = hook.created!.endpointId;
   await run(db, humanActor(B.emp2), 'submitLeaveRequest', { start: '2026-12-14', end: '2026-12-14', idempotencyKey: 'b-hook-1' });
   bDeliveryId = (await run(db, humanActor(B.owner), 'manageWebhooks', { op: 'list' })).deliveries[0]!.id;
+  const bo = humanActor(B.owner);
+  await run(db, bo, 'manageSchedule', { op: 'selectRulePack', locationId: B.location.id, packKey: 'childcare-us-ca', sickPolicy: 'none' });
+  bRoomId = (await run(db, bo, 'manageSchedule', { op: 'upsertRoom', locationId: B.location.id, name: 'Infants', kind: 'room', groupKey: 'infant' })).id!;
+  await run(db, bo, 'manageSchedule', { op: 'setShifts', memberId: B.emp.id, rows: [{ roomId: bRoomId, weekday: 0, start: '08:00', end: '16:00' }] });
+  await run(db, bo, 'manageCredentials', { op: 'define', key: 'cpr', name: 'CPR' });
+  bMemberCredId = (await run(db, bo, 'manageCredentials', { op: 'grant', memberId: B.emp.id, credentialKey: 'cpr', expiresOn: '2027-06-01' })).id;
+  bHoursBatch = (await run(db, bo, 'importHoursWorked', { stage: 'commit', rows: [{ member: B.emp.id, periodStart: '2026-10-01', periodEnd: '2026-10-07', hours: 40 }] })).batchId!;
 });
 
 const attacks = (): [CapabilityName, unknown][] => [
@@ -75,6 +85,23 @@ const attacks = (): [CapabilityName, unknown][] => [
   ['manageWebhooks', { op: 'sendTest', endpointId: bHookId, event: 'leave.requested' }],
   ['manageWebhooks', { op: 'retry', deliveryId: bDeliveryId }],
   ['eraseMember', { memberId: B.emp.id }],
+  ['getCoverage', { locationId: B.location.id, date: '2026-11-02' }],
+  ['manageSchedule', { op: 'upsertRoom', locationId: B.location.id, name: 'pwned', kind: 'room', groupKey: 'infant' }],
+  ['manageSchedule', { op: 'upsertRoom', roomId: bRoomId, locationId: A.location.id, name: 'pwned', kind: 'room', groupKey: 'infant' }],
+  ['manageSchedule', { op: 'archiveRoom', roomId: bRoomId }],
+  ['manageSchedule', { op: 'selectRulePack', locationId: B.location.id, packKey: 'childcare-us-tx', sickPolicy: 'none' }],
+  ['manageSchedule', { op: 'setDemand', roomId: bRoomId, rows: [{ weekday: 0, start: '08:00', end: '12:00', group: 'infant', count: 9 }] }],
+  ['manageSchedule', { op: 'addDemandException', roomId: bRoomId, date: '2026-11-02', closed: true }],
+  ['manageSchedule', { op: 'setShifts', memberId: B.emp.id, rows: [] }],
+  ['manageSchedule', { op: 'setShifts', memberId: A.emp.id, rows: [{ roomId: bRoomId, weekday: 0, start: '08:00', end: '16:00' }] }],
+  ['manageSchedule', { op: 'addShiftException', memberId: B.emp.id, date: '2026-11-02', kind: 'off' }],
+  ['manageCredentials', { op: 'grant', memberId: B.emp.id, credentialKey: 'cpr', expiresOn: '2027-06-01' }],
+  ['manageCredentials', { op: 'remove', memberCredentialId: bMemberCredId }],
+  ['getCredentials', { memberId: B.emp.id }],
+  ['getSickLeave', { memberId: B.emp.id }],
+  ['importHoursWorked', { stage: 'undo', batchId: bHoursBatch }],
+  ['importCsv', { stage: 'undo', kind: 'hours', batchId: bHoursBatch }],
+  ['listRulePacks', { locationId: B.location.id }],
 ];
 
 describe('tenant isolation (A6)', () => {
@@ -90,8 +117,8 @@ describe('tenant isolation (A6)', () => {
 
   it('the same attacks through agent tokens (personal and service) fail too, and create no drafts', async () => {
     const before = await snapshotOrg(db, B.org.id);
-    const pat = await run(db, humanActor(A.owner), 'managePersonalTokens', { op: 'create', name: 'a', scopes: ['leave:read', 'leave:request', 'leave:approve', 'policy:read', 'planner:run'] });
-    const key = await run(db, humanActor(A.owner), 'manageAgentAccess', { op: 'createApiKey', name: 'a', scopes: ['leave:read', 'leave:request', 'planner:run'] });
+    const pat = await run(db, humanActor(A.owner), 'managePersonalTokens', { op: 'create', name: 'a', scopes: ['leave:read', 'leave:request', 'leave:approve', 'policy:read', 'planner:run', 'coverage:read'] });
+    const key = await run(db, humanActor(A.owner), 'manageAgentAccess', { op: 'createApiKey', name: 'a', scopes: ['leave:read', 'leave:request', 'planner:run', 'coverage:read'] });
     const agents = [
       { auth: await authenticateBearer(db, `Bearer ${pat.created!.token}`, NOW), extra: {} },
       { auth: await authenticateBearer(db, `Bearer ${key.created!.token}`, NOW), extra: { forMemberId: A.emp.id } },
