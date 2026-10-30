@@ -5,6 +5,7 @@ import { addDays, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { DateListEditor } from './DateListEditor';
 import { ImportCalendar } from './ImportCalendar';
 import { todayISO, type HolidayEntry } from './useAppState';
+import { Term } from './Term';
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const H4_CLASS = 'mb-2 text-sm font-semibold text-slate-700';
@@ -78,7 +79,9 @@ export function MoreOptions(props: MoreOptionsProps) {
   return (
     <div className="grid grid-cols-1 gap-6 border-b border-slate-200 bg-slate-50 p-4 md:grid-cols-2 lg:grid-cols-3">
       <section>
-        <h4 className={H4_CLASS}>Accrual</h4>
+        <h4 className={H4_CLASS}>
+          <Term id="accrual">Accrual</Term>
+        </h4>
         <label className="flex items-center gap-2 text-sm text-slate-600">
           <input
             type="checkbox"
@@ -103,7 +106,9 @@ export function MoreOptions(props: MoreOptionsProps) {
       </section>
 
       <section>
-        <h4 className={H4_CLASS}>Expiry &amp; carryover</h4>
+        <h4 className={H4_CLASS}>
+          Expiry &amp; <Term id="carryover">carryover</Term>
+        </h4>
         <label className="flex items-center gap-2 text-sm text-slate-600">
           <input
             type="checkbox"
@@ -139,20 +144,26 @@ export function MoreOptions(props: MoreOptionsProps) {
 
       <section>
         <h4 className={H4_CLASS}>Requesting time off</h4>
-        <label className="flex items-center gap-2 text-sm text-slate-600">
-          My employer&apos;s notice period
-          <input
-            type="number"
-            min={0}
-            max={90}
-            step={1}
-            value={props.noticePeriodDays}
-            onChange={(e) => props.onChangeNoticePeriodDays(Number(e.target.value))}
-            aria-label="Notice period in days"
-            className={`${FIELD_CLASS} w-20`}
-          />
-          days
-        </label>
+        {/* Stage 6 quality-pass fix: Term must never be a <label> descendant - see
+         * Policy.tsx's Field comment for why (a real, browser-verified interaction bug,
+         * not a style preference). */}
+        <div className="flex items-center gap-1 text-sm text-slate-600">
+          <label className="flex items-center gap-2">
+            My employer&apos;s notice period
+            <input
+              type="number"
+              min={0}
+              max={90}
+              step={1}
+              value={props.noticePeriodDays}
+              onChange={(e) => props.onChangeNoticePeriodDays(Number(e.target.value))}
+              aria-label="Notice period in days"
+              className={`${FIELD_CLASS} w-20`}
+            />
+            days
+          </label>
+          <Term id="notice-period">?</Term>
+        </div>
         <p className="mt-1 text-xs text-slate-400">
           Drives the &quot;Request by&quot; date on each break card, and the lead time for the .ics reminder above
           &mdash; the same number for both.
