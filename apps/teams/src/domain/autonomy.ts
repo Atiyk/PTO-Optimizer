@@ -11,6 +11,9 @@ import type { Evaluation } from './leave';
  *   L3 act within policy: it acts, audited, and the human can undo within a window.
  */
 export type AutonomyLevel = 0 | 1 | 2 | 3;
+
+/** Actions that change data and that agents can reach (kept in step with the registry by a test). */
+export const AGENT_COMMIT_CAPABILITIES = ['submitLeaveRequest', 'cancelLeaveRequest', 'decideLeaveRequest', 'respondToProposal', 'sendPlanProposals'] as const;
 export type ActorClass = 'agent' | 'assistant';
 
 export const AUTONOMY_LABELS: Record<AutonomyLevel, string> = {

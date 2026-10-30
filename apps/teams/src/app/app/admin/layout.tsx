@@ -12,6 +12,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     ['/app/admin/handbook', 'Handbook'],
     ['/app/admin/data', 'Balances, export & audit'],
     ['/app/admin/ai', 'AI usage'],
+    ['/app/admin/agents', 'Agents & API'],
   ];
   return (
     <div className="space-y-4">

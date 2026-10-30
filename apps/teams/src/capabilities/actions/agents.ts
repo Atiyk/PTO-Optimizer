@@ -1,6 +1,8 @@
 import { and, asc, desc, eq, gte, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { apiTokens, drafts, members, oauthClients, organizations } from '@/db/schema';
+import { evalNoteFor } from '@/ai/evalScores';
+import { AGENT_COMMIT_CAPABILITIES, autonomyFor } from '@/domain/autonomy';
 import { TOKEN_PREFIX } from '@/lib/agentAuth';
 import { newToken } from '@/lib/tokens';
 import { CapabilityError } from '../errors';
@@ -127,6 +129,7 @@ export const manageAgentAccess = defineCapability({
     tokens: z.array(tokenView.extend({ memberName: z.object({ untrusted_text: z.string() }).nullable() })),
     clients: z.array(z.object({ id: z.uuid(), name: z.string(), clientId: z.string(), scopes: z.array(z.string()), lastUsedAt: z.string().nullable(), revokedAt: z.string().nullable() })),
     created: z.object({ token: z.string().nullable(), clientId: z.string().nullable(), clientSecret: z.string().nullable() }).nullable(),
+    autonomy: z.array(z.object({ capability: z.string(), level: z.number(), evalLabel: z.string(), evalScore: z.number().nullable() })),
   }),
   scope: 'admin',
   roles: ['owner', 'admin'],
@@ -190,6 +193,12 @@ export const manageAgentAccess = defineCapability({
       tokens: tokens.filter((r) => r.t.kind !== 'access' || !r.t.revokedAt).map((r) => ({ ...view(r.t), memberName: r.name == null ? null : { untrusted_text: r.name } })),
       clients: clients.map((c) => ({ id: c.id, name: c.name, clientId: c.clientId, scopes: c.scopes, lastUsedAt: c.lastUsedAt?.toISOString() ?? null, revokedAt: c.revokedAt?.toISOString() ?? null })),
       created,
+      autonomy: await Promise.all(
+        AGENT_COMMIT_CAPABILITIES.map(async (capability) => {
+          const e = evalNoteFor(capability, 'agent');
+          return { capability, level: await autonomyFor(db, orgId, capability, 'agent'), evalLabel: e.label, evalScore: e.score };
+        }),
+      ),
     };
   },
 });

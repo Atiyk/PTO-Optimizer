@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { auditLog } from '@/db/schema';
 import { freshDb, seedOrg } from '@/test/db';
 import { CapabilityError } from './errors';
+import { AGENT_COMMIT_CAPABILITIES } from '@/domain/autonomy';
 import { CAPABILITIES, invokeCapability } from './registry';
 import type { Actor } from './types';
 
@@ -15,6 +16,14 @@ describe('capability registry', () => {
       if (cap.effect === 'commit' && (cap.surfaces as readonly string[]).includes('mcp')) expect(cap.idempotent).toBe(true);
       expect(cap.annotations.readOnlyHint).toBe(cap.effect === 'read');
     }
+  });
+
+  it('the agent autonomy list matches the commit actions agents can reach', () => {
+    const commits = Object.values(CAPABILITIES)
+      .filter((c) => c.effect === 'commit' && (c.surfaces as readonly string[]).includes('mcp'))
+      .map((c) => c.name)
+      .sort();
+    expect([...AGENT_COMMIT_CAPABILITIES].sort()).toEqual(commits);
   });
 
   it('keeps the externally exposed (MCP) tool count within 25', () => {

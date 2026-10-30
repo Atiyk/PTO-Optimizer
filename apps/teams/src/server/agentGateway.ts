@@ -31,14 +31,16 @@ export type AgentCallResult =
 const DRAFT_TTL_MS = 7 * 86_400_000;
 
 /** Plain-language one-liners for drafts, written from the validated input only. */
-function describe(name: string, input: Record<string, unknown>): string {
+function describe(name: string, input: Record<string, unknown>, t: Targets): string {
+  // Dates only: summaries go back to agents verbatim, so no user-written text (names, notes) in them.
+  const req = t.request ? `the leave request ${t.request.start === t.request.end ? `for ${t.request.start}` : `from ${t.request.start} to ${t.request.end}`}` : `leave request ${input.requestId}`;
   switch (name) {
     case 'submitLeaveRequest':
       return `Request ${input.leaveType ?? 'vacation'} from ${input.start} to ${input.end}${input.part && input.part !== 'full' ? ` (${input.part})` : ''}`;
     case 'cancelLeaveRequest':
-      return `Cancel leave request ${input.requestId}`;
+      return `Cancel ${req}`;
     case 'decideLeaveRequest':
-      return `${input.decision === 'approve' ? 'Approve' : 'Decline'} leave request ${input.requestId}`;
+      return `${input.decision === 'approve' ? 'Approve' : 'Decline'} ${req}`;
     case 'respondToProposal':
       return `${input.response === 'accept' ? 'Accept' : 'Dismiss'} a suggested leave plan`;
     case 'sendPlanProposals':
@@ -52,11 +54,20 @@ function describe(name: string, input: Record<string, unknown>): string {
  * A draft must never point at another org's objects: check every id in the input before
  * storing anything, so a cross-tenant call fails now rather than at confirmation time.
  */
-async function checkTargets(db: Db, orgId: string, input: Record<string, unknown>) {
+interface Targets {
+  request?: { start: string; end: string };
+}
+
+async function checkTargets(db: Db, orgId: string, input: Record<string, unknown>): Promise<Targets> {
   const missing = () => new CapabilityError('not_found', 'Not found.');
+  const out: Targets = {};
   if (typeof input.requestId === 'string') {
-    const [r] = await db.select({ id: leaveRequests.id }).from(leaveRequests).where(and(eq(leaveRequests.orgId, orgId), eq(leaveRequests.id, input.requestId)));
+    const [r] = await db
+      .select({ start: leaveRequests.startDate, end: leaveRequests.endDate })
+      .from(leaveRequests)
+      .where(and(eq(leaveRequests.orgId, orgId), eq(leaveRequests.id, input.requestId)));
     if (!r) throw missing();
+    out.request = r;
   }
   if (typeof input.proposalId === 'string') {
     const [d] = await db.select({ id: drafts.id }).from(drafts).where(and(eq(drafts.orgId, orgId), eq(drafts.id, input.proposalId)));
@@ -72,6 +83,7 @@ async function checkTargets(db: Db, orgId: string, input: Record<string, unknown
       if (!m) throw missing();
     }
   }
+  return out;
 }
 
 export async function callAsAgent(
@@ -120,8 +132,8 @@ export async function callAsAgent(
   }
   if (!addressedTo) throw new CapabilityError('forbidden', 'This token has no member to confirm the action.');
 
-  await checkTargets(db, actor.orgId, parsed.data as Record<string, unknown>);
-  const summary = describe(name, parsed.data as Record<string, unknown>);
+  const targets = await checkTargets(db, actor.orgId, parsed.data as Record<string, unknown>);
+  const summary = describe(name, parsed.data as Record<string, unknown>, targets);
   const { token, hash } = newToken('conf');
   const expiresAt = new Date(now.getTime() + DRAFT_TTL_MS);
   const [d] = await db

@@ -64,8 +64,8 @@ const setupOp = z.discriminatedUnion('op', [
     op: z.literal('setAutonomy'),
     capability: z.string().min(1).max(64).describe('Registry capability name, e.g. "decideLeaveRequest" for the approval assistant.'),
     actorClass: z.enum(['agent', 'assistant']),
-    level: z.coerce.number().int().min(0).max(3).describe('0 off, 1 suggest/draft, 2 act reversibly, 3 act.'),
-    reversibleMinutes: z.number().int().min(5).max(14 * 24 * 60).optional().describe('Undo window for level 2 auto-approvals.'),
+    level: z.coerce.number().int().min(0).max(3).describe('0 off, 1 suggest, 2 draft (a person confirms), 3 act within policy (undo window).'),
+    reversibleMinutes: z.number().int().min(5).max(14 * 24 * 60).optional().describe('Undo window for level 3 auto-approvals.'),
   }),
 ]);
 

@@ -15,6 +15,7 @@ export default async function MyLeave({ searchParams }: { searchParams: Promise<
   );
   const { requests } = await call('listMyRequests', { limit: 30 }, actor);
   const { proposals } = await call('listMyProposals', {}, actor);
+  const { drafts: agentDrafts } = await call('listAgentDrafts', {}, actor);
   const typeName = new Map(types.map((t) => [t.key, t.name]));
 
   return (
@@ -51,6 +52,30 @@ export default async function MyLeave({ searchParams }: { searchParams: Promise<
         ))}
       </div>
       <div className="space-y-4 lg:col-span-3">
+        {agentDrafts.length > 0 && (
+          <div id="agent-requests">
+            <Card title="Requests from your agents">
+              <ul className="space-y-3 text-sm">
+                {agentDrafts.map((d) => (
+                  <li key={d.id} className="space-y-2">
+                    <p className="text-ink">
+                      {d.summary}
+                      <span className="text-muted"> · {d.createdByActorType === 'service-agent' ? 'from a workspace agent' : 'from your agent'}, until {d.expiresAt.slice(0, 10)}</span>
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <ActionButton capability="decideAgentDraft" input={{ draftId: d.id, decision: 'confirm' }} className={btnPrimary} doneMessage="Done.">
+                        Confirm
+                      </ActionButton>
+                      <ActionButton capability="decideAgentDraft" input={{ draftId: d.id, decision: 'reject' }}>
+                        Reject
+                      </ActionButton>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </div>
+        )}
         {proposals.length > 0 && (
           <Card title="Suggested by your manager">
             <ul className="space-y-3 text-sm">
