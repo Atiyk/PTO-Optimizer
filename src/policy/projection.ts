@@ -1,5 +1,5 @@
-import type { ISODate } from '../solver/types';
-import { addDays, isoToSerial } from '../solver/dateUtils';
+import type { ISODate } from '@daysoff/engine/solver/types';
+import { addDays, isoToSerial } from '@daysoff/engine/solver/dateUtils';
 import { payDatesInRange, resetDatesInRange, waitingPeriodEnd, type TimeOffPolicy } from './model';
 
 export interface BalancePoint {

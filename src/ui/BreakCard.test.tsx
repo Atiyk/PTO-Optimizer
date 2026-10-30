@@ -3,8 +3,8 @@ import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { BreakCard } from './BreakCard';
-import { DEFAULT_WORK_WEEK } from '../solver/types';
-import type { Break } from '../solver/types';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import type { Break } from '@daysoff/engine/solver/types';
 
 function makeBreak(overrides: Partial<Break> = {}): Break {
   return {

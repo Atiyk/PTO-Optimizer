@@ -1,8 +1,8 @@
-import { addDays, rangeISO, mondayIndexedDow, isoToSerial } from '../solver/dateUtils';
-import { computeRuns, type OffRun } from './calendarMath';
-import { DEFAULT_WORK_WEEK, type WorkWeek } from '../solver/types';
-import { weekdayName } from './requestDeadline';
-import type { Holiday } from '../data/holidays';
+import { addDays, rangeISO, mondayIndexedDow, isoToSerial } from '@daysoff/engine/solver/dateUtils';
+import { computeRuns, type OffRun } from '@daysoff/engine/calendar/calendarMath';
+import { DEFAULT_WORK_WEEK, type WorkWeek } from '@daysoff/engine/solver/types';
+import { weekdayName } from '@daysoff/engine/calendar/requestDeadline';
+import type { Holiday } from '@daysoff/engine/data/holidays';
 
 /** A day is off if it's outside the work week or a public holiday - the same two facts the
  * /pto calendar itself is built from (see dayCategory.ts's isBaseOff/isWeekend), just

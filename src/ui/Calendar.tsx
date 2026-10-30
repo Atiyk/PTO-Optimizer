@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
-import { buildMonths, type OffRun, type WeekStart } from './calendarMath';
+import { buildMonths, type OffRun, type WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import { MonthGrid } from './MonthGrid';
-import type { MarginalValue } from '../solver/marginalValue';
-import type { Alternative, Break } from '../solver/types';
+import type { MarginalValue } from '@daysoff/engine/solver/marginalValue';
+import type { Alternative, Break } from '@daysoff/engine/solver/types';
 import type { DayCategory } from './types';
 
 interface CalendarProps {

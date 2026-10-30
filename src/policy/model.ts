@@ -1,5 +1,5 @@
-import type { ISODate } from '../solver/types';
-import { addDays, isoToSerial, monthsElapsed, parseISO } from '../solver/dateUtils';
+import type { ISODate } from '@daysoff/engine/solver/types';
+import { addDays, isoToSerial, monthsElapsed, parseISO } from '@daysoff/engine/solver/dateUtils';
 
 /**
  * The shared policy model (Feature 1, Stage 2A) — pure TS, no React/DOM. /policy and /pto

@@ -1,4 +1,4 @@
-import type { Alternative } from '../solver/types';
+import type { Alternative } from '@daysoff/engine/solver/types';
 
 /**
  * Pulled out of useAppState.ts as a standalone pure function, same reasoning as

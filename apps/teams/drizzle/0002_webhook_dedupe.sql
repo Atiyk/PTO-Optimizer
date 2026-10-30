@@ -1,0 +1,2 @@
+ALTER TABLE "webhook_deliveries" ADD COLUMN "dedupe_key" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "webhook_deliveries_dedupe_idx" ON "webhook_deliveries" USING btree ("endpoint_id","dedupe_key");

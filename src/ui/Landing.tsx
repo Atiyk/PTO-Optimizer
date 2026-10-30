@@ -4,13 +4,13 @@ import { Footer } from './Footer';
 import { Container } from './Container';
 import { CountrySelect } from './CountrySelect';
 import { YearStrip } from './YearStrip';
-import { getHolidaysWithStatus, getPreloadedHolidays, type Holiday } from '../data/holidays';
+import { getHolidaysWithStatus, getPreloadedHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { getPrerenderedAt } from './prerenderedAt';
 import { geolocateCountry } from './geo';
 import { todayISO } from './useAppState';
-import { addDays, mondayIndexedDow } from '../solver/dateUtils';
-import { weekdayName } from './requestDeadline';
-import { formatLong, formatShort } from './dateFormat';
+import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
+import { weekdayName } from '@daysoff/engine/calendar/requestDeadline';
+import { formatLong, formatShort } from '@daysoff/engine/calendar/dateFormat';
 import { downloadHolidaysICS } from './icsExport';
 import { copyCanvasImage, SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT } from './imageExport';
 import { copyText } from './requestText';
@@ -25,12 +25,12 @@ import {
   remainingHolidays,
   runLength,
 } from './landingData';
-import { solve } from '../solver/solve';
-import type { Break } from '../solver/types';
-import { DEFAULT_WORK_WEEK } from '../solver/types';
+import { solve } from '@daysoff/engine/solver/solve';
+import type { Break } from '@daysoff/engine/solver/types';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { breakReason } from './breakReason';
 import { bestPlacements, placementNote } from './sabbaticalData';
-import holidayCoverage from '../data/holidayCoverage.json';
+import holidayCoverage from '@daysoff/engine/data/holidayCoverage.json';
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (

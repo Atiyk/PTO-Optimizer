@@ -17,10 +17,10 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { nextHoliday } from '../src/ui/landingData.ts';
-import { rawHolidaysToHolidays } from '../src/data/holidays.ts';
-import { solve } from '../src/solver/solve.ts';
+import { rawHolidaysToHolidays } from '@daysoff/engine/data/holidays';
+import { solve } from '@daysoff/engine/solver/solve';
 import { bestPlacements, placementNote } from '../src/ui/sabbaticalData.ts';
-import { DEFAULT_WORK_WEEK } from '../src/solver/types.ts';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '..');

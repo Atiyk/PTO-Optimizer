@@ -1,5 +1,5 @@
-import type { ISODate } from '../solver/types';
-import { addDays } from '../solver/dateUtils';
+import type { ISODate } from '@daysoff/engine/solver/types';
+import { addDays } from '@daysoff/engine/solver/dateUtils';
 import type { PolicyEvent } from './projection';
 import type { TimeOffPolicy } from './model';
 

@@ -1,7 +1,7 @@
-import type { Break, WorkWeek } from '../solver/types';
-import { mondayIndexedDow } from '../solver/dateUtils';
-import { formatShort, formatCardDateRange } from './dateFormat';
-import { requestByDate, isQuietWindow } from './requestDeadline';
+import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
+import { mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
+import { formatShort, formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
+import { requestByDate, isQuietWindow } from '@daysoff/engine/calendar/requestDeadline';
 
 const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 

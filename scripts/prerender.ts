@@ -37,7 +37,7 @@ import React from 'react';
 import { ITEMS as FAQ_ITEMS } from '../src/ui/FAQ.tsx';
 import { SABBATICAL_FAQ_ITEMS } from '../src/ui/sabbaticalFaqItems.ts';
 import { GLOSSARY_TERMS } from '../src/content/glossary/terms.ts';
-import { rawHolidaysToHolidays, type Holiday } from '../src/data/holidays.ts';
+import { rawHolidaysToHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { getSiteUrl } from './siteUrl.ts';
 import { ENTRIES, type Entry, type ComponentKind } from './routes.ts';
 

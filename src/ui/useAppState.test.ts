@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { defaultRangeEnd, discoverSubdivisions } from './useAppState';
-import type { Holiday } from '../data/holidays';
+import type { Holiday } from '@daysoff/engine/data/holidays';
 
 describe('defaultRangeEnd (Phase 2, bug found: always stuck to the current year)', () => {
   // Nothing in the solver/holiday-fetch/date-arithmetic layer actually blocks a

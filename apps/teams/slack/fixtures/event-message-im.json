@@ -1,0 +1,19 @@
+{
+  "token": "gIkuvaNzQIHg97ATvDxqgjtO",
+  "team_id": "T0TEST001",
+  "api_app_id": "A0DAYSOFF1",
+  "event": {
+    "type": "message",
+    "channel": "D0DMCHAN1",
+    "user": "U0EMPLOYEE",
+    "text": "who week",
+    "ts": "1730260100.000200",
+    "event_ts": "1730260100.000200",
+    "channel_type": "im"
+  },
+  "type": "event_callback",
+  "event_id": "Ev0FIXTURE01",
+  "event_time": 1730260100,
+  "authorizations": [{ "enterprise_id": null, "team_id": "T0TEST001", "user_id": "U0DAYSOFFBOT", "is_bot": true, "is_enterprise_install": false }],
+  "is_ext_shared_channel": false
+}

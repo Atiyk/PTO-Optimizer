@@ -1,3 +1,15 @@
+# Scope of this file
+
+This repo is an npm-workspaces monorepo:
+- **Days Off** (the live free site): the Vite app at the repo root (`src/`, `index.html`, the
+  country folders). Every rule below applies to Days Off ONLY.
+- **packages/engine** (`@daysoff/engine`): the pure planning engine shared by both apps. No
+  React, DOM or DB imports. Any change must keep Days Off's `npm run build` output unchanged
+  unless the change is deliberately a Days Off change.
+- **apps/teams** ("Days Off for Teams", the SMB product): has a backend, accounts and a
+  database by design. Its rules are in `apps/teams/CLAUDE.md`; the "no backend, no accounts"
+  rule below does not apply to it.
+
 # Workflow — every change, no exceptions
 
 1. Work on a feature branch per phase/change. Never commit to `main`.
@@ -24,7 +36,7 @@ alone, which is a real product differentiator (no competitor offers it) and a re
 exactly where it's easy to lose by accident. Grep any diff that touches controls for
 submit-style verbs before calling a phase done.
 
-No backend, no accounts, no stored personal data. Everything stays client-side.
+No backend, no accounts, no stored personal data. Everything stays client-side. (Days Off only.)
 
 Pushing and merging: use the Terminal panel (`run_in_terminal`), not the sandboxed Bash
 tool — `gh`/git credentials only exist in the user's real terminal shell, authenticated

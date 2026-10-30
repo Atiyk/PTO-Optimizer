@@ -1,4 +1,9 @@
 @import 'tailwindcss';
+/* Tailwind scans every text file in the repo. Keep the monorepo's other apps and its docs
+   (docs/teams/...) out of Days Off's CSS, so changes there can never change
+   this site's build output. */
+@source not '../apps';
+@source not '../docs';
 
 /*
  * Light theme only - no dark mode, no toggle. Colours used by more than one component (the

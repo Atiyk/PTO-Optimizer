@@ -1,4 +1,4 @@
-import type { Scores } from '../solver/types';
+import type { Scores } from '@daysoff/engine/solver/types';
 import { ordinal } from './scoreFormat';
 import { Container } from './Container';
 import { ACCENT_BUTTON } from './colorScheme';

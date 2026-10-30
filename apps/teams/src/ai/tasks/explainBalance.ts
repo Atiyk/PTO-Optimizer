@@ -1,0 +1,67 @@
+import { z } from 'zod';
+import { untracedIn } from '../provenance';
+import { asData, DATA_RULE, defineAiTask } from '../task';
+
+/** Engine facts only. Every number the explanation may use is in here (3C provenance). */
+export interface BalanceFacts {
+  leaveTypeName: string;
+  unit: 'days' | 'hours';
+  today: string;
+  balance: number;
+  usable: number;
+  bookedAhead: number;
+  carried: number;
+  carriedExpiresOn: string | null;
+  yearEnd: { date: string; balance: number; wouldCarry: number; wouldForfeit: number } | null;
+  usedThisPlanYear: number;
+  recent: Array<{ date: string; kind: string; amount: number; balanceAfter: number; note: string }>;
+  question: string | null;
+}
+
+export const explanationSchema = z.object({
+  text: z.string().min(1).max(900).describe('Two to five short sentences. Numbers as digits, dates as YYYY-MM-DD, only numbers from the facts.'),
+});
+export type Explanation = z.infer<typeof explanationSchema>;
+
+const n = (v: number) => String(Math.round(v * 100) / 100);
+
+/** Template used in mock mode and whenever the model's numbers cannot be traced to the facts. */
+export function templateExplanation(f: BalanceFacts): Explanation {
+  const u = f.unit;
+  const parts = [`You have ${n(f.balance)} ${u} of ${f.leaveTypeName.toLowerCase()} today.`];
+  if (f.bookedAhead > 0) parts.push(`${n(f.bookedAhead)} ${u} are already booked later this year, so you can still book ${n(f.usable)} ${u}.`);
+  if (f.carried > 0 && f.carriedExpiresOn) parts.push(`That includes ${n(f.carried)} ${u} carried over, which must be used by ${f.carriedExpiresOn}.`);
+  if (f.yearEnd) {
+    parts.push(
+      f.yearEnd.wouldForfeit > 0
+        ? `On ${f.yearEnd.date} you would have ${n(f.yearEnd.balance)} ${u}: ${n(f.yearEnd.wouldCarry)} would carry over and ${n(f.yearEnd.wouldForfeit)} would be lost.`
+        : `On ${f.yearEnd.date} you would have ${n(f.yearEnd.balance)} ${u}.`,
+    );
+  }
+  const last = f.recent.at(-1);
+  if (last) parts.push(`The last entry was ${last.kind} (${last.amount > 0 ? '+' : ''}${n(last.amount)} ${u}) on ${last.date}.`);
+  return { text: parts.join(' ') };
+}
+
+export const explainBalanceTask = defineAiTask<BalanceFacts, Explanation>({
+  name: 'explainBalance',
+  promptVersion: 'e1',
+  cache: false,
+  system:
+    'You explain a leave balance to an employee in plain, friendly English, in two to five short ' +
+    'sentences. Use ONLY numbers and dates that appear in the facts JSON; never calculate, add, ' +
+    'subtract or round. Write numbers as digits and dates as YYYY-MM-DD. If the facts cannot answer ' +
+    'the question, say so and suggest asking an admin. ' +
+    DATA_RULE,
+  render: ({ question, ...facts }) =>
+    `Facts (computed by the leave engine):\n${JSON.stringify(facts)}\n` +
+    (question ? asData('untrusted_question', question) : 'Explain the balance.'),
+  output: explanationSchema,
+  heuristic: templateExplanation,
+});
+
+/** Every number in the text must be a fact (the question is not a fact). */
+export function untracedNumbers(text: string, f: BalanceFacts): string[] {
+  const { question: _q, ...facts } = f;
+  return untracedIn(text, facts);
+}

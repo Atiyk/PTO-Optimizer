@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MoreOptions, blockNextNDays } from './MoreOptions';
-import { DEFAULT_WORK_WEEK } from '../solver/types';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 
 describe('blockNextNDays (Phase 3: "Block the next N days" bulk helper)', () => {
   it('includes today itself as day 1, not day 0 - "the next 14 days" is 14 dates total', () => {

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { parseICSBusyDays, IcsParseError, type ParsedImportResult } from './icsImport';
-import { monthShortName } from './dateFormat';
+import { monthShortName } from '@daysoff/engine/calendar/dateFormat';
 
 interface ImportCalendarProps {
   /** Reuses the same bulk handler "Block the next N days" already uses - an .ics import is

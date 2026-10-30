@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateICS } from './icsExport';
-import type { Break } from '../solver/types';
+import type { Break } from '@daysoff/engine/solver/types';
 
 function makeBreak(overrides: Partial<Break> = {}): Break {
   return {

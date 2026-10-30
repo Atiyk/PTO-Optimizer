@@ -2,7 +2,7 @@ import { SiteHeader } from './SiteHeader';
 import { Footer } from './Footer';
 import { Container } from './Container';
 import dataSources from '../../public/data-sources.json';
-import holidayCoverage from '../data/holidayCoverage.json';
+import holidayCoverage from '@daysoff/engine/data/holidayCoverage.json';
 
 interface Source {
   id: string;
@@ -18,7 +18,7 @@ interface Source {
  * Phase 6B: a readable page built from the same data-sources.json this site already
  * publishes machine-readably (linked from /docs and llms.txt) - never a second, separately
  * maintained description of where the data comes from. The country count and "as of" date
- * are the real, build-time-verified figures from src/data/holidayCoverage.json (the same
+ * are the real, build-time-verified figures from packages/engine/src/data/holidayCoverage.json (the same
  * file the landing page's "<N> countries" chip reads), not a hand-typed guess.
  */
 export function DataSources() {

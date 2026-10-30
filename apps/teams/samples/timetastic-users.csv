@@ -1,0 +1,13 @@
+Name,Email,Department,Start Date,Remaining Allowance,Approver,Working Days,User Type
+Priya Shah,priya@example.com,Engineering,04/01/2022,12.5,,Mon-Fri,Approver
+Tom Becker,tom@example.com,Engineering,15/03/2023,8,Priya Shah,Mon-Fri,User
+Lena Fischer,lena@example.com,Engineering,01/06/2021,15,Priya Shah,Mon-Fri,User
+Omar Haddad,omar@example.com,Engineering,10/10/2024,20,Priya Shah,Mon-Fri,User
+Grace Kim,grace@example.com,Engineering,02/02/2020,3.5,Priya Shah,"Mon,Tue,Wed,Thu",User
+Diego Alvarez,diego@example.com,Engineering,20/07/2023,11,Priya Shah,Mon-Fri,User
+Hannah Wright,hannah@example.com,Support,05/05/2022,9,,Mon-Fri,Approver
+Ben Carter,ben@example.com,Support,12/12/2022,14,Hannah Wright,Mon-Fri,User
+Aisha Bello,aisha@example.com,Support,01/09/2023,6.5,Hannah Wright,Mon-Fri,User
+Noah Fischer,noah@example.com,Support,18/01/2024,17,Hannah Wright,Mon-Fri,User
+Mia Rossi,mia@example.com,Support,07/04/2025,20,Hannah Wright,Mon-Fri,User
+Ethan Brown,ethan@example.com,Operations,03/03/2021,10,,Mon-Fri,Admin

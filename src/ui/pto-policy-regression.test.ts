@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { policyFromLegacyPtoState, toLegacySolverFields } from '../policy/model';
-import { solve } from '../solver/solve';
-import type { SolveInput } from '../solver/types';
+import { solve } from '@daysoff/engine/solver/solve';
+import type { SolveInput } from '@daysoff/engine/solver/types';
 
 /**
  * Feature 1 Stage 2A follow-through safety net. useAppState.ts used to compute

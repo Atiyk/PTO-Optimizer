@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
-import { defineConfig, type Plugin } from 'vitest/config'
+import { configDefaults, defineConfig, type Plugin } from 'vitest/config'
 import { getSiteUrl } from './scripts/siteUrl.ts'
 import { GLOSSARY_TERMS } from './src/content/glossary/terms.ts'
 
@@ -66,5 +66,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: false,
+    // apps/* run their own test suites (npm run test:all); the root run is Days Off + engine.
+    exclude: [...configDefaults.exclude, 'apps/**'],
   },
 })

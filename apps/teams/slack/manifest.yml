@@ -1,0 +1,65 @@
+# Days Off for Teams: Slack app manifest.
+# Paste into https://api.slack.com/apps → Create New App → From a manifest (or an existing app →
+# App Manifest). Replace every https://YOUR-TEAMS-DOMAIN with the teams deployment URL first.
+# Scopes must match apps/teams/src/slack/config.ts.
+_metadata:
+  major_version: 2
+  minor_version: 1
+
+display_information:
+  name: Days Off
+  description: Request leave, approve it and see who's out, without leaving Slack.
+  long_description: >-
+    Days Off for Teams in Slack. Type a request in your own words (/daysoff Friday afternoon off),
+    check the exact cost against your balance, and send it. Managers approve from the message with
+    the same balance and coverage facts as the web app. /daysoff who shows who's out today or this
+    week, short and grouped by team. Every number comes from the Days Off engine.
+  background_color: "#1e3a8a"
+
+features:
+  app_home:
+    home_tab_enabled: false
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
+  bot_user:
+    display_name: Days Off
+    always_online: true
+  slash_commands:
+    - command: /daysoff
+      url: https://YOUR-TEAMS-DOMAIN/api/slack/commands
+      description: Request leave in your own words, see who's out, check your balance
+      usage_hint: "Friday afternoon off | who | who week | balance | help"
+      should_escape: false
+
+oauth_config:
+  redirect_urls:
+    - https://YOUR-TEAMS-DOMAIN/api/slack/oauth
+    - https://YOUR-TEAMS-DOMAIN/api/auth/slack/callback
+  scopes:
+    bot:
+      - commands
+      - chat:write
+      - im:history
+      - users:read
+      - users:read.email
+    user:
+      # Sign in with Slack (OpenID Connect).
+      - openid
+      - profile
+      - email
+      # Optional: set "Out of office" while someone is away (each person allows it themselves).
+      - users.profile:write
+
+settings:
+  event_subscriptions:
+    request_url: https://YOUR-TEAMS-DOMAIN/api/slack/events
+    bot_events:
+      - message.im
+      - app_uninstalled
+      - tokens_revoked
+  interactivity:
+    is_enabled: true
+    request_url: https://YOUR-TEAMS-DOMAIN/api/slack/interactivity
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

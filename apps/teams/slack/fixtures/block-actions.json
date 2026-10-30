@@ -1,0 +1,24 @@
+{
+  "type": "block_actions",
+  "user": { "id": "U0EMPLOYEE", "username": "tom", "name": "tom", "team_id": "T0TEST001" },
+  "api_app_id": "A0DAYSOFF1",
+  "token": "gIkuvaNzQIHg97ATvDxqgjtO",
+  "container": { "type": "message", "message_ts": "1730260000.000100", "channel_id": "D0DMCHAN1", "is_ephemeral": true },
+  "trigger_id": "13345224609.738474920.8088930838d88f008e1",
+  "team": { "id": "T0TEST001", "domain": "brightside" },
+  "enterprise": null,
+  "is_enterprise_install": false,
+  "channel": { "id": "D0DMCHAN1", "name": "directmessage" },
+  "response_url": "https://hooks.slack.com/actions/T0TEST001/1234567891/FixtureResponseUrl2",
+  "actions": [
+    {
+      "action_id": "REPLACED_BY_TEST",
+      "block_id": "b1",
+      "text": { "type": "plain_text", "text": "Request", "emoji": true },
+      "value": "REPLACED_BY_TEST",
+      "style": "primary",
+      "type": "button",
+      "action_ts": "1730260005.123456"
+    }
+  ]
+}

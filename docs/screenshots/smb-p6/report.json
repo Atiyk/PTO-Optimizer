@@ -1,0 +1,78 @@
+{
+  "axe": {
+    "signin@1440": [],
+    "signin@375": [],
+    "docs-agents@1440": [],
+    "docs-agents@375": [],
+    "admin-people@1440": [],
+    "admin-people@375": [],
+    "admin-setup@1440": [],
+    "admin-setup@375": [],
+    "admin-import@1440": [],
+    "admin-import@375": [],
+    "admin-handbook@1440": [],
+    "admin-handbook@375": [],
+    "admin-data@1440": [],
+    "admin-data@375": [],
+    "admin-ai@1440": [],
+    "admin-ai@375": [],
+    "admin-agents@1440": [],
+    "admin-agents@375": [],
+    "planner@1440": [],
+    "planner@375": [],
+    "approvals@1440": [],
+    "approvals@375": [],
+    "calendar@1440": [],
+    "calendar@375": [],
+    "home@1440": [],
+    "home@375": [],
+    "my-agents@1440": [],
+    "my-agents@375": []
+  },
+  "keyboard": {
+    "request": {
+      "tabs": {
+        "toFirstDay": 9,
+        "toLastDay": 2,
+        "toRequest": 3
+      },
+      "focusIndicator": "outline"
+    },
+    "approve": {
+      "tabs": 8,
+      "focusIndicator": "outline"
+    },
+    "planner": {
+      "tabs": 9,
+      "url": "/app/planner?from=2026-12-01"
+    }
+  },
+  "timings": {
+    "/app": {
+      "ttfbMs": 36,
+      "domContentLoadedMs": 63
+    },
+    "/app/approvals": {
+      "ttfbMs": 57,
+      "domContentLoadedMs": 79
+    },
+    "/app/calendar": {
+      "ttfbMs": 31,
+      "domContentLoadedMs": 58
+    },
+    "/app/planner (Engineering)": {
+      "ttfbMs": 67,
+      "domContentLoadedMs": 98
+    },
+    "api": {
+      "getMyBalanceMs": 16,
+      "whoIsOutMonthMs": 11,
+      "listPendingApprovalsMs": 59,
+      "runTeamPlanMs": 62,
+      "mcpToolsListMs": 113
+    }
+  },
+  "mobile": {
+    "horizontalOverflowOnAgentsPage": false
+  }
+}

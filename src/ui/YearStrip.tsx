@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { isoToSerial, addDays } from '../solver/dateUtils';
-import { monthLabel } from './calendarMath';
+import { isoToSerial, addDays } from '@daysoff/engine/solver/dateUtils';
+import { monthLabel } from '@daysoff/engine/calendar/calendarMath';
 import { findDrySpells } from './landingData';
-import type { Holiday } from '../data/holidays';
+import type { Holiday } from '@daysoff/engine/data/holidays';
 
 interface YearStripProps {
   today: string;

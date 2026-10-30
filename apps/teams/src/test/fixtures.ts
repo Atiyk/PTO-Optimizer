@@ -1,0 +1,55 @@
+import { and, eq } from 'drizzle-orm';
+import type { Db } from '@/db/client';
+import { apiTokens, blackouts, coverageRules, drafts, invites, leaveRequests, leaveTypes, members, oauthClients, teams, webhookDeliveries, webhookEndpoints } from '@/db/schema';
+import { invokeCapability, type CapabilityName } from '@/capabilities/registry';
+import { ROLE_SCOPES } from '@/capabilities/scopes';
+import type { Actor } from '@/capabilities/types';
+import { createOrganization } from '@/server/bootstrap';
+
+export const TODAY = '2026-11-02'; // a Monday
+export const NOW = new Date(`${TODAY}T12:00:00Z`);
+
+export function humanActor(m: { id: string; orgId: string; role: 'owner' | 'admin' | 'manager' | 'employee' }): Actor {
+  return { type: 'human', orgId: m.orgId, memberId: m.id, role: m.role, clientId: null, onBehalfOfMemberId: null, scopes: ROLE_SCOPES[m.role] };
+}
+
+export function run<N extends CapabilityName>(db: Db, actor: Actor, name: N, input: unknown) {
+  return invokeCapability(name, { db, actor, now: NOW }, input);
+}
+
+/** A complete small org: owner, manager, two employees in one team, a coverage rule, a request. */
+export async function buildOrg(db: Db, name: string) {
+  const { org, owner, team, location } = await createOrganization(
+    db,
+    { provider: 'dev', subject: `${name}-owner`, name: `${name} Owner`, email: null, slackTeamId: null, issuedAt: 0 },
+    { orgName: name, countryCode: 'US', today: TODAY, teamName: 'Eng' },
+  );
+  const mk = async (n: string, role: 'manager' | 'employee', managerId?: string) =>
+    (await db.insert(members).values({ orgId: org.id, name: `${name} ${n}`, role, teamId: team.id, locationId: location.id, startDate: '2024-01-01', managerId, tags: ['engineer'] }).returning())[0]!;
+  const manager = await mk('Manager', 'manager');
+  const emp = await mk('Emp', 'employee', manager.id);
+  const emp2 = await mk('Emp2', 'employee', manager.id);
+  await db.update(members).set({ startDate: '2024-01-01', tags: ['engineer'] }).where(eq(members.id, owner.id));
+  const [rule] = await db.insert(coverageRules).values({ orgId: org.id, teamId: team.id, minPresent: 1, tag: 'engineer' }).returning();
+  const [bl] = await db.insert(blackouts).values({ orgId: org.id, startDate: '2026-12-30', endDate: '2026-12-31', reason: 'close', hard: false }).returning();
+  const [inv] = await db.insert(invites).values({ orgId: org.id, tokenHash: `hash-${name}`, expiresAt: new Date('2027-01-01') }).returning();
+  const sub = await run(db, humanActor(emp), 'submitLeaveRequest', { leaveType: 'vacation', start: '2026-11-16', end: '2026-11-17', idempotencyKey: `${name}-req-1` });
+  const [vac] = await db.select().from(leaveTypes).where(and(eq(leaveTypes.orgId, org.id), eq(leaveTypes.key, 'vacation')));
+  return { org, owner, manager, emp, emp2, team, location, rule: rule!, blackout: bl!, invite: inv!, requestId: sub.request.id, vacation: vac! };
+}
+
+export async function snapshotOrg(db: Db, orgId: string) {
+  return {
+    members: await db.select().from(members).where(eq(members.orgId, orgId)),
+    requests: await db.select().from(leaveRequests).where(eq(leaveRequests.orgId, orgId)),
+    teams: await db.select().from(teams).where(eq(teams.orgId, orgId)),
+    rules: await db.select().from(coverageRules).where(eq(coverageRules.orgId, orgId)),
+    blackouts: await db.select().from(blackouts).where(eq(blackouts.orgId, orgId)),
+    invites: await db.select().from(invites).where(eq(invites.orgId, orgId)),
+    drafts: await db.select().from(drafts).where(eq(drafts.orgId, orgId)),
+    tokens: await db.select().from(apiTokens).where(eq(apiTokens.orgId, orgId)),
+    clients: await db.select().from(oauthClients).where(eq(oauthClients.orgId, orgId)),
+    webhooks: await db.select().from(webhookEndpoints).where(eq(webhookEndpoints.orgId, orgId)),
+    deliveries: await db.select().from(webhookDeliveries).where(eq(webhookDeliveries.orgId, orgId)),
+  };
+}

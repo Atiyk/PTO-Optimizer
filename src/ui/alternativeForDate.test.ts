@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { alternativeForDate } from './alternativeForDate';
-import type { Alternative } from '../solver/types';
+import type { Alternative } from '@daysoff/engine/solver/types';
 
 function makeAlt(overrides: Partial<Alternative> = {}): Alternative {
   return {

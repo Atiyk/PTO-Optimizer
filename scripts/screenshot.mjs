@@ -3,7 +3,10 @@
 import { chromium } from 'playwright';
 
 const [, , url, outPath, width, height] = process.argv;
-const browser = await chromium.launch();
+// PW_CHROMIUM_PATH lets sandboxes with a preinstalled browser skip `playwright install`.
+const browser = await chromium.launch(
+  process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
+);
 const page = await browser.newPage({ viewport: { width: Number(width), height: Number(height) } });
 await page.goto(url, { waitUntil: 'networkidle' });
 await page.screenshot({ path: outPath, fullPage: true });

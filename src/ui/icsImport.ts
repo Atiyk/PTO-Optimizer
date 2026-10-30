@@ -1,4 +1,4 @@
-import { addDays, rangeISO, isoToSerial } from '../solver/dateUtils';
+import { addDays, rangeISO, isoToSerial } from '@daysoff/engine/solver/dateUtils';
 
 /** A single .ics file is parsed entirely client-side (FileReader/`file.text()`, never
  * fetch/XHR) - nothing is uploaded anywhere, per the product's no-backend design. This

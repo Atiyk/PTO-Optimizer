@@ -1,9 +1,9 @@
 /**
- * Phase 2: fetches Nager.Date for every country in src/data/countries.json (all 204 are
+ * Phase 2: fetches Nager.Date for every country in packages/engine/src/data/countries.json (all 204 are
  * genuinely supported - confirmed against Nager's own /AvailableCountries, which returns
  * the exact same 204 codes), for the current year plus the next two, and writes one small
  * static file per country/year to public/holidays/<CC>-<YEAR>.json. These are committed,
- * so a build with no network still has real data (src/data/holidays.ts reads them
+ * so a build with no network still has real data (packages/engine/src/data/holidays.ts reads them
  * same-origin first, Nager only as a live fallback - see that file's own Phase 2 changes),
  * and scripts/prerender.ts reads them directly in Node to put real stats, holiday names and
  * sabbatical placements into the initial HTML instead of the empty-holiday-set snapshot a
@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '..');
-const countriesPath = resolve(projectRoot, 'src/data/countries.json');
+const countriesPath = resolve(projectRoot, 'packages/engine/src/data/countries.json');
 const outDir = resolve(projectRoot, 'public/holidays');
 
 const API_BASE = 'https://date.nager.at/api/v3/PublicHolidays';
@@ -178,12 +178,12 @@ async function main(): Promise<void> {
   // number is computed, and imported as a plain JSON module by the client, same pattern as
   // demandIndex.json.
   const countriesWithData = new Set(results.filter((r) => r.outcome === 'written' || r.outcome === 'kept-existing').map((r) => r.task.code)).size;
-  const coveragePath = resolve(projectRoot, 'src/data/holidayCoverage.json');
+  const coveragePath = resolve(projectRoot, 'packages/engine/src/data/holidayCoverage.json');
   writeFileSync(coveragePath, `${JSON.stringify({ countriesWithData, asOf: new Date().toISOString().slice(0, 10) }, null, 2)}\n`, 'utf-8');
-  console.log(`  ${countriesWithData} countries have real holiday data (src/data/holidayCoverage.json updated).`);
+  console.log(`  ${countriesWithData} countries have real holiday data (packages/engine/src/data/holidayCoverage.json updated).`);
 
   // Never fail the build over this - a stale or absent static snapshot degrades to a live
-  // fetch at runtime (src/data/holidays.ts), not a broken deploy.
+  // fetch at runtime (packages/engine/src/data/holidays.ts), not a broken deploy.
   process.exit(0);
 }
 

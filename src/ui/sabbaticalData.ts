@@ -1,8 +1,8 @@
-import { addDays, mondayIndexedDow } from '../solver/dateUtils';
+import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { isOffDay, daysBetween } from './landingData';
-import { DEFAULT_WORK_WEEK, type WorkWeek } from '../solver/types';
-import { demandFor } from '../data/demandIndex';
-import type { Holiday } from '../data/holidays';
+import { DEFAULT_WORK_WEEK, type WorkWeek } from '@daysoff/engine/solver/types';
+import { demandFor } from '@daysoff/engine/data/demandIndex';
+import type { Holiday } from '@daysoff/engine/data/holidays';
 
 // Same thresholds solve.ts's HIGH_DEMAND_THRESHOLD/LOW_DEMAND_THRESHOLD and
 // requestDeadline.ts's CONTESTED/QUIET_DEMAND_THRESHOLD use - kept as separate local

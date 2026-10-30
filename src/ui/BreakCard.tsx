@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import type { Break, WorkWeek } from '../solver/types';
+import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
 import { formatWorkingDaysList, formatManagerEmailShort, formatManagerEmailDetailed, copyText } from './requestText';
-import { formatCardDateRange } from './dateFormat';
-import { requestByText, isContested } from './requestDeadline';
+import { formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
+import { requestByText, isContested } from '@daysoff/engine/calendar/requestDeadline';
 
 interface BreakCardProps {
   brk: Break;

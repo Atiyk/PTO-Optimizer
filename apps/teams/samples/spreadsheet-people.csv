@@ -1,0 +1,4 @@
+name,email,team,start date,balance,manager,working days,hours per day,role
+Sam Taylor,sam@example.com,Design,2023-01-09,10,,1111100,7.5,manager
+Ravi Kumar,ravi@example.com,Design,2024-05-20,18,Sam Taylor,1111100,7.5,employee
+Julia Nowak,julia@example.com,Design,2022-08-01,4,Sam Taylor,1111000,7.5,employee

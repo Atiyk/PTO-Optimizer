@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { extendSabbatical, bestPlacements, placementNote, paddedCalendarRange, type SabbaticalPlacement } from './sabbaticalData';
-import { addDays } from '../solver/dateUtils';
-import { DEFAULT_WORK_WEEK } from '../solver/types';
-import type { Holiday } from '../data/holidays';
+import { addDays } from '@daysoff/engine/solver/dateUtils';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import type { Holiday } from '@daysoff/engine/data/holidays';
 
 function holiday(date: string, name: string): Holiday {
   return { date, nominalDate: date, name, countryCode: 'US', counties: null };

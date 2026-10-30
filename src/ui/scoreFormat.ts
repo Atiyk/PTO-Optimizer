@@ -1,4 +1,4 @@
-import type { Scores } from '../solver/types';
+import type { Scores } from '@daysoff/engine/solver/types';
 
 /** "78th", "91st", "1st", "2nd", "3rd", "11th"/"12th"/"13th" (the -teen exception). */
 export function ordinal(n: number): string {
