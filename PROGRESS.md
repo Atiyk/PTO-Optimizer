@@ -724,6 +724,172 @@ after a restart or context compaction.
 Scheduled, resumable run. Resumable state: GitHub issue #32 "SMB MVP: build log" (label
 `smb-run`). This section holds detail: decisions, test output, open issues.
 
+## SMB MVP: FINAL REPORT (2026-10-30)
+
+All nine phases (0–8) are built, tested and up as draft PRs. Nothing was merged, nothing was pushed to `main`, no branch was deleted or force-pushed, no Vercel, Slack, Anthropic or DNS setting was changed, and no secrets were committed. Every step that needs you is a click-path below.
+
+### 1. PRs in merge order
+Every Vercel preview below is **Ready**. They are previews of the **Days Off** project, so they show that Days Off still builds and deploys on each branch. The team app has no Vercel project yet (setup step 2), so it has no preview URL of its own. You can run it locally with `npm run dev -w @daysoff/teams`.
+
+| Order | PR | Branch → base | Preview |
+|---|---|---|---|
+| 0 | #41 Fix main build (duplicate `firstOfMonth`) | → `main` | **Close it, don't merge.** `main` now builds on its own: I built it in a clean checkout today and it has one `firstOfMonth` |
+| 1 | #34 Phase 0: monorepo and shared engine | `claude/smb-p0-monorepo` → `main` | https://pto-optimizer-git-claude-smb-p0-monorepo-atiyk-a.vercel.app |
+| 2 | #39 Phase 1: spec and domain model | `…p1-spec` → p0 | https://pto-optimizer-git-claude-smb-p1-spec-atiyk-a.vercel.app |
+| 3 | #45 Phase 2: core web product | `…p2-core` → p1 | https://pto-optimizer-git-claude-smb-p2-core-atiyk-a.vercel.app |
+| 4 | #47 Phase 3: AI layer | `…p3-ai` → p2 | https://pto-optimizer-git-claude-smb-p3-ai-atiyk-a.vercel.app |
+| 5 | #48 Phase 4: team planner | `…p4-planner` → p3 | https://pto-optimizer-git-claude-smb-p4-planner-atiyk-a.vercel.app |
+| 6 | #49 Phase 5: agents and API | `…p5-agents` → p4 | https://pto-optimizer-git-claude-smb-p5-agents-atiyk-a.vercel.app |
+| 7 | #50 Phase 6: quality, security, privacy | `…p6-quality` → p5 | https://pto-optimizer-git-claude-smb-p6-quality-atiyk-a.vercel.app |
+| 8 | #51 Phase 7: Slack app | `…p7-slack` → p6 | https://pto-optimizer-git-claude-smb-p7-slack-atiyk-a.vercel.app |
+| 9 | #52 Phase 8: landing, demo, acceptance | `…p8-launch` → p7 | https://pto-optimizer-git-claude-smb-p8-launch-atiyk-a.vercel.app |
+| any | #53 Days Off footer link (off until `TEAMS_URL` is set) | `claude/smb-daysoff-link` → `main` | https://pto-optimizer-git-claude-smb-daysoff-link-atiyk-a.vercel.app |
+
+**How to merge the stack.** Merge #34 into `main`. If GitHub doesn't move #39's base to `main` automatically (it does when "Automatically delete head branches" is on), change it: PR → **Edit** next to the title → base: `main`. Repeat up the stack. Use merge commits rather than squash, because the later branches contain the earlier commits.
+
+### 2. What changed, broke or surprised
+- **`main` moved during the run.** You merged the old phase 1–6 stack while Phase 1 was in progress. I merged the new `main` into the Phase 0 branch (no force-push). For a while `main` didn't build (#41); it builds again now.
+- **Days Off's dist never changed.** After every phase, `scripts/verify-days-off-dist.sh` found the build identical to the `main` baseline: 652 files, with the build timestamp normalised. The last check was on the Phase 8 branch today. The one deliberate Days Off change is #53, kept separate.
+- **The acceptance run found three bugs, all fixed in #52:**
+  - The no-AI date reader turned "next Friday and Monday off" into a request ending a year later.
+  - An injected "unlimited vacation" line knocked the real 20-day allowance out of the no-AI handbook reader. It was never obeyed, but it removed a value.
+  - Auto-approval reasons said "1 days".
+- **The rules parser out-scores the model on our own eval set.** Rules got 45/46 and Haiku 44/46. The cases were written alongside the rules, so treat that as overfitting, not proof the rules are better. Real traffic needs the model; next, collect real phrasings for the eval set.
+- **Plans are deterministic per org.** The planner breaks ties by member id. Two freshly seeded copies of the demo org get different ids, so their plans can differ slightly. One persistent demo org always shows the same plan.
+- **Things that bit me during the build, all fixed:** two in-process PGlite databases when route handlers and pages each opened one (now one per process), a planner date field that rewrote the URL on every keystroke, and contrast and focus issues found by axe (28 scans, 0 violations now).
+- **The sandbox had no Slack app, Anthropic key or Vercel access.** So Slack is tested against Slack-shaped fixtures only, and the AI ran on this session's Claude credits through the Claude Code CLI, as you asked on 2026-10-30.
+
+### 3. Acceptance A1–A12
+All 12 pass. The full table, with test names and screens, is in `docs/teams/ACCEPTANCE.md`.
+
+| A1 | A2 | A3 | A4 | A5 | A6 | A7 | A8 | A9 | A10 | A11 | A12 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Pass (8 clicks, 5.1 s) | Pass | Pass after fix | Pass | Pass (41/41 placed) | Pass | Pass | Pass with fixtures; **not run live** (no Slack app yet) | Pass | Pass | Pass | Pass |
+
+### 4. Days Off dist proof
+`npm run verify:dist` on `claude/smb-p8-launch`: "Days Off dist/ is identical to the baseline (652 files; build timestamp normalised)." The same check passed at the gate of every phase (see each PR). For #53, the Footer chunk and the 4 chunks that import it get new hashes, which is expected. While `TEAMS_URL` is unset the page renders identically (0 links counted in the DOM).
+
+### 5. AI evals and spend
+| Capability | Model | Result | Tokens in / out | Cost |
+|---|---|---|---|---|
+| Parse a request in words (`parseLeaveRequestText`) | claude-haiku-5-5 | 44/46 (95.7%); misses: "Off on Nov 20 and Nov 23", "this week" | 57,796 / 31,795 | $0.0217 |
+| Parse a request in words | built-in rules (no AI, CI) | 45/46 | – | – |
+| Read a handbook (`importHandbook`) | claude-sonnet-5-5 | 6/6 handbooks, 100% of fields | 12 / 4,649 (the CLI reports cached input as ~0) | $0.0465 |
+| Read a handbook | built-in rules (no AI, CI) | 6/6, 100% of fields | – | – |
+| Demo handbook fixture (one live read) | claude-sonnet-5-5 | Injection ignored and flagged; 5 questions | 5,955 / 798 | $0.0199 |
+| Explain a balance, summarise a plan | claude-haiku-5-5 | Not separately evaluated. Every number is checked against engine facts, and the template replaces any reply that invents one (tested) | – | – |
+
+**Run total: 63,763 input and 37,242 output tokens, about $0.09 at API prices.** It ran on this session's Claude credits, so nothing was billed to an Anthropic API account.
+
+**Production guardrails:**
+- `AI_ORG_DAILY_TOKEN_BUDGET` (default 200k tokens per org per day) and `AI_MONTHLY_TOKEN_BUDGET` (default 5M) switch AI off gracefully when reached.
+- Handbook reads are cached by content hash.
+- The public demo is capped by its org's daily budget and 10 reads a minute per IP. Worst case is roughly 30 fresh Sonnet handbook reads a day, about $0.60.
+
+### 6. Capability catalog
+Agents start at **L2 Draft**: a person confirms in the app. The approval assistant starts at **L1 Suggest**. Admins can change either per action (Admin → Agents & API). Service agents (API keys, OAuth clients) can never hold `admin` or `leave:approve`, and can only draft for a named member.
+
+| Capability | Surfaces | Scope | Roles | Effect | Default autonomy |
+|---|---|---|---|---|---|
+| getMyBalance | ui, rest, mcp, slack, assistant | leave:read | any member | read | n/a (read) |
+| explainBalance | ui, rest, mcp, slack, assistant | leave:read | any member | read | n/a (read) |
+| draftLeaveRequest | ui, rest, mcp, slack, assistant | leave:request | any member | draft | Never saves (a person acts on the result) |
+| submitLeaveRequest | ui, rest, mcp, slack, assistant | leave:request | any member | commit | Agents: L2 Draft |
+| cancelLeaveRequest | ui, rest, mcp, slack, assistant | leave:request | any member | commit | Agents: L2 Draft |
+| listMyRequests | ui, rest, mcp, slack, assistant | leave:read | any member | read | n/a (read) |
+| whoIsOut | ui, rest, mcp, slack, assistant | leave:read | any member | read | n/a (read) |
+| listHolidays | ui, rest, mcp, assistant | leave:read | any member | read | n/a (read) |
+| listPendingApprovals | ui, rest, mcp, slack, assistant | leave:approve | owner, admin, manager | read | n/a (read) |
+| decideLeaveRequest | ui, rest, mcp, slack, assistant | leave:approve | owner, admin, manager | commit | Agents: L2 Draft; assistant: L1 Suggest |
+| getOrgSetup | ui, rest | policy:read | any member | read | n/a (read) |
+| manageOrgSetup | ui, rest | admin | owner, admin | commit | People only |
+| listMembers | ui, rest | admin | owner, admin | read | n/a (read) |
+| manageMembers | ui, rest | admin | owner, admin | commit | People only |
+| adjustBalance | ui, rest | admin | owner, admin | commit | People only |
+| exportData | ui, rest | admin | owner, admin | read | n/a (read) |
+| getAuditLog | ui, rest | admin | owner, admin | read | n/a (read) |
+| importCsv | ui, rest | admin | owner, admin | commit | People only |
+| parseLeaveRequestText | ui, rest, mcp, slack, assistant | leave:request | any member | draft | Never saves (a person acts on the result) |
+| importHandbook | ui, rest, mcp, assistant | policy:draft | owner, admin | draft | Never saves (a person acts on the result) |
+| explainBalanceInWords | ui, rest, mcp, slack, assistant | leave:read | any member | read | n/a (read) |
+| getAiUsage | ui, rest | admin | owner, admin | read | n/a (read) |
+| runTeamPlan | ui, rest, mcp, assistant | planner:run | owner, admin, manager | read | n/a (read) |
+| sendPlanProposals | ui, rest, mcp, assistant | planner:run | owner, admin, manager | commit | Agents: L2 Draft |
+| listMyProposals | ui, rest, mcp, slack, assistant | leave:read | any member | read | n/a (read) |
+| respondToProposal | ui, rest, mcp, slack, assistant | leave:request | any member | commit | Agents: L2 Draft |
+| managePersonalTokens | ui | leave:read | any member | commit | People only |
+| manageAgentAccess | ui | admin | owner, admin | commit | People only |
+| manageWebhooks | ui | admin | owner, admin | commit | People only |
+| eraseMember | ui | admin | owner, admin | commit | People only |
+| deleteWorkspace | ui | admin | owner | commit | People only |
+| manageSlack | ui | leave:read | any member | commit | People only |
+| getSlackConnection | ui | leave:read | any member | read | n/a (read) |
+| listAgentDrafts | ui | leave:read | any member | read | n/a (read) |
+| decideAgentDraft | ui | leave:read | any member | commit | People only |
+
+### 7. Agent connections by platform
+None of these were tried live: the app isn't deployed, and these are your accounts. The status comes from each platform's current documentation and our tests against the MCP spec (2026-07-28) and the strictest schema rules (no `$ref`, no type arrays). The setup guide for each is at `/docs/agents`.
+
+| Platform | How it connects today | Status |
+|---|---|---|
+| Salesforce Agentforce | Setup → Agentforce Registry → New, with OAuth 2.0 client credentials (our OAuth client, `/api/oauth/token`) | **Works today**, as a service agent: reads, the planner, and drafts for a named member |
+| Microsoft Copilot Studio | MCP with an API key (header) or a personal token | **Works today** |
+| Claude (Claude Code) | MCP with a personal token in a header | **Works today** |
+| Claude apps (claude.ai, Desktop, Cowork) | Need OAuth (CIMD or DCR); static headers are in beta for some orgs only | **Partly**: works through headers where that beta is on. Full support needs per-person OAuth (Q4, designed in `docs/teams/AGENT-AUTH.md`, not built) |
+| ChatGPT (developer mode / apps) | OAuth or no auth; no API keys | **Not yet**. Needs per-person OAuth (Q4) |
+| Slackbot (Slack's MCP client) | Streamable HTTP; Slack identity or OAuth | **Not yet** live. Our own Slack app covers requests, approvals, who's out and status (fixture-tested). Recommendation: keep both, and add MCP for Slackbot after Q4 |
+| A2A | Agent card at `/.well-known/agent-card.json` | **Off** (`A2A_ENABLED`), stub only (Q7) |
+
+### 8. Security and privacy
+**In place:**
+- Tenant isolation is tested against every id-taking capability, as a person, a personal token and a service key, and a test fails if a new capability skips it.
+- One capability layer with scope and role checks and an audit row for every change.
+- Hashed credentials and a kill switch for all agent access.
+- Rate limits per member, per token and per IP.
+- CSRF checks, CSP and security headers.
+- Signed webhooks with SSRF checks.
+- Health-related leave is never a reason, and webhooks and Slack show it only as "out".
+- Export and erasure for one person, and whole-workspace deletion (tested to leave 0 rows).
+- The demo can't be signed into in production.
+- Details: `docs/teams/SECURITY.md` and `docs/teams/PRIVACY.md`.
+
+**Gaps, in priority order:**
+1. **The privacy policy and DPA summary are engineering drafts** with blanks: entity, regions, Anthropic retention terms, transfers. Get legal review before taking a customer.
+2. **Sessions can't be revoked** short of rotating `SESSION_SECRET`.
+3. **Webhook secrets use a key derived from `SESSION_SECRET`**, not a dedicated `ENCRYPTION_KEY`.
+4. **A DNS-rebinding window on webhooks**: the checked IP isn't pinned.
+5. **The CSP allows inline scripts** (no nonces yet).
+6. **No per-person OAuth for agents** (Q4).
+7. **No MFA or SSO beyond Slack's.**
+8. **SOC 2 groundwork hasn't started**: policies, monitoring, a tested restore, Dependabot and secret scanning.
+
+### 9. Setup checklist (click-paths)
+1. **Neon database.** console.neon.tech → **New project** (pick the region closest to your Vercel region) → open the project → **Connect** → keep **Connection pooling** on → copy the string (its host contains `-pooler`). That's `DATABASE_URL`. Then, on your machine: `DATABASE_URL='…' npm run db:migrate -w @daysoff/teams` and, optionally, `DATABASE_URL='…' npm run seed:demo -w @daysoff/teams`.
+2. **Vercel project for the team app.** Vercel dashboard → **Add New… → Project** → import `Atiyk/PTO-Optimizer` → **Root Directory → Edit → `apps/teams`** → Framework: Next.js → leave Install and Build at their defaults → **Deploy**. Leave the existing Days Off project as it is (root `/`). Vercel skips projects a commit doesn't touch, because the repo uses npm workspaces.
+3. **Environment variables.** Teams project → **Settings → Environment Variables** → add these for Production (and Preview where noted), then **Deployments → Redeploy**:
+   - `DATABASE_URL` from step 1. A Neon branch per preview is optional.
+   - `SESSION_SECRET`: a long random string, for example `openssl rand -base64 48`. Rotating it signs everyone out and breaks webhook secrets (Q6).
+   - `APP_URL`: the production URL, for example `https://teams.yourdomain.com`.
+   - `CRON_SECRET`: a long random string, used by the daily cron in `apps/teams/vercel.json`.
+   - `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET` from step 4.
+   - `ANTHROPIC_API_KEY`: **only after step 6.** Without it, every AI feature falls back to the rules and says so.
+   - Optional: `AI_ORG_DAILY_TOKEN_BUDGET` and `AI_MONTHLY_TOKEN_BUDGET`.
+   - Never set `DEV_LOGIN` or `ALLOW_PGLITE` in production.
+4. **Slack app.** https://api.slack.com/apps → **Create New App → From a manifest** → your workspace → paste `apps/teams/slack/manifest.yml` with `YOUR-TEAMS-DOMAIN` replaced → **Create** → **Basic Information** → copy the Client ID, Client Secret and Signing Secret into step 3.
+5. **Slack redirect URLs.** These are in the manifest; check them under **OAuth & Permissions → Redirect URLs**: `https://<teams-domain>/api/slack/oauth` (Add to Slack) and `https://<teams-domain>/api/auth/slack/callback` (Sign in with Slack). Then **Event Subscriptions** should show the request URL as Verified. Smoke test: `/daysoff help`, then `/daysoff Friday afternoon off` → Request → approve from the manager's DM.
+6. **Anthropic monthly spend limit, before adding the key.** platform.claude.com → your organization name (bottom left) → **Organization settings → Billing → Spend limits → Set limit** (or **Adjust limit**) → for example $20 → **Update limit**. Better: create a separate workspace for this app, give it a lower limit under **Manage → Spend limits**, and create the API key in that workspace.
+7. **Vercel Pro before you charge anyone.** Vercel's Hobby plan is for "non-commercial, personal use only". Dashboard → **Settings → Billing → Plan → Upgrade** ($20 per developer seat per month). Pro also allows the faster cron schedule (Q5).
+8. **Domain.** Add the teams domain under Teams project → **Settings → Domains**. Then set `APP_URL`, set the Slack manifest URLs, and set `TEAMS_URL` in `src/ui/Footer.tsx` (#53).
+
+### 10. Questions for Atiyk, with recommendations
+- **Product name (Q10).** It's the `PRODUCT_NAME` placeholder, "Days Off for Teams" (`apps/teams/src/lib/brand.ts`). *Recommendation:* launch under it. It borrows Days Off's search traffic and trust, and the link in #53 reads naturally. Rename only if the domain or trademark isn't available, or if you want the two products clearly apart. It's one constant either way.
+- **Pricing against the $1.20–$4 per user incumbents (Q11).** AI costs per user are tiny: a parsed request costs about $0.0005 on Haiku, and handbook reads are one-off and cached. Fixed costs are a Vercel Pro seat ($20 a month) plus Neon once past the free tier. *Recommendation:* **$3 per user per month, $2.50 billed yearly, free for up to 5 people**, with AI included under the fair-use budgets. That's mid-market against Timetastic-style tools while selling planning and AI they don't have. Don't go below $2: about 15 paying users then covers the fixed costs. Validate with 3 to 5 design partners before publishing prices.
+- **Moving Days Off into `apps/` (Q12).** *Recommendation:* not yet. It would change the live Days Off project's root directory and build for no user-facing gain. Revisit when a third app arrives or the root workspace becomes a nuisance. The engine is already shared through `packages/engine`.
+- **When to add Microsoft Teams (Q13).** *Recommendation:* after Slack is live and at least 2 real prospects say they're Teams-only. Copilot Studio already reaches Microsoft users through MCP. A Teams app needs a Bot Framework app, Entra ID sign-in and Adaptive Cards for approvals. It can reuse the same capability layer, like the Slack adapter.
+- **The Days Off link needs the teams URL (Q14).** Set `TEAMS_URL` in `src/ui/Footer.tsx` (#53) once the domain exists. Until then the link stays hidden instead of guessing.
+- Still open from earlier phases: Q4 (per-person OAuth), Q5 (`CRON_SECRET`), Q6 (encryption key), Q7 (A2A off), Q8 (legal review), Q9 (Slack app). Details are under "Questions for Atiyk (SMB)" below.
+
+
 ## Phase 0: monorepo and shared engine (`claude/smb-p0-monorepo`)
 
 ### P0.1 / P0.2 engine extraction (run 1, 2026-10-30)
@@ -1028,9 +1194,18 @@ Scheduled, resumable run. Resumable state: GitHub issue #32 "SMB MVP: build log"
   secrets were available, so no live workspace smoke test; the live routes were smoke-tested
   locally with a signed URL check, a forged signature (401) and a signed command (200 in 7 ms).
 
+## Phase 8: launch (`claude/smb-p8-launch`, plus `claude/smb-daysoff-link`)
+
+- **`/demo`**: Northwind Labs, a made-up 25-person org (San Francisco and London), seeded once (`organizations.is_demo`, agent access off). (1) Read the sample handbook: live AI; else a stored real-model result for the sample text, labelled as such; else the rules, labelled. (2) The Engineering manager's real plan with its heatmap. Nothing a visitor does is saved (tested). `POST /api/demo/handbook`: same-origin, 10 a minute per IP, 20k characters max, the org's daily AI budget.
+- **Landing `/`**: honest copy, no imagery or social proof, "Try the demo", "Sign in with Slack". A shared public header.
+- **Scripts**: `npm run db:migrate -w @daysoff/teams` (Neon) and `npm run seed:demo -w @daysoff/teams` (idempotent; checked twice on PGlite).
+- **Acceptance A1–A12**: `src/acceptance.test.ts` plus the Slack and agent tests; map in `docs/teams/ACCEPTANCE.md`. Three bugs found and fixed (no-AI date reader, no-AI handbook reader vs an injected line, "1 days").
+- **Days Off link (#53)**: one footer link, hidden until `TEAMS_URL` is set.
+- Gate: teams 125 pass / 2 skipped; root 474 pass / 2 known-flaky; engine 211 / 1 known-flaky; typecheck clean; teams build OK; lint 0 errors; Days Off dist identical (652 files).
+
 ## Questions for Atiyk (SMB)
-- Q1. ~~main lacks the old stack~~ Resolved: you merged it. But main's build is broken by
-  a merge artifact. Recommended: merge #41 first, then this stack.
+- Q1. ~~main lacks the old stack~~ Resolved: you merged it. ~~main's build is broken~~ Resolved:
+  main builds again on its own (checked 2026-10-30), so #41 is no longer needed. Recommended: close #41.
 - Q3. ~~No API key for the live eval~~ Resolved: ran on this session's credits via the
   Claude Code CLI (`EVAL_PROVIDER=claude-cli npm run eval:live -w apps/teams`). For
   production: set an Anthropic spend limit first, then add `ANTHROPIC_API_KEY` in Vercel.
@@ -1051,3 +1226,5 @@ Scheduled, resumable run. Resumable state: GitHub issue #32 "SMB MVP: build log"
 - Q9. Slack: create the app from `apps/teams/slack/manifest.yml` and add the three Slack env vars
   (click-path in `apps/teams/slack/README.md`), then run the live smoke test: `/daysoff help`,
   `/daysoff Friday afternoon off` → Request, approve from the manager DM.
+- Q10–Q14 (product name, pricing, moving Days Off into `apps/`, Microsoft Teams timing, the
+  teams URL for the Days Off link): see the final report at the top of this section.
