@@ -1,7 +1,7 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '@/db/client';
-import { drafts, members } from '@/db/schema';
+import { drafts, leaveRequests, members, teams } from '@/db/schema';
 import { autonomyFor } from '@/domain/autonomy';
 import { CapabilityError } from '@/capabilities/errors';
 import { authorize, describeZodError, getCapability, invokeCapability, writeAudit, type CapabilityName } from '@/capabilities/registry';
@@ -45,6 +45,32 @@ function describe(name: string, input: Record<string, unknown>): string {
       return `Send leave suggestions to ${(input.proposals as unknown[] | undefined)?.length ?? 0} people`;
     default:
       return `Run ${name}`;
+  }
+}
+
+/**
+ * A draft must never point at another org's objects: check every id in the input before
+ * storing anything, so a cross-tenant call fails now rather than at confirmation time.
+ */
+async function checkTargets(db: Db, orgId: string, input: Record<string, unknown>) {
+  const missing = () => new CapabilityError('not_found', 'Not found.');
+  if (typeof input.requestId === 'string') {
+    const [r] = await db.select({ id: leaveRequests.id }).from(leaveRequests).where(and(eq(leaveRequests.orgId, orgId), eq(leaveRequests.id, input.requestId)));
+    if (!r) throw missing();
+  }
+  if (typeof input.proposalId === 'string') {
+    const [d] = await db.select({ id: drafts.id }).from(drafts).where(and(eq(drafts.orgId, orgId), eq(drafts.id, input.proposalId)));
+    if (!d) throw missing();
+  }
+  if (typeof input.teamId === 'string') {
+    const [t] = await db.select({ id: teams.id }).from(teams).where(and(eq(teams.orgId, orgId), eq(teams.id, input.teamId)));
+    if (!t) throw missing();
+  }
+  if (Array.isArray(input.proposals)) {
+    for (const p of input.proposals as { memberId: string }[]) {
+      const [m] = await db.select({ id: members.id }).from(members).where(and(eq(members.orgId, orgId), eq(members.id, p.memberId), isNull(members.deletedAt)));
+      if (!m) throw missing();
+    }
   }
 }
 
@@ -94,6 +120,7 @@ export async function callAsAgent(
   }
   if (!addressedTo) throw new CapabilityError('forbidden', 'This token has no member to confirm the action.');
 
+  await checkTargets(db, actor.orgId, parsed.data as Record<string, unknown>);
   const summary = describe(name, parsed.data as Record<string, unknown>);
   const { token, hash } = newToken('conf');
   const expiresAt = new Date(now.getTime() + DRAFT_TTL_MS);
