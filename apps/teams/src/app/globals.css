@@ -11,7 +11,7 @@
   --bg-surface-alt: #f1f5f9;
   --border-default: #e2e8f0;
   --text-primary: #0f172a;
-  --text-muted: #64748b;
+  --text-muted: #5a687c; /* #64748b failed 4.5:1 on surface-alt (axe, Phase 6) */
   --focus-ring: #1e3a8a;
   --accent: #1e3a8a;
   --accent-strong: #172554;

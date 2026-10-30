@@ -118,7 +118,7 @@ export function RequestForm({
         <div className="flex gap-2">
           <input
             id={`${id}-say`}
-            className={input}
+            className={`${input} min-w-0 flex-1`}
             value={sentence}
             maxLength={500}
             placeholder="e.g. Friday afternoon off, or Dec 22 to Jan 2"

@@ -32,13 +32,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         <Link className="rounded border border-line bg-page px-2 py-1" href={qs({ from: addDays(from, -RANGES[range]) })} aria-label="Earlier">←</Link>
         <span className="font-medium text-ink">{formatRange(from, to)}</span>
         <Link className="rounded border border-line bg-page px-2 py-1" href={qs({ from: addDays(from, RANGES[range]) })} aria-label="Later">→</Link>
-        <span className="mx-2 text-muted">|</span>
+        <span aria-hidden="true" className="mx-2 hidden text-muted sm:inline">|</span>
         {(['week', 'month'] as const).map((r) => (
           <Link key={r} href={qs({ range: r })} aria-current={r === range ? 'page' : undefined} className={`rounded px-2 py-1 ${r === range ? 'bg-accent text-white' : 'border border-line bg-page'}`}>
             {r === 'week' ? 'Week' : '5 weeks'}
           </Link>
         ))}
-        <span className="mx-2 text-muted">|</span>
+        <span aria-hidden="true" className="mx-2 hidden text-muted sm:inline">|</span>
         <Link href={qs({ team: undefined })} className={`rounded px-2 py-1 ${!teamId ? 'bg-accent text-white' : 'border border-line bg-page'}`}>All teams</Link>
         {setup.teams.map((t) => (
           <Link key={t.id} href={qs({ team: t.id })} className={`rounded px-2 py-1 ${teamId === t.id ? 'bg-accent text-white' : 'border border-line bg-page'}`}>{t.name}</Link>

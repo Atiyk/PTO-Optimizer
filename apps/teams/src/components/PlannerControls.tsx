@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useId, useTransition } from 'react';
+import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import { input, label } from './ui';
 
 /**
@@ -26,6 +26,17 @@ export function PlannerControls({
   const pathname = usePathname();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
+  // The date is typed segment by segment (month, day, year). Pushing every keystroke to the URL
+  // re-rendered the field mid-typing, so keep it local and follow the URL after a short pause.
+  const [from, setFrom] = useState(start);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [seenStart, setSeenStart] = useState(start);
+  if (start !== seenStart) {
+    // The URL moved (back button, a shared link): show its date.
+    setSeenStart(start);
+    setFrom(start);
+  }
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
   const set = (k: string, v: string) => {
     const next = new URLSearchParams(params.toString());
     next.set(k, v);
@@ -47,7 +58,22 @@ export function PlannerControls({
       </div>
       <div>
         <label className={label} htmlFor={`${id}-from`}>Plan from</label>
-        <input id={`${id}-from`} type="date" className={`${input} mt-1`} value={start} onChange={(e) => e.target.value && set('from', e.target.value)} />
+        <input
+          id={`${id}-from`}
+          type="date"
+          className={`${input} mt-1`}
+          value={from}
+          onChange={(e) => {
+            const v = e.target.value;
+            setFrom(v);
+            if (timer.current) clearTimeout(timer.current);
+            if (/^\d{4}-\d{2}-\d{2}$/.test(v) && v !== start) timer.current = setTimeout(() => set('from', v), 600);
+          }}
+          onBlur={() => {
+            if (timer.current) clearTimeout(timer.current);
+            if (/^\d{4}-\d{2}-\d{2}$/.test(from) && from !== start) set('from', from);
+          }}
+        />
       </div>
       {pending && <p className="text-sm text-muted sm:col-span-3" aria-live="polite">Recomputing…</p>}
     </div>

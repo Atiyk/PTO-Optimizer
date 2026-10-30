@@ -65,7 +65,7 @@ export default function AgentDocs() {
       <h2 className={h2}>Claude</h2>
       <h3 className={h3}>Claude Code</h3>
       <Status kind="yes">Use a personal token.</Status>
-      <pre className={pre}>{`claude mcp add --transport http days-off ${e.mcp} \\
+      <pre className={pre} tabIndex={0} role="region" aria-label="Code example">{`claude mcp add --transport http days-off ${e.mcp} \\
   --header "Authorization: Bearer dop_your_token"`}</pre>
       <h3 className={h3}>Claude apps (claude.ai, Desktop, Cowork)</h3>
       <Status kind="partial">
@@ -119,7 +119,7 @@ export default function AgentDocs() {
         Admin → Agents &amp; API → Webhooks. Events: <code className={code}>leave.requested</code>, <code className={code}>leave.decided</code>,{' '}
         <code className={code}>balance.expiring</code>, <code className={code}>plan.proposed</code>. Signed per the Standard Webhooks spec, so its libraries verify them:
       </p>
-      <pre className={pre}>{`import { Webhook } from 'standardwebhooks';
+      <pre className={pre} tabIndex={0} role="region" aria-label="Code example">{`import { Webhook } from 'standardwebhooks';
 const event = new Webhook(process.env.DAYS_OFF_WEBHOOK_SECRET) // whsec_…
   .verify(rawBody, { 'webhook-id': id, 'webhook-timestamp': ts, 'webhook-signature': sig });`}</pre>
       <p className={p}>Failed deliveries retry after 30 s, 2 min, 10 min, 1 h, 6 h and 24 h. Payloads never include notes, and health-related leave shows only as &ldquo;out&rdquo;.</p>

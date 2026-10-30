@@ -981,6 +981,29 @@ Scheduled, resumable run. Resumable state: GitHub issue #32 "SMB MVP: build log"
   credentials, strict-client schemas), 8 webhook tests, 2 discovery tests, isolation attacks for every
   new id-taking action.
 
+## Phase 6: quality, security and privacy (`claude/smb-p6-quality`)
+
+- **Security** (`docs/teams/SECURITY.md`): same-origin check on cookie REST and sign-out; people
+  are rate-limited per member like tokens; per-IP limits on sign-in, the token endpoint and failed
+  bearer auth; CSP, frame, nosniff, referrer, permissions and HSTS headers; a daily job prunes
+  rate windows, expired access tokens, old deliveries and stale drafts; isolation attacks now run
+  as a person, a personal token and a service key. `npm audit --omit=dev`: 0. Logs carry error
+  class names only. Known gaps and SOC 2 list are in the doc.
+- **Privacy** (`docs/teams/PRIVACY.md`, marked needs legal review): `eraseMember` (anonymises,
+  keeps leave dates as "Former member") and `deleteWorkspace` (owner, typed name). A test counts
+  zero rows of the deleted org in every table with `org_id`, and checks the other org is untouched.
+  Per-person export in the admin Data page.
+- **Accessibility**: axe (WCAG 2.2 AA tags) on 14 pages at 1440 and 375: two issues found and
+  fixed (muted text was 4.34:1 on weekend cells; code blocks weren't keyboard-scrollable), now 0.
+  Keyboard only: request 9 + 2 + 3 Tabs, approve 8, planner 9; visible focus outline everywhere.
+  The planner's date field fought keyboard typing (URL updated per segment); it now follows the
+  URL after a 600 ms pause or on blur, still with no button.
+- **Mobile 375px**: home, request, sent, calendar, agents (screens in `docs/screenshots/smb-p6/`);
+  fixed the clipped "Fill in" button and stray separators on the calendar.
+- **Timings** (local production build, PGlite, median): pages TTFB 31–67 ms; API getMyBalance 16 ms,
+  whoIsOut month 11 ms, pending approvals 59 ms, runTeamPlan 62 ms, MCP tools/list 113 ms; engine
+  planner 50 people × 60 days 100 ms (26 ms when coverage is tight).
+
 ## Questions for Atiyk (SMB)
 - Q1. ~~main lacks the old stack~~ Resolved: you merged it. But main's build is broken by
   a merge artifact. Recommended: merge #41 first, then this stack.
@@ -999,3 +1022,5 @@ Scheduled, resumable run. Resumable state: GitHub issue #32 "SMB MVP: build log"
   `ENCRYPTION_KEY` with rotation later.
 - Q7. The A2A card is behind `A2A_ENABLED` (off) and the endpoint is a stub that points to MCP.
   Recommended: leave off until a customer asks.
+- Q8. The privacy policy and DPA summary are engineering drafts marked "needs legal review", with
+  bracketed blanks (entity, regions, Anthropic retention terms, transfer mechanism).
