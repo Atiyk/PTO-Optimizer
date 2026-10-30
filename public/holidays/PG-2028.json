@@ -1,0 +1,145 @@
+[
+  {
+    "date": "2028-01-01",
+    "localName": "New Year's Day",
+    "name": "New Year's Day",
+    "countryCode": "PG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-14",
+    "localName": "Good Friday",
+    "name": "Good Friday",
+    "countryCode": "PG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-15",
+    "localName": "Holy Saturday",
+    "name": "Holy Saturday",
+    "countryCode": "PG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-16",
+    "localName": "Easter Sunday",
+    "name": "Easter Sunday",
+    "countryCode": "PG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-17",
+    "localName": "Easter Monday",
+    "name": "Easter Monday",
+    "countryCode": "PG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-06-12",
+    "localName": "Queen's Birthday",
+    "name": "Queen's Birthday",
+    "countryCode": "PG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-07-23",
+    "localName": "Remembrance Day",
+    "name": "Remembrance Day",
+    "countryCode": "PG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-08-26",
+    "localName": "Repentance Day",
+    "name": "Repentance Day",
+    "countryCode": "PG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-09-16",
+    "localName": "Independence Day",
+    "name": "Independence Day",
+    "countryCode": "PG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-25",
+    "localName": "Christmas Day",
+    "name": "Christmas Day",
+    "countryCode": "PG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-26",
+    "localName": "St. Stephen's Day",
+    "name": "Boxing Day",
+    "countryCode": "PG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  }
+]

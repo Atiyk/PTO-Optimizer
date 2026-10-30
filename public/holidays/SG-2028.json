@@ -1,0 +1,93 @@
+[
+  {
+    "date": "2028-01-01",
+    "localName": "New Year's Day",
+    "name": "New Year's Day",
+    "countryCode": "SG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-01-26",
+    "localName": "Chinese New Year",
+    "name": "Chinese New Year",
+    "countryCode": "SG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-01-27",
+    "localName": "Chinese New Year",
+    "name": "Chinese New Year",
+    "countryCode": "SG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-14",
+    "localName": "Good Friday",
+    "name": "Good Friday",
+    "countryCode": "SG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-01",
+    "localName": "Labour Day",
+    "name": "Labour Day",
+    "countryCode": "SG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-08-09",
+    "localName": "National Day",
+    "name": "National Day",
+    "countryCode": "SG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-25",
+    "localName": "Christmas Day",
+    "name": "Christmas Day",
+    "countryCode": "SG",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  }
+]

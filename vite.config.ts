@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
-import { configDefaults, defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig, type Plugin } from 'vitest/config'
+import { getSiteUrl } from './scripts/siteUrl.ts'
 
 // Country landing pages (Phase 2B): each is a real static HTML file at the project root
 // (uk/index.html, canada/index.html, ...), loading the same app bundle as / but with its
@@ -9,9 +10,29 @@ import { configDefaults, defineConfig } from 'vitest/config'
 // automatically with no extra config.
 const COUNTRY_SLUGS = ['uk', 'canada', 'australia', 'germany', 'ireland', 'india']
 
+/**
+ * Phase 1: every HTML entry's canonical/og:url/og:image/twitter:image/Plausible
+ * data-domain used to hardcode pto-optimizer.app directly. Replaced with %SITE_URL%/
+ * %SITE_HOST% placeholders in each HTML file, interpolated here from the one shared
+ * getSiteUrl() - a plain transformIndexHtml plugin rather than Vite's own %VITE_X% env
+ * interpolation, so the value is computed by the SAME function scripts/prerender.ts and
+ * scripts/build-seo-files.ts call (no risk of the html build and the Node postbuild
+ * scripts reading two different env-loading mechanisms and silently disagreeing).
+ */
+function siteUrlHtmlPlugin(): Plugin {
+  const siteUrl = getSiteUrl()
+  const siteHost = new URL(siteUrl).host
+  return {
+    name: 'site-url-html-interpolation',
+    transformIndexHtml(html) {
+      return html.replaceAll('%SITE_URL%', siteUrl).replaceAll('%SITE_HOST%', siteHost)
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), siteUrlHtmlPlugin()],
   build: {
     rollupOptions: {
       input: {
@@ -21,6 +42,8 @@ export default defineConfig({
         main: resolve(import.meta.dirname, 'index.html'),
         pto: resolve(import.meta.dirname, 'pto', 'index.html'),
         sabbatical: resolve(import.meta.dirname, 'sabbatical', 'index.html'),
+        faq: resolve(import.meta.dirname, 'faq', 'index.html'),
+        dataSources: resolve(import.meta.dirname, 'data-sources', 'index.html'),
         ...Object.fromEntries(
           COUNTRY_SLUGS.map((slug) => [slug, resolve(import.meta.dirname, slug, 'index.html')]),
         ),

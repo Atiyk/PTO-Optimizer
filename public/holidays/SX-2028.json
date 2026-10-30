@@ -1,0 +1,184 @@
+[
+  {
+    "date": "2028-01-01",
+    "localName": "Nieuwjaarsdag",
+    "name": "New Year's Day",
+    "countryCode": "SX",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-14",
+    "localName": "Goede vrijdag",
+    "name": "Good Friday",
+    "countryCode": "SX",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-16",
+    "localName": "Pasen",
+    "name": "Easter Sunday",
+    "countryCode": "SX",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-17",
+    "localName": "Easter Monday",
+    "name": "Easter Monday",
+    "countryCode": "SX",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-27",
+    "localName": "Koningsdag",
+    "name": "King's Day",
+    "countryCode": "SX",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-30",
+    "localName": "Karnaval",
+    "name": "Carnival Day",
+    "countryCode": "SX",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-01",
+    "localName": "Dag van de Arbeid",
+    "name": "Labour Day",
+    "countryCode": "SX",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-25",
+    "localName": "Hemelvaartsdag",
+    "name": "Ascension Day",
+    "countryCode": "SX",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-06-04",
+    "localName": "Pinksteren",
+    "name": "Pentecost",
+    "countryCode": "SX",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-07-01",
+    "localName": "Emancipation Day",
+    "name": "Emancipation Day",
+    "countryCode": "SX",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-10-09",
+    "localName": "Constitution Day",
+    "name": "Constitution Day",
+    "countryCode": "SX",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-11",
+    "localName": "Sint Maarten Day",
+    "name": "Sint Maarten Day",
+    "countryCode": "SX",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-25",
+    "localName": "Kerstmis",
+    "name": "Christmas Day",
+    "countryCode": "SX",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-26",
+    "localName": "Tweede kerstdag",
+    "name": "St. Stephen's Day",
+    "countryCode": "SX",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  }
+]

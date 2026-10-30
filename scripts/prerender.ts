@@ -35,41 +35,45 @@ import { JSDOM } from 'jsdom';
 import { renderToString } from 'react-dom/server';
 import React from 'react';
 import { ITEMS as FAQ_ITEMS } from '../src/ui/FAQ.tsx';
+import { SABBATICAL_FAQ_ITEMS } from '../src/ui/sabbaticalFaqItems.ts';
+import { rawHolidaysToHolidays, type Holiday } from '@daysoff/engine/data/holidays';
+import { getSiteUrl } from './siteUrl.ts';
+import { ENTRIES, type Entry } from './routes.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '..');
 const distDir = resolve(projectRoot, 'dist');
+const publicHolidaysDir = resolve(projectRoot, 'public/holidays');
+const SITE_URL = getSiteUrl();
+/** The build date, stamped onto the HTML next to every date-relative claim it makes (the
+ * countdown, "N days away", placement dates) - those numbers are computed once, here, and
+ * go stale every day the site isn't rebuilt. See PROGRESS.md / the Phase 2 PR for the
+ * GitHub Actions workflow that redeploys daily to keep this drift small. */
+const PRERENDERED_AT = new Date().toISOString();
 
-type ComponentKind = 'landing' | 'app' | 'sabbatical';
-
-interface Entry {
-  /** Path relative to dist/ of the built HTML file to inject into. */
-  file: string;
-  /** URL this route is served at, for window.location inside the render. */
-  url: string;
-  /** Which top-level component this route mounts. */
-  component: ComponentKind;
-  /** Matches the inline `window.__PTO_COUNTRY_PRESET__` each entry's own HTML sets. */
-  countryPreset?: string;
-  /** Human-readable name for the BreadcrumbList's second item - undefined on routes with no
-   * second breadcrumb level (the landing page, /pto, /sabbatical). */
-  countryName?: string;
+/**
+ * Phase 2 (fixes K1): loads the SAME static files scripts/build-holidays.ts commits,
+ * directly in Node, for the years this route's holiday-dependent UI actually needs -
+ * 3 calendar years from "today" covers both the landing page's 12-month strip and
+ * /sabbatical's ~18-month search window. Missing files (a country the last
+ * build-holidays.ts run couldn't reach and had no prior committed copy for) are skipped
+ * silently - that route's SSR falls back to an empty list for this phase, exactly the
+ * pre-Phase-2 behavior, not a new failure mode.
+ */
+function loadStaticHolidaysForSsr(countryCode: string): Holiday[] {
+  const currentYear = new Date().getUTCFullYear();
+  const years = [currentYear, currentYear + 1, currentYear + 2];
+  const raw = years.flatMap((year) => {
+    const filePath = resolve(publicHolidaysDir, `${countryCode}-${year}.json`);
+    if (!existsSync(filePath)) return [];
+    try {
+      return JSON.parse(readFileSync(filePath, 'utf-8'));
+    } catch {
+      return [];
+    }
+  });
+  return rawHolidaysToHolidays(raw);
 }
-
-// Site restructure: "/" is the landing page, the optimizer itself moved to /pto (same
-// App.tsx component it always was), and /sabbatical is new - every country route below is
-// untouched, since none of those links need to move.
-const ENTRIES: Entry[] = [
-  { file: 'index.html', url: 'https://pto-optimizer.app/', component: 'landing' },
-  { file: 'pto/index.html', url: 'https://pto-optimizer.app/pto', component: 'app' },
-  { file: 'sabbatical/index.html', url: 'https://pto-optimizer.app/sabbatical', component: 'sabbatical' },
-  { file: 'uk/index.html', url: 'https://pto-optimizer.app/uk', component: 'app', countryPreset: 'GB', countryName: 'United Kingdom' },
-  { file: 'canada/index.html', url: 'https://pto-optimizer.app/canada', component: 'app', countryPreset: 'CA', countryName: 'Canada' },
-  { file: 'australia/index.html', url: 'https://pto-optimizer.app/australia', component: 'app', countryPreset: 'AU', countryName: 'Australia' },
-  { file: 'germany/index.html', url: 'https://pto-optimizer.app/germany', component: 'app', countryPreset: 'DE', countryName: 'Germany' },
-  { file: 'ireland/index.html', url: 'https://pto-optimizer.app/ireland', component: 'app', countryPreset: 'IE', countryName: 'Ireland' },
-  { file: 'india/index.html', url: 'https://pto-optimizer.app/india', component: 'app', countryPreset: 'IN', countryName: 'India' },
-];
 
 /** Decodes the small, fixed set of HTML entities this project's own <title>/<meta> tags
  * actually use - JSON-LD is JSON text, not HTML, so "UK Bank Holidays 2027 &mdash; PTO
@@ -85,7 +89,7 @@ function decodeEntities(s: string): string {
 }
 
 function extractMeta(html: string, fallbackUrl: string): { title: string; description: string; canonical: string } {
-  const title = decodeEntities(/<title>(.*?)<\/title>/s.exec(html)?.[1] ?? 'PTO Optimizer');
+  const title = decodeEntities(/<title>(.*?)<\/title>/s.exec(html)?.[1] ?? 'Days Off');
   const description = decodeEntities(/<meta\s+name="description"\s+content="([^"]*)"/s.exec(html)?.[1] ?? '');
   const canonical = /<link rel="canonical" href="([^"]*)"/.exec(html)?.[1] ?? fallbackUrl;
   return { title, description, canonical };
@@ -110,7 +114,7 @@ function buildJsonLd(entry: Entry, meta: { title: string; description: string; c
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
   };
 
-  const breadcrumbItems = [{ '@type': 'ListItem', position: 1, name: 'Days Off', item: 'https://pto-optimizer.app/' }];
+  const breadcrumbItems = [{ '@type': 'ListItem', position: 1, name: 'Days Off', item: `${SITE_URL}/` }];
   if (entry.countryName) {
     breadcrumbItems.push({ '@type': 'ListItem', position: 2, name: entry.countryName, item: meta.canonical });
   }
@@ -122,14 +126,23 @@ function buildJsonLd(entry: Entry, meta: { title: string; description: string; c
 
   const result: object[] = [webApplication, breadcrumbList];
 
-  // FAQPage only where FAQ.tsx's six questions are actually rendered (the /pto routes) -
-  // the landing page and /sabbatical have no FAQ section to describe (yet, for
-  // /sabbatical - its own short FAQ is a later phase).
-  if (entry.component === 'app') {
+  // FAQPage for whichever FAQ array(s) that route actually renders - /faq shows both
+  // tools' questions, so its own structured data combines both arrays rather than
+  // picking one. The landing page and /data-sources have no FAQ section, so neither
+  // gets this block at all.
+  const faqItems =
+    entry.component === 'app'
+      ? FAQ_ITEMS
+      : entry.component === 'sabbatical'
+        ? SABBATICAL_FAQ_ITEMS
+        : entry.component === 'faq'
+          ? [...FAQ_ITEMS, ...SABBATICAL_FAQ_ITEMS]
+          : null;
+  if (faqItems) {
     result.push({
       '@context': 'https://schema.org',
       '@type': 'FAQPage',
-      mainEntity: FAQ_ITEMS.map((item) => ({
+      mainEntity: faqItems.map((item) => ({
         '@type': 'Question',
         name: item.question,
         acceptedAnswer: { '@type': 'Answer', text: item.answer },
@@ -147,6 +160,12 @@ function setGlobal(name: string, value: unknown): void {
   Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
 }
 
+/** The jsdom default navigator.language ("en-US") is what src/ui/geo.ts's
+ * geolocateCountry() resolves to 'US' from - true for every entry with no countryPreset
+ * (landing, /pto, /sabbatical), so that's the country whose holidays those routes need
+ * preloaded for prerendering. */
+const SSR_DEFAULT_COUNTRY = 'US';
+
 function installWindow(url: string, countryPreset?: string): void {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', { url });
   const win = dom.window as unknown as typeof globalThis;
@@ -157,24 +176,38 @@ function installWindow(url: string, countryPreset?: string): void {
   if (countryPreset) {
     (win as unknown as { __PTO_COUNTRY_PRESET__?: string }).__PTO_COUNTRY_PRESET__ = countryPreset;
   }
+  const ssrCountry = countryPreset ?? SSR_DEFAULT_COUNTRY;
+  (win as unknown as { __PTO_PRELOADED_HOLIDAYS__?: Record<string, Holiday[]> }).__PTO_PRELOADED_HOLIDAYS__ = {
+    [ssrCountry]: loadStaticHolidaysForSsr(ssrCountry),
+  };
+  (win as unknown as { __PTO_PRERENDERED_AT__?: string }).__PTO_PRERENDERED_AT__ = PRERENDERED_AT;
 }
 
 // A window must exist BEFORE these are even imported, in case anything in their import
 // chains touches `window` at module-evaluation time rather than inside a function - using
 // the first entry's own URL/preset rather than a placeholder, so that if it DOES matter,
 // the very first render is still correct.
-installWindow(ENTRIES[0].url, ENTRIES[0].countryPreset);
+installWindow(`${SITE_URL}${ENTRIES[0].path}`, ENTRIES[0].countryPreset);
 const { App } = await import('../src/ui/App.tsx');
 const { Landing } = await import('../src/ui/Landing.tsx');
 const { Sabbatical } = await import('../src/ui/Sabbatical.tsx');
+const { FaqPage } = await import('../src/ui/FaqPage.tsx');
+const { DataSources } = await import('../src/ui/DataSources.tsx');
 
-const COMPONENTS: Record<ComponentKind, React.ComponentType> = { app: App, landing: Landing, sabbatical: Sabbatical };
+const COMPONENTS: Record<ComponentKind, React.ComponentType> = {
+  app: App,
+  landing: Landing,
+  sabbatical: Sabbatical,
+  faq: FaqPage,
+  dataSources: DataSources,
+};
 
 async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInjected: number }> {
+  const url = `${SITE_URL}${entry.path}`;
   // Re-installed per entry (not reused from the bootstrap above) - window/navigator differ
   // per route (different URL, different country preset), and activeCountryPreset() /
   // geolocateCountry() read them fresh on every call rather than caching at module scope.
-  installWindow(entry.url, entry.countryPreset);
+  installWindow(url, entry.countryPreset);
 
   const html = renderToString(React.createElement(COMPONENTS[entry.component]));
 
@@ -189,15 +222,25 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
   }
   const withRoot = original.replace(marker, `<div id="root">${html}</div>`);
 
-  const meta = extractMeta(original, entry.url);
+  const meta = extractMeta(original, url);
   const jsonLdScripts = buildJsonLd(entry, meta)
     .map((obj) => `    <script type="application/ld+json">${JSON.stringify(obj)}</script>`)
     .join('\n');
+
+  // The exact same data just used for this render's initial state (via
+  // getPreloadedHolidays), re-embedded here so the real browser's FIRST paint - before
+  // hydration, before any fetch effect runs - starts from the identical snapshot instead
+  // of an empty list. Must run before the module script at the end of <body>, so <head>
+  // (same injection point as the JSON-LD above) is the right place.
+  const ssrCountry = entry.countryPreset ?? SSR_DEFAULT_COUNTRY;
+  const preloadedHolidays = loadStaticHolidaysForSsr(ssrCountry);
+  const preloadScript = `    <script>window.__PTO_PRELOADED_HOLIDAYS__ = ${JSON.stringify({ [ssrCountry]: preloadedHolidays })}; window.__PTO_PRERENDERED_AT__ = ${JSON.stringify(PRERENDERED_AT)};</script>`;
+
   const headMarker = '</head>';
   if (!withRoot.includes(headMarker)) {
     throw new Error(`${entry.file}: no </head> found - can't inject structured data.`);
   }
-  const injected = withRoot.replace(headMarker, `${jsonLdScripts}\n  </head>`);
+  const injected = withRoot.replace(headMarker, `${preloadScript}\n${jsonLdScripts}\n  </head>`);
   writeFileSync(filePath, injected, 'utf-8');
 
   return { file: entry.file, bytesInjected: html.length };

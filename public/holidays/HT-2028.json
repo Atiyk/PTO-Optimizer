@@ -1,0 +1,262 @@
+[
+  {
+    "date": "2028-01-01",
+    "localName": "Jour de l'an",
+    "name": "New Year's Day",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-01-02",
+    "localName": "Jour des Aieux",
+    "name": "Ancestry Day",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-01-06",
+    "localName": "Le Jour des Rois",
+    "name": "Epiphany",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-02-28",
+    "localName": "Carnaval",
+    "name": "Carnival",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-02-29",
+    "localName": "Carnaval",
+    "name": "Carnival",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-03-01",
+    "localName": "Mercredi Des Cendres",
+    "name": "Ash Wednesday",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-13",
+    "localName": "Jeudi saint",
+    "name": "Maundy Thursday",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-14",
+    "localName": "Vendredi saint",
+    "name": "Good Friday",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-16",
+    "localName": "Pâques",
+    "name": "Easter Sunday",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-01",
+    "localName": "Fête du Travail / Fête des Travailleurs",
+    "name": "Labour and Agriculture Day",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-18",
+    "localName": "Jour du Drapeau et de l'Université",
+    "name": "Flag and Universities Day",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-25",
+    "localName": "Ascension",
+    "name": "Ascension Day",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-06-15",
+    "localName": "Fête-Dieu",
+    "name": "Corpus Christi",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-08-15",
+    "localName": "L'Assomption de Marie",
+    "name": "Assumption of Mary",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-10-17",
+    "localName": "Anniversaire de la mort de Dessalines",
+    "name": "Dessalines Day",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-01",
+    "localName": "La Toussaint",
+    "name": "All Saints Day",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-02",
+    "localName": "Jour des Morts",
+    "name": "All Souls' Day",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-18",
+    "localName": "Vertières",
+    "name": "Battle of Vertières Day",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-05",
+    "localName": "Découverte d'Haïti",
+    "name": "Discovery Day",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-25",
+    "localName": "Noël",
+    "name": "Christmas Day",
+    "countryCode": "HT",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  }
+]

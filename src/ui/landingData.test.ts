@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   isOffDay,
   nextDayOff,
+  nextHoliday,
   daysOffRemainingThisYear,
   longestStretchAhead,
   longestDrySpell,
+  findDrySpells,
   findBridges,
   remainingHolidays,
   runLength,
@@ -66,12 +68,32 @@ describe('longestStretchAhead / longestDrySpell', () => {
     expect(runLength(run!)).toBe(3);
   });
 
-  it('finds the longest run of working days (the dry spell) in the same window', () => {
+  it('(K4) a dry spell spans weekends - it only ends at the next holiday that falls on a working day, not at the next Saturday', () => {
+    // Only one working-day holiday in the whole window (Nov 9); everything else, weekends
+    // included, is one continuous dry spell on either side of it. Under the old "longest
+    // run of working days" definition, every weekend would have ended it at ~5 days - here
+    // it correctly spans straight through the Nov 7-8 and Nov 14-15 etc. weekends.
     const set = holidaySet(MONDAY_HOLIDAY);
-    // Nov 2 (Mon) - Nov 6 (Fri): 5 working days before the first weekend - the longest run,
-    // tied with two later 5-day working weeks but first chronologically.
     const run = longestDrySpell('2026-11-01', '2026-11-30', set);
-    expect(run).toEqual({ start: '2026-11-02', end: '2026-11-06' });
+    expect(run).toEqual({ start: '2026-11-10', end: '2026-11-30' }); // 21 days, weekends included
+    expect(runLength(run!)).toBe(21);
+  });
+
+  it('(K4) a holiday landing on a weekend is not a "break" - it does not end a dry spell, since it created no new day off', () => {
+    const weekendHoliday: Holiday = { date: '2026-11-07', nominalDate: '2026-11-07', name: 'Falls on a Saturday', countryCode: 'US', counties: null };
+    const run = longestDrySpell('2026-11-01', '2026-11-30', holidaySet(weekendHoliday));
+    // No working-day break anywhere in the window - the whole thing is one dry spell.
+    expect(run).toEqual({ start: '2026-11-02', end: '2026-11-30' });
+  });
+
+  it('(K4) today and the horizon act as implicit boundaries, so the dry spell you are currently in is found too', () => {
+    // A single working-day holiday mid-month splits the window into a spell right after
+    // today (Nov 2-17, 16 days) and a shorter one after the holiday (Nov 19-30, 12 days) -
+    // "today" itself is the start of the longer one, found correctly without a real
+    // holiday bounding it on that side.
+    const midMonth: Holiday = { date: '2026-11-18', nominalDate: '2026-11-18', name: 'Mid-month holiday', countryCode: 'US', counties: null };
+    const run = longestDrySpell('2026-11-01', '2026-11-30', holidaySet(midMonth));
+    expect(run).toEqual({ start: '2026-11-02', end: '2026-11-17' });
   });
 });
 
@@ -115,5 +137,36 @@ describe('remainingHolidays', () => {
     const shifted: Holiday = { date: '2026-11-27', nominalDate: '2026-11-28', name: 'Shifted Day', countryCode: 'US', counties: null };
     const list = remainingHolidays('2026-11-01', '2026-11-30', [shifted]);
     expect(list[0].isObserved).toBe(true);
+  });
+});
+
+describe('nextHoliday (5A: weekends are not news)', () => {
+  it('finds the next real public holiday and the bridge touching its run, skipping ordinary weekends entirely', () => {
+    const set = [THANKSGIVING];
+    const result = nextHoliday('2026-11-01', '2026-11-30', set);
+    expect(result).toBeDefined();
+    expect(result!.holiday.name).toBe('Thanksgiving');
+    expect(result!.daysAway).toBe(25);
+    expect(result!.runLength).toBe(1); // isolated Thursday, not yet merged with the weekend
+    expect(result!.bridge).toBeDefined();
+    expect(result!.bridge!.bridgeDate).toBe('2026-11-27'); // the Friday that bridges it to the weekend
+  });
+
+  it('returns undefined when no holiday falls in the window at all', () => {
+    expect(nextHoliday('2026-11-01', '2026-11-30', [])).toBeUndefined();
+  });
+});
+
+describe('findDrySpells (K4, used directly by YearStrip)', () => {
+  it('returns every spell at least minDays long, not just the longest one', () => {
+    const early: Holiday = { date: '2026-11-04', nominalDate: '2026-11-04', name: 'Early', countryCode: 'US', counties: null };
+    const late: Holiday = { date: '2026-11-25', nominalDate: '2026-11-25', name: 'Late', countryCode: 'US', counties: null };
+    const spells = findDrySpells('2026-11-01', '2026-11-30', new Set([early.date, late.date]), DEFAULT_WORK_WEEK, 5);
+    // Gaps: Nov2-3 (2d, excluded), Nov5-24 (20d), Nov26-30 (5d) - both of the latter two
+    // clear the 5-day threshold.
+    expect(spells).toEqual([
+      { start: '2026-11-05', end: '2026-11-24' },
+      { start: '2026-11-26', end: '2026-11-30' },
+    ]);
   });
 });

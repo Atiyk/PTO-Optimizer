@@ -5,8 +5,10 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Privacy &mdash; PTO Optimizer</title>
-    <meta name="description" content="PTO Optimizer collects no personal data. Everything runs in your browser; analytics are anonymous and cookieless." />
+    <meta name="theme-color" content="#f8fafc" />
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
+    <title>Privacy &mdash; Days Off</title>
+    <meta name="description" content="Days Off collects no personal data. Everything runs in your browser; analytics are anonymous." />
     <style>
       :root {
         color-scheme: light dark;
@@ -64,23 +66,29 @@
       <h1>Privacy</h1>
       <p>Short version: nothing about you is collected.</p>
 
-      <h2>What this tool does with your data</h2>
+      <h2>What this site does with your data</h2>
       <p>
-        PTO Optimizer runs entirely in your browser. The dates, PTO balance, country, and every
-        other setting you enter stay on your device and are never sent to a server &mdash; there
-        isn't one. The only thing that leaves your browser is a request to
-        <a href="https://date.nager.at" target="_blank" rel="noreferrer">Nager.Date</a> to look up
-        public holidays for the country you select, which contains no personal information, just
-        a country code and a year.
+        Days Off runs entirely in your browser. The dates, PTO balance, country, and every other
+        setting you enter stay on your device and are never sent to a server &mdash; there isn't
+        one; your whole plan lives only in the page's URL and memory.
+      </p>
+      <p>
+        Public holiday data is served from this site's own static files first. The only time a
+        request leaves your browser for it is as a fallback, when a country or year isn't
+        available from those static files &mdash; that request goes to
+        <a href="https://date.nager.at" target="_blank" rel="noreferrer">Nager.Date</a> and
+        contains no personal information, just a country code and a year.
       </p>
 
       <h2>Analytics</h2>
       <p>
-        We use <a href="https://plausible.io" target="_blank" rel="noreferrer">Plausible</a>, a
-        cookieless analytics service. It sets no cookies and stores no cross-site identifier tied
-        to you &mdash; visit counts are derived from a rotating, salted daily hash that's discarded
-        after 24 hours. We track six anonymous events (page views and which export/share actions
-        were used) and nothing else: no inputs, no dates, no locations, no plan details.
+        We use <a href="https://vercel.com/analytics" target="_blank" rel="noreferrer">Vercel Analytics</a>
+        (page views and which pages are visited, anonymized) and
+        <a href="https://plausible.io" target="_blank" rel="noreferrer">Plausible</a>, a cookieless
+        analytics service. Plausible sets no cookies and stores no cross-site identifier tied to
+        you &mdash; visit counts are derived from a rotating, salted daily hash that's discarded
+        after 24 hours. Between the two, we see page views and which export/share actions were
+        used, and nothing else: no inputs, no dates, no locations, no plan details.
       </p>
 
       <h2>Links you share</h2>
@@ -90,7 +98,7 @@
         it.
       </p>
 
-      <a class="back" href="/">&larr; Back to PTO Optimizer</a>
+      <a class="back" href="/">&larr; Back to Days Off</a>
     </main>
   </body>
 </html>

@@ -1,0 +1,218 @@
+[
+  {
+    "date": "2028-01-01",
+    "localName": "Ukiortaaq",
+    "name": "New Year's Day",
+    "countryCode": "GL",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-01-06",
+    "localName": "Kunngit pingasut ulluat",
+    "name": "Epiphany",
+    "countryCode": "GL",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Bank",
+      "School",
+      "Optional"
+    ]
+  },
+  {
+    "date": "2028-04-13",
+    "localName": "Sisamanngortoq illernartoq",
+    "name": "Maundy Thursday",
+    "countryCode": "GL",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-14",
+    "localName": "Tallimanngorneq tannaartoq",
+    "name": "Good Friday",
+    "countryCode": "GL",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-16",
+    "localName": "Poorskip ullua",
+    "name": "Easter Sunday",
+    "countryCode": "GL",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-17",
+    "localName": "Poorskip-aappaa",
+    "name": "Easter Monday",
+    "countryCode": "GL",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-12",
+    "localName": "Tussiarfik",
+    "name": "General Prayer Day",
+    "countryCode": "GL",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-25",
+    "localName": "Qilaliarfik",
+    "name": "Ascension Day",
+    "countryCode": "GL",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-26",
+    "localName": "Atuanngiffik",
+    "name": "Bank closing day",
+    "countryCode": "GL",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Bank",
+      "School",
+      "Optional"
+    ]
+  },
+  {
+    "date": "2028-06-04",
+    "localName": "Piinsi",
+    "name": "Pentecost",
+    "countryCode": "GL",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-06-05",
+    "localName": "Piinsip-aappaa",
+    "name": "Whit Monday",
+    "countryCode": "GL",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-06-21",
+    "localName": "Ullortuneq",
+    "name": "Ullortuneq",
+    "countryCode": "GL",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-24",
+    "localName": "Juulliaraq",
+    "name": "Christmas Eve",
+    "countryCode": "GL",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Bank",
+      "School",
+      "Optional"
+    ]
+  },
+  {
+    "date": "2028-12-25",
+    "localName": "Juullip ullua",
+    "name": "Christmas Day",
+    "countryCode": "GL",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-26",
+    "localName": "Juullip-aappaa",
+    "name": "St. Stephen's Day",
+    "countryCode": "GL",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-31",
+    "localName": "Ukiutoqaq",
+    "name": "New Year's Eve",
+    "countryCode": "GL",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Bank",
+      "School",
+      "Optional"
+    ]
+  }
+]

@@ -1,0 +1,223 @@
+[
+  {
+    "date": "2028-01-01",
+    "localName": "Anul Nou",
+    "name": "New Year's Day",
+    "countryCode": "RO",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-01-02",
+    "localName": "Anul Nou",
+    "name": "Day after New Year's Day",
+    "countryCode": "RO",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-01-06",
+    "localName": "Bobotează",
+    "name": "Epiphany",
+    "countryCode": "RO",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-01-07",
+    "localName": "Sfântul Ion",
+    "name": "Saint John the Baptist",
+    "countryCode": "RO",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-01-24",
+    "localName": "Unirea Principatelor Române/Mica Unire",
+    "name": "Union Day/Small Union",
+    "countryCode": "RO",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-14",
+    "localName": "Vinerea mare",
+    "name": "Good Friday",
+    "countryCode": "RO",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-16",
+    "localName": "Paștele",
+    "name": "Easter Sunday",
+    "countryCode": "RO",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-17",
+    "localName": "Paștele",
+    "name": "Easter Monday",
+    "countryCode": "RO",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-01",
+    "localName": "Ziua Muncii",
+    "name": "Labour Day",
+    "countryCode": "RO",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-06-01",
+    "localName": "Ziua Copilului",
+    "name": "Children's Day",
+    "countryCode": "RO",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-06-04",
+    "localName": "Rusaliile",
+    "name": "Pentecost",
+    "countryCode": "RO",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-06-05",
+    "localName": "Rusaliile",
+    "name": "Whit Monday",
+    "countryCode": "RO",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-08-15",
+    "localName": "Adormirea Maicii Domnului/Sfânta Maria Mare",
+    "name": "Dormition of the Theotokos",
+    "countryCode": "RO",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-30",
+    "localName": "Sfântul Andrei",
+    "name": "St. Andrew's Day",
+    "countryCode": "RO",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-01",
+    "localName": "Ziua Națională/Marea Unire",
+    "name": "National Day/Great Union",
+    "countryCode": "RO",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-25",
+    "localName": "Crăciunul",
+    "name": "Christmas Day",
+    "countryCode": "RO",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-26",
+    "localName": "Crăciunul",
+    "name": "St. Stephen's Day",
+    "countryCode": "RO",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  }
+]
