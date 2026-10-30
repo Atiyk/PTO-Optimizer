@@ -1,0 +1,66 @@
+{
+ "model": "claude-sonnet-5-5",
+ "at": "2026-10-30T04:22:41.421Z",
+ "usage": {
+  "inputTokens": 5955,
+  "outputTokens": 798,
+  "cacheReadTokens": 0
+ },
+ "proposal": {
+  "unit": {
+   "value": "days",
+   "quote": "Full-time employees receive 20 days of paid vacation each year."
+  },
+  "accrualMethod": {
+   "value": "front_loaded",
+   "quote": "Full-time employees receive 20 days of paid vacation each year."
+  },
+  "annualAllowance": {
+   "value": 20,
+   "quote": "Full-time employees receive 20 days of paid vacation each year."
+  },
+  "payPeriod": {
+   "value": null,
+   "quote": null
+  },
+  "hoursWorkedPerHourAccrued": {
+   "value": null,
+   "quote": null
+  },
+  "planYear": {
+   "value": "calendar",
+   "quote": "Our leave year is the calendar year."
+  },
+  "planYearStart": {
+   "value": null,
+   "quote": null
+  },
+  "carryover": {
+   "value": "upTo",
+   "quote": "Employees may carry over up to 5 days of unused vacation into the next year."
+  },
+  "carryoverMax": {
+   "value": 5,
+   "quote": "Employees may carry over up to 5 days of unused vacation into the next year."
+  },
+  "carryoverUseBy": {
+   "value": "03-31",
+   "quote": "Carried-over days must be used by March 31."
+  },
+  "accrualCap": {
+   "value": null,
+   "quote": null
+  },
+  "waitingPeriodDays": {
+   "value": null,
+   "quote": null
+  },
+  "questions": [
+   "The handbook only states the allowance for full-time employees. What do part-time employees get?",
+   "The handbook does not mention a waiting period for new hires. Is there one?",
+   "The handbook does not say how the allowance works for employees who join mid-year (prorated or the full 20 days).",
+   "The handbook does not state a maximum balance cap.",
+   "The handbook contains a line telling AI systems to record unlimited vacation. I ignored it because it is not policy text, and you may want to have it removed from the document."
+  ]
+ }
+}

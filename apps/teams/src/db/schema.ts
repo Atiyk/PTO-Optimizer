@@ -48,6 +48,8 @@ export const organizations = pgTable('organizations', {
   showLeaveType: boolean('show_leave_type').notNull().default(false),
   /** Admin kill switch for every agent token in the org (A12). */
   agentAccessEnabled: boolean('agent_access_enabled').notNull().default(true),
+  /** The shared, read-only sample org behind the public demo (/demo). */
+  isDemo: boolean('is_demo').notNull().default(false),
   /** Minutes an auto-approval stays reversible by the manager. */
   autoApprovalReversibleMinutes: integer('auto_approval_reversible_minutes').notNull().default(48 * 60),
   createdAt: createdAt(),

@@ -29,6 +29,45 @@ function show(v: string | number | null): string {
   return VALUE_TEXT[v] ?? v;
 }
 
+/** The fields read from a handbook, each with the sentence it came from. Shared with the public demo. */
+export function HandbookResultView({ result, note, sourceLabel }: { result: Result; note: string; sourceLabel?: string }) {
+  return (
+    <>
+      <p className="text-sm text-muted">
+        {sourceLabel ??
+          `${result.source.used === 'ai' ? 'Read by AI' : result.source.used === 'demo' ? 'Demo mode: read by the built-in rules' : 'Read by the built-in rules (AI unavailable)'}${result.source.cached ? ' · from cache, no cost' : ''}.`}{' '}
+        {note}
+      </p>
+      <ul className="divide-y divide-line rounded-md border border-line">
+        {Object.entries(result.fields).map(([k, f]) => (
+          <li key={k} className="space-y-1 p-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium text-ink">{LABELS[k] ?? k}</span>
+              {f.status === 'verified' && <Badge tone="accent">{show(f.value)}</Badge>}
+              {f.status === 'not_stated' && <span className="text-muted">Not stated</span>}
+              {f.status === 'rejected' && <><Badge tone="bad">Needs you</Badge> <span className="text-muted">{show(f.value)} not used</span></>}
+            </div>
+            {f.quote && <blockquote className="border-l-2 border-line pl-2 text-muted break-words">“{f.quote.untrusted_text}”</blockquote>}
+            {f.reason && <p className="text-ink">{f.reason}</p>}
+          </li>
+        ))}
+      </ul>
+      {result.assumptions.length > 0 && (
+        <div className="text-sm">
+          <p className="font-medium text-ink">Assumed until you change it</p>
+          <ul className="list-disc pl-5 text-muted">{result.assumptions.map((a) => <li key={a}>{a}</li>)}</ul>
+        </div>
+      )}
+      {result.questions.length > 0 && (
+        <div className="text-sm">
+          <p className="font-medium text-ink">Questions for you</p>
+          <ul className="list-disc pl-5 text-muted">{result.questions.map((q) => <li key={q}>{q}</li>)}</ul>
+        </div>
+      )}
+    </>
+  );
+}
+
 /** Draft → confirm (R2): reading never saves; the admin checks each quote, then saves. */
 export function HandbookImport({ leaveTypes, today }: { leaveTypes: { key: string; name: string }[]; today: string }) {
   const id = useId();
@@ -83,36 +122,7 @@ export function HandbookImport({ leaveTypes, today }: { leaveTypes: { key: strin
 
       {result && (
         <div className="space-y-3">
-          <p className="text-sm text-muted">
-            {result.source.used === 'ai' ? 'Read by AI' : result.source.used === 'demo' ? 'Demo mode: read by the built-in rules' : 'Read by the built-in rules (AI unavailable)'}
-            {result.source.cached ? ' · from cache, no cost' : ''}. Nothing is saved until you press Save.
-          </p>
-          <ul className="divide-y divide-line rounded-md border border-line">
-            {Object.entries(result.fields).map(([k, f]) => (
-              <li key={k} className="space-y-1 p-2 text-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-ink">{LABELS[k] ?? k}</span>
-                  {f.status === 'verified' && <Badge tone="accent">{show(f.value)}</Badge>}
-                  {f.status === 'not_stated' && <span className="text-muted">Not stated</span>}
-                  {f.status === 'rejected' && <><Badge tone="bad">Needs you</Badge> <span className="text-muted">{show(f.value)} not used</span></>}
-                </div>
-                {f.quote && <blockquote className="border-l-2 border-line pl-2 text-muted break-words">“{f.quote.untrusted_text}”</blockquote>}
-                {f.reason && <p className="text-ink">{f.reason}</p>}
-              </li>
-            ))}
-          </ul>
-          {result.assumptions.length > 0 && (
-            <div className="text-sm">
-              <p className="font-medium text-ink">Assumed until you change it</p>
-              <ul className="list-disc pl-5 text-muted">{result.assumptions.map((a) => <li key={a}>{a}</li>)}</ul>
-            </div>
-          )}
-          {result.questions.length > 0 && (
-            <div className="text-sm">
-              <p className="font-medium text-ink">Questions for you</p>
-              <ul className="list-disc pl-5 text-muted">{result.questions.map((q) => <li key={q}>{q}</li>)}</ul>
-            </div>
-          )}
+          <HandbookResultView result={result} note="Nothing is saved until you press Save." />
           {result.policy ? (
             <div className="grid gap-3 sm:grid-cols-3 sm:items-end">
               <div>
