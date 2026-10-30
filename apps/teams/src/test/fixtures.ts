@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '@/db/client';
-import { blackouts, coverageRules, invites, leaveRequests, leaveTypes, members, teams } from '@/db/schema';
+import { apiTokens, blackouts, coverageRules, drafts, invites, leaveRequests, leaveTypes, members, oauthClients, teams, webhookDeliveries, webhookEndpoints } from '@/db/schema';
 import { invokeCapability, type CapabilityName } from '@/capabilities/registry';
 import { ROLE_SCOPES } from '@/capabilities/scopes';
 import type { Actor } from '@/capabilities/types';
@@ -46,5 +46,10 @@ export async function snapshotOrg(db: Db, orgId: string) {
     rules: await db.select().from(coverageRules).where(eq(coverageRules.orgId, orgId)),
     blackouts: await db.select().from(blackouts).where(eq(blackouts.orgId, orgId)),
     invites: await db.select().from(invites).where(eq(invites.orgId, orgId)),
+    drafts: await db.select().from(drafts).where(eq(drafts.orgId, orgId)),
+    tokens: await db.select().from(apiTokens).where(eq(apiTokens.orgId, orgId)),
+    clients: await db.select().from(oauthClients).where(eq(oauthClients.orgId, orgId)),
+    webhooks: await db.select().from(webhookEndpoints).where(eq(webhookEndpoints.orgId, orgId)),
+    deliveries: await db.select().from(webhookDeliveries).where(eq(webhookDeliveries.orgId, orgId)),
   };
 }

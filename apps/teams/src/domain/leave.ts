@@ -175,6 +175,32 @@ export async function balanceView(
   return { projection, leaveType, hasPolicy };
 }
 
+/**
+ * Leave a person would lose: the next scheduled forfeiture within a year (carried days that
+ * expire) or, failing that, what the year-end rollover would forfeit. Amount in days.
+ */
+export async function forfeitureRisk(
+  db: Db,
+  orgId: string,
+  member: MemberRow,
+  leaveType: LeaveTypeRow,
+  today: string,
+): Promise<{ amount: number; deadline: string } | null> {
+  if (!leaveType.countsAgainstBalance) return null;
+  const { projection: p } = await balanceView(db, orgId, member, leaveType, today, [], { includePending: true });
+  if (p.unlimited) return null;
+  const horizon = addDays(today, 366);
+  const f = p.timeline.find((t) => t.kind === 'forfeiture' && t.source === 'scheduled' && t.date > today && t.date <= horizon && t.amount < 0);
+  const at = f
+    ? { amount: -f.amount, deadline: addDays(f.date, -1) }
+    : p.yearEnd && p.yearEnd.wouldForfeit > 0
+      ? { amount: p.yearEnd.wouldForfeit, deadline: p.yearEnd.yearEnd }
+      : null;
+  if (!at) return null;
+  const perDay = p.unit === 'hours' ? Number(member.hoursPerDay) : 1;
+  return { amount: Math.round((at.amount / perDay) * 100) / 100, deadline: at.deadline };
+}
+
 /** Minimum running balance over [from, to], starting from the balance at `from`. */
 export function lowestBalance(p: Projection, from: string, to: string): number {
   let low = p.asOf.balance;

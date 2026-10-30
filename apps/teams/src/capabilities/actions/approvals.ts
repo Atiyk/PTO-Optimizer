@@ -9,6 +9,7 @@ import { CapabilityError } from '../errors';
 import { actingMemberId, managesMember, untrusted } from '../helpers';
 import { defineCapability } from '../types';
 import { reverseUsage } from './requests';
+import { emitWebhook, kickWebhooks, requestEventData } from '@/server/webhooks';
 
 const impact = z.object({
   balanceAfter: z.number().nullable().describe('Engine balance after this request, including other pending requests.'),
@@ -250,7 +251,22 @@ export const decideLeaveRequest = defineCapability({
         });
       }
       if (reversingAuto) await reverseUsage(tx as never, actor.orgId, r.req.id, actor, 'auto-approval reversed by manager');
+      await emitWebhook(
+        tx as never,
+        actor.orgId,
+        'leave.decided',
+        requestEventData({
+          request: { ...r.req, status, decidedAt: now },
+          memberName: target.name,
+          leaveType: type,
+          amount: snap.amount,
+          unit: snap.unit,
+          decidedByMemberId: actingMemberId(actor),
+        }),
+        now,
+      );
     });
+    kickWebhooks(db, actor.orgId);
     return view(status);
   },
 });

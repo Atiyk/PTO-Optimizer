@@ -6,6 +6,7 @@ import { evaluateRequest, getMember, getOrg, isoDate, type Evaluation } from '@/
 import { CapabilityError } from '../errors';
 import { isAdmin, subjectMember, untrusted } from '../helpers';
 import { defineCapability } from '../types';
+import { emitWebhook, kickWebhooks, requestEventData } from '@/server/webhooks';
 
 const isoDay = z.iso.date().describe('YYYY-MM-DD');
 
@@ -230,8 +231,21 @@ export const submitLeaveRequest = defineCapability({
           createdByMemberId: actor.memberId,
         });
       }
+      const data = (decided: boolean) =>
+        requestEventData({
+          request: row!,
+          memberName: member.name,
+          leaveType: ev.leaveType,
+          amount: ev.cost.amount,
+          unit: ev.unit,
+          ...(decided ? { decidedByMemberId: null } : {}),
+        });
+      await emitWebhook(tx as never, actor.orgId, 'leave.requested', data(false), now);
+      // Auto-approval is a decision too; requests that never needed one are not.
+      if (auto) await emitWebhook(tx as never, actor.orgId, 'leave.decided', data(true), now);
       return row!;
     });
+    kickWebhooks(db, actor.orgId);
     return { request: summarize(request, input.leaveType), evaluation: evaluationToOutput(ev) };
   },
 });

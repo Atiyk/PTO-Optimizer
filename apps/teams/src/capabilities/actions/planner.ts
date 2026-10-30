@@ -6,11 +6,12 @@ import { untracedIn } from '@/ai/provenance';
 import { AiUnavailableError, runAiTask } from '@/ai/run';
 import { summarizePlanTask, templatePlanSummary, type PlanFacts } from '@/ai/tasks/summarizePlan';
 import { blackouts, coverageRules, drafts, members, teams } from '@/db/schema';
-import { balanceView, getLeaveTypeByKey, getMember, isoDate, teamCoverageMembers } from '@/domain/leave';
+import { forfeitureRisk, getLeaveTypeByKey, getMember, isoDate, teamCoverageMembers } from '@/domain/leave';
 import { newToken } from '@/lib/tokens';
 import { CapabilityError } from '../errors';
 import { actingMemberId, subjectMember } from '../helpers';
 import { defineCapability, type Actor } from '../types';
+import { emitWebhook, kickWebhooks } from '@/server/webhooks';
 
 const block = z.object({ start: z.iso.date(), end: z.iso.date(), leaveDays: z.number(), daysOff: z.number() });
 
@@ -114,22 +115,11 @@ export const runTeamPlan = defineCapability({
       .orderBy(asc(members.name));
 
     // Days at risk per person: the next scheduled forfeiture in the coming year.
-    const horizon = addDays(today, 366);
     const risk = new Map<string, { amount: number; deadline: string }>();
     for (const m of roster) {
       if (!type.countsAgainstBalance) break;
-      const { projection: p } = await balanceView(db, actor.orgId, m, type, today, [], { includePending: true });
-      if (p.unlimited) continue;
-      // Carried days expiring this year show up in the timeline; year-end loss in yearEnd.
-      const f = p.timeline.find((t) => t.kind === 'forfeiture' && t.source === 'scheduled' && t.date > today && t.date <= horizon && t.amount < 0);
-      const at = f
-        ? { amount: -f.amount, deadline: addDays(f.date, -1) }
-        : p.yearEnd && p.yearEnd.wouldForfeit > 0
-          ? { amount: p.yearEnd.wouldForfeit, deadline: p.yearEnd.yearEnd }
-          : null;
-      if (!at) continue;
-      const perDay = p.unit === 'hours' ? Number(m.hoursPerDay) : 1;
-      risk.set(m.id, { amount: Math.round((at.amount / perDay) * 100) / 100, deadline: at.deadline });
+      const at = await forfeitureRisk(db, actor.orgId, m, type, today);
+      if (at) risk.set(m.id, at);
     }
     const lastDeadline = [...risk.values()].reduce((mx, r) => (r.deadline > mx ? r.deadline : mx), start);
 
@@ -288,7 +278,7 @@ export const sendPlanProposals = defineCapability({
         continue;
       }
       const { hash } = newToken('prop');
-      await db.insert(drafts).values({
+      const [row] = await db.insert(drafts).values({
         orgId: actor.orgId,
         capability: 'acceptPlanProposal',
         payload,
@@ -298,9 +288,12 @@ export const sendPlanProposals = defineCapability({
         createdByClientId: actor.clientId,
         confirmationTokenHash: hash,
         expiresAt: new Date(`${addDays(p.deadline, 1)}T00:00:00Z`) > now ? new Date(`${addDays(p.deadline, 1)}T00:00:00Z`) : new Date(now.getTime() + 86_400_000),
-      });
+      }).returning({ id: drafts.id });
+      const who = await getMember(db, actor.orgId, p.memberId);
+      await emitWebhook(db, actor.orgId, 'plan.proposed', { proposalId: row!.id, member: { id: who.id, name: { untrusted_text: who.name } }, ...payload }, now);
       sent++;
     }
+    if (sent) kickWebhooks(db, actor.orgId);
     return { sent, alreadyOpen };
   },
 });

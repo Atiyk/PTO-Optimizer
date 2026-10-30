@@ -19,6 +19,8 @@ let bProposalId: string;
 let bTokenId: string;
 let bClientRowId: string;
 let bDraftId: string;
+let bHookId: string;
+let bDeliveryId: string;
 
 beforeAll(async () => {
   db = await freshDb();
@@ -35,6 +37,10 @@ beforeAll(async () => {
   const auth = await authenticateBearer(db, `Bearer ${pat.created!.token}`, NOW);
   const d = await callAsAgent(db, auth, 'submitLeaveRequest', { start: '2026-12-07', end: '2026-12-07', idempotencyKey: 'b-draft-1' }, NOW, 'mcp');
   bDraftId = d.status === 'confirmation_required' ? d.draftId : '';
+  const hook = await run(db, humanActor(B.owner), 'manageWebhooks', { op: 'create', url: 'https://hooks.example.com/b', events: ['leave.requested'] });
+  bHookId = hook.created!.endpointId;
+  await run(db, humanActor(B.emp2), 'submitLeaveRequest', { start: '2026-12-14', end: '2026-12-14', idempotencyKey: 'b-hook-1' });
+  bDeliveryId = (await run(db, humanActor(B.owner), 'manageWebhooks', { op: 'list' })).deliveries[0]!.id;
 });
 
 const attacks = (): [CapabilityName, unknown][] => [
@@ -64,6 +70,10 @@ const attacks = (): [CapabilityName, unknown][] => [
   ['manageAgentAccess', { op: 'revokeToken', tokenId: bTokenId }],
   ['manageAgentAccess', { op: 'revokeOAuthClient', clientRowId: bClientRowId }],
   ['decideAgentDraft', { draftId: bDraftId, decision: 'confirm' }],
+  ['manageWebhooks', { op: 'setActive', endpointId: bHookId, active: false }],
+  ['manageWebhooks', { op: 'delete', endpointId: bHookId }],
+  ['manageWebhooks', { op: 'sendTest', endpointId: bHookId, event: 'leave.requested' }],
+  ['manageWebhooks', { op: 'retry', deliveryId: bDeliveryId }],
 ];
 
 describe('tenant isolation (A6)', () => {

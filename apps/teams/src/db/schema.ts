@@ -486,7 +486,13 @@ export const webhookDeliveries = pgTable(
     lastStatusCode: integer('last_status_code'),
     lastError: text('last_error'),
     deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+    /** Set for scheduled events (balance.expiring) so a daily scan never sends the same one twice. */
+    dedupeKey: text('dedupe_key'),
     createdAt: createdAt(),
   },
-  (t) => [index('webhook_deliveries_org_idx').on(t.orgId, t.createdAt), index('webhook_deliveries_due_idx').on(t.status, t.nextAttemptAt)],
+  (t) => [
+    index('webhook_deliveries_org_idx').on(t.orgId, t.createdAt),
+    index('webhook_deliveries_due_idx').on(t.status, t.nextAttemptAt),
+    uniqueIndex('webhook_deliveries_dedupe_idx').on(t.endpointId, t.dedupeKey),
+  ],
 );
