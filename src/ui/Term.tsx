@@ -26,7 +26,16 @@ export function Term({ id, children }: { id: string; children?: React.ReactNode 
         role="button"
         aria-expanded={open}
         aria-label={`${term.term}: ${term.short}`}
-        className="cursor-help border-b border-dotted border-slate-400 text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]"
+        // Stage 6 quality pass: the short "?" glyph form (passed as children in Policy.tsx/
+        // MoreOptions.tsx) rendered a ~7x17px hit area, found while live-clicking it in the
+        // browser (a real mouse click at its exact geometric centre missed the React handler
+        // more often than not - .click() always worked, a coordinate-based click didn't,
+        // which is exactly what a too-small touch/click target looks like). Padding widens
+        // the clickable+focusable box without changing the full-term-text usage's visual
+        // inline flow (MoreOptions.tsx's "Accrual" heading etc.) - still short of the ideal
+        // 44px touch target for a one-character glyph without turning it into a visible
+        // button, which is a real design tradeoff, not fully resolved - see PROGRESS.md.
+        className="cursor-help border-b border-dotted border-slate-400 px-0.5 py-1 text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]"
         onMouseEnter={openPopover}
         onMouseLeave={() => setOpen(false)}
         onFocus={openPopover}

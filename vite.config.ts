@@ -52,6 +52,8 @@ export default defineConfig({
         sabbatical: resolve(import.meta.dirname, 'sabbatical', 'index.html'),
         faq: resolve(import.meta.dirname, 'faq', 'index.html'),
         dataSources: resolve(import.meta.dirname, 'data-sources', 'index.html'),
+        policy: resolve(import.meta.dirname, 'policy', 'index.html'),
+        glossary: resolve(import.meta.dirname, 'glossary', 'index.html'),
         ...Object.fromEntries(
           COUNTRY_SLUGS.map((slug) => [slug, resolve(import.meta.dirname, slug, 'index.html')]),
         ),

@@ -36,6 +36,7 @@ import { renderToString } from 'react-dom/server';
 import React from 'react';
 import { ITEMS as FAQ_ITEMS } from '../src/ui/FAQ.tsx';
 import { SABBATICAL_FAQ_ITEMS } from '../src/ui/sabbaticalFaqItems.ts';
+import { GLOSSARY_TERMS } from '../src/content/glossary/terms.ts';
 import { rawHolidaysToHolidays, type Holiday } from '../src/data/holidays.ts';
 import { getSiteUrl } from './siteUrl.ts';
 import { ENTRIES, type Entry, type ComponentKind } from './routes.ts';
@@ -210,6 +211,17 @@ function installWindow(url: string, countryPreset?: string): void {
     [ssrCountry]: loadStaticHolidaysForSsr(ssrCountry),
   };
   (win as unknown as { __PTO_PRERENDERED_AT__?: string }).__PTO_PRERENDERED_AT__ = PRERENDERED_AT;
+  // Stage 5G fix (Feature 1, PR-C): the Travel/Efficiency scores rendered blank ("—") in
+  // every prerendered /pto page. Root cause: useAppState.ts deliberately computes them in a
+  // useEffect, deferred past first paint (a real Phase 5 performance fix - computing them
+  // synchronously on every input change made a full-year calendar feel frozen on a real
+  // click). renderToString runs no effects at all, so the deferred computation never ran -
+  // the prerendered snapshot always showed the pre-effect "null" state. This flag, set ONLY
+  // here (never present in the deployed HTML's own script, so a real visitor's browser never
+  // sees it), lets useAppState.ts compute them synchronously just for this one-time Node
+  // render - a one-off blocking cost that's irrelevant outside a live browser click, and
+  // never present for a real user's actual interaction.
+  (win as unknown as { __PTO_SSR__?: boolean }).__PTO_SSR__ = true;
 }
 
 // A window must exist BEFORE these are even imported, in case anything in their import
@@ -222,14 +234,28 @@ const { Landing } = await import('../src/ui/Landing.tsx');
 const { Sabbatical } = await import('../src/ui/Sabbatical.tsx');
 const { FaqPage } = await import('../src/ui/FaqPage.tsx');
 const { DataSources } = await import('../src/ui/DataSources.tsx');
+const { Policy } = await import('../src/ui/Policy.tsx');
+const { Glossary } = await import('../src/ui/Glossary.tsx');
+const { GlossaryTermPage } = await import('../src/ui/GlossaryTermPage.tsx');
 
-const COMPONENTS: Record<ComponentKind, React.ComponentType> = {
-  app: App,
-  landing: Landing,
-  sabbatical: Sabbatical,
-  faq: FaqPage,
-  dataSources: DataSources,
-};
+/** glossary-term is the one component that needs a per-entry prop (which term), so it's
+ * rendered via a small wrapper function rather than through the no-props COMPONENTS map
+ * every other route shares. */
+function renderEntry(entry: Entry): string {
+  if (entry.component === 'glossary-term') {
+    return renderToString(React.createElement(GlossaryTermPage, { termId: entry.termId ?? '' }));
+  }
+  const COMPONENTS: Record<Exclude<ComponentKind, 'glossary-term'>, React.ComponentType> = {
+    app: App,
+    landing: Landing,
+    sabbatical: Sabbatical,
+    faq: FaqPage,
+    dataSources: DataSources,
+    policy: Policy,
+    glossary: Glossary,
+  };
+  return renderToString(React.createElement(COMPONENTS[entry.component]));
+}
 
 async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInjected: number }> {
   const url = `${SITE_URL}${entry.path}`;

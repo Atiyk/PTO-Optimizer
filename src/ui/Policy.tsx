@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { cloneElement, isValidElement, useEffect, useId, useMemo, useState, type ReactElement } from 'react';
 import { SiteHeader } from './SiteHeader';
 import { Footer } from './Footer';
 import { Container } from './Container';
@@ -7,7 +7,6 @@ import { DateListEditor } from './DateListEditor';
 import { Term } from './Term';
 import { track } from './analytics';
 import { geolocateCountry } from './geo';
-import { todayISO } from './useAppState';
 import { projectBalance } from '../policy/projection';
 import { generateAlerts } from '../policy/alerts';
 import { generatePolicySummary } from '../policy/summary';
@@ -15,6 +14,7 @@ import { generateHRQuestions, hrQuestionsMessage } from '../policy/hrQuestions';
 import { decodeParagraph, uniqueMatchedTerms } from '../policy/decode';
 import type { AccrualMethod, CarryoverRule, PlanYear, TimeOffPolicy } from '../policy/model';
 import { copyText } from './requestText';
+import { readPolicyStateFromURL, writePolicyStateToURL, defaultPolicyURLState, type PolicyURLState } from './policyUrlState';
 
 const HORIZON_MONTHS = 18;
 
@@ -28,22 +28,34 @@ function addMonthsISO(iso: string, months: number): string {
   return `${String(ny).padStart(4, '0')}-${String(nm).padStart(2, '0')}-${String(nd).padStart(2, '0')}`;
 }
 
-/** Minimal field wrapper: label + a small <Term> hint next to the jargon word, per Stage 4A -
+/**
+ * Minimal field wrapper: label + a small <Term> hint next to the jargon word, per Stage 4A -
  * the hint renders as a plain "?" glyph (never repeating the term's full name after the
- * label already named it), so hovering/tapping it is how you get the definition. */
-function Field({ label, termId, children }: { label: string; termId?: string; children: React.ReactNode }) {
+ * label already named it), so hovering/tapping it is how you get the definition.
+ *
+ * Stage 6 quality-pass fix: this used to be one <label> wrapping BOTH the hint text and the
+ * actual input (the usual implicit label/control association this codebase uses elsewhere).
+ * Found live in the browser that a Term nested inside that <label> stopped responding to
+ * hover/click entirely - confirmed with a real pointer click/hover at its exact geometric
+ * centre (elementFromPoint even resolved to the right node) while a direct .click() call on
+ * the same node worked fine, and the identical <Term> OUTSIDE a <label> (MoreOptions.tsx's
+ * "Accrual" heading) worked normally either way. Nesting an interactive control inside a
+ * <label> that also wraps a different form control is a known cross-browser footgun for
+ * exactly this reason, which is why label/control association here is now explicit
+ * (useId + htmlFor) instead of implicit nesting - the Term hint is a plain sibling, never a
+ * <label> descendant.
+ */
+function Field({ label, termId, children }: { label: string; termId?: string; children: ReactElement<{ id?: string }> }) {
+  const id = useId();
+  const child = isValidElement(children) ? cloneElement(children, { id }) : children;
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="font-medium text-slate-700">
-        {label}{' '}
-        {termId && (
-          <Term id={termId}>
-            <span aria-hidden="true">?</span>
-          </Term>
-        )}
+    <div className="flex flex-col gap-1 text-sm">
+      <span className="flex items-center gap-1 font-medium text-slate-700">
+        <label htmlFor={id}>{label}</label>
+        {termId && <Term id={termId}>{'?'}</Term>}
       </span>
-      {children}
-    </label>
+      {child}
+    </div>
   );
 }
 
@@ -83,44 +95,51 @@ function BalanceChart({ series, cap }: { series: { date: string; balance: number
  * chart) - this is the simple accrual/forfeiture timeline instead. */
 
 export function Policy() {
-  const today = todayISO();
-  const [country, setCountry] = useState<string>(() => geolocateCountry());
+  // Stage 4A follow-through (PR-C): every input below is read from the URL once on mount
+  // (readPolicyStateFromURL) and written back on every change (the useEffect further down),
+  // using the same conventions as src/ui/urlState.ts - a /policy link now reproduces the
+  // exact policy described, same as every /pto link already does.
+  const initial = useMemo(
+    () => (typeof window === 'undefined' ? null : readPolicyStateFromURL(window.location.search, geolocateCountry())),
+    [],
+  );
+  const d = useMemo(() => initial ?? { ...defaultPolicyURLState(), country: geolocateCountry() }, [initial]);
 
-  // Inputs — Stage 4A, grouped in handbook-reading order. No URL round-trip for these yet
-  // (flagged in PROGRESS.md as a gap: see this file's own header comment and the PR body).
-  const [accrualKind, setAccrualKind] = useState<AccrualMethod['kind']>('per-pay-period');
-  const [amount, setAmount] = useState(1.25);
-  const [frequency, setFrequency] = useState<'weekly' | 'biweekly' | 'semi-monthly' | 'monthly'>('monthly');
-  const [payDateAnchor, setPayDateAnchor] = useState(today);
-  const [grantDate, setGrantDate] = useState(today);
-  const [hourlyRate, setHourlyRate] = useState(0.0577);
-  const [typicalWeeklyHours, setTypicalWeeklyHours] = useState(40);
-  const [expectedDaysPerYear, setExpectedDaysPerYear] = useState(15);
+  const [country, setCountry] = useState<string>(d.country);
 
-  const [planYearKind, setPlanYearKind] = useState<PlanYear['kind']>('calendar');
-  const [anniversaryStart, setAnniversaryStart] = useState(today);
-  const [customResetDate, setCustomResetDate] = useState(`${today.slice(0, 4)}-12-31`);
+  const [accrualKind, setAccrualKind] = useState<AccrualMethod['kind']>(d.accrualKind);
+  const [amount, setAmount] = useState(d.amount);
+  const [frequency, setFrequency] = useState<'weekly' | 'biweekly' | 'semi-monthly' | 'monthly'>(d.frequency);
+  const [payDateAnchor, setPayDateAnchor] = useState(d.payDateAnchor);
+  const [grantDate, setGrantDate] = useState(d.grantDate);
+  const [hourlyRate, setHourlyRate] = useState(d.hourlyRate);
+  const [typicalWeeklyHours, setTypicalWeeklyHours] = useState(d.typicalWeeklyHours);
+  const [expectedDaysPerYear, setExpectedDaysPerYear] = useState(d.expectedDaysPerYear);
 
-  const [accrualCapEnabled, setAccrualCapEnabled] = useState(true);
-  const [accrualCap, setAccrualCap] = useState(20);
+  const [planYearKind, setPlanYearKind] = useState<PlanYear['kind']>(d.planYearKind);
+  const [anniversaryStart, setAnniversaryStart] = useState(d.anniversaryStart);
+  const [customResetDate, setCustomResetDate] = useState(d.customResetDate);
 
-  const [carryoverMode, setCarryoverMode] = useState<CarryoverRule['mode']>('capped');
-  const [carryoverCap, setCarryoverCap] = useState(5);
-  const [carryoverUseByEnabled, setCarryoverUseByEnabled] = useState(false);
-  const [carryoverUseBy, setCarryoverUseBy] = useState(`${today.slice(0, 4)}-03-31`);
+  const [accrualCapEnabled, setAccrualCapEnabled] = useState(d.accrualCapEnabled);
+  const [accrualCap, setAccrualCap] = useState(d.accrualCap);
 
-  const [waitingPeriodEnabled, setWaitingPeriodEnabled] = useState(false);
-  const [waitingPeriodDays, setWaitingPeriodDays] = useState(90);
+  const [carryoverMode, setCarryoverMode] = useState<CarryoverRule['mode']>(d.carryoverMode);
+  const [carryoverCap, setCarryoverCap] = useState(d.carryoverCap);
+  const [carryoverUseByEnabled, setCarryoverUseByEnabled] = useState(d.carryoverUseByEnabled);
+  const [carryoverUseBy, setCarryoverUseBy] = useState(d.carryoverUseBy);
 
-  const [negativeBalanceAllowance, setNegativeBalanceAllowance] = useState(0);
-  const [payoutOnLeaving, setPayoutOnLeaving] = useState<TimeOffPolicy['payoutOnLeaving']>('not-sure');
+  const [waitingPeriodEnabled, setWaitingPeriodEnabled] = useState(d.waitingPeriodEnabled);
+  const [waitingPeriodDays, setWaitingPeriodDays] = useState(d.waitingPeriodDays);
 
-  const [currentBalance, setCurrentBalance] = useState(12);
-  const [balanceAsOf, setBalanceAsOf] = useState(today);
-  const [plannedDays, setPlannedDays] = useState<string[]>([]);
+  const [negativeBalanceAllowance, setNegativeBalanceAllowance] = useState(d.negativeBalanceAllowance);
+  const [payoutOnLeaving, setPayoutOnLeaving] = useState<TimeOffPolicy['payoutOnLeaving']>(d.payoutOnLeaving);
 
-  const [unit, setUnit] = useState<'days' | 'hours'>('days');
-  const [hoursPerDay, setHoursPerDay] = useState(8);
+  const [currentBalance, setCurrentBalance] = useState(d.currentBalance);
+  const [balanceAsOf, setBalanceAsOf] = useState(d.balanceAsOf);
+  const [plannedDays, setPlannedDays] = useState<string[]>(d.plannedDays);
+
+  const [unit, setUnit] = useState<'days' | 'hours'>(d.unit);
+  const [hoursPerDay, setHoursPerDay] = useState(d.hoursPerDay);
 
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pastedText, setPastedText] = useState('');
@@ -169,6 +188,28 @@ export function Policy() {
       balanceAsOf, plannedDays,
     ],
   );
+
+  // Sync every input into the shareable URL whenever it changes - same pattern
+  // useAppState.ts already uses for /pto.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    const state: PolicyURLState = {
+      unit, hoursPerDay, accrualKind, amount, frequency, payDateAnchor, grantDate, hourlyRate,
+      typicalWeeklyHours, expectedDaysPerYear, planYearKind, anniversaryStart, customResetDate,
+      accrualCapEnabled, accrualCap, carryoverMode, carryoverCap, carryoverUseByEnabled,
+      carryoverUseBy, waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance,
+      payoutOnLeaving, currentBalance, balanceAsOf, plannedDays, country,
+    };
+    writePolicyStateToURL(url.searchParams, state);
+    window.history.replaceState(null, '', url);
+  }, [
+    unit, hoursPerDay, accrualKind, amount, frequency, payDateAnchor, grantDate, hourlyRate,
+    typicalWeeklyHours, expectedDaysPerYear, planYearKind, anniversaryStart, customResetDate,
+    accrualCapEnabled, accrualCap, carryoverMode, carryoverCap, carryoverUseByEnabled,
+    carryoverUseBy, waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance,
+    payoutOnLeaving, currentBalance, balanceAsOf, plannedDays, country,
+  ]);
 
   const horizonEnd = useMemo(() => addMonthsISO(balanceAsOf, HORIZON_MONTHS), [balanceAsOf]);
   const { series, events } = useMemo(() => projectBalance(policy, horizonEnd), [policy, horizonEnd]);
@@ -309,13 +350,13 @@ export function Policy() {
               )}
 
               {accrualKind !== 'unlimited' && (
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input type="checkbox" checked={accrualCapEnabled} onChange={(e) => setAccrualCapEnabled(e.target.checked)} />
-                  Has an accrual cap{' '}
-                  <Term id="accrual-cap">
-                    <span aria-hidden="true">?</span>
-                  </Term>
-                </label>
+                <div className="flex items-center gap-1 text-sm text-slate-700">
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={accrualCapEnabled} onChange={(e) => setAccrualCapEnabled(e.target.checked)} />
+                    Has an accrual cap
+                  </label>
+                  <Term id="accrual-cap">{'?'}</Term>
+                </div>
               )}
               {accrualCapEnabled && accrualKind !== 'unlimited' && (
                 <Field label={`Cap (${unit})`}>
@@ -349,13 +390,13 @@ export function Policy() {
                 </>
               )}
 
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" checked={waitingPeriodEnabled} onChange={(e) => setWaitingPeriodEnabled(e.target.checked)} />
-                There's a waiting period{' '}
-                <Term id="waiting-period">
-                  <span aria-hidden="true">?</span>
-                </Term>
-              </label>
+              <div className="flex items-center gap-1 text-sm text-slate-700">
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={waitingPeriodEnabled} onChange={(e) => setWaitingPeriodEnabled(e.target.checked)} />
+                  There&apos;s a waiting period
+                </label>
+                <Term id="waiting-period">{'?'}</Term>
+              </div>
               {waitingPeriodEnabled && (
                 <Field label="Waiting period (days)">
                   <input type="number" min={0} step={1} value={waitingPeriodDays} onChange={(e) => setWaitingPeriodDays(Number(e.target.value))} className={inputClass} />
