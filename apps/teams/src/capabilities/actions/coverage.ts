@@ -35,7 +35,7 @@ export const NOT_LEGAL_ADVICE =
 
 const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD');
 const hhmmStr = z.string().regex(/^\d{1,2}:\d{2}$/, 'HH:MM');
-const isManagerPlus = (a: Actor) => a.role === 'owner' || a.role === 'admin' || a.role === 'manager';
+export const isManagerPlus = (a: Actor) => a.role === 'owner' || a.role === 'admin' || a.role === 'manager';
 
 /** Staff see their own site; managers and admins any site in the org. */
 async function readableSite(db: Db, actor: Actor, locationId: string | undefined): Promise<string> {

@@ -1,0 +1,46 @@
+{
+ "at": "2026-10-30T07:06:01.239Z",
+ "provider": "claude-cli",
+ "worstCaseUsd": 1.031832,
+ "regulations": {
+  "task": "rulePackFromText",
+  "provider": "claude-cli",
+  "model": "claude-sonnet-5-5",
+  "total": 8,
+  "passed": 6,
+  "accuracy": 0.75,
+  "inputTokens": 16233,
+  "outputTokens": 8486,
+  "costUsd": 0.117326,
+  "failures": [
+   {
+    "id": "01-ca-childcare-centers.md",
+    "detail": "missing {\"kind\":\"ratio\",\"ageGroup\":\"toddler\",\"childrenPerStaff\":6}"
+   },
+   {
+    "id": "05-wa-sick-overtime.md",
+    "detail": "missing {\"kind\":\"sick_accrual\",\"hoursPerUnit\":40}; missing {\"kind\":\"sick_accrual\",\"usableFromDay\":90}"
+   }
+  ],
+  "recall": 0.90625,
+  "precision": 1,
+  "injectedKept": 0
+ },
+ "cover": {
+  "task": "parseCoverText",
+  "provider": "claude-cli",
+  "model": "claude-haiku-5-5",
+  "total": 32,
+  "passed": 31,
+  "accuracy": 0.96875,
+  "inputTokens": 87741,
+  "outputTokens": 14127,
+  "costUsd": 0.0158376,
+  "failures": [
+   {
+    "id": "27: find cover for Preschool 2-4 (manager)",
+    "detail": "got {\"intent\":\"cover_request\",\"day\":null,\"room\":\"Preschool\",\"date\":\"2026-11-04\",\"start\":\"14:00\",\"end\":\"16:00\",\"clarifyingQuestion\":null}"
+   }
+  ]
+ }
+}

@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { estimateCostUsd, taskConfig } from './config';
-import { evalHandbooks, evalParsing, loadHandbookCases, loadParsingCases } from './evalHarness';
+import { evalCoverText, evalHandbooks, evalParsing, evalRegulations, loadCoverCases, loadHandbookCases, loadParsingCases, loadRegulationCases } from './evalHarness';
 import { claudeCliProvider } from './evalProviders';
 import { anthropicProvider } from './provider';
 
@@ -24,8 +24,38 @@ function worstCaseUsd(): number {
   return (parse + books) * 2; // retries
 }
 
+/** EVAL_SUITE=rc runs only the regulated-coverage sets (rule drafting and cover phrasings). */
+const rcOnly = process.env.EVAL_SUITE === 'rc';
+
+function rcWorstCaseUsd(): number {
+  const r = taskConfig('rulePackFromText');
+  const c = taskConfig('parseCoverText');
+  const regs = loadRegulationCases().reduce((sum, x) => sum + estimateCostUsd(r.model, Math.ceil(x.text.length / 3) + 1_500, r.maxTokens), 0);
+  const cover = loadCoverCases().cases.length * estimateCostUsd(c.model, 1_000, c.maxTokens);
+  return (regs + cover) * 2;
+}
+
 describe.skipIf(!live)('live evals (real model, costs money)', () => {
-  it('stays inside the eval budget, then runs parsing and handbook evals', { timeout: 600_000 }, async () => {
+  it.runIf(rcOnly)('regulated coverage: rule drafting and cover phrasings', { timeout: 900_000 }, async () => {
+    const cap = Number(process.env.EVAL_MAX_USD ?? '1');
+    const worst = rcWorstCaseUsd();
+    expect(worst, `worst case $${worst.toFixed(2)} exceeds EVAL_MAX_USD=$${cap}`).toBeLessThanOrEqual(cap);
+    const regulations = await evalRegulations(provider);
+    const cover = await evalCoverText(provider);
+    const report = { at: new Date().toISOString(), provider: provider.name, worstCaseUsd: worst, regulations, cover };
+    mkdirSync(join(process.cwd(), 'evals/results'), { recursive: true });
+    writeFileSync(join(process.cwd(), 'evals/results/latest-rc.json'), JSON.stringify(report, null, 1));
+    console.log(
+      `regulations recall ${(regulations.recall * 100).toFixed(1)}% precision ${(regulations.precision * 100).toFixed(1)}% injected ${regulations.injectedKept} ` +
+        `(${regulations.model}, $${regulations.costUsd.toFixed(4)}); cover ${cover.passed}/${cover.total} (${cover.model}, $${cover.costUsd.toFixed(4)})`,
+    );
+    if (regulations.failures.length || cover.failures.length) console.log([...regulations.failures, ...cover.failures].map((f) => `${f.id} → ${f.detail}`).join('\n'));
+    expect(regulations.injectedKept).toBe(0);
+    expect(regulations.recall).toBeGreaterThanOrEqual(0.85);
+    expect(cover.accuracy).toBeGreaterThanOrEqual(0.85);
+  });
+
+  it.skipIf(rcOnly)('stays inside the eval budget, then runs parsing and handbook evals', { timeout: 600_000 }, async () => {
     const cap = Number(process.env.EVAL_MAX_USD ?? '1');
     const worst = worstCaseUsd();
     expect(worst, `worst case $${worst.toFixed(2)} exceeds EVAL_MAX_USD=$${cap}`).toBeLessThanOrEqual(cap);

@@ -3,7 +3,7 @@
  * eval is the default; override per task with AI_MODEL_<TASK> (e.g. AI_MODEL_IMPORT_HANDBOOK).
  * Model IDs verified against Anthropic's model list on 2026-10-30.
  */
-export const AI_TASKS = ['parseLeaveRequest', 'importHandbook', 'explainBalance', 'summarizePlan'] as const;
+export const AI_TASKS = ['parseLeaveRequest', 'importHandbook', 'explainBalance', 'summarizePlan', 'rulePackFromText', 'explainCoverage', 'parseCoverText'] as const;
 export type AiTaskName = (typeof AI_TASKS)[number];
 
 interface TaskConfig {
@@ -22,6 +22,12 @@ const DEFAULTS: Record<AiTaskName, TaskConfig> = {
   // Rewording engine facts into a sentence or two: Haiku.
   explainBalance: { model: 'claude-haiku-5-5', maxTokens: 300, maxInputChars: 8_000, effort: 'low' },
   summarizePlan: { model: 'claude-haiku-5-5', maxTokens: 300, maxInputChars: 4_000, effort: 'low' },
+  // Regulation text with tables and conditions, quoted rule by rule: Sonnet. Cached by content hash.
+  rulePackFromText: { model: 'claude-sonnet-5-5', maxTokens: 6_000, maxInputChars: 60_000, effort: 'medium' },
+  // Rewording engine facts (a gap, a ranking) into a few sentences: Haiku.
+  explainCoverage: { model: 'claude-haiku-5-5', maxTokens: 350, maxInputChars: 8_000, effort: 'low' },
+  // "can't make it tomorrow" / "need someone in toddlers 3:30-4:30 Monday": short extraction, Haiku.
+  parseCoverText: { model: 'claude-haiku-5-5', maxTokens: 300, maxInputChars: 1_500, effort: 'low' },
 };
 
 const ENV_KEY: Record<AiTaskName, string> = {
@@ -29,6 +35,9 @@ const ENV_KEY: Record<AiTaskName, string> = {
   importHandbook: 'AI_MODEL_IMPORT_HANDBOOK',
   explainBalance: 'AI_MODEL_EXPLAIN_BALANCE',
   summarizePlan: 'AI_MODEL_SUMMARIZE_PLAN',
+  rulePackFromText: 'AI_MODEL_RULE_PACK_FROM_TEXT',
+  explainCoverage: 'AI_MODEL_EXPLAIN_COVERAGE',
+  parseCoverText: 'AI_MODEL_PARSE_COVER_TEXT',
 };
 
 export function taskConfig(task: AiTaskName): TaskConfig {

@@ -22,7 +22,7 @@ const hhmmStr = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$|^24:00$/, 'HH:MM');
 const by = (a: Actor) => ({ actorType: a.type, memberId: actingMemberId(a) });
 const minute = (s: string) => parseHhmm(s);
 
-const target = z.object({
+export const target = z.object({
   locationId: z.uuid(),
   roomId: z.uuid(),
   date: isoDay,

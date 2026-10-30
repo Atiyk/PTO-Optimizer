@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ActionButton } from '@/components/ActionButton';
 import { CapabilityForm } from '@/components/CapabilityForm';
+import { RuleDraft } from '@/components/RuleDraft';
 import { Badge, Card } from '@/components/ui';
 import { WeekRowsEditor } from '@/components/WeekRowsEditor';
 import { call, requireActor } from '@/server/page';
@@ -15,6 +16,8 @@ export default async function CoverageSetup() {
   const members = await call('listMembers', {}, actor);
   const packs = await call('listRulePacks', {}, actor);
   const packByKey = new Map(packs.packs.map((p) => [p.key, p.pack as PackView]));
+  // The org's own packs (drafted from text or edited), latest version of each key.
+  const ownPacks = [...new Map(packs.packs.filter((p) => p.source !== 'seed').sort((a, b) => a.version - b.version).map((p) => [p.key, { key: p.key, version: p.version, name: (p.pack as { name: string }).name }])).values()];
   const allRooms = s.sites.flatMap((x) => x.rooms.map((r) => ({ value: r.id, label: `${r.name} (${x.name})` })));
   const today = new Date().toISOString().slice(0, 10);
 
@@ -53,7 +56,12 @@ export default async function CoverageSetup() {
                 capability="manageSchedule"
                 fixed={{ op: 'selectRulePack', locationId: site.id }}
                 fields={[
-                  { name: 'packKey', label: 'Rule pack', type: 'select', options: s.seedPacks.map((p) => ({ value: p.key, label: `${p.name} (${p.jurisdiction})` })) },
+                  {
+                    name: 'packKey',
+                    label: 'Rule pack',
+                    type: 'select',
+                    options: [...s.seedPacks.map((p) => ({ value: p.key, label: `${p.name} (${p.jurisdiction})` })), ...ownPacks.map((p) => ({ value: p.key, label: `${p.name} (yours, v${p.version})` }))],
+                  },
                   {
                     name: 'sickPolicy',
                     label: 'Sick leave (labour packs)',
@@ -136,6 +144,13 @@ export default async function CoverageSetup() {
           </Card>
         );
       })}
+
+      <details className="rounded-lg border border-line bg-page p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-ink">Rules for another state, or your own policy? Draft them from text</summary>
+        <div className="mt-3">
+          <RuleDraft />
+        </div>
+      </details>
 
       {allRooms.length > 0 && (
         <Card title="4. Staff schedules">

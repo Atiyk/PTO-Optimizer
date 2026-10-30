@@ -9,6 +9,7 @@ import { explainBalanceInWords, getAiUsage, importHandbook, parseLeaveRequestTex
 import { importCsv } from './actions/importCsv';
 import { manageStaffSignIn, setMyCoverPrefs } from './actions/staff';
 import { findCover, getCoverRequests, getMySchedule, reportCallOff, requestCover, respondToCover } from './actions/cover';
+import { draftRulePackFromText, explainCoverInWords, parseCoverText, saveRulePack } from './actions/coverAi';
 import { getCoverage, getCoverageSetup, getCredentials, getSickLeave, importHoursWorked, listRulePacks, manageCredentials, manageSchedule } from './actions/coverage';
 import { listMyProposals, respondToProposal, runTeamPlan, sendPlanProposals } from './actions/planner';
 import { decideLeaveRequest, listPendingApprovals } from './actions/approvals';
@@ -74,6 +75,10 @@ export const CAPABILITIES = {
   manageStaffSignIn,
   setMyCoverPrefs,
   getMySchedule,
+  draftRulePackFromText,
+  saveRulePack,
+  explainCoverInWords,
+  parseCoverText,
 } as const satisfies Record<string, CapabilityDef>;
 
 export type CapabilityName = keyof typeof CAPABILITIES;

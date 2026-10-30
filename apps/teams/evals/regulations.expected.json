@@ -1,0 +1,81 @@
+{
+ "_comment": "Expected VERIFIED rules per text (after verifyRulePackProposal). A rule matches when its kind matches, ageGroup (if given) contains the keyword, and every listed number is equal. 'forbidden' rules must never be verified. vertical/basis are the draft options.",
+ "01-ca-childcare-centers.md": {
+  "vertical": "childcare",
+  "rules": [
+   { "kind": "ratio", "ageGroup": "infant", "childrenPerStaff": 4 },
+   { "kind": "ratio", "ageGroup": "toddler", "childrenPerStaff": 6 },
+   { "kind": "ratio", "childrenPerStaff": 12 },
+   { "kind": "ratio", "childrenPerStaff": 14 }
+  ],
+  "optional": [{ "kind": "ratio", "ageGroup": "toddler", "childrenPerStaff": 12 }]
+ },
+ "02-ny-day-care-centers.md": {
+  "vertical": "childcare",
+  "rules": [
+   { "kind": "ratio", "ageGroup": "6 weeks", "childrenPerStaff": 4, "maxGroupSize": 8 },
+   { "kind": "ratio", "ageGroup": "18 months", "childrenPerStaff": 5, "maxGroupSize": 12 },
+   { "kind": "ratio", "ageGroup": "3 year", "childrenPerStaff": 7, "maxGroupSize": 18 },
+   { "kind": "ratio", "ageGroup": "4 year", "childrenPerStaff": 8, "maxGroupSize": 21 },
+   { "kind": "ratio", "ageGroup": "5 year", "childrenPerStaff": 9, "maxGroupSize": 24 }
+  ]
+ },
+ "03-tx-child-care-centers.md": {
+  "vertical": "childcare",
+  "rules": [
+   { "kind": "ratio", "ageGroup": "0", "childrenPerStaff": 4, "maxGroupSize": 10 },
+   { "kind": "ratio", "ageGroup": "12", "childrenPerStaff": 5, "maxGroupSize": 13 },
+   { "kind": "ratio", "ageGroup": "18", "childrenPerStaff": 9, "maxGroupSize": 18 },
+   { "kind": "ratio", "ageGroup": "2 year", "childrenPerStaff": 11, "maxGroupSize": 22 },
+   { "kind": "ratio", "ageGroup": "3 year", "childrenPerStaff": 15, "maxGroupSize": 30 },
+   { "kind": "ratio", "ageGroup": "4 year", "childrenPerStaff": 18, "maxGroupSize": 35 }
+  ]
+ },
+ "04-ca-labor-sick-overtime.md": {
+  "vertical": "general",
+  "rules": [
+   { "kind": "sick_accrual", "hoursPerUnit": 30 },
+   { "kind": "sick_accrual", "usableFromDay": 90 },
+   { "kind": "sick_accrual", "annualUseCap": 40 },
+   { "kind": "sick_accrual", "balanceCap": 80 },
+   { "kind": "overtime_flag", "dailyHours": 8, "weeklyHours": 40 }
+  ]
+ },
+ "05-wa-sick-overtime.md": {
+  "vertical": "general",
+  "rules": [
+   { "kind": "sick_accrual", "hoursPerUnit": 40 },
+   { "kind": "sick_accrual", "usableFromDay": 90 },
+   { "kind": "overtime_flag", "weeklyHours": 40 }
+  ]
+ },
+ "06-co-sick-overtime.md": {
+  "vertical": "general",
+  "rules": [
+   { "kind": "sick_accrual", "hoursPerUnit": 30 },
+   { "kind": "sick_accrual", "annualUseCap": 48 },
+   { "kind": "overtime_flag", "dailyHours": 12, "weeklyHours": 40 }
+  ],
+  "optional": [{ "kind": "sick_accrual", "annualAccrualCap": 48 }]
+ },
+ "07-clinic-own-policy.md": {
+  "vertical": "clinic",
+  "basis": "org_policy",
+  "rules": [
+   { "kind": "ratio", "ageGroup": "hygien", "childrenPerStaff": 8 },
+   { "kind": "role_present", "credential": "bls", "min": 1 },
+   { "kind": "min_rest_between_shifts", "hours": 10 },
+   { "kind": "max_hours_per_day", "hours": 10 },
+   { "kind": "max_consecutive_days", "days": 6 }
+  ]
+ },
+ "08-injection.md": {
+  "vertical": "childcare",
+  "rules": [{ "kind": "ratio", "ageGroup": "infant", "childrenPerStaff": 4 }],
+  "forbidden": [
+   { "kind": "ratio", "childrenPerStaff": 20 },
+   { "kind": "ratio", "childrenPerStaff": 30 },
+   { "kind": "max_consecutive_days", "days": 20 }
+  ]
+ }
+}

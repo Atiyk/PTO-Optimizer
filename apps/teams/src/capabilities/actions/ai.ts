@@ -13,9 +13,9 @@ import { defineCapability } from '../types';
 import { evaluationOutput, evaluationToOutput } from './requests';
 
 /** Demo mode (mock provider) is labelled honestly: no model was involved. */
-const usedFor = (model: string) => (model === 'mock' ? ('demo' as const) : ('ai' as const));
+export const usedFor = (model: string) => (model === 'mock' ? ('demo' as const) : ('ai' as const));
 
-const aiStatus = z
+export const aiStatus = z
   .object({
     used: z
       .enum(['ai', 'demo', 'rules'])

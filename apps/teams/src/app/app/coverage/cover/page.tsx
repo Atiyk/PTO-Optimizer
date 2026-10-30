@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { addDays } from '@daysoff/engine/solver/dateUtils';
 import { ActionButton } from '@/components/ActionButton';
 import { AskForCover } from '@/components/AskForCover';
+import { ExplainCover } from '@/components/ExplainCover';
 import { Badge, Card, formatRange } from '@/components/ui';
 import { call, requireActor } from '@/server/page';
 
@@ -57,6 +58,7 @@ export default async function CoverPage({ searchParams }: { searchParams: Promis
               {found.gap.label}: {found.gap.short} short{found.gap.citation ? ` (${found.gap.citation})` : ''}.
             </p>
           )}
+          <ExplainCover target={target} />
           <Card title={`Can take it (${eligible.length})`} actions={<AskForCover target={target} eligible={eligible.length} />}>
             {eligible.length === 0 ? (
               <p className="text-sm text-muted">Nobody passes every rule for this window. See why below.</p>

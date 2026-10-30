@@ -65,6 +65,8 @@ export const handbookFieldLabel = (f: HandbookField) => LABELS[f];
  */
 export function verifyHandbookProposal(handbookText: string, p: HandbookProposal): VerifiedHandbook {
   const doc = norm(handbookText);
+  // A clean-looking quote can be the tail of an injected line, so its whole line is checked too.
+  const lines = handbookText.split(/\n+/).map(norm);
   const questions = [...p.questions];
   const unit = p.unit.value ?? 'days';
   const fields = {} as Record<HandbookField, VerifiedField>;
@@ -77,7 +79,7 @@ export function verifyHandbookProposal(handbookText: string, p: HandbookProposal
     }
     let reason: string | null = null;
     if (!quote || norm(quote).length < 8 || !doc.includes(norm(quote))) reason = 'The quoted sentence is not in the handbook.';
-    else if (INSTRUCTION_LIKE.test(quote)) reason = 'The quote reads like an instruction, not a policy.';
+    else if (INSTRUCTION_LIKE.test(quote) || lines.some((l) => l.includes(norm(quote)) && INSTRUCTION_LIKE.test(l))) reason = 'The quote reads like an instruction, not a policy.';
     else if (typeof value === 'number') {
       if (LITERAL_NUMBER.includes(f) && !mentionsNumber(quote, value)) reason = `The quote does not mention ${value}.`;
       else if (BOUNDS[f] && !BOUNDS[f]!(value, unit)) reason = `${value} is outside the usual range; enter it by hand if it is right.`;
