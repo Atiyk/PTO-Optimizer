@@ -180,6 +180,7 @@ export const runTeamPlan = defineCapability({
     });
     const rules = await db.select().from(coverageRules).where(and(eq(coverageRules.orgId, actor.orgId), eq(coverageRules.teamId, team.id)));
     const ruleInputs = rules.map((x) => ({ id: x.id, teamId: x.teamId, minPresent: x.minPresent, tag: x.tag, weekdays: x.weekdays, effectiveFrom: x.effectiveFrom, effectiveTo: x.effectiveTo }));
+    const t0 = performance.now();
     let result = planTeam({ members: planMembers, rules: ruleInputs, start, timeBudgetMs: 1_500 });
 
     // Regulated sites: the day-level plan is re-checked block by block against each site's rule
@@ -211,6 +212,8 @@ export const runTeamPlan = defineCapability({
       }
     }
 
+    // Includes the block-level re-check and any re-plans.
+    const planMs = performance.now() - t0;
     const name = new Map(roster.map((m) => [m.id, m.name]));
     const people = result.plans.map((p) => {
       const r = risk.get(p.memberId)!;
@@ -285,7 +288,7 @@ export const runTeamPlan = defineCapability({
       rules: rules.map((r) => ({ id: r.id, label: `At least ${r.minPresent} ${r.tag ? `${r.tag}${r.minPresent === 1 ? '' : 's'}` : r.minPresent === 1 ? 'person' : 'people'} in` })),
       heatmap: result.heatmap,
       summary,
-      stats: { ms: Math.round(result.stats.ms), stoppedEarly: result.stats.stoppedEarly },
+      stats: { ms: Math.round(planMs), stoppedEarly: result.stats.stoppedEarly },
     };
   },
 });

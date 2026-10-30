@@ -61,7 +61,7 @@ export default async function ForecastPage({ searchParams }: { searchParams: Pro
                   const sum = w.hoursShort.schedule + w.hoursShort.credential + w.hoursShort.approved + w.hoursShort.pending;
                   const parts = CAUSES.filter(([k]) => w.hoursShort[k] > 0).map(([k, l]) => `${h(w.hoursShort[k])} ${l.toLowerCase()}`);
                   return (
-                    <li key={w.weekStart} className="grid gap-1 sm:grid-cols-[9rem_1fr_minmax(0,16rem)] sm:items-center sm:gap-3">
+                    <li key={w.weekStart} className="grid gap-1 sm:grid-cols-[13rem_1fr_minmax(0,16rem)] sm:items-center sm:gap-3">
                       <Link className="text-sm font-medium text-ink underline-offset-2 hover:underline" href={`/app/coverage?${new URLSearchParams({ site: s.site.id, date: w.weekStart }).toString()}`}>
                         {formatRange(w.weekStart, w.weekEnd)}
                       </Link>

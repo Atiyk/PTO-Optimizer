@@ -2209,3 +2209,93 @@ The isolation test covers `explainCoverInWords`.
   someone adds an official citation, and there's no UI for that yet. *Recommendation:* add a
   "verify" step (paste the official URL and section) after launch; an admin can't remove the
   warning by accident meanwhile.
+
+## Phase 5: coverage forecast and the planner at regulated sites (`claude/rc-p5-forecast`)
+
+### What's in it
+- `getCoverageForecast` (managers and above; UI, REST, MCP, assistant). It covers one site or
+  every regulated site, for 1–12 weeks (8 by default), from the same block-level engine as
+  `getCoverage`. `apps/teams/src/domain/forecast.ts` does the work.
+  - Staff-hours short each week, split by cause. The engine runs on four stacked versions of
+    the same inputs: no leave with every credential current (the rota itself is short), real
+    credential dates, plus approved leave, plus pending leave. Each step can only take staff
+    away, so every difference is zero or more.
+  - Credential alerts: every credential that expires before the end of the range, or has
+    already expired, held by someone on the site's rota. For each one, the engine finds the
+    first day that expiry alone leaves a room short while the person is scheduled, and how
+    many days it does so. It compares renewing just that credential against reality.
+  - Stagger suggestions: a pending request that would open a gap is moved by the fewest whole
+    days (±1 to ±14) that open no gap. The move must keep the same number of working days and
+    must not overlap the person's other leave. Pending requests are first come, first served:
+    each is judged against approved leave plus the pending requests submitted before it, so
+    of two clashing requests only the later one is flagged. Capped at 10 requests and 20
+    alerts. No pay data and no child data appear anywhere.
+- `/app/coverage/forecast`: site, start date and weeks ahead live in the URL and update as
+  you type, with no button. Each week shows a stacked bar plus the hours in words. The bar
+  reads in greyscale (solid, striped, accent, dashed) and the numbers are always in the text.
+  The coverage page links to the forecast.
+- `runTeamPlan` at regulated sites. The day-level plan is re-checked per 30-minute block
+  against each site's rule pack. Planned days are added date by date, in member-id order,
+  on top of booked leave (approved and pending).
+  - A day that opens a ratio or role gap becomes unavailable for that person, and the team is
+    re-planned, up to 3 times. Anything still conflicting after that is dropped, and the
+    blocks and ranges are recomputed (`planShape`, newly exported from the engine).
+  - `exact` is false whenever the re-check changed the plan. The short person's
+    `shortfallReason` names the site, rule, date and time. The output shape is unchanged.
+  - "Computed in" now includes the re-check.
+- Demo seed: the Tuesday after next, both early toddler teachers ask for the day. Kwame asks
+  first, so the forecast suggests moving Hannah's request to Wednesday.
+
+### Days Off build fix (deliberate, its own commit)
+Tailwind was scanning `PROGRESS.md`, the other root `.md` files and `packages/`, so editing
+project notes changed Days Off's CSS. This is why the Phase 4 gate commit (`ee8f374`) does
+**not** in fact match the dist baseline: its PROGRESS.md edit came after the check. I
+confirmed this by rebuilding with each commit's PROGRESS.md; Phase 3 matches. `src/index.css`
+now excludes `../packages` and `../*.md`. That drops 15 selectors nothing in Days Off uses
+(listed in the commit message, each grepped in `src/` and the prerendered HTML). Every other
+dist file differs only by hashed asset names: I normalised the names and compared all 688
+non-CSS files. The baseline is rewritten (Q12).
+
+### Performance (60 staff, 5 sites, 8 weeks; `src/domain/forecast.perf.test.ts`)
+- Forecast, all 5 sites × 8 weeks: about 2.3 s (1,140 engine day-runs, about 2 ms each).
+- Team plan for 61 people through year end with the block-level re-check: about 4 s, all
+  900 days placed. It was 5.9 s before the check started trying the whole day at once
+  (falling back to person by person only when that day has a conflict).
+- The demo centre (18 staff): forecast page about 1.5 s, planner page about 1.9 s, server
+  render included.
+- CI budgets in the test are 20 s and 30 s.
+
+### Tests
+- `capabilities/forecast.test.ts` (6 tests):
+  - causes per week;
+  - a credential expiry that leaves Toddlers without a CPR holder (org policy pack), with the
+    first gap date and 12.5 h credential-caused hours;
+  - a stagger suggestion of +1 day;
+  - first come, first served;
+  - managers only, and org isolation;
+  - the planner never plans a gap, checked independently by recomputing every planned day
+    together, and is deterministic.
+- The isolation test has a `getCoverageForecast` cross-org attack.
+
+### Gate
+- Typecheck is clean (root and teams).
+- Root `npm run build` passes; `verify:dist` is identical against the new baseline (690 files).
+- Teams tests: 178 passed, 3 skipped (the live evals).
+- Root tests: 587 passed, plus the same 2 solver timing tests (Q1).
+- MCP tools: 24.
+- Screenshots are in `docs/screenshots/rc-p5/`: forecast, planner and coverage at 1440, 768
+  and 375, plus forecast with 4 weeks set by typing. No overflow, no page errors.
+
+### Questions for Atiyk (Phase 5)
+- Q12: Should Days Off's Tailwind scan exclude root notes and the engine package? I did,
+  because otherwise every PROGRESS.md edit changes the live site's CSS. The cost is a new dist
+  baseline and 15 unused selectors gone. *Recommendation:* keep it. It's dead CSS, and the
+  byte-identical check means nothing without it.
+- Q13: The stagger suggestion only checks this site's staffing rules. Team minimums and
+  balance are re-checked when the request is changed. Should it also check team minimums up
+  front? *Recommendation:* yes after launch. It's cheap with `newViolationsFor`, but no demo
+  site has both kinds of rules.
+- Q14: On the demo centre the planner can't place any days for the two late toddler teachers:
+  nobody else covers 15:30–16:30. That is correct, but a real director would add a floater.
+  Should the planner say "one more person on the late toddler shift would free N days"?
+  *Recommendation:* yes, as a later what-if. It needs a second engine pass per suggestion.
