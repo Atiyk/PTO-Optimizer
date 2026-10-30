@@ -9,8 +9,8 @@ import {
   remainingHolidays,
   runLength,
 } from './landingData';
-import { DEFAULT_WORK_WEEK } from '../solver/types';
-import type { Holiday } from '../data/holidays';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import type { Holiday } from '@daysoff/engine/data/holidays';
 
 // 2026-11-26 is a Thursday (Thanksgiving); 2026-11-27 Fri, 28 Sat, 29 Sun.
 const THANKSGIVING: Holiday = { date: '2026-11-26', nominalDate: '2026-11-26', name: 'Thanksgiving', countryCode: 'US', counties: null };

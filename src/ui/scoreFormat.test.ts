@@ -11,7 +11,7 @@ import {
   relativeLuminance,
   SCORE_INTENSITY,
 } from './scoreFormat';
-import type { Scores } from '../solver/types';
+import type { Scores } from '@daysoff/engine/solver/types';
 
 describe('ordinal', () => {
   it('formats the spec examples correctly', () => {

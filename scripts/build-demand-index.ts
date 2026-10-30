@@ -1,6 +1,6 @@
 // One-off build script: NOT part of the app runtime. Fetches the most recent
 // full calendar year of TSA checkpoint throughput, smooths it, and writes a
-// static src/data/demandIndex.json the app imports directly (no network call
+// static packages/engine/src/data/demandIndex.json the app imports directly (no network call
 // at runtime, fully deterministic).
 //
 // Run with: npm run build:demand-index
@@ -89,7 +89,7 @@ async function main() {
     throw new Error(`Expected 365 keys, got ${Object.keys(index).length}`);
   }
 
-  const outPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'data', 'demandIndex.json');
+  const outPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'packages', 'engine', 'src', 'data', 'demandIndex.json');
   writeFileSync(outPath, JSON.stringify(index, null, 2) + '\n');
   console.log(`Wrote ${outPath} (source year: ${mostRecentFullYear}, ${Object.keys(index).length} days)`);
 }

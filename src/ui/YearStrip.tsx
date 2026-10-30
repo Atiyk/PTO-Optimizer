@@ -1,7 +1,7 @@
-import { isoToSerial, addDays } from '../solver/dateUtils';
-import { computeRuns, monthLabel, type OffRun } from './calendarMath';
+import { isoToSerial, addDays } from '@daysoff/engine/solver/dateUtils';
+import { computeRuns, monthLabel, type OffRun } from '@daysoff/engine/calendar/calendarMath';
 import { isOffDay, runLength } from './landingData';
-import type { Holiday } from '../data/holidays';
+import type { Holiday } from '@daysoff/engine/data/holidays';
 
 interface YearStripProps {
   today: string;

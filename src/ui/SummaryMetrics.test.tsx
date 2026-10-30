@@ -3,7 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { SummaryMetrics } from './SummaryMetrics';
-import type { Scores } from '../solver/types';
+import type { Scores } from '@daysoff/engine/solver/types';
 
 describe('SummaryMetrics', () => {
   const scores: Scores = { efficiency: { percentile: 91 }, travel: { percentile: 78 } };

@@ -1,0 +1,16 @@
+{
+  "name": "@daysoff/engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure, deterministic Days Off planning engine: solver, dates, holidays, calendar math. No React, no DOM.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts",
+    "./data/*.json": "./src/data/*.json"
+  },
+  "scripts": {
+    "test": "NODE_OPTIONS=--no-experimental-webstorage vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

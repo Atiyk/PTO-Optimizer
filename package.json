@@ -11,12 +11,17 @@
     "preview": "vite preview",
     "test": "NODE_OPTIONS=--no-experimental-webstorage vitest run",
     "build:demand-index": "tsx scripts/build-demand-index.ts",
-    "build:countries": "tsx scripts/build-countries.ts"
+    "build:countries": "tsx scripts/build-countries.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && npm run typecheck --workspaces --if-present",
+    "test:all": "npm test && npm run test -w apps/teams --if-present",
+    "build:all": "npm run build && npm run build --workspaces --if-present",
+    "lint:all": "oxlint && npm run lint --workspaces --if-present"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "@daysoff/engine": "*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
@@ -35,5 +40,9 @@
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vitest": "^4.1.12"
-  }
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ]
 }

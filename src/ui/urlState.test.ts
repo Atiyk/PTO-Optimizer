@@ -7,7 +7,7 @@ import {
   buildOverlapShareURL,
   readOverlapPayloadFromURL,
 } from './urlState';
-import { DEFAULT_WORK_WEEK } from '../solver/types';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import type { WriteStateInput } from './urlState';
 
 describe('readSliderStateFromURL', () => {

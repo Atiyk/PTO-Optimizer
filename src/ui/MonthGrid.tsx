@@ -1,10 +1,10 @@
-import { addDays } from '../solver/dateUtils';
-import type { MarginalValue } from '../solver/marginalValue';
-import { computeBandSegments, monthLabel, type MonthDescriptor, type OffRun, type WeekStart } from './calendarMath';
+import { addDays } from '@daysoff/engine/solver/dateUtils';
+import type { MarginalValue } from '@daysoff/engine/solver/marginalValue';
+import { computeBandSegments, monthLabel, type MonthDescriptor, type OffRun, type WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import { COLORS } from './colorScheme';
-import { formatCardDateRange } from './dateFormat';
+import { formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
 import { DayCell } from './DayCell';
-import type { Alternative, Break } from '../solver/types';
+import type { Alternative, Break } from '@daysoff/engine/solver/types';
 import type { DayCategory } from './types';
 
 interface MonthGridProps {

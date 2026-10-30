@@ -1,4 +1,4 @@
-import type { Break } from '../solver/types';
+import type { Break } from '@daysoff/engine/solver/types';
 
 /**
  * Phase 3 step 4: "UNDERSTAND WHY each recommendation is good" - one plain-language sentence

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import type { WorkWeek } from '../solver/types';
-import type { WeekStart } from './calendarMath';
-import { addDays, rangeISO } from '../solver/dateUtils';
+import type { WorkWeek } from '@daysoff/engine/solver/types';
+import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
+import { addDays, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { DateListEditor } from './DateListEditor';
 import { ImportCalendar } from './ImportCalendar';
 import { todayISO, type HolidayEntry } from './useAppState';

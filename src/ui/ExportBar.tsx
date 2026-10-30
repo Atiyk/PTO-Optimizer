@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import type { Break } from '../solver/types';
+import type { Break } from '@daysoff/engine/solver/types';
 import type { DayCategory } from './types';
-import type { WeekStart } from './calendarMath';
+import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import { downloadICS } from './icsExport';
 import { copyShareImage, buildShareImageMonths } from './imageExport';
 import { copyText } from './requestText';

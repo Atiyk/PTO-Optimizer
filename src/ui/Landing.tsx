@@ -4,12 +4,12 @@ import { Footer } from './Footer';
 import { Container } from './Container';
 import { CountrySelect } from './CountrySelect';
 import { YearStrip } from './YearStrip';
-import { getHolidaysWithStatus, type Holiday } from '../data/holidays';
+import { getHolidaysWithStatus, type Holiday } from '@daysoff/engine/data/holidays';
 import { geolocateCountry } from './geo';
 import { todayISO } from './useAppState';
-import { addDays } from '../solver/dateUtils';
-import { weekdayName } from './requestDeadline';
-import { formatLong } from './dateFormat';
+import { addDays } from '@daysoff/engine/solver/dateUtils';
+import { weekdayName } from '@daysoff/engine/calendar/requestDeadline';
+import { formatLong } from '@daysoff/engine/calendar/dateFormat';
 import { downloadHolidaysICS } from './icsExport';
 import { copyCanvasImage, SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT } from './imageExport';
 import {

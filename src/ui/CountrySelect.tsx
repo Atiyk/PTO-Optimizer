@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { COUNTRIES, subdivisionLabel } from '../data/countries';
+import { COUNTRIES, subdivisionLabel } from '@daysoff/engine/data/countries';
 
 interface CountrySelectProps {
   country: string;

@@ -1,4 +1,4 @@
-import type { Break } from '../solver/types';
+import type { Break } from '@daysoff/engine/solver/types';
 import { WeightingSlider } from './WeightingSlider';
 import { BreakCountSlider } from './BreakCountSlider';
 

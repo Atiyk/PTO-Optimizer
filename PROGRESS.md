@@ -59,3 +59,35 @@ after a restart or context compaction.
 ## Questions for Atiyk
 
 (none yet — will accumulate here as phases proceed)
+
+---
+
+# SMB MVP ("Days Off for Teams")
+
+Scheduled, resumable run. Resumable state: GitHub issue #32 "SMB MVP: build log" (label
+`smb-run`). This section holds detail: decisions, test output, open issues.
+
+## Phase 0: monorepo and shared engine (`claude/smb-p0-monorepo`)
+
+### P0.1 / P0.2 engine extraction (run 1, 2026-10-30)
+- npm workspaces: `packages/*`, `apps/*`. Days Off stays at repo root; root package name
+  unchanged.
+- `packages/engine` (`@daysoff/engine`, TS source, no build step; exports map `./*` →
+  `./src/*.ts`). Moved with `git mv` (history kept): `src/solver/*`, `src/data/*`, and the
+  pure UI helpers `calendarMath`, `requestDeadline`, `dateFormat` (→ `src/calendar/`).
+  Days Off imports subpaths (`@daysoff/engine/solver/solve`, ...) so module graph and
+  bundle are unchanged. `requestText` stays in Days Off (it is UI copy).
+- `countryPresets` reads a `window` global behind a `typeof window` guard; it is in the
+  engine package but not in the barrel. `holidays.ts` uses `localStorage` inside
+  try/catch, so the engine tsconfig includes the DOM lib for now.
+- **dist proof**: `npm run build` before (main @ 9f61d18) and after; sha256 of every file
+  in `dist/` (29 files) is **identical, including hashed asset names**.
+- **Tests**: before 405 passed / 2 failed; after 405 passed / 2 failed, the same two
+  timing tests in `solve.test.ts` (known-flaky K9 baseline, per Phase 0 above).
+- `tsc --noEmit` (Days Off + engine) clean; oxlint: 0 errors, 2 pre-existing warnings.
+
+## Questions for Atiyk (SMB)
+- Q1. main does not contain the open stacked PRs #23–#31 (phases 1–6, Feature 1). Phase 0
+  branches from main as instructed, so the engine is extracted from main's solver.
+  Merging the old stack later needs its solver/data changes re-applied under
+  `packages/engine`. Recommended: merge or close the old stack before merging this one.

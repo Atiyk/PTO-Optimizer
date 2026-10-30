@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { formatWorkingDaysList, formatManagerEmailShort, formatManagerEmailDetailed } from './requestText';
-import { requestByDate } from './requestDeadline';
-import { formatShort } from './dateFormat';
-import { DEFAULT_WORK_WEEK } from '../solver/types';
-import type { Break } from '../solver/types';
+import { requestByDate } from '@daysoff/engine/calendar/requestDeadline';
+import { formatShort } from '@daysoff/engine/calendar/dateFormat';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import type { Break } from '@daysoff/engine/solver/types';
 
 function makeBreak(overrides: Partial<Break> = {}): Break {
   return {

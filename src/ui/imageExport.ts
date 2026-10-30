@@ -1,4 +1,4 @@
-import { buildMonths, monthLabel, type WeekStart } from './calendarMath';
+import { buildMonths, monthLabel, type WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import type { DayCategory } from './types';
 
 export const SHARE_IMAGE_WIDTH = 1200;

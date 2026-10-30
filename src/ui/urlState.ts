@@ -1,6 +1,6 @@
-import type { WorkWeek } from '../solver/types';
-import { DEFAULT_WORK_WEEK } from '../solver/types';
-import type { WeekStart } from './calendarMath';
+import type { WorkWeek } from '@daysoff/engine/solver/types';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import type { ForcedState } from './types';
 
 // Maps the old, now-removed named objectives and shape presets to a sensible (w, breakCount)

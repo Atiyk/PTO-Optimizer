@@ -1,4 +1,4 @@
-import { formatShort } from './dateFormat';
+import { formatShort } from '@daysoff/engine/calendar/dateFormat';
 import { Container } from './Container';
 
 /** Phase 5.1: "a message when it changes the plan" - pure and exported so the exact wording

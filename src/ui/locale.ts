@@ -1,4 +1,4 @@
-import type { WeekStart } from './calendarMath';
+import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 
 // Countries whose calendars conventionally start the week on Sunday. Everyone else
 // (Europe, UK, Australia, and the ISO 8601 default) starts on Monday.

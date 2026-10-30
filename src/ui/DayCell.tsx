@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent } from 'react';
-import type { MarginalValue } from '../solver/marginalValue';
+import type { MarginalValue } from '@daysoff/engine/solver/marginalValue';
 import { COLORS, HOLIDAY_DOT, TEXT_MUTED, TEXT_PRIMARY, BAND_TEXT } from './colorScheme';
 import type { DayCategory } from './types';
 

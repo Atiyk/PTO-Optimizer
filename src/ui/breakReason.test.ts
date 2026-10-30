@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { breakReason } from './breakReason';
-import type { Break } from '../solver/types';
+import type { Break } from '@daysoff/engine/solver/types';
 
 const BASE: Break = {
   id: '2026-11-26|2026-11-29',

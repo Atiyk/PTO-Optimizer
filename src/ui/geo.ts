@@ -1,4 +1,4 @@
-import { COUNTRIES } from '../data/countries';
+import { COUNTRIES } from '@daysoff/engine/data/countries';
 
 /** Best-effort country guess from the browser locale. Never throws. */
 export function geolocateCountry(): string {

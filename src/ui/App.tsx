@@ -20,7 +20,7 @@ import { PeakCapBanner } from './PeakCapBanner';
 import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { Container, SECTION_GAP } from './Container';
-import { mostContestedBreakId } from './requestDeadline';
+import { mostContestedBreakId } from '@daysoff/engine/calendar/requestDeadline';
 import { breakReason } from './breakReason';
 import { useAppState, todayISO } from './useAppState';
 import { useHasHover } from './useHasHover';

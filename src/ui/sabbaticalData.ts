@@ -1,6 +1,6 @@
-import { addDays, mondayIndexedDow } from '../solver/dateUtils';
+import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { isOffDay, daysBetween } from './landingData';
-import { DEFAULT_WORK_WEEK, type WorkWeek } from '../solver/types';
+import { DEFAULT_WORK_WEEK, type WorkWeek } from '@daysoff/engine/solver/types';
 
 export interface SabbaticalPlacement {
   start: string;

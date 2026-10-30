@@ -1,7 +1,7 @@
-import type { Break } from '../solver/types';
-import { parseISO, addDays } from '../solver/dateUtils';
-import { formatDateRange, formatCardDateRange } from './dateFormat';
-import type { Holiday } from '../data/holidays';
+import type { Break } from '@daysoff/engine/solver/types';
+import { parseISO, addDays } from '@daysoff/engine/solver/dateUtils';
+import { formatDateRange, formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
+import type { Holiday } from '@daysoff/engine/data/holidays';
 
 /** RFC 5545 TEXT escaping: backslash, comma, semicolon, and newline must be escaped. */
 function escapeText(s: string): string {
