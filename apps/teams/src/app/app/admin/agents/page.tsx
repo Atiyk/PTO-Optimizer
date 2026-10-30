@@ -193,9 +193,9 @@ export default async function AgentsAndApi() {
                       {d.status === 'delivered'
                         ? `Delivered (HTTP ${d.lastStatusCode})`
                         : d.status === 'failed'
-                          ? `Failed after ${d.attempts} tries: ${d.lastError}`
+                          ? `Failed after ${d.attempts} ${d.attempts === 1 ? "try" : "tries"}: ${d.lastError}`
                           : d.attempts
-                            ? `Retrying (${d.attempts} tries so far): ${d.lastError}`
+                            ? `Retrying (${d.attempts} ${d.attempts === 1 ? "try" : "tries"} so far): ${d.lastError}`
                             : 'Queued'}
                     </td>
                     <td className="py-2">

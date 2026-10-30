@@ -7,7 +7,9 @@ export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 export const MIGRATIONS_DIR = path.join(process.cwd(), 'drizzle');
 
-let current: Promise<Db> | undefined;
+// On globalThis, not module scope: Next bundles route handlers and pages into separate module
+// graphs, and two PGlite instances on one data directory silently diverge.
+const slot = globalThis as typeof globalThis & { __daysOffTeamsDb?: Promise<Db> };
 
 /**
  * Production reads DATABASE_URL (e.g. a free Neon project). Without it, dev falls back to
@@ -15,12 +17,12 @@ let current: Promise<Db> | undefined;
  * setDb().
  */
 export function getDb(): Promise<Db> {
-  current ??= open();
-  return current;
+  slot.__daysOffTeamsDb ??= open();
+  return slot.__daysOffTeamsDb;
 }
 
 export function setDb(db: Db | undefined): void {
-  current = db ? Promise.resolve(db) : undefined;
+  slot.__daysOffTeamsDb = db ? Promise.resolve(db) : undefined;
 }
 
 async function open(): Promise<Db> {

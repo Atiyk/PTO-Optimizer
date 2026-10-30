@@ -935,9 +935,67 @@ Scheduled, resumable run. Resumable state: GitHub issue #32 "SMB MVP: build log"
   typecheck clean; Days Off dist identical; teams build OK; lint 0 errors. Screenshots:
   `docs/screenshots/smb-p4/` (planner, member proposal, after accept × 1440/768/375).
 
+## Phase 5: agents and API (`claude/smb-p5-agents`)
+
+- **Spec and platforms re-checked 2026-10-30 (P5.0).** MCP 2026-07-28 is current: stateless
+  (no `initialize`; `server/discover`), `resultType` on results, `Mcp-Method` headers, cacheable
+  lists (`ttlMs`/`cacheScope`), CIMD preferred and DCR deprecated, RFC 9207 `iss` checks. Built on
+  the official TypeScript SDK v2 (`@modelcontextprotocol/server` / `client` 2.4.0, legacy-stateless
+  mode so 2025-era clients still connect). Platforms: Claude apps need OAuth sign-in (static request
+  headers are a limited beta; no client credentials); ChatGPT accepts OAuth or none only; Copilot
+  Studio takes API keys (header) or OAuth, drops `$ref` and truncates at type arrays (a test keeps
+  our schemas clear of both); Agentforce takes none or client credentials only, tools only, 60 s
+  timeout. Details in `docs/teams/AGENT-AUTH.md`.
+- **One gateway for agents** (`src/server/agentGateway.ts`): REST bearer and MCP both go through
+  `callAsAgent`: per-token rate limit, autonomy level, then R2 draft → confirm. Drafts check every
+  target id against the org before they are stored (a cross-tenant id fails at once).
+- **Autonomy realigned to the prompt's R6**: L0 Off, L1 Suggest, L2 Draft (person confirms), L3 Act
+  within policy (undo window). Agents default to Draft, the assistant to Suggest. Auto-approval only
+  at L3. Agents & API shows each agent action's level next to its eval evidence.
+- **REST** `/api/v1/actions/{name}` with bearer or session cookie, `/api/v1/drafts/{id}/confirm`,
+  OpenAPI 3.1 generated from the registry at `/api/v1/openapi.json`; idempotency keys on commits;
+  errors carry code, message and the exact invalid field.
+- **MCP** `/api/mcp` (Streamable HTTP, JSON responses): only the tools the token's scopes allow
+  (≤ 25), two read-only resources (org policies, this year's holidays), `confirmAgentDraft` for
+  agents acting for a person.
+- **Auth Stage 1**: personal tokens (`dop_`), API keys (`dok_`), OAuth client credentials (`doc_`
+  / `doa_`), `X-API-Key` accepted for Copilot Studio, last-used tracking, one-click revoke, kill
+  switch, RFC 9728 / 8414 metadata. **Stage 2** (code + PKCE, CIMD, separate AS on `oidc-provider`)
+  is fully designed in `docs/teams/AGENT-AUTH.md`, not built (see Q4).
+- **Webhooks**: Standard Webhooks signing (verified in tests with the official `standardwebhooks`
+  library), retries at 30 s, 2 min, 10 min, 1 h, 6 h, 24 h then failed; same `webhook-id` on every
+  attempt; SSRF guard (https only, private ranges refused at creation and after DNS); secrets
+  encrypted at rest (AES-GCM, key from `SESSION_SECRET`); delivery log, health, pause, test event,
+  retry now. Events emitted in the same transaction as the change; sent after the response
+  (`after()`), on the daily cron, or on retry. `balance.expiring` fires once at 30 and 7 days out.
+  Payloads omit notes; health-related leave is just "out".
+- **Discovery**: `/llms.txt` and `/docs/agents` (Claude Code, Claude apps, ChatGPT, Copilot Studio,
+  Agentforce, with honest "works today / not yet") are generated from the registry; A2A 1.0 Agent
+  Card at `/.well-known/agent-card.json` and a stub `/api/a2a`, both 404 unless `A2A_ENABLED=1`.
+- **UI**: My agents (personal tokens with consent-style scope list, expiry, revoke), Admin → Agents &
+  API (kill switch, autonomy per action with eval notes, API keys, OAuth clients, all tokens, webhooks,
+  delivery log), "Requests from your agents" card on the home page.
+- **Tests added**: 11 agent tests through the official MCP client (tool lists by scope, drafts and
+  confirmation, service agent cannot commit, L3 for on-behalf agents only, cross-tenant and wrong
+  scope, audit actor rows, injection text stays data, per-token rate limits, kill switch, client
+  credentials, strict-client schemas), 8 webhook tests, 2 discovery tests, isolation attacks for every
+  new id-taking action.
+
 ## Questions for Atiyk (SMB)
 - Q1. ~~main lacks the old stack~~ Resolved: you merged it. But main's build is broken by
   a merge artifact. Recommended: merge #41 first, then this stack.
 - Q3. ~~No API key for the live eval~~ Resolved: ran on this session's credits via the
   Claude Code CLI (`EVAL_PROVIDER=claude-cli npm run eval:live -w apps/teams`). For
   production: set an Anthropic spend limit first, then add `ANTHROPIC_API_KEY` in Vercel.
+- Q4. Per-person OAuth sign-in (Stage 2) is designed, not built. It is what makes ChatGPT and the
+  Claude apps act as a person. Recommended: build it next on `oidc-provider` with CIMD on and DCR
+  off unless ChatGPT needs it (decide after a live test). Your call on the dependency and on DCR.
+- Q5. Webhook retries rely on the response hook and a **daily** cron (`apps/teams/vercel.json`,
+  Hobby-compatible). On Vercel Pro you can make it every 5 minutes (`*/5 * * * *`) for faster
+  retries. Set `CRON_SECRET` in the teams project: Vercel → teams project → Settings → Environment
+  Variables → Add `CRON_SECRET` (any long random string) → Save → Redeploy.
+- Q6. Webhook secrets are encrypted with a key derived from `SESSION_SECRET`; rotating that secret
+  makes existing webhooks fail until re-created. Recommended: accept for the MVP; add a dedicated
+  `ENCRYPTION_KEY` with rotation later.
+- Q7. The A2A card is behind `A2A_ENABLED` (off) and the endpoint is a stub that points to MCP.
+  Recommended: leave off until a customer asks.
