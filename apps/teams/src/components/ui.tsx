@@ -26,15 +26,33 @@ export function Stat({ label, value, hint }: { label: string; value: ReactNode; 
   );
 }
 
-export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'accent' | 'warn' | 'bad' }) {
+export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'accent' | 'warn' | 'bad' | 'ok' }) {
   // Tone is carried by border style and weight too, so it stays legible in greyscale.
   const cls = {
     neutral: 'border-line bg-surface-alt text-ink',
     accent: 'border-accent bg-accent text-white',
     warn: 'border-dashed border-ink bg-band text-ink',
-    bad: 'border-2 border-ink bg-page text-ink font-semibold',
+    bad: 'border-2 border-gap-line bg-gap-bg text-gap-text font-semibold',
+    ok: 'border-ok-line bg-ok-bg text-ok-text',
   }[tone];
   return <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-xs ${cls}`}>{children}</span>;
+}
+
+/**
+ * The one-line answer at the top of a page ("1 gap this week" / "Every room is in ratio"). The
+ * state is in the words and a thick or thin left rule, not only in the colour.
+ */
+export function StatusBanner({ tone, title, children, action }: { tone: 'ok' | 'gap'; title: ReactNode; children?: ReactNode; action?: ReactNode }) {
+  const cls = tone === 'gap' ? 'border-l-8 border-gap-line bg-gap-bg' : 'border-l-4 border-ok-line bg-ok-bg';
+  return (
+    <section role="status" className={`flex flex-wrap items-center justify-between gap-3 rounded-lg p-4 sm:p-5 ${cls}`}>
+      <div className="min-w-0">
+        <p className={`text-lg font-semibold ${tone === 'gap' ? 'text-gap-text' : 'text-ok-text'}`}>{title}</p>
+        {children && <div className="mt-1 text-sm text-ink">{children}</div>}
+      </div>
+      {action}
+    </section>
+  );
 }
 
 export const btn =

@@ -3,12 +3,48 @@ import { addDays } from '@daysoff/engine/solver/dateUtils';
 import { ActionButton } from '@/components/ActionButton';
 import { AskForCover } from '@/components/AskForCover';
 import { ExplainCover } from '@/components/ExplainCover';
-import { Badge, Card, formatRange } from '@/components/ui';
+import { Badge, Card, formatRange, StatusBanner } from '@/components/ui';
+import type { CapabilityOutput } from '@/capabilities/registry';
 import { call, requireActor } from '@/server/page';
 
 const isUuid = (v?: string) => !!v && /^[0-9a-f-]{36}$/i.test(v);
 const isDate = (v?: string) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isTime = (v?: string) => !!v && /^\d{2}:\d{2}$/.test(v);
+
+type Candidate = CapabilityOutput<'findCover'>['candidates'][number];
+
+/** Plain-words chips from the engine's score parts (no new numbers). */
+function reasons(c: Candidate): { text: string; tone: 'ok' | 'warn' | 'neutral' }[] {
+  const out: { text: string; tone: 'ok' | 'warn' | 'neutral' }[] = [];
+  const p = c.scoreParts;
+  out.push(p && p.fairness > 0 ? { text: 'Covered recently', tone: 'neutral' } : { text: 'No recent cover', tone: 'ok' });
+  if (p && p.preference < 0) out.push({ text: 'Opted in', tone: 'ok' });
+  out.push(c.costBand === 'overtime' ? { text: 'Overtime', tone: 'warn' } : { text: 'Regular hours', tone: 'neutral' });
+  if (p && p.travel > 0) out.push({ text: 'From another site', tone: 'neutral' });
+  return out;
+}
+
+const EXCLUDED_GROUP: Record<string, string> = {
+  active: 'Not active',
+  site_allowed: 'Not set up for this site',
+  opted_in: 'Opted out of cover',
+  not_on_leave: 'On leave',
+  available: 'Already working then',
+  credential_valid: 'Missing or expired credential',
+  min_rest: 'Rest rule',
+  max_hours_day: 'Too many hours that day',
+  max_hours_week: 'Too many hours that week',
+  max_consecutive_days: 'Too many days in a row',
+};
+
+function groupExcluded(list: Candidate[]): [string, Candidate[]][] {
+  const m = new Map<string, Candidate[]>();
+  for (const c of list) {
+    const k = EXCLUDED_GROUP[c.excludedBy ?? ''] ?? c.excludedBy ?? 'Other';
+    m.set(k, [...(m.get(k) ?? []), c]);
+  }
+  return [...m];
+}
 
 /**
  * Find cover for one window (who can legally take it, in fair order, and why others can't),
@@ -50,28 +86,52 @@ export default async function CoverPage({ searchParams }: { searchParams: Promis
       )}
       {found && target && (
         <>
-          <h1 className="text-xl font-semibold text-ink">
-            Cover for {found.window.roomName}, {formatRange(date, date)}, {found.window.start}–{found.window.end}
-          </h1>
-          {found.gap && (
-            <p className="text-sm text-ink">
-              {found.gap.label}: {found.gap.short} short{found.gap.citation ? ` (${found.gap.citation})` : ''}.
+          <div>
+            <h1 className="text-2xl font-semibold text-ink">Cover for {found.window.roomName}</h1>
+            <p className="text-sm text-muted">
+              {formatRange(date, date)} · <span className="tabular-nums">{found.window.start}–{found.window.end}</span>
             </p>
+          </div>
+          {found.gap && (
+            <StatusBanner tone="gap" title={`${found.gap.short} staff short`}>
+              {found.gap.label}
+              {found.gap.citation ? ` · ${found.gap.citation}` : ''}
+            </StatusBanner>
           )}
-          <ExplainCover target={target} />
-          <Card title={`Can take it (${eligible.length})`} actions={<AskForCover target={target} eligible={eligible.length} />}>
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-ink">Can take it ({eligible.length})</h2>
+                <p className="text-sm text-muted">In fair order: whoever covered least lately goes first, then whoever opted in. Overtime only counts when cost-aware ranking is on.</p>
+              </div>
+              <AskForCover target={target} eligible={eligible.length} />
+            </div>
             {eligible.length === 0 ? (
-              <p className="text-sm text-muted">Nobody passes every rule for this window. See why below.</p>
+              <Card>
+                <p className="text-sm text-muted">Nobody passes every rule for this window. See why below.</p>
+              </Card>
             ) : (
-              <ol className="space-y-2 text-sm">
+              <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {eligible.map((c) => (
-                  <li key={c.memberId} className="rounded-md border border-line p-2">
-                    <span className="font-medium text-ink">
-                      {c.rank}. {c.name?.untrusted_text}
-                    </span>{' '}
-                    {c.costBand === 'overtime' && <Badge tone="warn">overtime</Badge>}
-                    <details className="mt-1">
-                      <summary className="cursor-pointer text-muted">Why this order</summary>
+                  <li key={c.memberId} className={`rounded-lg border bg-page p-3 text-sm ${c.rank! <= 3 ? 'border-2 border-accent' : 'border-line'}`}>
+                    <div className="flex items-center gap-2">
+                      <span aria-hidden className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${c.rank! <= 3 ? 'bg-accent text-white' : 'bg-surface-alt text-ink'}`}>
+                        {c.rank}
+                      </span>
+                      <span className="min-w-0 truncate font-semibold text-ink">
+                        <span className="sr-only">{c.rank}. </span>
+                        {c.name?.untrusted_text}
+                      </span>
+                    </div>
+                    <ul className="mt-2 flex flex-wrap gap-1" aria-label="Why here">
+                      {reasons(c).map((r) => (
+                        <li key={r.text}>
+                          <Badge tone={r.tone}>{r.text}</Badge>
+                        </li>
+                      ))}
+                    </ul>
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-muted">Every rule checked</summary>
                       <p className="mt-1 text-muted">
                         Fairness {c.scoreParts?.fairness ?? 0} · preference {c.scoreParts?.preference ?? 0} · cost {c.scoreParts?.cost ?? 0} · travel {c.scoreParts?.travel ?? 0}. Lower goes
                         first.
@@ -89,18 +149,30 @@ export default async function CoverPage({ searchParams }: { searchParams: Promis
                 ))}
               </ol>
             )}
-          </Card>
+          </section>
+          <ExplainCover target={target} />
           {excluded.length > 0 && (
             <Card title={`Can’t take it (${excluded.length})`}>
-              <ul className="space-y-1 text-sm">
-                {excluded.map((c) => {
-                  const failed = c.checks.find((x) => !x.passed);
-                  return (
-                    <li key={c.memberId} className="text-ink">
-                      <span className="font-medium">{c.name?.untrusted_text}</span>: <span className="text-muted">{failed ? `${failed.detail}${failed.rule ? ` (${failed.rule})` : ''}` : c.excludedBy}</span>
-                    </li>
-                  );
-                })}
+              <ul className="space-y-2 text-sm">
+                {groupExcluded(excluded).map(([why, people]) => (
+                  <li key={why}>
+                    <details>
+                      <summary className="cursor-pointer">
+                        <span className="font-medium text-ink">{why}</span> <span className="text-muted">· {people.length}</span>
+                      </summary>
+                      <ul className="mt-1 space-y-0.5 pl-5">
+                        {people.map((c) => {
+                          const failed = c.checks.find((x) => !x.passed);
+                          return (
+                            <li key={c.memberId} className="text-ink">
+                              <span className="font-medium">{c.name?.untrusted_text}</span>: <span className="text-muted">{failed ? `${failed.detail}${failed.rule ? ` (${failed.rule})` : ''}` : c.excludedBy}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </details>
+                  </li>
+                ))}
               </ul>
             </Card>
           )}

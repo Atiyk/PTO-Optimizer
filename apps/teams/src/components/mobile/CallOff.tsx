@@ -31,8 +31,8 @@ export function CallOff({ today, tomorrow }: { today: string; tomorrow: string }
 
   if (step === 'done' && result) {
     return (
-      <section className="rounded-lg border-2 border-ink bg-page p-4" role="status">
-        <p className="font-semibold text-ink">Your manager knows you’re out {result.date === today ? 'today' : 'tomorrow'}.</p>
+      <section className="rounded-lg border-l-4 border-ok-line bg-ok-bg p-4" role="status">
+        <p className="font-semibold text-ok-text">Your manager knows you’re out {result.date === today ? 'today' : 'tomorrow'}.</p>
         <p className="mt-1 text-sm text-ink">
           {result.coverRequests.length
             ? `Cover has been asked for ${result.coverRequests.length === 1 ? 'one time slot' : `${result.coverRequests.length} time slots`}. You don’t need to find it.`
@@ -75,7 +75,7 @@ export function CallOff({ today, tomorrow }: { today: string; tomorrow: string }
     );
   }
   return (
-    <button onClick={() => setStep('confirm')} className="min-h-14 w-full rounded-lg border-2 border-ink bg-page text-base font-semibold text-ink">
+    <button onClick={() => setStep('confirm')} className="min-h-14 w-full rounded-lg border-2 border-gap-line bg-gap-bg text-lg font-semibold text-gap-text">
       I can’t come in
     </button>
   );

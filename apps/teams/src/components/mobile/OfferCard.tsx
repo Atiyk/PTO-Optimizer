@@ -23,15 +23,15 @@ export function OfferCard({ offerId, title, when, open }: { offerId: string; tit
       router.refresh();
     });
   return (
-    <section className="rounded-lg border border-line bg-page p-4">
+    <section className="rounded-xl border border-line bg-page p-4 shadow-sm">
       <h2 className="text-base font-semibold text-ink">{title}</h2>
       <p className="text-sm text-ink">{when}</p>
       {open && !msg && (
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <button disabled={pending} onClick={() => answer('accept')} className="min-h-12 rounded-md bg-accent text-base font-semibold text-white">
+          <button disabled={pending} onClick={() => answer('accept')} className="min-h-14 rounded-lg bg-accent text-base font-semibold text-white">
             Take it
           </button>
-          <button disabled={pending} onClick={() => answer('decline')} className="min-h-12 rounded-md border border-line text-base text-ink">
+          <button disabled={pending} onClick={() => answer('decline')} className="min-h-14 rounded-lg border border-line text-base text-ink">
             Can’t
           </button>
         </div>

@@ -20,43 +20,60 @@ export default async function StaffToday() {
   const { today, shifts } = await call('getMySchedule', { days: 7 }, actor);
   const { myOffers } = await call('getCoverRequests', {}, actor);
   const open = myOffers.filter((o) => o.requestStatus === 'open' && !o.response).length;
-  const byDay = new Map<string, typeof shifts>();
-  for (const s of shifts) byDay.set(s.date, [...(byDay.get(s.date) ?? []), s]);
+  const working = shifts.filter((s) => !s.onLeave);
+  const next = working[0] ?? null;
+  const later = shifts.filter((s) => s !== next);
 
   return (
     <Shell title="Today" org={org.name} active="/m" badge={open}>
       {open > 0 && (
-        <Link href="/m/offers" className="block rounded-lg border-2 border-accent bg-page p-4 text-base font-semibold text-ink">
+        <Link href="/m/offers" className="block rounded-xl border-2 border-accent bg-accent p-4 text-base font-semibold text-white">
           {open === 1 ? 'One cover offer is waiting for you' : `${open} cover offers are waiting for you`} →
         </Link>
       )}
-      <CallOff today={today} tomorrow={addDays(today, 1)} />
-      <section aria-labelledby="next-shifts" className="space-y-2">
-        <h2 id="next-shifts" className="text-base font-semibold text-ink">
-          Your next 7 days
+      <section aria-labelledby="next-shift" className="rounded-xl border border-line bg-page p-4 shadow-sm">
+        <h2 id="next-shift" className="text-xs font-semibold tracking-wide text-muted uppercase">
+          {next ? (next.date === today ? 'Your shift today' : `Your next shift · ${dayLabel(next.date, today)}`) : 'Your next shift'}
         </h2>
-        {byDay.size === 0 ? (
-          <p className="rounded-lg border border-line bg-page p-4 text-sm text-muted">No shifts on your schedule this week.</p>
+        {next ? (
+          <>
+            <p className="mt-1 text-3xl font-semibold text-ink tabular-nums">
+              {next.start}–{next.end}
+            </p>
+            <p className="text-base text-ink">
+              {next.roomName} · <span className="text-muted">{next.siteName}</span>
+            </p>
+            {next.cover && <p className="mt-1 text-sm text-muted">Cover you took. Thank you.</p>}
+          </>
         ) : (
-          <ul className="space-y-2">
-            {[...byDay].map(([date, list]) => (
-              <li key={date} className="rounded-lg border border-line bg-page p-4">
-                <div className="text-sm font-semibold text-ink">{dayLabel(date, today)}</div>
-                {list.map((s, i) => (
-                  <div key={i} className="mt-1 text-base text-ink">
-                    {s.start}–{s.end} · {s.roomName}
-                    <span className="block text-sm text-muted">
-                      {s.siteName}
-                      {s.cover && ' · cover you took'}
-                      {s.onLeave && ' · you’re off (leave booked)'}
-                    </span>
-                  </div>
-                ))}
+          <p className="mt-1 text-base text-muted">No shifts on your schedule this week.</p>
+        )}
+        <div className="mt-4">
+          <CallOff today={today} tomorrow={addDays(today, 1)} />
+        </div>
+      </section>
+      {later.length > 0 && (
+        <section aria-labelledby="next-shifts" className="space-y-2">
+          <h2 id="next-shifts" className="text-base font-semibold text-ink">
+            Later this week
+          </h2>
+          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-page">
+            {later.map((s, i) => (
+              <li key={i} className="flex items-baseline justify-between gap-3 px-4 py-3">
+                <span className="text-sm font-semibold text-ink">{dayLabel(s.date, today)}</span>
+                <span className="text-right text-base text-ink tabular-nums">
+                  {s.start}–{s.end}
+                  <span className="block text-sm text-muted">
+                    {s.roomName}
+                    {s.cover && ' · cover you took'}
+                    {s.onLeave && ' · you’re off'}
+                  </span>
+                </span>
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      )}
     </Shell>
   );
 }
