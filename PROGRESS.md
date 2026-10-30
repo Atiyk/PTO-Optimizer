@@ -2017,3 +2017,7 @@ Phase 7.
   up.
 - Q5: The CA labour citation regulation was renamed from "Cal. Labor Code § 246" to "Cal.
   Labor Code" (the section carries the §). This is a data fix with no behaviour change.
+
+## Phase 3: cover workflow and employee PWA (`claude/rc-p3-cover`)
+
+In progress.
