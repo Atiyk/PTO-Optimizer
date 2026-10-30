@@ -117,6 +117,10 @@ const attacks = (): [CapabilityName, unknown][] => [
   ['requestCover', { op: 'cancel', requestId: bCoverId }],
   ['respondToCover', { offerId: bOfferId, response: 'decline' }],
   ['getCoverRequests', { locationId: B.location.id }],
+  ['manageStaffSignIn', { op: 'issueCode', memberId: B.emp.id }],
+  ['manageStaffSignIn', { op: 'listPasskeys', memberId: B.emp.id }],
+  ['manageStaffSignIn', { op: 'revokePasskey', passkeyId: '00000000-0000-4000-8000-000000000000' }],
+  ['setMyCoverPrefs', { allowedLocationIds: [B.location.id] }],
 ];
 
 describe('tenant isolation (A6)', () => {

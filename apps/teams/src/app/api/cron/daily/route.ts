@@ -4,6 +4,7 @@ import { getDb } from '@/db/client';
 import { slackStatusGrants, webhookEndpoints } from '@/db/schema';
 import { syncSlackStatuses } from '@/slack/notify';
 import { housekeeping } from '@/server/housekeeping';
+import { advanceWaves } from '@/domain/coverFlow';
 import { deliverDue, scanExpiringBalances } from '@/server/webhooks';
 
 /*
@@ -39,5 +40,6 @@ export async function GET(req: Request) {
   const grantOrgs = await db.selectDistinct({ orgId: slackStatusGrants.orgId }).from(slackStatusGrants);
   let statuses = 0;
   for (const { orgId } of grantOrgs) statuses += await syncSlackStatuses(db, orgId, now);
-  return Response.json({ queued, ...sent, cleaned, statuses });
+  const coverWaves = await advanceWaves(db, null, now);
+  return Response.json({ queued, ...sent, cleaned, statuses, coverWaves });
 }
