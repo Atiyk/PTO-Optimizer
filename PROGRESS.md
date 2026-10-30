@@ -2611,3 +2611,27 @@ facts and fall back to a template.
   from CSV (and undo); next, read hours from the time clocks centres already use (the childcare
   suites' and Homebase's). A time clock means kiosks, geofencing and pay disputes, which is a
   different product.
+
+## Regulated coverage UI pass (`claude/rc-ui-pass`)
+Prompt: `/mnt/project-files/prompts/regulated-coverage-ui-pass-prompt.md`. Run unattended; Atiyk
+waived review. Before/after screens: `docs/screenshots/rc-ui/before/` and `after/`.
+- **Landing:** coverage is its own full-width section right under the hero, with a rendered
+  example heatmap (labelled "Example") and its cited gap; a "Coverage demo" button in the hero.
+- **Coverage:** a status banner ("1 gap this week" + "Find cover for the first gap", or "Every
+  room is in ratio"), a 7-day strip instead of seven rows, gap cards with the citation and a
+  Find cover button, and a calmer heatmap: in-ratio cells are a plain green fill (counts for
+  screen readers and on hover), gaps keep "−N", a heavy border and stripes. On a phone the
+  heatmap scrolls to the first gap. New tokens `ok-*` and `gap-*` in `globals.css`.
+- **Find cover:** ranked people as cards (top 3 highlighted) with plain chips from the engine's
+  score parts (no recent cover, opted in, overtime, another site); the full rule list stays one
+  click away; people who can't take it are grouped by reason.
+- **Staff app:** today's shift is the hero with the call-off button inside it; the rest of the
+  week is a compact list. Still 2 taps, still no reason field.
+- **Forecast:** four headline numbers per site, short week labels, gap weeks tinted with their
+  total, credential alerts sorted by first gap date, and stagger suggestions as one-line actions.
+- Not done: an "Offer to this person" button per candidate. That needs `requestCover` to accept
+  a chosen person, which is a capability change, so offers still go out in ranked waves.
+
+Gate: teams 200 passed (3 skipped); typecheck clean; lint 0 errors; `npm run build` passes and
+Days Off dist is identical (690 files); axe 0 violations on 26 page-widths; RC1 browser setup
+still 28 clicks (6.2 min); RC5 call-off still 2 taps; no overflow or page errors.

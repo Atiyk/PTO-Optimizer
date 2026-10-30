@@ -18,6 +18,15 @@
   --accent-text: #ffffff;
   --band-bg: #fef3c7;
   --band-text: #1e293b;
+  /* Coverage states. Each pairs with a pattern or border too, so none relies on hue alone. */
+  --ok-bg: #ecfdf5;
+  --ok-fill: #d1fae5;
+  --ok-line: #6ee7b7;
+  --ok-text: #065f46;
+  --gap-bg: #fef2f2;
+  --gap-fill: #fee2e2;
+  --gap-line: #b91c1c;
+  --gap-text: #991b1b;
   color-scheme: light;
 }
 
@@ -31,6 +40,14 @@
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
   --color-band: var(--band-bg);
+  --color-ok-bg: var(--ok-bg);
+  --color-ok-fill: var(--ok-fill);
+  --color-ok-line: var(--ok-line);
+  --color-ok-text: var(--ok-text);
+  --color-gap-bg: var(--gap-bg);
+  --color-gap-fill: var(--gap-fill);
+  --color-gap-line: var(--gap-line);
+  --color-gap-text: var(--gap-text);
 }
 
 body {
