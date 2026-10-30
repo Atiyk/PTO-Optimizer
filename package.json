@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json && npm run typecheck --workspaces --if-present",
     "test:all": "npm test && npm run test -w apps/teams --if-present",
     "build:all": "npm run build && npm run build --workspaces --if-present",
-    "lint:all": "oxlint && npm run lint --workspaces --if-present"
+    "lint:all": "oxlint && npm run lint --workspaces --if-present",
+    "verify:dist": "bash scripts/verify-days-off-dist.sh"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

@@ -86,6 +86,35 @@ Scheduled, resumable run. Resumable state: GitHub issue #32 "SMB MVP: build log"
   timing tests in `solve.test.ts` (known-flaky K9 baseline, per Phase 0 above).
 - `tsc --noEmit` (Days Off + engine) clean; oxlint: 0 errors, 2 pre-existing warnings.
 
+### P0.3–P0.7 (run 1, 2026-10-30)
+- `apps/teams`: Next.js 16.4 App Router, React 19, Tailwind 4 (Days Off tokens), Drizzle
+  0.45 + drizzle-kit migrations (`apps/teams/drizzle/`), PGlite 0.5 for dev (`.pglite/`)
+  and in-memory tests; postgres-js (`prepare:false`) when `DATABASE_URL` is set.
+  Next 16 removed `next lint`, so the app lints with oxlint like Days Off.
+- Capability registry (`apps/teams/src/capabilities/`): `defineCapability` with zod I/O,
+  scope, role gate, effect class, idempotency, MCP annotations, rate-limit class,
+  surfaces, audit template. `invokeCapability` = authorize → validate → run → validate
+  output → audit (denials always audited with actor type, client id, on-behalf-of).
+- `getMyBalance` exposed via server action (`app/me/actions.ts`) and
+  `GET /api/v1/me/balance`; `getMyBalance.test.ts` proves identical output, identical
+  auth failures, cross-org cookie rejection, model-readable validation errors.
+- Engine gained `ledger/fixedPoint.ts` (sums in integer 1/10000 units; no float drift).
+- Signed session cookie (HMAC-SHA256, member+org bound, 14-day max age); role re-read from
+  the DB per request.
+- **Surprise: Tailwind v4 scans every text file in the repo.** The new app's class names
+  leaked into Days Off's CSS and changed every hashed asset. Fixed with
+  `@source not '../apps'` and `'../docs'` in `src/index.css`. Root `*.md` files (README,
+  NOTES, PROGRESS) were already scanned on main and contribute classes, so they cannot be
+  excluded without changing the build; editing PROGRESS.md could in theory add a utility
+  class to Days Off's CSS. `npm run verify:dist` (baseline in
+  `scripts/days-off-dist.sha256`) catches that at every gate.
+- `scripts/screenshot.mjs` accepts `PW_CHROMIUM_PATH` (sandbox has a preinstalled
+  Chromium at a different revision than the repo's Playwright).
+- Gate: Days Off build OK, `verify:dist` identical (29 files); root tests 409 pass / 2
+  known-flaky timing failures (baseline 405/2, +4 new engine tests); teams tests 10/10;
+  typecheck clean (Days Off, engine, teams); teams `next build` OK; oxlint 0 errors.
+  Screenshots: `docs/screenshots/smb-p0/teams-home-{1440,768,375}.png`.
+
 ## Questions for Atiyk (SMB)
 - Q1. main does not contain the open stacked PRs #23–#31 (phases 1–6, Feature 1). Phase 0
   branches from main as instructed, so the engine is extracted from main's solver.

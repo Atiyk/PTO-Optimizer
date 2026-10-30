@@ -3,6 +3,7 @@ import { getDb } from '@/db/client';
 import { CapabilityError } from '@/capabilities/errors';
 import { invokeCapability, type CapabilityName, type CapabilityOutput } from '@/capabilities/registry';
 import { humanActorFromSession } from '@/lib/actor';
+import { decodeSession } from '@/lib/session';
 
 /** Run a capability as the signed-in human. Shared by server actions and REST routes. */
 export async function runForSession<N extends CapabilityName>(
@@ -10,6 +11,8 @@ export async function runForSession<N extends CapabilityName>(
   sessionCookie: string | undefined,
   input: unknown,
 ): Promise<CapabilityOutput<N>> {
+  // Reject a missing or forged cookie before touching the database.
+  if (!decodeSession(sessionCookie)) throw new CapabilityError('unauthenticated', 'Sign in first.');
   const db = await getDb();
   const actor = await humanActorFromSession(db, sessionCookie);
   if (!actor) throw new CapabilityError('unauthenticated', 'Sign in first.');
