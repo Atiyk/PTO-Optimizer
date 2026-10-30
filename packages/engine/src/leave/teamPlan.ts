@@ -66,6 +66,8 @@ export interface MemberPlan {
   unplaced: number;
   days: ISODate[];
   blocks: PlannedBlock[];
+  /** The planned days as bookable ranges: consecutive planned days, joined across weekends and holidays only. */
+  requests: Array<{ start: ISODate; end: ISODate }>;
   /** Why some days could not be placed. Null when everything was placed. */
   shortfallReason: string | null;
 }
@@ -170,22 +172,38 @@ function isLaminar(rules: readonly CoverageRuleInput[], members: readonly Covera
 /** Off for free (weekend, holiday, booked leave): the things a planned day can bridge onto. */
 const freeOff = (m: PlannerMember, d: ISODate) => !isScheduled(m, d) || m.out.has(d);
 
-function runsScore(m: PlannerMember, planned: ReadonlySet<ISODate>, lo: ISODate, hi: ISODate): number {
+/** Σ run² over runs of days off that contain a planned day; arrays are indexed by date. */
+function runsScore(free: Uint8Array, planned: Uint8Array): number {
   let score = 0;
   let run = 0;
   let hasPlanned = false;
-  for (const d of rangeISO(addDays(lo, -7), addDays(hi, 7))) {
-    if (planned.has(d) || freeOff(m, d)) {
+  for (let i = 0; i < free.length; i++) {
+    if (planned[i] || free[i]) {
       run++;
-      if (planned.has(d)) hasPlanned = true;
+      if (planned[i]) hasPlanned = true;
     } else {
       if (hasPlanned) score += run * run;
       run = 0;
       hasPlanned = false;
     }
   }
-  if (hasPlanned) score += run * run;
-  return score;
+  return hasPlanned ? score + run * run : score;
+}
+
+function requestRanges(m: PlannerMember, days: readonly ISODate[]): Array<{ start: ISODate; end: ISODate }> {
+  const out: Array<{ start: ISODate; end: ISODate }> = [];
+  for (const d of days) {
+    const last = out[out.length - 1];
+    if (last) {
+      const between = rangeISO(addDays(last.end, 1), addDays(d, -1));
+      if (between.every((x) => !isScheduled(m, x))) {
+        last.end = d;
+        continue;
+      }
+    }
+    out.push({ start: d, end: d });
+  }
+  return out;
 }
 
 function blocksFor(m: PlannerMember, days: readonly ISODate[]): PlannedBlock[] {
@@ -237,8 +255,16 @@ export function planTeam(input: TeamPlanInput): TeamPlanResult {
   }
   /** A person's rules on a day, innermost (fewest members) first. */
   const ruleSize = new Map(rules.map((r) => [r.id, members.filter((m) => counts(r, m)).length]));
-  const chainFor = (m: PlannerMember, d: ISODate) =>
-    (applying.get(d) ?? []).filter((r) => counts(r, m)).sort((a, b) => ruleSize.get(a.id)! - ruleSize.get(b.id)! || (a.id < b.id ? -1 : 1));
+  const chainCache = new Map<string, CoverageRuleInput[]>();
+  const chainFor = (m: PlannerMember, d: ISODate) => {
+    const k = `${m.id}|${d}`;
+    let c = chainCache.get(k);
+    if (!c) {
+      c = (applying.get(d) ?? []).filter((r) => counts(r, m)).sort((a, b) => ruleSize.get(a.id)! - ruleSize.get(b.id)! || (a.id < b.id ? -1 : 1));
+      chainCache.set(k, c);
+    }
+    return c;
+  };
 
   const eligible = (m: PlannerMember, d: ISODate) =>
     d >= input.start && d <= m.deadline && isScheduled(m, d) && !m.out.has(d) && !m.unavailable?.has(d);
@@ -317,9 +343,23 @@ export function planTeam(input: TeamPlanInput): TeamPlanResult {
     }
   }
 
-  // Stage 2: longer runs, same counts.
+  // Stage 2: longer runs, same counts. Index-based arrays keep this cheap.
+  const ext = dates.length ? rangeISO(addDays(input.start, -7), addDays(lastDay, 7)) : [];
+  const offset = 7; // ext[offset] === input.start
   let swaps = 0;
   let stoppedEarly = false;
+  const state = new Map(
+    needy.map((m) => {
+      const free = new Uint8Array(ext.length);
+      const planned = new Uint8Array(ext.length);
+      ext.forEach((d, i) => {
+        free[i] = freeOff(m, d) ? 1 : 0;
+        planned[i] = assigned.get(m.id)!.has(d) ? 1 : 0;
+      });
+      const options = dates.map((d, i) => (eligible(m, d) && !m.avoid?.has(d) ? i + offset : -1)).filter((i) => i >= 0);
+      return [m.id, { free, planned, options }];
+    }),
+  );
   for (let pass = 0; pass < 6; pass++) {
     let improved = false;
     for (const m of needy) {
@@ -327,31 +367,34 @@ export function planTeam(input: TeamPlanInput): TeamPlanResult {
         stoppedEarly = true;
         break;
       }
-      const mine = assigned.get(m.id)!;
-      const options = dates.filter((d) => eligible(m, d) && !mine.has(d) && !m.avoid?.has(d));
-      for (const x of [...mine].sort()) {
-        let best = runsScore(m, mine, input.start, m.deadline);
-        let bestDay: ISODate | null = null;
-        bump(m, x, -1);
-        mine.delete(x);
+      const { free, planned, options } = state.get(m.id)!;
+      const current = options.filter((i) => planned[i]).concat(dates.map((_, i) => i + offset).filter((i) => planned[i] && !options.includes(i)));
+      for (const x of current) {
+        planned[x] = 0;
+        bump(m, ext[x]!, -1);
+        planned[x] = 1;
+        let best = runsScore(free, planned);
+        planned[x] = 0;
+        let bestIdx = -1;
         for (const y of options) {
-          if (mine.has(y) || !fits(m, y)) continue;
-          mine.add(y);
-          const s = runsScore(m, mine, input.start, m.deadline);
-          mine.delete(y);
-          if (s > best) {
-            best = s;
-            bestDay = y;
+          if (planned[y] || y === x || !fits(m, ext[y]!)) continue;
+          planned[y] = 1;
+          const sc = runsScore(free, planned);
+          planned[y] = 0;
+          if (sc > best) {
+            best = sc;
+            bestIdx = y;
           }
         }
-        const take = bestDay ?? x;
-        mine.add(take);
-        bump(m, take, 1);
-        if (bestDay) {
+        const take = bestIdx >= 0 ? bestIdx : x;
+        planned[take] = 1;
+        bump(m, ext[take]!, 1);
+        if (bestIdx >= 0) {
           swaps++;
           improved = true;
         }
       }
+      assigned.set(m.id, new Set(ext.filter((_, i) => planned[i])));
     }
     if (!improved || stoppedEarly) break;
   }
@@ -367,7 +410,7 @@ export function planTeam(input: TeamPlanInput): TeamPlanResult {
           ? `Only ${free} working days are free before ${m.deadline}.`
           : `Coverage rules leave room for only ${days.length} of ${m.need} days before ${m.deadline}.`;
     }
-    return { memberId: m.id, need: m.need, placed: days.length, unplaced, days, blocks: blocksFor(m, days), shortfallReason };
+    return { memberId: m.id, need: m.need, placed: days.length, unplaced, days, blocks: blocksFor(m, days), requests: requestRanges(m, days), shortfallReason };
   });
 
   const plannedOn = new Map<ISODate, number>();

@@ -3,7 +3,7 @@
  * eval is the default; override per task with AI_MODEL_<TASK> (e.g. AI_MODEL_IMPORT_HANDBOOK).
  * Model IDs verified against Anthropic's model list on 2026-10-30.
  */
-export const AI_TASKS = ['parseLeaveRequest', 'importHandbook', 'explainBalance'] as const;
+export const AI_TASKS = ['parseLeaveRequest', 'importHandbook', 'explainBalance', 'summarizePlan'] as const;
 export type AiTaskName = (typeof AI_TASKS)[number];
 
 interface TaskConfig {
@@ -21,12 +21,14 @@ const DEFAULTS: Record<AiTaskName, TaskConfig> = {
   importHandbook: { model: 'claude-sonnet-5-5', maxTokens: 4_000, maxInputChars: 120_000, effort: 'medium' },
   // Rewording engine facts into a sentence or two: Haiku.
   explainBalance: { model: 'claude-haiku-5-5', maxTokens: 300, maxInputChars: 8_000, effort: 'low' },
+  summarizePlan: { model: 'claude-haiku-5-5', maxTokens: 300, maxInputChars: 4_000, effort: 'low' },
 };
 
 const ENV_KEY: Record<AiTaskName, string> = {
   parseLeaveRequest: 'AI_MODEL_PARSE_LEAVE_REQUEST',
   importHandbook: 'AI_MODEL_IMPORT_HANDBOOK',
   explainBalance: 'AI_MODEL_EXPLAIN_BALANCE',
+  summarizePlan: 'AI_MODEL_SUMMARIZE_PLAN',
 };
 
 export function taskConfig(task: AiTaskName): TaskConfig {

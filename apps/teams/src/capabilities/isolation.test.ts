@@ -13,11 +13,16 @@ import { freshDb } from '@/test/db';
 let db: Db;
 let A: Awaited<ReturnType<typeof buildOrg>>;
 let B: Awaited<ReturnType<typeof buildOrg>>;
+let bProposalId: string;
 
 beforeAll(async () => {
   db = await freshDb();
   A = await buildOrg(db, 'Acme');
   B = await buildOrg(db, 'Globex');
+  const plan = await run(db, humanActor(B.manager), 'runTeamPlan', {});
+  const p = plan.people.find((x) => x.memberId === B.emp.id)!;
+  await run(db, humanActor(B.manager), 'sendPlanProposals', { teamId: B.team.id, proposals: [{ memberId: B.emp.id, blocks: p.requests, deadline: p.deadline }] });
+  bProposalId = (await run(db, humanActor(B.emp), 'listMyProposals', {})).proposals[0]!.id;
 });
 
 const attacks = (): [CapabilityName, unknown][] => [
@@ -39,6 +44,10 @@ const attacks = (): [CapabilityName, unknown][] => [
   ['manageMembers', { op: 'createInvite', teamId: B.team.id }],
   ['adjustBalance', { memberId: B.emp.id, leaveType: 'vacation', amount: 5, effectiveDate: '2026-11-01', reason: 'pwned' }],
   ['exportData', { memberId: B.emp.id }],
+  ['runTeamPlan', { teamId: B.team.id }],
+  ['sendPlanProposals', { teamId: B.team.id, proposals: [{ memberId: B.emp.id, blocks: [{ start: '2026-12-07', end: '2026-12-08' }], deadline: '2026-12-31' }] }],
+  ['sendPlanProposals', { teamId: A.team.id, proposals: [{ memberId: B.emp.id, blocks: [{ start: '2026-12-07', end: '2026-12-08' }], deadline: '2026-12-31' }] }],
+  ['respondToProposal', { proposalId: bProposalId, response: 'accept' }],
 ];
 
 describe('tenant isolation (A6)', () => {

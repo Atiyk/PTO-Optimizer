@@ -3,6 +3,7 @@ import { auditLog } from '@/db/schema';
 import { adjustBalance, exportData, getAuditLog, getOrgSetup, listMembers, manageMembers, manageOrgSetup } from './actions/admin';
 import { explainBalanceInWords, getAiUsage, importHandbook, parseLeaveRequestText } from './actions/ai';
 import { importCsv } from './actions/importCsv';
+import { listMyProposals, respondToProposal, runTeamPlan, sendPlanProposals } from './actions/planner';
 import { decideLeaveRequest, listPendingApprovals } from './actions/approvals';
 import { explainBalance, getMyBalance } from './actions/balance';
 import { listHolidays, whoIsOut } from './actions/calendar';
@@ -37,6 +38,10 @@ export const CAPABILITIES = {
   importHandbook,
   explainBalanceInWords,
   getAiUsage,
+  runTeamPlan,
+  sendPlanProposals,
+  listMyProposals,
+  respondToProposal,
 } as const satisfies Record<string, CapabilityDef>;
 
 export type CapabilityName = keyof typeof CAPABILITIES;

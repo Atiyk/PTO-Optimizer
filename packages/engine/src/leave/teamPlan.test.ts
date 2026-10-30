@@ -102,6 +102,15 @@ describe('team planner', () => {
     const ms = performance.now() - t;
     console.log(`50 people × 60 days: ${ms.toFixed(0)} ms, ${r.stats.flowAugmentations} augmentations, ${r.stats.swaps} swaps, placed ${r.totalPlaced}/${r.totalNeed}`);
     expect(ms).toBeLessThan(3000);
+    expect(r.stats.stoppedEarly).toBe(false);
     expect(violationsAfter(members, rules, r, '2026-12-01', '2027-01-29')).toEqual([]);
+
+    // Tight: 45 of 50 must be in, so most days cannot be placed.
+    const tightRules = [rule('all', 45)];
+    const t2 = performance.now();
+    const tight = planTeam({ members, rules: tightRules, start: '2026-12-01', timeBudgetMs: 1500 });
+    console.log(`tight (45 of 50 in): ${(performance.now() - t2).toFixed(0)} ms, placed ${tight.totalPlaced}/${tight.totalNeed}`);
+    expect(tight.stats.stoppedEarly).toBe(false);
+    expect(violationsAfter(members, tightRules, tight, '2026-12-01', '2027-01-29')).toEqual([]);
   });
 });
