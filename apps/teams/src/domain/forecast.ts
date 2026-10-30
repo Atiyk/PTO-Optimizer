@@ -48,7 +48,7 @@ export interface StaggerSuggestion {
   memberName: string;
   start: string;
   end: string;
-  /** New staff-hours short this request adds at the site (pending on top of approved). */
+  /** New staff-hours short this request adds at the site, on top of approved leave and earlier pending requests. */
   hoursAdded: number;
   /** First gap it causes, for the "why". */
   firstGap: Pick<GapWindow, 'date' | 'start' | 'end' | 'label' | 'short'> & { roomName: string | null };
@@ -153,12 +153,24 @@ export async function siteForecast(db: Db, orgId: string, locationId: string, st
   }
 
   // Stagger suggestions for pending requests that add gaps in range.
-  const pendingIds = [...new Set(ctx.absences.filter((a) => a.status === 'pending' && a.date >= start && a.date <= end).map((a) => a.requestId))];
-  const reqs = pendingIds.length
-    ? await db.select().from(leaveRequests).where(and(eq(leaveRequests.orgId, orgId), inArray(leaveRequests.id, pendingIds)))
+  // Pending requests are taken first come, first served: each one is judged against approved
+  // leave plus the pending requests submitted before it, so of two clashing requests only the
+  // later one is flagged.
+  const allPending = [...new Set(ctx.absences.filter((a) => a.status === 'pending').map((a) => a.requestId))];
+  const pendingRows = allPending.length
+    ? await db.select().from(leaveRequests).where(and(eq(leaveRequests.orgId, orgId), inArray(leaveRequests.id, allPending)))
     : [];
-  reqs.sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : a.id < b.id ? -1 : 1));
-  const approvedOnly: SiteContext = { ...ctx, absences: ctx.absences.filter((a) => a.status === 'approved') };
+  pendingRows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1));
+  const rank = new Map(pendingRows.map((r, i) => [r.id, i]));
+  const reqs = pendingRows
+    .filter((r) => r.startDate <= end && r.endDate >= start)
+    .sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : a.id < b.id ? -1 : 1));
+  const baseFor = (r: (typeof reqs)[number]): SiteContext => ({
+    ...ctx,
+    absences: ctx.absences
+      .filter((a) => a.status === 'approved' || (rank.get(a.requestId) ?? Infinity) < rank.get(r.id)!)
+      .map((a) => ({ ...a, status: 'approved' as const })),
+  });
   const tz = ctx.location.timezone;
   const window = (r: (typeof reqs)[number]) => (r.part === 'hours' && r.startMinute != null && r.endMinute != null ? { startMinute: r.startMinute, endMinute: r.endMinute } : null);
   const absencesFor = (r: (typeof reqs)[number], dates: string[]): Absence[] => dates.map((d) => ({ memberId: r.memberId, status: 'approved', interval: leaveInterval(d, r.part, tz, window(r)) }));
@@ -168,8 +180,9 @@ export async function siteForecast(db: Db, orgId: string, locationId: string, st
   const added = (r: (typeof reqs)[number], dates: string[]) => {
     const from = dates[0]!;
     const to = dates.at(-1)!;
-    const before = run(approvedOnly, from, to, false);
-    const after = run(approvedOnly, from, to, false, absencesFor(r, dates));
+    const base = baseFor(r);
+    const before = run(base, from, to, false);
+    const after = run(base, from, to, false, absencesFor(r, dates));
     const gaps: GapWindow[] = [];
     let hours = 0;
     before.forEach((b, i) => {

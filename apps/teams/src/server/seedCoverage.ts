@@ -127,13 +127,16 @@ export async function seedChildcareCentre(db: Db, today: string, opts: { orgName
 
   // Next Monday a toddler teacher is on approved leave: the early shift leaves at 15:30 and
   // 12 toddlers stay until 16:30, so 15:30–16:30 is one short (CA 1:6). Wednesday's pending
-  // request would open the same gap ("likely" view).
+  // request would open the same gap ("likely" view). The Tuesday after, both early toddler
+  // teachers have asked for the day; the later request is the one the forecast suggests moving.
   const nextMonday = addDays(today, 7 - mondayIndexedDow(today));
   const [vac] = (await db.select().from(leaveTypes).where(eq(leaveTypes.orgId, orgId))).filter((t) => t.key === 'vacation');
-  for (const [idx, start, status] of [
+  for (const [n, [idx, start, status]] of ([
     [8, nextMonday, 'approved'],
     [9, addDays(nextMonday, 2), 'pending'],
-  ] as const) {
+    [7, addDays(nextMonday, 8), 'pending'],
+    [6, addDays(nextMonday, 8), 'pending'],
+  ] as const).entries()) {
     const member = await getMember(db, orgId, ids[idx]!);
     const ev = await evaluateRequest(db, orgId, member, { leaveTypeKey: 'vacation', start, end: start, part: 'full' }, today);
     await db.insert(leaveRequests).values({
@@ -143,6 +146,7 @@ export async function seedChildcareCentre(db: Db, today: string, opts: { orgName
       status,
       startDate: start,
       endDate: start,
+      createdAt: new Date(now.getTime() - (10 - n) * 3_600_000),
       engineSnapshot: { amount: ev.cost.amount, unit: ev.unit, chargedDates: ev.cost.chargedDates, excluded: ev.cost.excluded },
     });
   }

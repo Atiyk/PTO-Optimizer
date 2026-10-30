@@ -14,7 +14,8 @@ import type { Actor } from './types';
  * Phase 5: the coverage forecast (gaps by cause, credential expiry, stagger suggestions) and
  * the planner's block-level re-check at regulated sites. Seed: 3-room CA centre, today Sunday
  * 2026-11-01; Monday 11-02 has approved toddler leave (late shift, 15:30–16:30 one short),
- * Wednesday 11-04 a pending one that would open the same gap.
+ * Wednesday 11-04 a pending one that would open the same gap; Tuesday 11-10 both early
+ * toddler teachers asked for the day (Kwame first, then Hannah).
  */
 const TODAY = '2026-11-01';
 const NOW = new Date(`${TODAY}T18:00:00Z`);
@@ -27,9 +28,9 @@ async function actor(i: number): Promise<Actor> {
 }
 const run = <N extends CapabilityName>(a: Actor, name: N, input: unknown) => invokeCapability(name, { db, actor: a, now: NOW }, input);
 
-async function addLeave(i: number, date: string, status: 'approved' | 'pending') {
+async function addLeave(i: number, date: string, status: 'approved' | 'pending', createdAt?: Date) {
   const [vac] = (await db.select().from(leaveTypes).where(eq(leaveTypes.orgId, S.org.id))).filter((t) => t.key === 'vacation');
-  const [r] = await db.insert(leaveRequests).values({ orgId: S.org.id, memberId: id(i), leaveTypeId: vac!.id, status, startDate: date, endDate: date, engineSnapshot: {} }).returning();
+  const [r] = await db.insert(leaveRequests).values({ orgId: S.org.id, memberId: id(i), leaveTypeId: vac!.id, status, startDate: date, endDate: date, engineSnapshot: {}, ...(createdAt ? { createdAt } : {}) }).returning();
   return r!.id;
 }
 
@@ -46,8 +47,15 @@ describe('getCoverageForecast', () => {
     const s = f.sites[0]!;
     expect(s.weeks).toHaveLength(8);
     expect(s.weeks[0]).toMatchObject({ weekStart: TODAY, weekEnd: '2026-11-07', hoursShort: { schedule: 0, credential: 0, approved: 1, pending: 1 }, gapDates: ['2026-11-02', '2026-11-04'] });
-    expect(s.weeks.slice(1).every((w) => w.gapDates.length === 0)).toBe(true);
-    expect(s.totals).toEqual({ schedule: 0, credential: 0, approved: 1, pending: 1 });
+    expect(s.weeks[1]).toMatchObject({ hoursShort: { schedule: 0, credential: 0, approved: 0 }, gapDates: ['2026-11-10'] });
+    expect(s.weeks[1]!.hoursShort.pending).toBe(2.5); // nobody in Toddlers 07:00–09:30; the late shift covers from 09:30
+    expect(s.weeks.slice(2).every((w) => w.gapDates.length === 0)).toBe(true);
+    expect(s.totals).toMatchObject({ schedule: 0, credential: 0, approved: 1 });
+    // Only Hannah's later request is flagged, with Wednesday 11-11 as the nearest clear day.
+    expect(s.staggers.map((x) => [x.name.untrusted_text, x.start, x.suggestion?.start ?? null])).toEqual([
+      ['Ava Bennett', '2026-11-04', null],
+      ['Hannah Moore', '2026-11-10', '2026-11-11'],
+    ]);
     expect(f.notice).toMatch(/Not legal advice/);
     expect(JSON.stringify(f)).not.toMatch(/rate|wage|\$/i);
   });
@@ -80,18 +88,27 @@ describe('getCoverageForecast', () => {
   });
 
   it('suggests moving a pending request by the fewest days that opens no gap', async () => {
-    // Hannah (toddlers, early) is off Tue 11-10; Kwame's pending request the same day would
+    // Hannah (toddlers, early) is off Tue 11-24; Kwame's pending request the same day would
     // leave Toddlers with nobody before 09:30. Wednesday is clear.
-    await addLeave(6, '2026-11-10', 'approved');
-    const reqId = await addLeave(7, '2026-11-10', 'pending');
+    await addLeave(6, '2026-11-24', 'approved');
+    const reqId = await addLeave(7, '2026-11-24', 'pending');
     const s = (await run(await actor(1), 'getCoverageForecast', {})).sites[0]!;
     const st = s.staggers.find((x) => x.requestId === reqId)!;
-    expect(st).toMatchObject({ start: '2026-11-10', end: '2026-11-10', suggestion: { start: '2026-11-11', end: '2026-11-11', shiftDays: 1 } });
-    expect(st.firstGap).toMatchObject({ date: '2026-11-10', roomName: 'Toddlers', start: '07:00' });
+    expect(st).toMatchObject({ start: '2026-11-24', end: '2026-11-24', suggestion: { start: '2026-11-25', end: '2026-11-25', shiftDays: 1 } });
+    expect(st.firstGap).toMatchObject({ date: '2026-11-24', roomName: 'Toddlers', start: '07:00' });
     expect(st.hoursAdded).toBeGreaterThan(0);
     // The seeded Wednesday request (late toddler shift) has no move that works: every weekday
     // the late shift is the only cover 15:30–16:30.
     expect(s.staggers.find((x) => x.start === '2026-11-04')).toMatchObject({ suggestion: null, hoursAdded: 1 });
+  });
+
+  it('two clashing pending requests: first come, first served, so only the later one is flagged', async () => {
+    const first = await addLeave(7, '2026-11-17', 'pending', new Date('2026-10-20T10:00:00Z'));
+    const later = await addLeave(6, '2026-11-17', 'pending', new Date('2026-10-21T10:00:00Z'));
+    const s = (await run(await actor(1), 'getCoverageForecast', {})).sites[0]!;
+    expect(s.staggers.some((x) => x.requestId === first)).toBe(false);
+    expect(s.staggers.find((x) => x.requestId === later)).toMatchObject({ suggestion: { shiftDays: 1, start: '2026-11-18' } });
+    expect(s.weeks[2]!.hoursShort.pending).toBeGreaterThan(0);
   });
 
   it('is for managers and above only, and stays in the org', async () => {
