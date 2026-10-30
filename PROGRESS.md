@@ -908,6 +908,33 @@ Scheduled, resumable run. Resumable state: GitHub issue #32 "SMB MVP: build log"
   errors. Screenshots: `docs/screenshots/smb-p3/` (NL request, explanation, handbook,
   auto-approval setup, approvals with undo, AI usage × 1440/768/375). Before = smb-p2.
 
+## Phase 4: team planner (`claude/smb-p4-planner`)
+
+- Engine `packages/engine/src/leave/teamPlan.ts` (write-up and timings in
+  `docs/teams/PLANNER.md`): min-cost max-flow places each person's at-risk days under every
+  coverage rule (exact minimum forfeiture when rules are nested or disjoint, which covers
+  "N people" + "N with tag"), with rising per-person costs so scarce days are shared evenly;
+  then a deterministic local search lengthens runs off (bridges onto weekends, holidays,
+  booked leave) without changing counts. Coverage is never violated, for any rule shape.
+  Measured: 50 people × 60 days ~100–130 ms; with 45 of 50 required in, ~30 ms and the
+  minimum forfeiture.
+- Days at risk come from the projection: carried days expiring this year, else year-end
+  over the carry-over limit. Hard blackouts and booked leave (approved + pending) respected.
+- Capabilities: `runTeamPlan` (read, planner:run), `sendPlanProposals` (commit; drafts
+  addressed to each person, no duplicates), `listMyProposals`, `respondToProposal`
+  (accept submits normal leave requests through submitLeaveRequest, idempotent; dismiss).
+  Plan summary from engine facts (AI with number provenance; template otherwise).
+- UI: **Planner** (managers/admins): team, leave type and start date live in the URL and
+  the plan recomputes on every change (no Generate button; a link reproduces the plan);
+  totals, summary, per-person breaks, coverage heatmap by week (numbers + shade + stripes
+  at the minimum, legible in greyscale). Members get "Suggested by your manager" on their
+  home page: Accept / Change dates (prefills the request form via the URL) / Not now.
+- Not done: per-person preferences have engine and API support (preferred months, dates to
+  avoid) but no UI yet; half days are not planned (fractions reported as part-days).
+- Gate: root 474 pass / 2 known-flaky; engine 210/212 (same 2); teams 68 pass (+1 skipped);
+  typecheck clean; Days Off dist identical; teams build OK; lint 0 errors. Screenshots:
+  `docs/screenshots/smb-p4/` (planner, member proposal, after accept × 1440/768/375).
+
 ## Questions for Atiyk (SMB)
 - Q1. ~~main lacks the old stack~~ Resolved: you merged it. But main's build is broken by
   a merge artifact. Recommended: merge #41 first, then this stack.

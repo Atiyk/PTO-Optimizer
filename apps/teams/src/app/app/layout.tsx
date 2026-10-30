@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     ['/app', 'My leave'],
     ['/app/calendar', 'Calendar'],
   ];
-  if (actor.role !== 'employee') links.push(['/app/approvals', 'Approvals']);
+  if (actor.role !== 'employee') links.push(['/app/approvals', 'Approvals'], ['/app/planner', 'Planner']);
   if (actor.role === 'owner' || actor.role === 'admin') links.push(['/app/admin', 'Admin']);
   return (
     <div className="min-h-screen bg-surface">

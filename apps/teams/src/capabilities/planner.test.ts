@@ -22,7 +22,7 @@ describe('team planner (Phase 4)', () => {
     const r = await run(db, humanActor(A.manager), 'runTeamPlan', {});
     const emp = r.people.find((p) => p.memberId === A.emp.id)!;
     expect(emp).toMatchObject({ atRisk: 13, deadline: '2026-12-31', placed: 13, stillLost: 0 }); // 20 - 2 pending - 5 carried
-    expect(r.totals).toEqual({ atRisk: 13 + 15 * 3, placed: 58, stillLost: 0 });
+    expect(r.totals).toEqual({ atRisk: 13 + 15 * 3, placed: 58, stillLost: 0, lostToCoverage: 0, partDays: 0 });
     expect(r.exact).toBe(true);
     for (const h of r.heatmap) for (const rule of h.rules) expect(rule.slackLeft).toBeGreaterThanOrEqual(0);
     // At least one engineer is in on every weekday.

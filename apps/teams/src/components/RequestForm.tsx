@@ -13,12 +13,24 @@ type Part = 'full' | 'am' | 'pm' | 'hours';
  * Live validation: every change re-runs draftLeaveRequest (the engine) and shows the
  * result immediately. Submitting is the one explicit step, because it asks a manager.
  */
-export function RequestForm({ leaveTypes, today }: { leaveTypes: { key: string; name: string }[]; today: string }) {
+export function RequestForm({
+  leaveTypes,
+  today,
+  initial,
+}: {
+  leaveTypes: { key: string; name: string }[];
+  today: string;
+  /** Prefill from the URL (?type=&start=&end=), e.g. "Change dates" on a proposal. */
+  initial?: { leaveType?: string; start?: string; end?: string };
+}) {
   const id = useId();
   const router = useRouter();
-  const [leaveType, setLeaveType] = useState(leaveTypes[0]?.key ?? 'vacation');
-  const [start, setStart] = useState('');
-  const [end, setEnd] = useState('');
+  const iso = (v?: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '');
+  const [leaveType, setLeaveType] = useState(
+    initial?.leaveType && leaveTypes.some((t) => t.key === initial.leaveType) ? initial.leaveType : (leaveTypes[0]?.key ?? 'vacation'),
+  );
+  const [start, setStart] = useState(iso(initial?.start));
+  const [end, setEnd] = useState(iso(initial?.end));
   const [part, setPart] = useState<Part>('full');
   const [hours, setHours] = useState(4);
   const [note, setNote] = useState('');

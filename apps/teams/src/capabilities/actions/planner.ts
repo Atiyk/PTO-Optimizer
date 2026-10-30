@@ -73,7 +73,13 @@ export const runTeamPlan = defineCapability({
         shortfallReason: z.string().nullable(),
       }),
     ),
-    totals: z.object({ atRisk: z.number(), placed: z.number(), stillLost: z.number() }),
+    totals: z.object({
+      atRisk: z.number(),
+      placed: z.number(),
+      stillLost: z.number(),
+      lostToCoverage: z.number().describe('Whole days the coverage rules leave no room for.'),
+      partDays: z.number().describe('Fractions of a day the plan does not place; bookable as half days.'),
+    }),
     exact: z.boolean().describe('True when the plan provably forfeits the minimum possible.'),
     rules: z.array(z.object({ id: z.uuid(), label: z.string() })),
     heatmap: z.array(
@@ -179,7 +185,10 @@ export const runTeamPlan = defineCapability({
       atRisk: Math.round(people.reduce((s, p) => s + p.atRisk, 0) * 100) / 100,
       placed: result.totalPlaced,
       stillLost: Math.round(people.reduce((s, p) => s + p.stillLost, 0) * 100) / 100,
+      lostToCoverage: result.totalForfeited,
+      partDays: 0,
     };
+    totals.partDays = Math.round((totals.stillLost - totals.lostToCoverage) * 100) / 100;
 
     let tightest: { date: string; slack: number } | null = null;
     for (const h of result.heatmap) {
@@ -192,6 +201,8 @@ export const runTeamPlan = defineCapability({
       daysAtRisk: totals.atRisk,
       daysPlaced: totals.placed,
       daysStillLost: totals.stillLost,
+      daysLostToCoverage: totals.lostToCoverage,
+      partDaysLeft: totals.partDays,
       peopleFullyPlaced: people.filter((p) => p.stillLost === 0).length,
       longestBreakDays: Math.max(0, ...people.flatMap((p) => p.blocks.map((b) => b.daysOff))),
       latestDeadline: people.length ? lastDeadline : null,

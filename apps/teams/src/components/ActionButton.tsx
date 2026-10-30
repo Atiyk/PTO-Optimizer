@@ -13,23 +13,28 @@ export function ActionButton({
   children,
   className = btnSecondary,
   confirm,
+  doneMessage,
 }: {
   capability: CapabilityName;
   input: unknown;
   children: React.ReactNode;
   className?: string;
   confirm?: string;
+  /** Shown after success, e.g. "Sent." */
+  doneMessage?: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  const [done, setDone] = useState(false);
   const run = () =>
     start(async () => {
       const r = await runCapability(capability, input);
       if (r.ok) {
         setError(null);
         setAsking(false);
+        setDone(true);
         router.refresh();
       } else setError(r.error.message);
     });
@@ -47,6 +52,7 @@ export function ActionButton({
         </button>
       )}
       {error && <span role="alert" className="text-xs text-ink">{error}</span>}
+      {done && doneMessage && !error && <span aria-live="polite" className="text-xs text-muted">{doneMessage}</span>}
     </span>
   );
 }

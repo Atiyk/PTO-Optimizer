@@ -1,10 +1,11 @@
 import { ActionButton } from '@/components/ActionButton';
 import { RequestForm } from '@/components/RequestForm';
 import { ExplainBalance } from '@/components/ExplainBalance';
-import { Badge, Card, fmt, formatRange, Stat } from '@/components/ui';
+import { Badge, btnPrimary, btnSecondary, Card, fmt, formatRange, Stat } from '@/components/ui';
 import { call, requireActor } from '@/server/page';
 
-export default async function MyLeave() {
+export default async function MyLeave({ searchParams }: { searchParams: Promise<{ type?: string; start?: string; end?: string }> }) {
+  const prefill = await searchParams;
   const actor = await requireActor();
   const today = new Date().toISOString().slice(0, 10);
   const setup = await call('getOrgSetup', {}, actor);
@@ -13,6 +14,7 @@ export default async function MyLeave() {
     types.filter((t) => t.countsAgainstBalance).map(async (t) => ({ type: t, b: await call('getMyBalance', { leaveType: t.key }, actor) })),
   );
   const { requests } = await call('listMyRequests', { limit: 30 }, actor);
+  const { proposals } = await call('listMyProposals', {}, actor);
   const typeName = new Map(types.map((t) => [t.key, t.name]));
 
   return (
@@ -49,8 +51,38 @@ export default async function MyLeave() {
         ))}
       </div>
       <div className="space-y-4 lg:col-span-3">
+        {proposals.length > 0 && (
+          <Card title="Suggested by your manager">
+            <ul className="space-y-3 text-sm">
+              {proposals.map((p) => (
+                <li key={p.id} className="space-y-2">
+                  <p className="text-ink">
+                    {p.blocks.map((b) => formatRange(b.start, b.end)).join(' and ')}{' '}
+                    <span className="text-muted">· {typeName.get(p.leaveType) ?? p.leaveType} you would otherwise lose after {p.deadline}</span>
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <ActionButton capability="respondToProposal" input={{ proposalId: p.id, response: 'accept' }} className={btnPrimary}>
+                      Accept
+                    </ActionButton>
+                    <a className={btnSecondary} href={`/app?type=${encodeURIComponent(p.leaveType)}&start=${p.blocks[0]!.start}&end=${p.blocks[0]!.end}`}>
+                      Change dates
+                    </a>
+                    <ActionButton capability="respondToProposal" input={{ proposalId: p.id, response: 'dismiss' }}>
+                      Not now
+                    </ActionButton>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
         <Card title="Request time off">
-          <RequestForm leaveTypes={types.map((t) => ({ key: t.key, name: t.name }))} today={today} />
+          <RequestForm
+            key={`${prefill.type ?? ''}${prefill.start ?? ''}${prefill.end ?? ''}`}
+            leaveTypes={types.map((t) => ({ key: t.key, name: t.name }))}
+            today={today}
+            initial={{ leaveType: prefill.type, start: prefill.start, end: prefill.end }}
+          />
         </Card>
         <Card title="My requests">
           {requests.length === 0 ? (
