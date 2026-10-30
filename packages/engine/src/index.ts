@@ -18,3 +18,4 @@ export * from './leave/requestCost';
 export * from './leave/projection';
 export * from './leave/coverage';
 export * from './leave/teamPlan';
+export * from './coverage';

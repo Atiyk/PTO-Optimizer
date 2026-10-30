@@ -391,7 +391,7 @@ export function projectBalance(input: ProjectionInput): Projection {
       const units = nextCum - cumUnits;
       cumUnits = nextCum;
       const rate = acc.hoursPerUnit ? `1 per ${acc.hoursPerUnit} hours worked` : `${acc.ratePerHour} per hour worked`;
-      const capNote = nextCum === capUnits && earnedTotal > capUnits ? ` (annual accrual cap of ${acc.annualAccrualCap} reached)` : '';
+      const capNote = nextCum === capUnits && earnedTotal > capUnits ? ` (annual accrual cap of ${acc.annualAccrualCap} reached: accrual paused)` : '';
       schedule({
         key: `accrual:hours:${row.periodStart}:${row.periodEnd}`,
         date: row.periodEnd,

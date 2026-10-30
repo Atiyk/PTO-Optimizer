@@ -129,7 +129,9 @@ export function validateRulePack(pack: RulePack): string[] {
   for (const r of pack.rules) {
     if (ids.has(r.id)) errs.push(`duplicate rule id ${r.id}`);
     ids.add(r.id);
-    if (r.basis === 'law' && !r.needsVerification && !r.citation) errs.push(`${r.id}: a law rule needs a citation or needsVerification`);
+    // Packs also arrive from JSON (saved or AI-drafted), so check what the type promises.
+    const prov = r as Provenance & { id: string };
+    if (prov.basis === 'law' && !prov.needsVerification && !prov.citation) errs.push(`${r.id}: a law rule needs a citation or needsVerification`);
     if (r.citation && (!r.citation.url || !r.citation.section || !r.citation.retrievedOn)) errs.push(`${r.id}: citation needs url, section and retrievedOn`);
     if (r.kind === 'ratio') {
       if (!groups.has(r.ageGroup)) errs.push(`${r.id}: unknown age group ${r.ageGroup}`);
