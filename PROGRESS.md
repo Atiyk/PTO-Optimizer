@@ -2299,3 +2299,69 @@ non-CSS files. The baseline is rewritten (Q12).
   nobody else covers 15:30–16:30. That is correct, but a real director would add a floater.
   Should the planner say "one more person on the late toddler shift would free N days"?
   *Recommendation:* yes, as a later what-if. It needs a second engine pass per suggestion.
+
+## Phase 6: API, webhooks and the security pass (`claude/rc-p6-api`)
+
+### What's in it
+- **REST and OpenAPI.** Every coverage capability is a REST operation, generated from the
+  registry. The OpenAPI 3.1 document now also has a `webhooks` section with a payload schema for
+  all 8 events (`src/server/webhookSchemas.ts`). Tests parse every sample body and every real
+  delivery against those schemas and fail on any extra key, so the docs can't drift.
+- **MCP.** 24 tools (the limit is 25); `getCoverageForecast` is the one new tool.
+- **Webhooks.** There are four new events, each sent once thanks to dedupe keys. None carries a
+  child, pay, or a reason for absence.
+  - `coverage.gap_detected`: from the daily scan of the next 14 days (approved leave), and at once
+    for today and tomorrow after a call-off. It carries the rule, its citation or "needs
+    verification", and the not-legal-advice notice.
+  - `cover.requested`
+  - `cover.filled`, with who filled it
+  - `credential.expiring`: at 30, 14 and 7 days, and once in the week after expiry
+- **Security pass**, written up in `docs/teams/SECURITY.md` under "Regulated coverage". Three
+  real problems were found and fixed:
+  1. **Push endpoint SSRF.** The browser-supplied push endpoint could be any https URL, which
+     the server would then POST to. Now only the browsers' push services are allowed (FCM,
+     Mozilla, `*.push.apple.com` per Apple's docs, WNS). This is checked on subscribe and again
+     on send.
+  2. **Removed staff still counted toward ratios.** Their weekly shifts kept counting, so a room
+     could show "in ratio" when it wasn't. They now stop counting from the day of removal.
+  3. **Erasure and export missed the coverage tables.** Erasure left the phone number, passkeys,
+     push devices, credentials and rota behind; export didn't include them. Both now cover
+     them. Hours worked and past cover events stay under "Former member", as sick-leave records.
+  - Also: turning cost-aware ranking off deletes stored pay rates. (Nothing writes pay rates yet;
+    see Q15.)
+  - `npm audit --omit=dev`: 0 vulnerabilities. Five `console.error` calls, all logging the error
+    class name only.
+- **Privacy draft** (`docs/teams/PRIVACY.md`): coverage data in the policy and the DPA annex.
+  Children appear as counts only; call-offs carry no reason.
+- **Accessibility.** `e2e/rc-axe.mjs` runs axe at WCAG 2.2 AA on every coverage page and the staff
+  app, at 1440 and 375. It found one problem: the coverage heatmap's sideways-scrolling area
+  wasn't keyboard-focusable at 375. That is fixed, and the result is now **0 violations on 26
+  page-widths** (`docs/screenshots/rc-p6/axe.json`).
+
+### Tests
+- `server/coverageEvents.test.ts`: 4 tests covering each event, dedupe, the call-off path and
+  schema conformance.
+- `openapi.test.ts`: coverage operations, webhooks and sample conformance.
+- `security.test.ts`: the push allowlist, and pay-rate purge.
+- `privacy.test.ts`: coverage erasure and export.
+- `forecast.test.ts`: removed staff stop counting.
+
+### Gate
+- Typecheck is clean (root and teams).
+- `npm run build` passes, and `verify:dist` is identical (690 files).
+- Teams tests: 188 passed, 3 skipped (the live evals).
+- Root tests: 587 passed, plus the same 2 solver timing tests (Q1).
+- Screenshots in `docs/screenshots/rc-p6/` at 1440, 768 and 375:
+  - the webhook event list;
+  - the agent docs;
+  - the coverage page with the focusable heatmap.
+- No overflow and no page errors.
+
+### Questions for Atiyk (Phase 6)
+- Q15: Pay rates have a table and an opt-in switch, but no screen or import writes them, so
+  cost-aware ranking only uses the overtime band. Should I build rate entry? *Recommendation:*
+  not until a customer asks. The overtime band covers the main cost signal, and storing no pay
+  is the safer default.
+- Q16: Subscribing a push endpoint that already exists moves it to the new person (low risk,
+  because endpoints are unguessable). Should that be refused instead? *Recommendation:* yes, a
+  small follow-up.

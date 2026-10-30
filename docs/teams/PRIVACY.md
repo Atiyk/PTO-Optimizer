@@ -57,6 +57,21 @@ email [privacy contact]. You may complain to your data protection authority.
 
 **Security.** See our security overview (`docs/teams/SECURITY.md`).
 
+**Childcare centres and clinics (regulated coverage).** If a customer uses staffing coverage, we
+also hold, for staff:
+- weekly shifts and dated changes;
+- credentials such as CPR, with issue and expiry dates;
+- hours worked, for sick-leave accrual;
+- cover offers and responses;
+- optionally, a phone number for SMS cover offers, only with the person's opt-in;
+- passkeys (public keys only) and push-notification device addresses for the staff app;
+- pay rates, only if the customer turns on cost-aware ranking. They are visible to admins only and
+  never sent to the AI provider.
+
+**About children** we hold only **how many** children of each age group are expected in each room
+and time block. We never hold names, birthdays, photos or any other detail that could identify a
+child. **When someone calls in sick**, we record that they are out, never why.
+
 **International transfers.** [Describe SCCs / UK addendum / DPF as applicable to the subprocessors.]
 
 **Changes.** We'll notify customers of material changes [N] days in advance.
@@ -69,8 +84,8 @@ email [privacy contact]. You may complain to your data protection authority.
 | Duration | The term of the customer's subscription, plus the deletion period above |
 | Nature and purpose | Storage, calculation, display, notifications (Slack and webhooks the customer configures), AI-assisted reading of text the customer supplies |
 | Data subjects | The customer's employees, contractors and admins |
-| Personal data | Identity and work details (name, work email, role, team, manager, location, start date, work pattern, tags), Slack ids, leave records, balance ledger, audit trail |
-| Special category data | None by design. Health-related leave is recorded only as "out" with dates; no reasons. Optional notes, if a customer enables them, may contain health data: the customer is responsible for that choice |
+| Personal data | Identity and work details (name, work email, role, team, manager, location, start date, work pattern, tags), Slack ids, leave records, balance ledger, audit trail. With coverage: shifts, credentials and expiry dates, hours worked, cover offers, optional SMS phone, passkey public keys, push device addresses, and pay rates only if cost-aware ranking is on |
+| Special category data | None by design. Children appear only as counts per age group, room and time block; call-offs carry no reason. Health-related leave is recorded only as "out" with dates; no reasons. Optional notes, if a customer enables them, may contain health data: the customer is responsible for that choice |
 | Subprocessors | Vercel, Neon, Anthropic, Slack (see Part 1) |
 | Security measures | `docs/teams/SECURITY.md`: tenant isolation tests, encryption in transit, hashed credentials, role- and scope-based access, audit log, rate limits |
 | Return and deletion | Admin export (JSON/CSV, whole workspace or one person) at any time; workspace deletion removes all rows at once (tested); per-person erasure anonymises the person and keeps leave dates under "Former member" |

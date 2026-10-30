@@ -173,7 +173,7 @@ export default async function AgentsAndApi() {
 
       <Card title="Webhooks">
         <p className="mb-3 text-sm text-muted">
-          Signed per the Standard Webhooks spec. Payloads never include notes, and health-related leave shows only as &ldquo;out&rdquo;.
+          Signed per the Standard Webhooks spec. Payloads never include notes, children, pay or why someone is out, and health-related leave shows only as &ldquo;out&rdquo;. Schemas for every event are in the <a className="text-accent underline" href="/api/v1/openapi.json">OpenAPI document</a> under <code>webhooks</code>.
         </p>
         <WebhookCreator events={EVENTS} />
         {w.endpoints.length > 0 && (
