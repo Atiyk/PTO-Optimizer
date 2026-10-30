@@ -38,7 +38,7 @@ import { ITEMS as FAQ_ITEMS } from '../src/ui/FAQ.tsx';
 import { SABBATICAL_FAQ_ITEMS } from '../src/ui/sabbaticalFaqItems.ts';
 import { rawHolidaysToHolidays, type Holiday } from '../src/data/holidays.ts';
 import { getSiteUrl } from './siteUrl.ts';
-import { ENTRIES, type Entry } from './routes.ts';
+import { ENTRIES, type Entry, type ComponentKind } from './routes.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '..');
@@ -150,6 +150,35 @@ function buildJsonLd(entry: Entry, meta: { title: string; description: string; c
     });
   }
 
+  // Stage 3C: DefinedTermSet for the index, DefinedTerm for each term page - built from the
+  // SAME GLOSSARY_TERMS array the visible pages render, never a duplicated copy.
+  if (entry.component === 'glossary') {
+    result.push({
+      '@context': 'https://schema.org',
+      '@type': 'DefinedTermSet',
+      name: 'Days Off Glossary',
+      url: meta.canonical,
+      hasDefinedTerm: GLOSSARY_TERMS.map((t) => ({
+        '@type': 'DefinedTerm',
+        name: t.term,
+        url: `${SITE_URL}/glossary/${t.id}`,
+      })),
+    });
+  }
+  if (entry.component === 'glossary-term') {
+    const term = GLOSSARY_TERMS.find((t) => t.id === entry.termId);
+    if (term) {
+      result.push({
+        '@context': 'https://schema.org',
+        '@type': 'DefinedTerm',
+        name: term.term,
+        description: term.long,
+        url: meta.canonical,
+        inDefinedTermSet: `${SITE_URL}/glossary`,
+      });
+    }
+  }
+
   return result;
 }
 
@@ -209,7 +238,7 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
   // geolocateCountry() read them fresh on every call rather than caching at module scope.
   installWindow(url, entry.countryPreset);
 
-  const html = renderToString(React.createElement(COMPONENTS[entry.component]));
+  const html = renderEntry(entry);
 
   const filePath = resolve(distDir, entry.file);
   if (!existsSync(filePath)) {

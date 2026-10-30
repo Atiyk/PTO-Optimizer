@@ -16,6 +16,7 @@ import { classifyDay } from './dayCategory';
 import { alternativeForDate as alternativeForDateImpl } from './alternativeForDate';
 import { track } from './analytics';
 import { validateInputs } from './validation';
+import { policyFromLegacyPtoState, toLegacySolverFields } from '../policy/model';
 
 /** The slider's own stored position while unchecked - also what it falls back to showing
  * (disabled) when "let the solver decide" is checked. The middle of the 1-7 range, so
@@ -498,15 +499,27 @@ export function useAppState() {
   // balance just means nothing is planned, not a negative budget).
   const effectiveBudget = Math.max(0, budget - reserveDays);
 
+  // Feature 1 Stage 2A follow-through: routed through the shared policy model
+  // (src/policy/model.ts) instead of this file's own parallel ternary logic, so /policy and
+  // /pto describe a policy's accrual/reset/carryover the same way. `effectiveBudget` (the
+  // reserve-days subtraction) stays a separate, UI-level step applied after - the policy
+  // model doesn't know about "reserve days", which isn't a policy concept, it's a planning
+  // preference. Equivalence with the old ternary logic, for every combination of these
+  // fields, is locked down by src/ui/pto-policy-regression.test.ts.
+  const policyAccrualFields = useMemo(
+    () => toLegacySolverFields(policyFromLegacyPtoState({ budget, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap, rangeStart }), rangeStart),
+    [budget, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap, rangeStart],
+  );
+
   const solveInput: SolveInput = useMemo(
     () => ({
       offDays: effectiveOffDays,
       rangeStart,
       rangeEnd,
       budget: effectiveBudget,
-      accrualPerMonth: accrualEnabled ? accrualPerMonth : undefined,
-      expiryDate: expiryEnabled ? expiryDate : undefined,
-      carryoverCap: expiryEnabled ? carryoverCap : undefined,
+      accrualPerMonth: policyAccrualFields.accrualPerMonth,
+      expiryDate: policyAccrualFields.expiryDate,
+      carryoverCap: policyAccrualFields.carryoverCap,
       blackouts: effectiveBlackouts,
       mustIncludeDays,
       overlapDays,
