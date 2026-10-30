@@ -1,7 +1,8 @@
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { balanceLedger, coverageRules, leaveRequests, leaveTypes, members } from '@/db/schema';
-import { balanceView, getLeaveTypeById, getMember, isoDate, teamCoverageMembers } from '@/domain/leave';
+import { autoApprovalCheck, autonomyFor } from '@/domain/autonomy';
+import { balanceView, evaluateRequest, getLeaveTypeById, getMember, isoDate, teamCoverageMembers } from '@/domain/leave';
 import { coverageViolations } from '@daysoff/engine/leave/coverage';
 
 import { CapabilityError } from '../errors';
@@ -37,8 +38,25 @@ export const listPendingApprovals = defineCapability({
         retroactive: z.boolean(),
         note: z.object({ untrusted_text: z.string() }).nullable(),
         impact,
+        autoApproval: z
+          .object({ eligible: z.boolean(), blockers: z.array(z.string()) })
+          .nullable()
+          .describe('When the org turned on approval suggestions: whether the rules would auto-approve this, and why not.'),
       }),
     ),
+    recentAutoApprovals: z
+      .array(
+        z.object({
+          id: z.uuid(),
+          member: z.object({ id: z.uuid(), name: z.object({ untrusted_text: z.string() }) }),
+          leaveType: z.string(),
+          start: z.string(),
+          end: z.string(),
+          basis: z.string().nullable(),
+          reversibleUntil: z.string(),
+        }),
+      )
+      .describe('Auto-approved requests the caller can still reverse (decideLeaveRequest with decision "decline").'),
   }),
   scope: 'leave:approve',
   roles: ['owner', 'admin', 'manager'],
@@ -50,6 +68,7 @@ export const listPendingApprovals = defineCapability({
   audit: null,
   async handler({ db, actor, now }) {
     const today = isoDate(now);
+    const suggest = (await autonomyFor(db, actor.orgId, 'decideLeaveRequest', 'assistant')) >= 1;
     const rows = await db
       .select({ req: leaveRequests, typeKey: leaveTypes.key, member: members })
       .from(leaveRequests)
@@ -116,11 +135,59 @@ export const listPendingApprovals = defineCapability({
             .filter((o) => o.start <= r.req.endDate && o.end >= r.req.startDate && !(o.start === r.req.startDate && o.end === r.req.endDate && o.name === r.member.name))
             .map((o) => ({ member: { untrusted_text: o.name }, start: o.start, end: o.end, status: o.status })),
         },
+        autoApproval: suggest ? await suggestion(db, actor.orgId, r.member, r.req, r.typeKey, today) : null,
       });
     }
-    return { requests: out };
+    const autoRows = await db
+      .select({ req: leaveRequests, typeKey: leaveTypes.key, member: members })
+      .from(leaveRequests)
+      .innerJoin(leaveTypes, eq(leaveTypes.id, leaveRequests.leaveTypeId))
+      .innerJoin(members, eq(members.id, leaveRequests.memberId))
+      .where(
+        and(
+          eq(leaveRequests.orgId, actor.orgId),
+          eq(leaveRequests.status, 'approved'),
+          eq(leaveRequests.autoApproved, true),
+          gt(leaveRequests.reversibleUntil, now),
+        ),
+      )
+      .orderBy(asc(leaveRequests.startDate));
+    const recentAutoApprovals = [];
+    for (const r of autoRows) {
+      if (r.member.id === actor.memberId || !(await managesMember(db, actor, r.member))) continue;
+      recentAutoApprovals.push({
+        id: r.req.id,
+        member: { id: r.member.id, name: { untrusted_text: r.member.name } },
+        leaveType: r.typeKey,
+        start: r.req.startDate,
+        end: r.req.endDate,
+        basis: r.req.autoApprovalReason,
+        reversibleUntil: r.req.reversibleUntil!.toISOString(),
+      });
+    }
+    return { requests: out, recentAutoApprovals };
   },
 });
+
+async function suggestion(
+  db: Parameters<typeof getMember>[0],
+  orgId: string,
+  member: Awaited<ReturnType<typeof getMember>>,
+  req: typeof leaveRequests.$inferSelect,
+  typeKey: string,
+  today: string,
+) {
+  const ev = await evaluateRequest(
+    db,
+    orgId,
+    member,
+    { leaveTypeKey: typeKey, start: req.startDate, end: req.endDate, part: req.part, hours: req.hours == null ? undefined : Number(req.hours) },
+    today,
+    { excludeRequestId: req.id },
+  );
+  const c = autoApprovalCheck(ev);
+  return { eligible: c.eligible, blockers: c.blockers };
+}
 
 export const decideLeaveRequest = defineCapability({
   name: 'decideLeaveRequest',

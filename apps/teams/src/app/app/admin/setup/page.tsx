@@ -2,6 +2,7 @@ import { ActionButton } from '@/components/ActionButton';
 import { CapabilityForm } from '@/components/CapabilityForm';
 import { PolicyForm } from '@/components/PolicyForm';
 import { Badge, Card } from '@/components/ui';
+import { AUTONOMY_LABELS, type AutonomyLevel } from '@/domain/autonomy';
 import { describePolicy } from '@/domain/describePolicy';
 import { call, requireActor } from '@/server/page';
 
@@ -36,6 +37,7 @@ export default async function Setup() {
                 <Badge>{t.countsAgainstBalance ? 'uses balance' : 'no balance'}</Badge>
                 <Badge>{t.requiresApproval ? 'needs approval' : 'no approval'}</Badge>
                 {t.isHealthRelated && <Badge tone="warn">health: no notes</Badge>}
+                {t.autoApprove && <Badge tone="accent">auto-approve{t.maxAutoApproveDays != null ? ` ≤ ${t.maxAutoApproveDays}` : ''}</Badge>}
               </li>
             ))}
           </ul>
@@ -49,6 +51,8 @@ export default async function Setup() {
               { name: 'countsAgainstBalance', label: 'Uses a balance', type: 'checkbox', defaultValue: false },
               { name: 'requiresApproval', label: 'Needs approval', type: 'checkbox', defaultValue: true },
               { name: 'isHealthRelated', label: 'Health-related (no notes stored)', type: 'checkbox' },
+              { name: 'autoApprove', label: 'Can be auto-approved (see Auto-approval)', type: 'checkbox' },
+              { name: 'maxAutoApproveDays', label: 'Auto-approve up to (days or hours)', type: 'number', step: '0.5', placeholder: '2' },
             ]}
             submitLabel="Add or update leave type"
           />
@@ -114,6 +118,29 @@ export default async function Setup() {
               { name: 'hard', label: 'Block requests (not just warn)', type: 'checkbox' },
             ]}
             submitLabel="Add blackout"
+          />
+        </Card>
+        <Card title="Auto-approval">
+          <p className="mb-3 text-sm text-muted">
+            Clean requests only: the leave type allows it, within its limit, enough balance, no coverage gap, no blackout, not in the past.
+            The rules decide, never AI. Currently: <strong className="text-ink">{AUTONOMY_LABELS[s.autoApproval.level as AutonomyLevel]}</strong>.
+          </p>
+          <CapabilityForm
+            capability="manageOrgSetup"
+            fixed={{ op: 'setAutonomy', capability: 'decideLeaveRequest', actorClass: 'assistant' }}
+            fields={[
+              {
+                name: 'level', label: 'Level', type: 'select', defaultValue: String(s.autoApproval.level),
+                options: [
+                  { value: '0', label: 'Off: managers decide everything' },
+                  { value: '1', label: 'Suggest: show managers what qualifies' },
+                  { value: '2', label: 'Approve, manager can undo for a while' },
+                  { value: '3', label: 'Approve' },
+                ],
+              },
+              { name: 'reversibleMinutes', label: 'Undo window (minutes)', type: 'number', step: '5', defaultValue: s.autoApproval.reversibleMinutes },
+            ]}
+            submitLabel="Save auto-approval"
           />
         </Card>
         <Card title="Privacy and visibility">

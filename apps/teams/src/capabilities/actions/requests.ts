@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
-import { balanceLedger, leaveRequests, leaveTypes } from '@/db/schema';
+import { auditLog, balanceLedger, leaveRequests, leaveTypes } from '@/db/schema';
+import { autoApprovalCheck, autonomyFor } from '@/domain/autonomy';
 import { evaluateRequest, getMember, getOrg, isoDate, type Evaluation } from '@/domain/leave';
 import { CapabilityError } from '../errors';
 import { isAdmin, subjectMember, untrusted } from '../helpers';
@@ -165,7 +166,17 @@ export const submitLeaveRequest = defineCapability({
 
     const org = await getOrg(db, actor.orgId);
     const note = ev.leaveType.isHealthRelated && !org.sickNotesEnabled ? null : (input.note ?? null);
-    const needsApproval = ev.leaveType.requiresApproval || ev.retroactive;
+    let needsApproval = ev.leaveType.requiresApproval || ev.retroactive;
+    // 3D: the approval assistant may approve clean requests at L2 (reversible) or L3.
+    let auto: { basis: string; reversibleUntil: Date | null } | null = null;
+    if (needsApproval) {
+      const level = await autonomyFor(db, actor.orgId, 'decideLeaveRequest', 'assistant');
+      const check = level >= 2 ? autoApprovalCheck(ev) : null;
+      if (check?.eligible) {
+        auto = { basis: check.basis, reversibleUntil: level === 2 ? new Date(now.getTime() + org.autoApprovalReversibleMinutes * 60_000) : null };
+        needsApproval = false;
+      }
+    }
     const snapshot: Snapshot = { amount: ev.cost.amount, unit: ev.unit, chargedDates: ev.cost.chargedDates, excluded: ev.cost.excluded };
 
     const request = await db.transaction(async (tx) => {
@@ -186,8 +197,25 @@ export const submitLeaveRequest = defineCapability({
           createdByClientId: actor.clientId,
           decidedAt: needsApproval ? null : now,
           idempotencyKey: input.idempotencyKey,
+          autoApproved: auto != null,
+          autoApprovalReason: auto?.basis ?? null,
+          reversibleUntil: auto?.reversibleUntil ?? null,
         })
         .returning();
+      if (auto) {
+        await tx.insert(auditLog).values({
+          orgId: actor.orgId,
+          actorType: 'service-agent',
+          clientId: 'auto-approval',
+          onBehalfOfMemberId: member.id,
+          capability: 'decideLeaveRequest',
+          effect: 'commit',
+          outcome: 'ok',
+          summary: `Auto-approved ${ev.leaveType.key} request ${input.start} to ${input.end}: ${auto.basis}` +
+            (auto.reversibleUntil ? `; manager can reverse until ${auto.reversibleUntil.toISOString()}` : ''),
+          data: { requestId: row!.id },
+        });
+      }
       if (!needsApproval && ev.countsAgainstBalance && ev.cost.amount > 0) {
         await tx.insert(balanceLedger).values({
           orgId: actor.orgId,

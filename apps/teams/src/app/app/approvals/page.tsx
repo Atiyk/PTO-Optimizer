@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/ActionButton';
 import { DecideButtons } from '@/components/DecideButtons';
 import { Badge, Card, fmt, formatRange } from '@/components/ui';
 import { call, requireActor } from '@/server/page';
@@ -5,7 +6,7 @@ import { call, requireActor } from '@/server/page';
 export default async function Approvals() {
   const actor = await requireActor();
   if (actor.role === 'employee') return <p className="text-sm text-muted">Approvals are for managers and admins.</p>;
-  const { requests } = await call('listPendingApprovals', {}, actor);
+  const { requests, recentAutoApprovals } = await call('listPendingApprovals', {}, actor);
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold text-ink">Waiting for you ({requests.length})</h1>
@@ -47,6 +48,15 @@ export default async function Approvals() {
               ))}
             </ul>
           )}
+          {r.autoApproval && (
+            <p className="mt-2 text-sm">
+              {r.autoApproval.eligible ? (
+                <><Badge tone="accent">Meets auto-approval rules</Badge> Safe to approve by the org&rsquo;s rules.</>
+              ) : (
+                <><Badge>Needs a look</Badge> {r.autoApproval.blockers.join(' ')}</>
+              )}
+            </p>
+          )}
           {r.retroactive && <p className="mt-2 text-sm"><Badge tone="warn">Past dates</Badge> Starts before today.</p>}
           {r.note && (
             <p className="mt-2 text-sm text-ink">
@@ -59,6 +69,23 @@ export default async function Approvals() {
           </div>
         </Card>
       ))}
+      {recentAutoApprovals.length > 0 && (
+        <Card title={`Auto-approved, can still be undone (${recentAutoApprovals.length})`}>
+          <ul className="space-y-2 text-sm">
+            {recentAutoApprovals.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  <span className="font-medium text-ink">{a.member.name.untrusted_text}</span> · {formatRange(a.start, a.end)} · {a.leaveType}
+                  <span className="block text-muted">{a.basis}. Undo until {new Date(a.reversibleUntil).toUTCString().slice(0, 22)} UTC.</span>
+                </span>
+                <ActionButton capability="decideLeaveRequest" input={{ requestId: a.id, decision: 'decline' }} confirm="Undo this approval?">
+                  Undo
+                </ActionButton>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
     </div>
   );
 }

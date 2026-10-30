@@ -2,6 +2,7 @@ import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   auditLog,
+  autonomySettings,
   balanceLedger,
   blackouts,
   coverageRules,
@@ -16,6 +17,7 @@ import {
   organizations,
   teams,
 } from '@/db/schema';
+import { autonomyFor } from '@/domain/autonomy';
 import { getLeaveTypeByKey, getMember, isoDate } from '@/domain/leave';
 import { policySchema } from '@/domain/policySchema';
 import { newToken } from '@/lib/tokens';
@@ -58,6 +60,13 @@ const setupOp = z.discriminatedUnion('op', [
   z.object({ op: z.literal('addBlackout'), teamId: z.uuid().nullable().optional(), start: z.iso.date(), end: z.iso.date(), reason: z.string().min(1).max(200), hard: z.boolean().default(false) }),
   z.object({ op: z.literal('removeBlackout'), blackoutId: z.uuid() }),
   z.object({ op: z.literal('addClosure'), locationId: z.uuid().nullable().optional(), date: z.iso.date(), name: z.string().min(1).max(120) }),
+  z.object({
+    op: z.literal('setAutonomy'),
+    capability: z.string().min(1).max(64).describe('Registry capability name, e.g. "decideLeaveRequest" for the approval assistant.'),
+    actorClass: z.enum(['agent', 'assistant']),
+    level: z.coerce.number().int().min(0).max(3).describe('0 off, 1 suggest/draft, 2 act reversibly, 3 act.'),
+    reversibleMinutes: z.number().int().min(5).max(14 * 24 * 60).optional().describe('Undo window for level 2 auto-approvals.'),
+  }),
 ]);
 
 export const manageOrgSetup = defineCapability({
@@ -154,6 +163,20 @@ export const manageOrgSetup = defineCapability({
         const [c] = await db.insert(extraClosures).values({ orgId, locationId: input.locationId ?? null, date: input.date, name: input.name }).returning();
         return { ok: true as const, id: c!.id };
       }
+      case 'setAutonomy': {
+        const [row] = await db
+          .insert(autonomySettings)
+          .values({ orgId, capability: input.capability, actorClass: input.actorClass, level: input.level, updatedByMemberId: actor.memberId })
+          .onConflictDoUpdate({
+            target: [autonomySettings.orgId, autonomySettings.capability, autonomySettings.actorClass],
+            set: { level: input.level, updatedByMemberId: actor.memberId, updatedAt: new Date() },
+          })
+          .returning();
+        if (input.reversibleMinutes != null) {
+          await db.update(organizations).set({ autoApprovalReversibleMinutes: input.reversibleMinutes }).where(eq(organizations.id, orgId));
+        }
+        return { ok: true as const, id: row!.id };
+      }
     }
   },
 });
@@ -166,10 +189,11 @@ export const getOrgSetup = defineCapability({
     org: z.object({ id: z.uuid(), name: z.string(), visibility: z.string(), showLeaveType: z.boolean(), sickNotesEnabled: z.boolean(), agentAccessEnabled: z.boolean() }),
     locations: z.array(z.object({ id: z.uuid(), name: z.string(), countryCode: z.string(), subdivisionCode: z.string().nullable() })),
     teams: z.array(z.object({ id: z.uuid(), name: z.string() })),
-    leaveTypes: z.array(z.object({ id: z.uuid(), key: z.string(), name: z.string(), paid: z.boolean(), countsAgainstBalance: z.boolean(), requiresApproval: z.boolean(), isHealthRelated: z.boolean(), autoApprove: z.boolean() })),
+    leaveTypes: z.array(z.object({ id: z.uuid(), key: z.string(), name: z.string(), paid: z.boolean(), countsAgainstBalance: z.boolean(), requiresApproval: z.boolean(), isHealthRelated: z.boolean(), autoApprove: z.boolean(), maxAutoApproveDays: z.number().nullable() })),
     policies: z.array(z.object({ id: z.uuid(), leaveType: z.string(), name: z.string(), effectiveFrom: z.string(), appliesTo: z.unknown(), policy: z.unknown(), citations: z.unknown() })),
     coverageRules: z.array(z.object({ id: z.uuid(), teamId: z.uuid(), minPresent: z.number(), tag: z.string().nullable(), weekdays: z.string() })),
     blackouts: z.array(z.object({ id: z.uuid(), teamId: z.uuid().nullable(), start: z.string(), end: z.string(), reason: z.string(), hard: z.boolean() })),
+    autoApproval: z.object({ level: z.number().int(), reversibleMinutes: z.number().int() }).describe('The approval assistant (decideLeaveRequest, assistant class).'),
   }),
   scope: 'policy:read',
   effect: 'read',
@@ -187,10 +211,11 @@ export const getOrgSetup = defineCapability({
       org: { id: org!.id, name: org!.name, visibility: org!.visibility, showLeaveType: org!.showLeaveType, sickNotesEnabled: org!.sickNotesEnabled, agentAccessEnabled: org!.agentAccessEnabled },
       locations: (await db.select().from(locations).where(eq(locations.orgId, orgId)).orderBy(asc(locations.createdAt))).map((l) => ({ id: l.id, name: l.name, countryCode: l.countryCode, subdivisionCode: l.subdivisionCode })),
       teams: (await db.select().from(teams).where(eq(teams.orgId, orgId)).orderBy(asc(teams.name))).map((t) => ({ id: t.id, name: t.name })),
-      leaveTypes: lt.map((t) => ({ id: t.id, key: t.key, name: t.name, paid: t.paid, countsAgainstBalance: t.countsAgainstBalance, requiresApproval: t.requiresApproval, isHealthRelated: t.isHealthRelated, autoApprove: t.autoApprove })),
+      leaveTypes: lt.map((t) => ({ id: t.id, key: t.key, name: t.name, paid: t.paid, countsAgainstBalance: t.countsAgainstBalance, requiresApproval: t.requiresApproval, isHealthRelated: t.isHealthRelated, autoApprove: t.autoApprove, maxAutoApproveDays: t.maxAutoApproveDays == null ? null : Number(t.maxAutoApproveDays) })),
       policies: (await db.select().from(leavePolicies).where(eq(leavePolicies.orgId, orgId)).orderBy(asc(leavePolicies.effectiveFrom))).map((p) => ({ id: p.id, leaveType: key.get(p.leaveTypeId) ?? '?', name: p.name, effectiveFrom: p.effectiveFrom, appliesTo: p.appliesTo, policy: p.policy, citations: p.citations })),
       coverageRules: (await db.select().from(coverageRules).where(eq(coverageRules.orgId, orgId))).map((r) => ({ id: r.id, teamId: r.teamId, minPresent: r.minPresent, tag: r.tag, weekdays: r.weekdays })),
       blackouts: (await db.select().from(blackouts).where(eq(blackouts.orgId, orgId)).orderBy(asc(blackouts.startDate))).map((b) => ({ id: b.id, teamId: b.teamId, start: b.startDate, end: b.endDate, reason: b.reason, hard: b.hard })),
+      autoApproval: { level: await autonomyFor(db, orgId, 'decideLeaveRequest', 'assistant'), reversibleMinutes: org!.autoApprovalReversibleMinutes },
     };
   },
 });
