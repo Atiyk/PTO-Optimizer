@@ -6,7 +6,7 @@ import {
   daysBetweenInclusive,
   nextPlanYear,
   planYearContaining,
-  useByDate,
+  carryoverDeadline,
   type DateRange,
 } from './calendar';
 import { PERIODS_PER_YEAR, type LeavePolicy, type LeaveUnit, type PayPeriod, type PolicyVersion } from './policy';
@@ -259,7 +259,7 @@ export function projectBalance(input: ProjectionInput): Projection {
       },
     });
     if (co.type !== 'none' && co.useBy) {
-      const useBy = useByDate(date, co.useBy);
+      const useBy = carryoverDeadline(date, co.useBy);
       const expiry = addDays(useBy, 1);
       schedule({
         key: `forfeiture:useby:${expiry}`,

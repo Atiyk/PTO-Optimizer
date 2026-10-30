@@ -69,7 +69,7 @@ export function nextPlanYear(spec: PlanYear, memberStart: ISODate | null, year: 
  * First occurrence of `md` on or after the plan-year start: the use-by date for leave
  * carried into that year.
  */
-export function useByDate(yearStart: ISODate, md: MonthDay): ISODate {
+export function carryoverDeadline(yearStart: ISODate, md: MonthDay): ISODate {
   const { y } = parseISO(yearStart);
   const same = monthDayInYear(y, md);
   return same >= yearStart ? same : monthDayInYear(y + 1, md);

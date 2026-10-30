@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WORK_WEEK, type WorkWeek } from '../solver/types';
-import { addMonths, planYearContaining, useByDate } from './calendar';
+import { addMonths, planYearContaining, carryoverDeadline } from './calendar';
 import { validatePolicy, type LeavePolicy, type PolicyVersion } from './policy';
 import { balanceOn, payPeriodsInYear, projectBalance, type LedgerEntryInput, type MemberFacts } from './projection';
 import { requestCost } from './requestCost';
@@ -38,8 +38,8 @@ describe('calendar', () => {
     expect(addMonths('2026-12-15', 1)).toBe('2027-01-15');
   });
   it('use-by date is the first occurrence on or after the plan-year start', () => {
-    expect(useByDate('2027-01-01', { month: 3, day: 31 })).toBe('2027-03-31');
-    expect(useByDate('2027-04-01', { month: 3, day: 31 })).toBe('2028-03-31');
+    expect(carryoverDeadline('2027-01-01', { month: 3, day: 31 })).toBe('2027-03-31');
+    expect(carryoverDeadline('2027-04-01', { month: 3, day: 31 })).toBe('2028-03-31');
   });
   it('pay periods per year', () => {
     const y = { start: '2026-01-01', end: '2026-12-31' };

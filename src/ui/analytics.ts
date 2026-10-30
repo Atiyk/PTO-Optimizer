@@ -19,7 +19,14 @@ export type AnalyticsEvent =
   | 'URL shared'
   | 'Overlap link opened'
   | 'returned_with_saved_url'
-  | 'team_days_used';
+  | 'team_days_used'
+  // Feature 1 Stage 4E - event names only, never a payload, same as every event above.
+  // Listed on the privacy page (public/privacy.html) alongside the rest.
+  | 'policy_tool_used'
+  | 'policy_alert_action_clicked'
+  | 'term_opened'
+  | 'paragraph_decoded'
+  | 'policy_questions_copied';
 
 declare global {
   interface Window {
