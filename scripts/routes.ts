@@ -1,9 +1,11 @@
+import { GLOSSARY_TERMS } from '../src/content/glossary/terms.ts';
+
 /**
  * The one list of every real route this site builds, shared (no side effects - safe to
  * import from anywhere) between scripts/prerender.ts and scripts/build-seo-files.ts, so a
  * route can't exist in the sitemap but not be prerendered, or vice versa.
  */
-export type ComponentKind = 'landing' | 'app' | 'sabbatical' | 'faq' | 'dataSources';
+export type ComponentKind = 'landing' | 'app' | 'sabbatical' | 'faq' | 'dataSources' | 'policy' | 'glossary' | 'glossary-term';
 
 export interface Entry {
   /** Path relative to dist/ of the built HTML file to inject into. */

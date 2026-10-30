@@ -36,6 +36,7 @@ import { renderToString } from 'react-dom/server';
 import React from 'react';
 import { ITEMS as FAQ_ITEMS } from '../src/ui/FAQ.tsx';
 import { SABBATICAL_FAQ_ITEMS } from '../src/ui/sabbaticalFaqItems.ts';
+import { GLOSSARY_TERMS } from '../src/content/glossary/terms.ts';
 import { rawHolidaysToHolidays, type Holiday } from '../src/data/holidays.ts';
 import { getSiteUrl } from './siteUrl.ts';
 import { ENTRIES, type Entry, type ComponentKind } from './routes.ts';
@@ -233,14 +234,28 @@ const { Landing } = await import('../src/ui/Landing.tsx');
 const { Sabbatical } = await import('../src/ui/Sabbatical.tsx');
 const { FaqPage } = await import('../src/ui/FaqPage.tsx');
 const { DataSources } = await import('../src/ui/DataSources.tsx');
+const { Policy } = await import('../src/ui/Policy.tsx');
+const { Glossary } = await import('../src/ui/Glossary.tsx');
+const { GlossaryTermPage } = await import('../src/ui/GlossaryTermPage.tsx');
 
-const COMPONENTS: Record<ComponentKind, React.ComponentType> = {
-  app: App,
-  landing: Landing,
-  sabbatical: Sabbatical,
-  faq: FaqPage,
-  dataSources: DataSources,
-};
+/** glossary-term is the one component that needs a per-entry prop (which term), so it's
+ * rendered via a small wrapper function rather than through the no-props COMPONENTS map
+ * every other route shares. */
+function renderEntry(entry: Entry): string {
+  if (entry.component === 'glossary-term') {
+    return renderToString(React.createElement(GlossaryTermPage, { termId: entry.termId ?? '' }));
+  }
+  const COMPONENTS: Record<Exclude<ComponentKind, 'glossary-term'>, React.ComponentType> = {
+    app: App,
+    landing: Landing,
+    sabbatical: Sabbatical,
+    faq: FaqPage,
+    dataSources: DataSources,
+    policy: Policy,
+    glossary: Glossary,
+  };
+  return renderToString(React.createElement(COMPONENTS[entry.component]));
+}
 
 async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInjected: number }> {
   const url = `${SITE_URL}${entry.path}`;
