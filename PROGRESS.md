@@ -2426,7 +2426,7 @@ Preview URLs follow Vercel's branch pattern (teams app first, Days Off second).
 | [#59](https://github.com/Atiyk/PTO-Optimizer/pull/59) | `claude/rc-p4-ai` | Rules from text, explanations, call-offs in words, evals | [teams](https://leavemanagement-git-claude-rc-p4-ai-atiyk-a.vercel.app) |
 | [#60](https://github.com/Atiyk/PTO-Optimizer/pull/60) | `claude/rc-p5-forecast` | 1–12 week forecast, stagger suggestions, planner at regulated sites, Days Off Tailwind fix | [teams](https://leavemanagement-git-claude-rc-p5-forecast-atiyk-a.vercel.app) |
 | [#61](https://github.com/Atiyk/PTO-Optimizer/pull/61) | `claude/rc-p6-api` | REST/OpenAPI, MCP, 4 webhooks, security and privacy pass, axe | [teams](https://leavemanagement-git-claude-rc-p6-api-atiyk-a.vercel.app) |
-| Phase 7 PR | `claude/rc-p7-demo` | Clinic seed, landing, live demo, RC1–RC12 | `https://leavemanagement-git-claude-rc-p7-demo-atiyk-a.vercel.app` |
+| [#62](https://github.com/Atiyk/PTO-Optimizer/pull/62) | `claude/rc-p7-demo` | Clinic seed, landing, live demo, RC1–RC12 | [teams](https://leavemanagement-git-claude-rc-p7-demo-atiyk-a.vercel.app) |
 
 **Previews and Vercel's daily limit.** At about 06:26 UTC the account hit the Hobby plan's 100
 deployments a day ("api-deployments-free-per-day"). Some previews on #58–#61 failed for that
