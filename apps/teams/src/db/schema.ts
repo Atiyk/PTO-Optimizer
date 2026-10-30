@@ -395,3 +395,98 @@ export const autonomySettings = pgTable(
   },
   (t) => [uniqueIndex('autonomy_org_cap_idx').on(t.orgId, t.capability, t.actorClass)],
 );
+
+// ── Phase 5: agent access ────────────────────────────────────────────────────
+
+/**
+ * Bearer tokens for agents (R3). Only a SHA-256 hash is stored; the token is shown once.
+ *  - api_key: org-level, acts as a service agent (no member identity)
+ *  - pat: personal access token, acts as an agent on behalf of its member
+ *  - access: short-lived token minted by the client-credentials grant (service agent)
+ */
+export const apiTokens = pgTable(
+  'api_tokens',
+  {
+    id: id(),
+    orgId: orgRef(),
+    kind: text('kind', { enum: ['api_key', 'pat', 'access'] }).notNull(),
+    name: text('name').notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    /** First characters, for recognising a token in lists (never enough to use it). */
+    prefix: text('prefix').notNull(),
+    scopes: text('scopes').array().notNull(),
+    memberId: uuid('member_id').references(() => members.id, { onDelete: 'cascade' }),
+    /** For 'access' tokens: the OAuth client that minted it. For others: a stable client id. */
+    clientId: text('client_id').notNull(),
+    createdByMemberId: uuid('created_by_member_id'),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('api_tokens_org_idx').on(t.orgId)],
+);
+
+/** OAuth 2.0 client-credentials apps for service agents (Agentforce-style). */
+export const oauthClients = pgTable(
+  'oauth_clients',
+  {
+    id: id(),
+    orgId: orgRef(),
+    name: text('name').notNull(),
+    clientId: text('client_id').notNull().unique(),
+    secretHash: text('secret_hash').notNull(),
+    scopes: text('scopes').array().notNull(),
+    createdByMemberId: uuid('created_by_member_id'),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('oauth_clients_org_idx').on(t.orgId)],
+);
+
+/** Fixed-window request counters per token and rate-limit class (works across serverless instances). */
+export const rateCounters = pgTable('rate_counters', {
+  key: text('key').primaryKey(),
+  windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+  count: integer('count').notNull().default(0),
+});
+
+export const WEBHOOK_EVENTS = ['leave.requested', 'leave.decided', 'balance.expiring', 'plan.proposed'] as const;
+
+export const webhookEndpoints = pgTable(
+  'webhook_endpoints',
+  {
+    id: id(),
+    orgId: orgRef(),
+    url: text('url').notNull(),
+    events: text('events').array().notNull(),
+    /** HMAC signing secret. Shown once at creation; needed in clear to sign. */
+    secret: text('secret').notNull(),
+    active: boolean('active').notNull().default(true),
+    createdByMemberId: uuid('created_by_member_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('webhook_endpoints_org_idx').on(t.orgId)],
+);
+
+export const webhookDeliveries = pgTable(
+  'webhook_deliveries',
+  {
+    id: id(),
+    orgId: orgRef(),
+    endpointId: uuid('endpoint_id')
+      .notNull()
+      .references(() => webhookEndpoints.id, { onDelete: 'cascade' }),
+    event: text('event').notNull(),
+    payload: jsonb('payload').notNull(),
+    status: text('status', { enum: ['pending', 'delivered', 'failed'] }).notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
+    lastStatusCode: integer('last_status_code'),
+    lastError: text('last_error'),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('webhook_deliveries_org_idx').on(t.orgId, t.createdAt), index('webhook_deliveries_due_idx').on(t.status, t.nextAttemptAt)],
+);

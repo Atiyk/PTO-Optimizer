@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { decideAgentDraft, listAgentDrafts, manageAgentAccess, managePersonalTokens } from './actions/agents';
 import { auditLog } from '@/db/schema';
 import { adjustBalance, exportData, getAuditLog, getOrgSetup, listMembers, manageMembers, manageOrgSetup } from './actions/admin';
 import { explainBalanceInWords, getAiUsage, importHandbook, parseLeaveRequestText } from './actions/ai';
@@ -42,6 +43,10 @@ export const CAPABILITIES = {
   sendPlanProposals,
   listMyProposals,
   respondToProposal,
+  managePersonalTokens,
+  manageAgentAccess,
+  listAgentDrafts,
+  decideAgentDraft,
 } as const satisfies Record<string, CapabilityDef>;
 
 export type CapabilityName = keyof typeof CAPABILITIES;
@@ -62,12 +67,8 @@ export async function invokeCapability<N extends CapabilityName>(
   rawInput: unknown,
 ): Promise<CapabilityOutput<N>> {
   const cap = CAPABILITIES[name] as unknown as CapabilityDef;
-  const { actor } = ctx;
 
-  if (!actor.scopes.includes(cap.scope) || (cap.roles && (!actor.role || !cap.roles.includes(actor.role)))) {
-    await writeAudit(ctx, cap, 'denied', `Denied ${cap.name}: missing scope ${cap.scope} or role`);
-    throw new CapabilityError('forbidden', `${cap.name} requires the "${cap.scope}" scope.`);
-  }
+  await authorize(ctx, cap);
 
   const parsed = cap.input.safeParse(rawInput ?? {});
   if (!parsed.success) {
@@ -81,16 +82,26 @@ export async function invokeCapability<N extends CapabilityName>(
   return out;
 }
 
-function describeZodError(capName: string, err: z.ZodError): string {
+export function describeZodError(capName: string, err: z.ZodError): string {
   const parts = err.issues.map((i) => `${i.path.join('.') || '(input)'}: ${i.message}`);
   return `Invalid input for ${capName}. ${parts.join('; ')}`;
 }
 
-async function writeAudit(
+/** Scope and role gate shared by direct calls and the agent gateway's draft path. Audits denials. */
+export async function authorize(ctx: CapabilityContext, cap: CapabilityDef): Promise<void> {
+  const { actor } = ctx;
+  if (!actor.scopes.includes(cap.scope) || (cap.roles && (!actor.role || !cap.roles.includes(actor.role)))) {
+    await writeAudit(ctx, cap, 'denied', `Denied ${cap.name}: missing scope ${cap.scope} or role`);
+    throw new CapabilityError('forbidden', `${cap.name} requires the "${cap.scope}" scope${cap.roles ? ` and one of these roles: ${cap.roles.join(', ')}` : ''}.`);
+  }
+}
+
+export async function writeAudit(
   ctx: CapabilityContext,
-  cap: CapabilityDef,
+  cap: Pick<CapabilityDef, 'name' | 'effect'>,
   outcome: 'ok' | 'denied' | 'error',
   summary: string,
+  data?: Record<string, unknown>,
 ): Promise<void> {
   const { actor } = ctx;
   await ctx.db.insert(auditLog).values({
@@ -105,5 +116,6 @@ async function writeAudit(
     effect: cap.effect,
     outcome,
     summary,
+    data: data ?? null,
   });
 }

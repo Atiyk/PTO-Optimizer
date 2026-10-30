@@ -1,7 +1,9 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { Db } from '@/db/client';
 import { CAPABILITIES, type CapabilityName } from './registry';
-import { buildOrg, humanActor, run, snapshotOrg } from '@/test/fixtures';
+import { authenticateBearer } from '@/lib/agentAuth';
+import { callAsAgent } from '@/server/agentGateway';
+import { buildOrg, humanActor, NOW, run, snapshotOrg } from '@/test/fixtures';
 import { freshDb } from '@/test/db';
 
 /*
@@ -14,6 +16,9 @@ let db: Db;
 let A: Awaited<ReturnType<typeof buildOrg>>;
 let B: Awaited<ReturnType<typeof buildOrg>>;
 let bProposalId: string;
+let bTokenId: string;
+let bClientRowId: string;
+let bDraftId: string;
 
 beforeAll(async () => {
   db = await freshDb();
@@ -23,6 +28,13 @@ beforeAll(async () => {
   const p = plan.people.find((x) => x.memberId === B.emp.id)!;
   await run(db, humanActor(B.manager), 'sendPlanProposals', { teamId: B.team.id, proposals: [{ memberId: B.emp.id, blocks: p.requests, deadline: p.deadline }] });
   bProposalId = (await run(db, humanActor(B.emp), 'listMyProposals', {})).proposals[0]!.id;
+  const pat = await run(db, humanActor(B.emp), 'managePersonalTokens', { op: 'create', name: 'b', scopes: ['leave:read', 'leave:request'] });
+  bTokenId = pat.created!.id;
+  const cl = await run(db, humanActor(B.owner), 'manageAgentAccess', { op: 'createOAuthClient', name: 'b', scopes: ['leave:read'] });
+  bClientRowId = cl.clients[0]!.id;
+  const auth = await authenticateBearer(db, `Bearer ${pat.created!.token}`, NOW);
+  const d = await callAsAgent(db, auth, 'submitLeaveRequest', { start: '2026-12-07', end: '2026-12-07', idempotencyKey: 'b-draft-1' }, NOW, 'mcp');
+  bDraftId = d.status === 'confirmation_required' ? d.draftId : '';
 });
 
 const attacks = (): [CapabilityName, unknown][] => [
@@ -48,6 +60,10 @@ const attacks = (): [CapabilityName, unknown][] => [
   ['sendPlanProposals', { teamId: B.team.id, proposals: [{ memberId: B.emp.id, blocks: [{ start: '2026-12-07', end: '2026-12-08' }], deadline: '2026-12-31' }] }],
   ['sendPlanProposals', { teamId: A.team.id, proposals: [{ memberId: B.emp.id, blocks: [{ start: '2026-12-07', end: '2026-12-08' }], deadline: '2026-12-31' }] }],
   ['respondToProposal', { proposalId: bProposalId, response: 'accept' }],
+  ['managePersonalTokens', { op: 'revoke', tokenId: bTokenId }],
+  ['manageAgentAccess', { op: 'revokeToken', tokenId: bTokenId }],
+  ['manageAgentAccess', { op: 'revokeOAuthClient', clientRowId: bClientRowId }],
+  ['decideAgentDraft', { draftId: bDraftId, decision: 'confirm' }],
 ];
 
 describe('tenant isolation (A6)', () => {

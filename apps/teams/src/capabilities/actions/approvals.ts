@@ -6,7 +6,7 @@ import { balanceView, evaluateRequest, getLeaveTypeById, getMember, isoDate, tea
 import { coverageViolations } from '@daysoff/engine/leave/coverage';
 
 import { CapabilityError } from '../errors';
-import { managesMember, untrusted } from '../helpers';
+import { actingMemberId, managesMember, untrusted } from '../helpers';
 import { defineCapability } from '../types';
 import { reverseUsage } from './requests';
 
@@ -78,7 +78,7 @@ export const listPendingApprovals = defineCapability({
       .orderBy(asc(leaveRequests.startDate));
     const out = [];
     for (const r of rows) {
-      if (r.member.id === actor.memberId) continue; // nobody approves their own leave
+      if (r.member.id === actingMemberId(actor)) continue; // nobody approves their own leave
       if (!(await managesMember(db, actor, r.member))) continue;
       const type = await getLeaveTypeById(db, actor.orgId, r.req.leaveTypeId);
       const snap = r.req.engineSnapshot as { amount: number; unit: 'days' | 'hours'; chargedDates: string[] };
@@ -154,7 +154,7 @@ export const listPendingApprovals = defineCapability({
       .orderBy(asc(leaveRequests.startDate));
     const recentAutoApprovals = [];
     for (const r of autoRows) {
-      if (r.member.id === actor.memberId || !(await managesMember(db, actor, r.member))) continue;
+      if (r.member.id === actingMemberId(actor) || !(await managesMember(db, actor, r.member))) continue;
       recentAutoApprovals.push({
         id: r.req.id,
         member: { id: r.member.id, name: { untrusted_text: r.member.name } },
@@ -217,7 +217,7 @@ export const decideLeaveRequest = defineCapability({
       .where(and(eq(leaveRequests.orgId, actor.orgId), eq(leaveRequests.id, input.requestId)));
     if (!r) throw new CapabilityError('not_found', 'Request not found.');
     const target = await getMember(db, actor.orgId, r.req.memberId);
-    if (target.id === actor.memberId) throw new CapabilityError('forbidden', 'You cannot decide your own request.');
+    if (target.id === actingMemberId(actor)) throw new CapabilityError('forbidden', 'You cannot decide your own request.');
     if (!(await managesMember(db, actor, target))) throw new CapabilityError('not_found', 'Request not found.');
     const status = input.decision === 'approve' ? 'approved' : 'declined';
     const view = (s: string) => ({ request: { id: r.req.id, status: s, start: r.req.startDate, end: r.req.endDate, leaveType: r.typeKey } });
@@ -233,7 +233,7 @@ export const decideLeaveRequest = defineCapability({
     await db.transaction(async (tx) => {
       await tx
         .update(leaveRequests)
-        .set({ status, decidedByMemberId: actor.memberId, decidedAt: now, decisionNote: input.note ?? null })
+        .set({ status, decidedByMemberId: actingMemberId(actor), decidedAt: now, decisionNote: input.note ?? null })
         .where(and(eq(leaveRequests.orgId, actor.orgId), eq(leaveRequests.id, r.req.id)));
       if (status === 'approved' && type.countsAgainstBalance && snap.amount > 0) {
         await tx.insert(balanceLedger).values({

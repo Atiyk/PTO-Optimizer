@@ -9,19 +9,20 @@ import { blackouts, coverageRules, drafts, members, teams } from '@/db/schema';
 import { balanceView, getLeaveTypeByKey, getMember, isoDate, teamCoverageMembers } from '@/domain/leave';
 import { newToken } from '@/lib/tokens';
 import { CapabilityError } from '../errors';
-import { subjectMember } from '../helpers';
-import { defineCapability } from '../types';
+import { actingMemberId, subjectMember } from '../helpers';
+import { defineCapability, type Actor } from '../types';
 
 const block = z.object({ start: z.iso.date(), end: z.iso.date(), leaveDays: z.number(), daysOff: z.number() });
 
 /** Teams a caller may plan: admins any; managers their own team and their reports' teams. */
-async function plannableTeam(db: Parameters<typeof getMember>[0], actor: { orgId: string; memberId: string | null; role: string | null }, teamId?: string) {
+async function plannableTeam(db: Parameters<typeof getMember>[0], actor: Actor, teamId?: string) {
+  const meId = actingMemberId(actor);
   const all = await db.select().from(teams).where(eq(teams.orgId, actor.orgId)).orderBy(asc(teams.name));
   let allowed = all;
   if (actor.role !== 'owner' && actor.role !== 'admin') {
-    const me = actor.memberId ? await getMember(db, actor.orgId, actor.memberId) : null;
-    const reports = actor.memberId
-      ? await db.select({ teamId: members.teamId }).from(members).where(and(eq(members.orgId, actor.orgId), eq(members.managerId, actor.memberId), isNull(members.deletedAt)))
+    const me = meId ? await getMember(db, actor.orgId, meId) : null;
+    const reports = meId
+      ? await db.select({ teamId: members.teamId }).from(members).where(and(eq(members.orgId, actor.orgId), eq(members.managerId, meId), isNull(members.deletedAt)))
       : [];
     const ids = new Set([me?.teamId, ...reports.map((r) => r.teamId)].filter(Boolean));
     allowed = all.filter((t) => ids.has(t.id));
