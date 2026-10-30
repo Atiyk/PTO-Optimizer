@@ -58,8 +58,23 @@ function fixtureFor(countryCode: string, year: number): RawHoliday[] {
   return [];
 }
 
-function installFetchMock() {
+/**
+ * Phase 2: fetchYear now tries the same-origin static file (/holidays/<CC>-<YEAR>.json)
+ * before falling back to Nager (PublicHolidays/<YEAR>/<CC>) - this mock recognizes either
+ * URL shape and returns the same fixture either way, so existing tests exercise "a fetch
+ * succeeded" without caring which stage served it. staticFails lets a test force the
+ * static stage to 404 for specific country/years, so the Nager-fallback path still gets
+ * exercised the way the pre-Phase-2 tests intended.
+ */
+function installFetchMock(staticFails: (countryCode: string, year: number) => boolean = () => false) {
   const fetchMock = vi.fn(async (url: string) => {
+    const staticMatch = url.match(/\/holidays\/([A-Z]+)-(\d+)\.json$/);
+    if (staticMatch) {
+      const countryCode = staticMatch[1];
+      const year = Number(staticMatch[2]);
+      if (staticFails(countryCode, year)) return { ok: false, status: 404, json: async () => [] } as Response;
+      return { ok: true, json: async () => fixtureFor(countryCode, year) } as Response;
+    }
     const match = url.match(/PublicHolidays\/(\d+)\/([A-Z]+)/);
     const year = Number(match![1]);
     const countryCode = match![2];
@@ -94,7 +109,17 @@ describe('getHolidays', () => {
     await getHolidays('US', '2025-12-30', '2026-01-02');
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const urls = fetchMock.mock.calls.map((c) => c[0] as string);
-    expect(urls.some((u) => u.includes('/2025/US'))).toBe(true);
+    expect(urls.some((u) => u.includes('US-2025.json'))).toBe(true);
+    expect(urls.some((u) => u.includes('US-2026.json'))).toBe(true);
+  });
+
+  it('falls back to Nager when the same-origin static file is missing (404)', async () => {
+    const fetchMock = installFetchMock(() => true); // static always 404s
+    const holidays = await getHolidays('US', '2026-01-01', '2026-12-31');
+    expect(holidays.some((h) => h.name === 'Independence Day')).toBe(true);
+    // one failed static attempt + one successful Nager fallback, per year
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const urls = fetchMock.mock.calls.map((c) => c[0] as string);
     expect(urls.some((u) => u.includes('/2026/US'))).toBe(true);
   });
 
@@ -182,7 +207,12 @@ describe('getHolidaysWithStatus (graceful failure, Phase 5)', () => {
   });
 
   it('a range spanning two years is degraded if EITHER year fails, even if the other succeeds, and still returns the data the successful year had', async () => {
+    // Static file always 404s here (forces every request through to Nager), where 2025
+    // specifically fails outright and 2026 succeeds - exercising the same "one year of a
+    // multi-year range fails, the other doesn't" case the pre-Phase-2 version of this test
+    // covered, just with the extra static-fallback hop now in between.
     const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/holidays/')) return { ok: false, status: 404, json: async () => [] } as Response;
       if (url.includes('/2025/')) throw new Error('network down for 2025 only');
       return { ok: true, json: async () => fixtureFor('US', 2026) } as Response;
     });

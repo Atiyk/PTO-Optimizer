@@ -1,0 +1,184 @@
+[
+  {
+    "date": "2028-01-01",
+    "localName": "Nieuwjaar",
+    "name": "New Year's Day",
+    "countryCode": "BE",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-14",
+    "localName": "Goede Vrijdag",
+    "name": "Good Friday",
+    "countryCode": "BE",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Bank"
+    ]
+  },
+  {
+    "date": "2028-04-16",
+    "localName": "Pasen",
+    "name": "Easter Sunday",
+    "countryCode": "BE",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-17",
+    "localName": "Paasmaandag",
+    "name": "Easter Monday",
+    "countryCode": "BE",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-01",
+    "localName": "Dag van de arbeid",
+    "name": "Labour Day",
+    "countryCode": "BE",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-25",
+    "localName": "Onze Lieve Heer hemel",
+    "name": "Ascension Day",
+    "countryCode": "BE",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-26",
+    "localName": "Day after Ascension Day",
+    "name": "Day after Ascension Day",
+    "countryCode": "BE",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Bank"
+    ]
+  },
+  {
+    "date": "2028-06-05",
+    "localName": "Pinkstermaandag",
+    "name": "Whit Monday",
+    "countryCode": "BE",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-07-21",
+    "localName": "Nationale feestdag",
+    "name": "Belgian National Day",
+    "countryCode": "BE",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-08-15",
+    "localName": "Onze Lieve Vrouw hemelvaart",
+    "name": "Assumption Day",
+    "countryCode": "BE",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-01",
+    "localName": "Allerheiligen",
+    "name": "All Saints' Day",
+    "countryCode": "BE",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-11",
+    "localName": "Wapenstilstand",
+    "name": "Armistice Day",
+    "countryCode": "BE",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-25",
+    "localName": "Kerstdag",
+    "name": "Christmas Day",
+    "countryCode": "BE",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-26",
+    "localName": "Boxing Day",
+    "name": "St. Stephen's Day",
+    "countryCode": "BE",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Bank"
+    ]
+  }
+]

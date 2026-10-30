@@ -2,6 +2,12 @@ import { addDays, mondayIndexedDow } from '../solver/dateUtils';
 
 const CACHE_PREFIX = 'pto-optimizer:holidays:v1:';
 const API_BASE = 'https://date.nager.at/api/v3/PublicHolidays';
+/** Phase 2: the same files scripts/build-holidays.ts commits under public/holidays/ -
+ * same-origin, so no CORS and no dependency on Nager being up for the common case. Tried
+ * first; Nager is now the FALLBACK, only hit for a country/year this build didn't have
+ * (or a build old enough that the static file is missing one of this call's requested
+ * years - see fetchYear). */
+const STATIC_BASE = '/holidays';
 
 // Nager.Date shifts weekend holidays unreliably; we post-process these ourselves.
 const OBSERVED_FIX_COUNTRIES = new Set(['US', 'GB', 'CA', 'AU']);
@@ -61,6 +67,18 @@ interface YearFetch {
 async function fetchYear(countryCode: string, year: number): Promise<YearFetch> {
   const cached = readCache(countryCode, year);
   if (cached) return { data: cached, failed: false };
+
+  try {
+    const staticRes = await fetch(`${STATIC_BASE}/${countryCode}-${year}.json`);
+    if (staticRes.ok) {
+      const data = (await staticRes.json()) as RawHoliday[];
+      writeCache(countryCode, year, data);
+      return { data, failed: false };
+    }
+  } catch {
+    // Same-origin static file genuinely missing or unreadable - fall through to Nager.
+  }
+
   try {
     const res = await fetch(`${API_BASE}/${year}/${countryCode}`);
     if (!res.ok) return { data: [], failed: true };
@@ -79,6 +97,36 @@ function applyObservedDate(dateISO: string, countryCode: string): string {
   if (dow === 5) return addDays(dateISO, -1); // Saturday
   if (dow === 6) return addDays(dateISO, 1); // Sunday
   return dateISO;
+}
+
+/** Exported for scripts/prerender.ts: converts the same raw Nager shape the committed
+ * public/holidays/ files store into real Holiday records, with the same observed-date
+ * correction `fetchYear` applies - the prerendered snapshot and the live-fetched data must
+ * go through the identical transform, or a holiday's `date` could differ between the HTML
+ * a crawler sees and what hydration computes. */
+export function rawHolidaysToHolidays(raw: RawHoliday[]): Holiday[] {
+  return raw.map(toHoliday);
+}
+
+declare global {
+  interface Window {
+    /** Phase 2: set inline by each route's own HTML, before the bundle loads - the exact
+     * same static data scripts/prerender.ts read in Node to build that route's initial
+     * HTML, so the client's FIRST render (before hydration, before any fetch effect runs)
+     * starts from the same real holidays rather than an empty list. Read once via
+     * `getPreloadedHolidays`; the normal live-fetch effects still run afterward as before,
+     * they just no longer need to replace an empty placeholder with real data visibly. */
+    __PTO_PRELOADED_HOLIDAYS__?: Record<string, Holiday[]>;
+  }
+}
+
+/** Synchronous - used only as a lazy useState initializer, never inside an effect. Returns
+ * [] on the very first client-only render of a route this value was never embedded on
+ * (e.g. a hard navigation to a country the build didn't preload), which is exactly the
+ * pre-Phase-2 behavior for that case - unaffected, not regressed. */
+export function getPreloadedHolidays(countryCode: string): Holiday[] {
+  if (typeof window === 'undefined') return [];
+  return window.__PTO_PRELOADED_HOLIDAYS__?.[countryCode] ?? [];
 }
 
 function toHoliday(raw: RawHoliday): Holiday {

@@ -1,0 +1,210 @@
+[
+  {
+    "date": "2028-01-01",
+    "localName": "Nýársdagur",
+    "name": "New Year's Day",
+    "countryCode": "IS",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-13",
+    "localName": "Skírdagur",
+    "name": "Maundy Thursday",
+    "countryCode": "IS",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-14",
+    "localName": "Föstudagurinn langi",
+    "name": "Good Friday",
+    "countryCode": "IS",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-16",
+    "localName": "Páskadagur",
+    "name": "Easter Sunday",
+    "countryCode": "IS",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-17",
+    "localName": "Annar í páskum",
+    "name": "Easter Monday",
+    "countryCode": "IS",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-20",
+    "localName": "Sumardagurinn fyrsti",
+    "name": "First Day of Summer",
+    "countryCode": "IS",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-01",
+    "localName": "Verkalýðsdagurinn",
+    "name": "May Day",
+    "countryCode": "IS",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-25",
+    "localName": "Uppstigningardagur",
+    "name": "Ascension Day",
+    "countryCode": "IS",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-06-04",
+    "localName": "Hvítasunnudagur",
+    "name": "Pentecost",
+    "countryCode": "IS",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-06-05",
+    "localName": "Annar í hvítasunnu",
+    "name": "Whit Monday",
+    "countryCode": "IS",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-06-17",
+    "localName": "Þjóðhátíðardagurinn",
+    "name": "Icelandic National Day",
+    "countryCode": "IS",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-08-07",
+    "localName": "Frídagur verslunarmanna",
+    "name": "Commerce Day",
+    "countryCode": "IS",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-24",
+    "localName": "Aðfangadagur",
+    "name": "Christmas Eve",
+    "countryCode": "IS",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-25",
+    "localName": "Jóladagur",
+    "name": "Christmas Day",
+    "countryCode": "IS",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-26",
+    "localName": "Annar í jólum",
+    "name": "St. Stephen's Day",
+    "countryCode": "IS",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-31",
+    "localName": "Gamlársdagur",
+    "name": "New Year's Eve",
+    "countryCode": "IS",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  }
+]
