@@ -184,6 +184,41 @@ export function downloadHolidaysICS(holidays: Holiday[], filename = 'holidays.ic
   downloadICSContent(generateHolidaysICS(holidays), filename);
 }
 
+/**
+ * Phase 4B /sabbatical export row: one all-day VEVENT spanning the whole trip
+ * (extendedStart..extendedEnd inclusive - DTEND exclusive per RFC 5545, same as every
+ * other event this file writes), not one event per day - a sabbatical is booked as a
+ * single block on a real calendar, unlike /pto's per-day PTO events. Reuses this file's
+ * own RFC 5545 helpers, same as generateHolidaysICS does, rather than a third writer.
+ */
+export function generateSabbaticalICS(extendedStart: string, extendedEnd: string, summary: string, description: string, now: Date = new Date()): string {
+  const lines: string[] = [];
+  lines.push('BEGIN:VCALENDAR');
+  lines.push('VERSION:2.0');
+  lines.push('PRODID:-//PTO Optimizer//EN');
+  lines.push('CALSCALE:GREGORIAN');
+
+  const dtstamp = dtstampNow(now);
+  const dateStart = isoToICSDate(extendedStart);
+  const dateEnd = addOneDayICS(isoToICSDate(extendedEnd));
+  lines.push('BEGIN:VEVENT');
+  lines.push(foldLine(`UID:sabbatical-${dateStart}-${dateEnd}@pto-optimizer.app`));
+  lines.push(`DTSTAMP:${dtstamp}`);
+  lines.push(`DTSTART;VALUE=DATE:${dateStart}`);
+  lines.push(`DTEND;VALUE=DATE:${dateEnd}`);
+  lines.push(foldLine(`SUMMARY:${escapeText(summary)}`));
+  lines.push(foldLine(`DESCRIPTION:${escapeText(description)}`));
+  lines.push('TRANSP:TRANSPARENT');
+  lines.push('END:VEVENT');
+
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n') + '\r\n';
+}
+
+export function downloadSabbaticalICS(extendedStart: string, extendedEnd: string, summary: string, description: string, filename = 'sabbatical.ics'): void {
+  downloadICSContent(generateSabbaticalICS(extendedStart, extendedEnd, summary, description), filename);
+}
+
 function downloadICSContent(content: string, filename: string): void {
   const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
   const url = URL.createObjectURL(blob);

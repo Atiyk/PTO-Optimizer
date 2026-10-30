@@ -6,7 +6,8 @@
     <link rel="alternate icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex" />
-    <title>Page not found &mdash; PTO Optimizer</title>
+    <meta name="theme-color" content="#f8fafc" />
+    <title>Page not found &mdash; Days Off</title>
     <style>
       body {
         margin: 0;
@@ -31,6 +32,12 @@
         color: #64748b;
         margin: 0 0 1.5rem;
       }
+      .links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: center;
+      }
       a {
         display: inline-block;
         background: #1e3a8a;
@@ -43,13 +50,25 @@
       a:hover {
         background: #1e2f6e;
       }
+      a.secondary {
+        background: transparent;
+        color: #1e3a8a;
+        border: 1px solid #cbd5e1;
+      }
+      a.secondary:hover {
+        background: #f1f5f9;
+      }
     </style>
   </head>
   <body>
     <main>
       <h1>Page not found</h1>
-      <p>That link may be truncated or out of date. The PTO planner itself is still here.</p>
-      <a href="/">Back to PTO Optimizer</a>
+      <p>That link may be truncated or out of date. Days Off itself is still here.</p>
+      <div class="links">
+        <a href="/">Days Off</a>
+        <a class="secondary" href="/pto">PTO Optimizer</a>
+        <a class="secondary" href="/sabbatical">Sabbatical Planning</a>
+      </div>
     </main>
   </body>
 </html>

@@ -1,0 +1,220 @@
+[
+  {
+    "date": "2028-01-01",
+    "localName": "Nieuwjaarsdag",
+    "name": "New Year's Day",
+    "countryCode": "BQ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-14",
+    "localName": "Goede Vrijdag",
+    "name": "Good Friday",
+    "countryCode": "BQ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-16",
+    "localName": "Pasen",
+    "name": "Easter Sunday",
+    "countryCode": "BQ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-17",
+    "localName": "Paasmaandag",
+    "name": "Easter Monday",
+    "countryCode": "BQ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-27",
+    "localName": "King's Birthday",
+    "name": "King's Birthday",
+    "countryCode": "BQ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-30",
+    "localName": "Rincon Day",
+    "name": "Rincon Day",
+    "countryCode": "BQ",
+    "fixed": false,
+    "global": false,
+    "counties": [
+      "BQ-BO"
+    ],
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-01",
+    "localName": "Dag van de Arbeid",
+    "name": "Labour Day",
+    "countryCode": "BQ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-25",
+    "localName": "Hemelvaartsdag",
+    "name": "Ascension Day",
+    "countryCode": "BQ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-06-04",
+    "localName": "Pinksteren",
+    "name": "Pentecost",
+    "countryCode": "BQ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-07-01",
+    "localName": "Emancipation Day",
+    "name": "Emancipation Day",
+    "countryCode": "BQ",
+    "fixed": false,
+    "global": false,
+    "counties": [
+      "BQ-SE"
+    ],
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-08-07",
+    "localName": "Carnival Monday",
+    "name": "Carnival Monday",
+    "countryCode": "BQ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-09-06",
+    "localName": "Vlagdag bonaire",
+    "name": "Bonaire Flag Day",
+    "countryCode": "BQ",
+    "fixed": false,
+    "global": false,
+    "counties": [
+      "BQ-BO"
+    ],
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-16",
+    "localName": "Statia Day",
+    "name": "Statia Day",
+    "countryCode": "BQ",
+    "fixed": false,
+    "global": false,
+    "counties": [
+      "BQ-SE"
+    ],
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-01",
+    "localName": "Saba Day",
+    "name": "Saba Day",
+    "countryCode": "BQ",
+    "fixed": false,
+    "global": false,
+    "counties": [
+      "BQ-SA"
+    ],
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-25",
+    "localName": "Kerstmis",
+    "name": "Christmas Day",
+    "countryCode": "BQ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-26",
+    "localName": "Second Day of Christmas",
+    "name": "St. Stephen's Day",
+    "countryCode": "BQ",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  }
+]

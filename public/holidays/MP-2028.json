@@ -1,0 +1,197 @@
+[
+  {
+    "date": "2027-12-31",
+    "localName": "New Year's Day",
+    "name": "New Year's Day",
+    "countryCode": "MP",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-01-17",
+    "localName": "Martin Luther King Jr. Day",
+    "name": "Martin Luther King Jr. Day",
+    "countryCode": "MP",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-02-21",
+    "localName": "Presidents' Day",
+    "name": "Presidents' Day",
+    "countryCode": "MP",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-03-24",
+    "localName": "Commonwealth Covenant Day",
+    "name": "Commonwealth Covenant Day",
+    "countryCode": "MP",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-04-14",
+    "localName": "Good Friday",
+    "name": "Good Friday",
+    "countryCode": "MP",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-05-29",
+    "localName": "Memorial Day",
+    "name": "Memorial Day",
+    "countryCode": "MP",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-06-19",
+    "localName": "Juneteenth",
+    "name": "Juneteenth",
+    "countryCode": "MP",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-07-04",
+    "localName": "Independence Day",
+    "name": "Independence Day",
+    "countryCode": "MP",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-09-04",
+    "localName": "Labor Day",
+    "name": "Labour Day",
+    "countryCode": "MP",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-10-09",
+    "localName": "Commonwealth Cultural Day",
+    "name": "Commonwealth Cultural Day",
+    "countryCode": "MP",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-04",
+    "localName": "Citizenship Day",
+    "name": "Citizenship Day",
+    "countryCode": "MP",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-10",
+    "localName": "Veterans Day",
+    "name": "Veterans Day",
+    "countryCode": "MP",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-11-23",
+    "localName": "Thanksgiving",
+    "name": "Thanksgiving",
+    "countryCode": "MP",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-08",
+    "localName": "Constitution Day",
+    "name": "Constitution Day",
+    "countryCode": "MP",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2028-12-25",
+    "localName": "Christmas Day",
+    "name": "Christmas Day",
+    "countryCode": "MP",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  }
+]
