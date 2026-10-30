@@ -6,24 +6,23 @@ import type { Evaluation } from './leave';
 /**
  * R6 autonomy levels, per org × capability × actor class:
  *   L0 off: this actor class may not do it.
- *   L1 suggest / draft: it prepares, a human confirms (the default for agents' commit actions).
- *   L2 act, reversibly: it acts; the human can undo within a window and is told.
- *   L3 act: it acts; normal cancellation rules still apply.
+ *   L1 suggest: it may only point out what it would do.
+ *   L2 draft: it prepares the action; a human confirms (default for agents' commit actions).
+ *   L3 act within policy: it acts, audited, and the human can undo within a window.
  */
 export type AutonomyLevel = 0 | 1 | 2 | 3;
 export type ActorClass = 'agent' | 'assistant';
 
 export const AUTONOMY_LABELS: Record<AutonomyLevel, string> = {
   0: 'Off',
-  1: 'Suggest only',
-  2: 'Act, reversible',
-  3: 'Act',
+  1: 'Suggest',
+  2: 'Draft, a person confirms',
+  3: 'Act within policy (undo window)',
 };
 
-/** Defaults when no row exists: agents draft and humans confirm; the approval assistant is off. */
-function defaultLevel(capability: string, actorClass: ActorClass): AutonomyLevel {
-  if (actorClass === 'assistant') return 0;
-  return capability === 'decideLeaveRequest' ? 0 : 1;
+/** Defaults when no row exists: agents draft (L2); the approval assistant suggests (L1). */
+function defaultLevel(_capability: string, actorClass: ActorClass): AutonomyLevel {
+  return actorClass === 'assistant' ? 1 : 2;
 }
 
 export async function autonomyFor(db: Db, orgId: string, capability: string, actorClass: ActorClass): Promise<AutonomyLevel> {

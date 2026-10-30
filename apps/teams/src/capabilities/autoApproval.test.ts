@@ -19,15 +19,15 @@ const level = (l: 0 | 1 | 2 | 3) =>
 const submit = (start: string, end: string, key: string) => run(db, humanActor(A.emp2), 'submitLeaveRequest', { start, end, idempotencyKey: key });
 
 describe('auto-approval (3D) and autonomy levels (R6)', () => {
-  it('L0 (default): everything waits for the manager, no suggestion shown', async () => {
+  it('L0: everything waits for the manager, no suggestion shown', async () => {
+    await level(0);
     const s = await submit('2026-12-07', '2026-12-07', 'auto-l0-1');
     expect(s.request.status).toBe('pending');
     const p = await run(db, humanActor(A.manager), 'listPendingApprovals', {});
     expect(p.requests.every((r) => r.autoApproval === null)).toBe(true);
   });
 
-  it('L1 suggests: the manager sees which requests the rules would approve, and why not', async () => {
-    await level(1);
+  it('L1 (default) suggests: the manager sees which requests the rules would approve, and why not', async () => {
     await submit('2026-12-07', '2026-12-07', 'auto-l1-1');
     await submit('2026-12-14', '2026-12-16', 'auto-l1-2'); // 3 days > limit
     const p = await run(db, humanActor(A.manager), 'listPendingApprovals', {});
@@ -36,8 +36,13 @@ describe('auto-approval (3D) and autonomy levels (R6)', () => {
     expect(byStart['2026-12-14']!.blockers.join(' ')).toMatch(/2 days auto-approval limit/);
   });
 
-  it('L2 approves clean requests reversibly, audits as the assistant, and the manager can undo within the window', async () => {
+  it('L2 drafts: still the manager confirms', async () => {
     await level(2);
+    expect((await submit('2026-12-07', '2026-12-07', 'auto-l2-draft')).request.status).toBe('pending');
+  });
+
+  it('L3 approves clean requests reversibly, audits as the assistant, and the manager can undo within the window', async () => {
+    await level(3);
     const s = await submit('2026-12-07', '2026-12-08', 'auto-l2-1');
     expect(s.request).toMatchObject({ status: 'approved', autoApproved: true });
     expect((await run(db, humanActor(A.emp2), 'getMyBalance', {})).usable).toBe(18);
@@ -51,25 +56,20 @@ describe('auto-approval (3D) and autonomy levels (R6)', () => {
     expect((await run(db, humanActor(A.emp2), 'getMyBalance', {})).usable).toBe(20);
   });
 
-  it('L2 never auto-approves past the limit, a coverage gap or a blackout', async () => {
-    await level(2);
-    expect((await submit('2026-12-14', '2026-12-16', 'auto-l2-big')).request.status).toBe('pending'); // over limit
-    expect((await submit('2026-12-30', '2026-12-30', 'auto-l2-bl')).request.status).toBe('pending'); // soft blackout
+  it('L3 never auto-approves past the limit, a coverage gap or a blackout', async () => {
+    await level(3);
+    expect((await submit('2026-12-14', '2026-12-16', 'auto-l3-big')).request.status).toBe('pending'); // over limit
+    expect((await submit('2026-12-30', '2026-12-30', 'auto-l3-bl')).request.status).toBe('pending'); // soft blackout
   });
 
   it('after the window closes the auto-approval stands', async () => {
-    await level(2);
-    const s = await submit('2026-12-07', '2026-12-07', 'auto-l2-late');
+    await level(3);
+    const s = await submit('2026-12-07', '2026-12-07', 'auto-l3-late');
     const later = { db, actor: humanActor(A.manager), now: new Date(NOW.getTime() + 61 * 60_000) };
     await expect(invokeCapability('decideLeaveRequest', later, { requestId: s.request.id, decision: 'decline' })).rejects.toMatchObject({ code: 'conflict' });
   });
 
-  it('L3 approves without an undo window; only admins can change the level', async () => {
-    await level(3);
-    const s = await submit('2026-12-07', '2026-12-07', 'auto-l3-1');
-    expect(s.request.status).toBe('approved');
-    const p = await run(db, humanActor(A.manager), 'listPendingApprovals', {});
-    expect(p.recentAutoApprovals).toEqual([]);
+  it('only admins can change the level', async () => {
     await expect(
       run(db, humanActor(A.manager), 'manageOrgSetup', { op: 'setAutonomy', capability: 'decideLeaveRequest', actorClass: 'assistant', level: 3 }),
     ).rejects.toMatchObject({ code: 'forbidden' });

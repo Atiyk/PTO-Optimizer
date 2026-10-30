@@ -23,7 +23,7 @@ const signInAs = async (name) => {
   await page.waitForURL(/\/app/);
 };
 
-// Owner: vacation may be auto-approved up to 2 days; level 2 (undoable).
+// Owner: vacation may be auto-approved up to 2 days; level 3 (act within policy, undoable).
 await signInAs('Olivia Owner');
 await page.goto(`${base}/app/admin/setup`);
 const lt = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add or update leave type' }) });
@@ -35,9 +35,9 @@ await lt.getByLabel('Auto-approve up to (days or hours)').fill('2');
 await lt.getByRole('button', { name: 'Add or update leave type' }).click();
 await page.getByText('auto-approve ≤ 2').waitFor();
 const aa = page.locator('form').filter({ has: page.getByRole('button', { name: 'Save auto-approval' }) });
-await aa.getByLabel('Level').selectOption('2');
+await aa.getByLabel('Level').selectOption('3');
 await aa.getByRole('button', { name: 'Save auto-approval' }).click();
-await page.getByText('Act, reversible').waitFor();
+await page.getByText('Act within policy (undo window)').waitFor();
 await page.getByRole('heading', { name: 'Auto-approval' }).scrollIntoViewIfNeeded();
 await shoot('admin-setup-autoapproval');
 

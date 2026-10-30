@@ -134,8 +134,8 @@ export default async function Setup() {
                 options: [
                   { value: '0', label: 'Off: managers decide everything' },
                   { value: '1', label: 'Suggest: show managers what qualifies' },
-                  { value: '2', label: 'Approve, manager can undo for a while' },
-                  { value: '3', label: 'Approve' },
+                  { value: '2', label: 'Draft: mark it ready, manager confirms' },
+                  { value: '3', label: 'Approve; manager can undo for a while' },
                 ],
               },
               { name: 'reversibleMinutes', label: 'Undo window (minutes)', type: 'number', step: '5', defaultValue: s.autoApproval.reversibleMinutes },

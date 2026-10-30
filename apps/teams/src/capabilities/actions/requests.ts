@@ -167,13 +167,13 @@ export const submitLeaveRequest = defineCapability({
     const org = await getOrg(db, actor.orgId);
     const note = ev.leaveType.isHealthRelated && !org.sickNotesEnabled ? null : (input.note ?? null);
     let needsApproval = ev.leaveType.requiresApproval || ev.retroactive;
-    // 3D: the approval assistant may approve clean requests at L2 (reversible) or L3.
+    // 3D: at L3 the approval assistant approves clean requests, reversible within the window.
     let auto: { basis: string; reversibleUntil: Date | null } | null = null;
     if (needsApproval) {
       const level = await autonomyFor(db, actor.orgId, 'decideLeaveRequest', 'assistant');
-      const check = level >= 2 ? autoApprovalCheck(ev) : null;
+      const check = level >= 3 ? autoApprovalCheck(ev) : null;
       if (check?.eligible) {
-        auto = { basis: check.basis, reversibleUntil: level === 2 ? new Date(now.getTime() + org.autoApprovalReversibleMinutes * 60_000) : null };
+        auto = { basis: check.basis, reversibleUntil: new Date(now.getTime() + org.autoApprovalReversibleMinutes * 60_000) };
         needsApproval = false;
       }
     }
