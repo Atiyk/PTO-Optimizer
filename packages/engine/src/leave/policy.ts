@@ -30,7 +30,21 @@ export interface LeavePolicy {
   accrual:
     | { method: 'front_loaded'; annualAllowance: number; proRateFirstYear?: boolean }
     | { method: 'per_pay_period'; annualAllowance: number; payPeriod: PayPeriod }
-    | { method: 'per_hour_worked'; ratePerHour: number; payPeriod: PayPeriod }
+    | {
+        method: 'per_hour_worked';
+        ratePerHour: number;
+        payPeriod: PayPeriod;
+        /**
+         * `scheduled` (default, MVP behaviour): hours from the work week. `imported`: hours
+         * actually worked, from `MemberFacts.hoursWorked` (payroll / time-clock import),
+         * credited on each imported period's end date.
+         */
+        hoursSource?: 'scheduled' | 'imported';
+        /** Exact "1 per N hours worked" (overrides ratePerHour when set), e.g. 30. */
+        hoursPerUnit?: number | null;
+        /** Most that can be earned in one plan year (e.g. 48 in Colorado). */
+        annualAccrualCap?: number | null;
+      }
     | { method: 'unlimited' };
   planYear: PlanYear;
   /** Maximum balance. Accrual pauses at the cap and resumes once usage brings it below. */
@@ -40,6 +54,8 @@ export interface LeavePolicy {
   waitingPeriod?: { days: number; mode: 'no_accrual' | 'locked' } | null;
   /** How far below zero a request may take the balance. 0 = not at all. */
   negativeAllowance?: number;
+  /** Most that can be USED in one plan year, whatever the balance (sick-leave laws). */
+  annualUseCap?: number | null;
 }
 
 /** A policy and the date it applies from. Later versions apply going forward only. */
@@ -75,6 +91,9 @@ export function validatePolicy(p: LeavePolicy): string[] {
     case 'per_hour_worked':
       nonNeg(a.ratePerHour, 'accrual.ratePerHour');
       if (!(a.payPeriod in PERIODS_PER_YEAR)) errs.push('accrual.payPeriod is not a known pay period');
+      if (a.hoursPerUnit != null && !(a.hoursPerUnit > 0)) errs.push('accrual.hoursPerUnit must be > 0');
+      if (a.annualAccrualCap != null) nonNeg(a.annualAccrualCap, 'accrual.annualAccrualCap');
+      if (a.hoursSource && a.hoursSource !== 'scheduled' && a.hoursSource !== 'imported') errs.push('accrual.hoursSource must be "scheduled" or "imported"');
       break;
     case 'unlimited':
       break;
@@ -89,6 +108,7 @@ export function validatePolicy(p: LeavePolicy): string[] {
   }
   if (p.waitingPeriod) nonNeg(p.waitingPeriod.days, 'waitingPeriod.days');
   if (p.negativeAllowance != null) nonNeg(p.negativeAllowance, 'negativeAllowance');
+  if (p.annualUseCap != null) nonNeg(p.annualUseCap, 'annualUseCap');
   return errs;
 }
 

@@ -7,7 +7,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./*": "./src/*.ts",
-    "./data/*.json": "./src/data/*.json"
+    "./data/*.json": "./src/data/*.json",
+    "./rulepacks": "./rulepacks/index.ts",
+    "./rulepacks/*": "./rulepacks/*.ts"
   },
   "scripts": {
     "test": "NODE_OPTIONS=--no-experimental-webstorage vitest run",
