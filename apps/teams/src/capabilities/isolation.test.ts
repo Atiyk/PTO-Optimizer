@@ -87,6 +87,28 @@ describe('tenant isolation (A6)', () => {
     expect(await snapshotOrg(db, B.org.id)).toEqual(before);
   });
 
+  it('the same attacks through agent tokens (personal and service) fail too, and create no drafts', async () => {
+    const before = await snapshotOrg(db, B.org.id);
+    const pat = await run(db, humanActor(A.owner), 'managePersonalTokens', { op: 'create', name: 'a', scopes: ['leave:read', 'leave:request', 'leave:approve', 'policy:read', 'planner:run'] });
+    const key = await run(db, humanActor(A.owner), 'manageAgentAccess', { op: 'createApiKey', name: 'a', scopes: ['leave:read', 'leave:request', 'planner:run'] });
+    const agents = [
+      { auth: await authenticateBearer(db, `Bearer ${pat.created!.token}`, NOW), extra: {} },
+      { auth: await authenticateBearer(db, `Bearer ${key.created!.token}`, NOW), extra: { forMemberId: A.emp.id } },
+    ];
+    let tried = 0;
+    for (const { auth, extra } of agents) {
+      for (const [name, input] of attacks()) {
+        if (!(CAPABILITIES[name].surfaces as readonly string[]).includes('mcp')) continue;
+        if (!auth.actor.scopes.includes(CAPABILITIES[name].scope as never)) continue;
+        tried++;
+        const p = callAsAgent(db, auth, name, { ...(input as object), ...extra }, NOW, 'mcp');
+        await expect(p, `${auth.actor.type} ${name} ${JSON.stringify(input)}`).rejects.toMatchObject({ code: expect.stringMatching(/^(not_found|forbidden)$/) });
+      }
+    }
+    expect(tried).toBeGreaterThan(8);
+    expect(await snapshotOrg(db, B.org.id)).toEqual(before);
+  });
+
   it('list-style reads never include another org’s data', async () => {
     const owner = humanActor(A.owner);
     const out = await run(db, owner, 'whoIsOut', { from: '2026-11-01', to: '2026-11-30', includePending: true, teamId: B.team.id });

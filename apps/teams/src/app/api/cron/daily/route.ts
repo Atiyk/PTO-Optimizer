@@ -2,11 +2,12 @@ import { timingSafeEqual } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/db/client';
 import { webhookEndpoints } from '@/db/schema';
+import { housekeeping } from '@/server/housekeeping';
 import { deliverDue, scanExpiringBalances } from '@/server/webhooks';
 
 /*
- * Daily job (apps/teams/vercel.json): queue balance.expiring warnings and send any webhook
- * deliveries that are due. Vercel calls it with `Authorization: Bearer $CRON_SECRET`.
+ * Daily job (apps/teams/vercel.json): queue balance.expiring warnings, send any webhook
+ * deliveries that are due, and prune short-lived rows. Vercel calls it with `Authorization: Bearer $CRON_SECRET`.
  */
 export const dynamic = 'force-dynamic';
 
@@ -31,5 +32,7 @@ export async function GET(req: Request) {
     sent.retrying += r.retrying;
     if (r.delivered + r.failed + r.retrying < 25) break;
   }
-  return Response.json({ queued, ...sent });
+  // Housekeeping: old rate-limit windows, expired OAuth access tokens, stale drafts.
+  const cleaned = await housekeeping(db, now);
+  return Response.json({ queued, ...sent, cleaned });
 }

@@ -8,6 +8,9 @@ import { bearerChallenge } from '@/lib/resourceMetadata';
 import { SESSION_COOKIE } from '@/lib/session';
 import { callAsAgent } from '@/server/agentGateway';
 import { runForSession } from '@/server/run';
+import { clientIp } from '@/lib/clientIp';
+import { sameOrigin } from '@/lib/sameOrigin';
+import { consumeRate } from '@/server/rateLimit';
 
 /*
  * REST surface over the registry: POST /api/v1/actions/{capability} with a JSON body.
@@ -38,6 +41,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       try {
         auth = await authenticateBearer(db, authz, new Date());
       } catch (err) {
+        await consumeRate(db, `ip:${clientIp(request.headers)}`, 'auth', new Date()); // throttles token guessing
         const res = errorResponse(err);
         if (res.status === 401) res.headers.set('WWW-Authenticate', bearerChallenge('invalid_token', (err as Error).message));
         return res;
@@ -45,9 +49,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const r = await callAsAgent(db, auth, name, body, new Date(), 'rest');
       return r.status === 'done' ? NextResponse.json({ data: r.result }) : NextResponse.json({ confirmation: r }, { status: 202 });
     }
-    // Browsers send Origin on cross-site POSTs; refuse them (CSRF) when authenticated by cookie.
-    const origin = request.headers.get('origin');
-    if (origin && origin !== request.nextUrl.origin) throw new CapabilityError('forbidden', 'Cross-site request refused.');
+    if (!sameOrigin(request)) throw new CapabilityError('forbidden', 'Cross-site request refused.');
     const data = await runForSession(name as CapabilityName, request.cookies.get(SESSION_COOKIE)?.value, body);
     return NextResponse.json({ data });
   } catch (err) {

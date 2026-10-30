@@ -3,6 +3,8 @@ import { getDb } from '@/db/client';
 import { appUrl } from '@/lib/appUrl';
 import { cookieOptions, encodeIdentity, encodeSession, IDENTITY_COOKIE, IDENTITY_MAX_AGE, SESSION_COOKIE, SESSION_MAX_AGE_SEC } from '@/lib/session';
 import { membersForSlackUser } from '@/server/bootstrap';
+import { consumeRate } from '@/server/rateLimit';
+import { clientIp } from '@/lib/clientIp';
 
 interface UserInfo {
   ok: boolean;
@@ -14,6 +16,11 @@ interface UserInfo {
 
 export async function GET(request: NextRequest) {
   const fail = (code: string) => NextResponse.redirect(new URL(`/signin?error=${code}`, request.url));
+  try {
+    await consumeRate(await getDb(), `ip:${clientIp(request.headers)}`, 'auth', new Date());
+  } catch {
+    return fail('rate_limited');
+  }
   const params = request.nextUrl.searchParams;
   let saved: { state: string; nonce: string; next: string | null } | null = null;
   try {

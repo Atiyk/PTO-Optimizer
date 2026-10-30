@@ -7,6 +7,7 @@ import { SCOPES } from '@/capabilities/scopes';
 import { hashToken } from '@/lib/tokens';
 import { mcpResourceUrl } from '@/lib/resourceMetadata';
 import { consumeRate } from '@/server/rateLimit';
+import { clientIp } from '@/lib/clientIp';
 
 /*
  * OAuth 2.0 client-credentials grant (RFC 6749 §4.4) for service agents such as Agentforce.
@@ -33,6 +34,7 @@ export async function POST(request: NextRequest) {
   if (!clientId || !secret) return oauthError('invalid_client', 'Client authentication failed.', 401);
   const db = await getDb();
   try {
+    await consumeRate(db, `ip:${clientIp(request.headers)}`, 'auth', now);
     await consumeRate(db, `oauth:${clientId}`, 'auth', now);
   } catch {
     return oauthError('slow_down', 'Too many token requests; retry in a minute.', 429);

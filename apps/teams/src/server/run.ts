@@ -1,7 +1,8 @@
 import 'server-only';
 import { getDb } from '@/db/client';
 import { CapabilityError } from '@/capabilities/errors';
-import { invokeCapability, type CapabilityName, type CapabilityOutput } from '@/capabilities/registry';
+import { getCapability, invokeCapability, type CapabilityName, type CapabilityOutput } from '@/capabilities/registry';
+import { consumeRate } from './rateLimit';
 import { humanActorFromSession } from '@/lib/actor';
 import { decodeSession } from '@/lib/session';
 
@@ -16,7 +17,11 @@ export async function runForSession<N extends CapabilityName>(
   const db = await getDb();
   const actor = await humanActorFromSession(db, sessionCookie);
   if (!actor) throw new CapabilityError('unauthenticated', 'Sign in first.');
-  return invokeCapability(name, { db, actor, now: new Date() }, input);
+  const now = new Date();
+  // People get the same per-minute limits as agent tokens, counted per member.
+  const cap = getCapability(name);
+  if (cap) await consumeRate(db, `member:${actor.memberId}`, cap.rateLimit, now);
+  return invokeCapability(name, { db, actor, now }, input);
 }
 
 export type ActionResult<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };

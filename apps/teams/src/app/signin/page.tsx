@@ -9,6 +9,7 @@ const ERRORS: Record<string, string> = {
   denied: 'Slack sign-in was cancelled.',
   token: 'Slack did not accept the sign-in. Please try again.',
   userinfo: 'Could not read your Slack profile. Please try again.',
+  rate_limited: 'Too many sign-in attempts. Wait a minute and try again.',
 };
 
 export const dynamic = 'force-dynamic';

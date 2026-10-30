@@ -4,6 +4,8 @@ import { CapabilityError } from '@/capabilities/errors';
 import { authenticateBearer, credentialHeader } from '@/lib/agentAuth';
 import { bearerChallenge } from '@/lib/resourceMetadata';
 import { mcpHandler, toAuthInfo } from '@/server/mcp';
+import { clientIp } from '@/lib/clientIp';
+import { consumeRate } from '@/server/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +16,11 @@ async function handle(request: NextRequest) {
   try {
     auth = await authenticateBearer(db, credential, new Date());
   } catch (err) {
+    try {
+      await consumeRate(db, `ip:${clientIp(request.headers)}`, 'auth', new Date()); // throttles token guessing
+    } catch (limited) {
+      return NextResponse.json((limited as CapabilityError).toJSON(), { status: 429, headers: { 'Retry-After': '60' } });
+    }
     const e = err instanceof CapabilityError ? err : new CapabilityError('unauthenticated', 'Authentication failed.');
     return NextResponse.json(e.toJSON(), {
       status: e.status,
