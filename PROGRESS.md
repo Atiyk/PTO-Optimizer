@@ -2365,3 +2365,249 @@ non-CSS files. The baseline is rewritten (Q12).
 - Q16: Subscribing a push endpoint that already exists moves it to the new person (low risk,
   because endpoints are unguessable). Should that be refused instead? *Recommendation:* yes, a
   small follow-up.
+
+## Phase 7: demo, landing and acceptance (`claude/rc-p7-demo`)
+
+### What's in it
+- **Demo seeds** (`src/server/seedCoverage.ts`, `/dev/login`):
+  - Sunbeam Early Learning: a 3-room, 18-staff California centre (Phase 2), unchanged.
+  - New: a two-site dental clinic built from the clinic pack alone (`seedClinic`). Hygiene
+    chairs and procedures are booked-role demand; hygienists and dentists are credentials. No
+    code path knows the word "dental" (RC12 greps for it).
+  - No invented social proof: no testimonials, logos or customer counts.
+- **Landing section** on the teams landing page, in its existing style: "Know before an absence
+  breaks a staffing rule", six short points (rules with sources, gaps ahead, legal and fair cover,
+  the staff app, sick leave from hours, children stay anonymous), "not legal advice", and a link
+  to the live demo, which says it is a made-up centre. Screens `landing-*`.
+- **Live demo** (`/demo/coverage`): paste a regulation excerpt → cited rule draft (the
+  built-in reader when no model is available, labelled as such) → coverage
+  heatmap → a call-off → ranked cover → accepted cover. Each run is rolled back, so nothing a
+  visitor does is saved and nobody is messaged. Screens `demo-coverage-*`.
+- **RC1–RC12**: `src/acceptance/rc.test.ts` (11 tests: RC11 is the whole regression suite),
+  `e2e/rc-setup.mjs` (RC1 in a browser, with click counts) and `e2e/rc-acceptance.mjs`
+  (screens for RC2, RC3, RC5, RC7, RC8 and RC12). Results and evidence:
+  `docs/teams/ACCEPTANCE.md`, "Regulated coverage".
+- **Sample CSVs** for RC1: `samples/centre-people.csv` (14 rows), `centre-credentials.csv`
+  (14), `centre-schedule.csv` (65).
+- **`docs/teams/RULE-PACKS.md`**: every seed rule with its citation, generated from the packs.
+
+### Bugs the RC run found (fixed here, each with a test)
+1. Service agents were refused manager-level coverage tools because they have no member role.
+   They now pass the role gate for manager-level capabilities only, within their scopes; the MCP
+   tool list hides what an actor can't call (Q17).
+2. `forMemberId` was missing from `requestCover` over MCP (an op-style union), so a service
+   agent couldn't name the manager who must confirm.
+3. The rest rule read a shift running straight into the cover as "0 h rest" (Q18).
+4. Coverage dates accepted 2027-02-30.
+5. Onboarding named a site "US-US-CA".
+
+### Gate
+- Typecheck clean (root and teams). `npm run lint:all`: 0 errors (the warnings are the
+  existing `Date`-in-render and `setState`-in-effect patterns).
+- Root `npm run build` passes; `verify:dist` identical (690 files).
+- Teams tests: 200 passed, 3 skipped (the live evals).
+- Root tests: 588 passed, plus the same 2 Days Off solver timing tests (Q1; no solver file is
+  touched by this run).
+- Screenshots: `docs/screenshots/rc-p7/` (40 files), at 1440/768/375, the staff app at 375. No
+  horizontal overflow and no page errors (both checked by the scripts).
+
+# Regulated coverage: final report
+
+## PRs in merge order
+All are drafts, stacked; merge each into the one below it, then #55 into `main`, in this order.
+Preview URLs follow Vercel's branch pattern (teams app first, Days Off second).
+
+| # | Branch | What it adds | Preview |
+|---|---|---|---|
+| [#55](https://github.com/Atiyk/PTO-Optimizer/pull/55) | `claude/rc-p0-audit` → `main` | Audit, `COVERAGE-ARCHITECTURE.md` | [teams](https://leavemanagement-git-claude-rc-p0-audit-atiyk-a.vercel.app) · [Days Off](https://pto-optimizer-git-claude-rc-p0-audit-atiyk-a.vercel.app) |
+| [#56](https://github.com/Atiyk/PTO-Optimizer/pull/56) | `claude/rc-p1-spec` | Spec, engine (time blocks, required staff, ranking, hourly sick leave), seed packs, migration 0005 | [teams](https://leavemanagement-git-claude-rc-p1-spec-atiyk-a.vercel.app) |
+| [#57](https://github.com/Atiyk/PTO-Optimizer/pull/57) | `claude/rc-p2-core` | Setup forms, CSV import, coverage heatmap, credentials, sick leave, D4 ratio gaps | [teams](https://leavemanagement-git-claude-rc-p2-core-atiyk-a.vercel.app) |
+| [#58](https://github.com/Atiyk/PTO-Optimizer/pull/58) | `claude/rc-p3-cover` | findCover → waves → accept, call-off, staff PWA, passkeys, push, messaging adapter, fairness | [teams](https://leavemanagement-git-claude-rc-p3-cover-atiyk-a.vercel.app) |
+| [#59](https://github.com/Atiyk/PTO-Optimizer/pull/59) | `claude/rc-p4-ai` | Rules from text, explanations, call-offs in words, evals | [teams](https://leavemanagement-git-claude-rc-p4-ai-atiyk-a.vercel.app) |
+| [#60](https://github.com/Atiyk/PTO-Optimizer/pull/60) | `claude/rc-p5-forecast` | 1–12 week forecast, stagger suggestions, planner at regulated sites, Days Off Tailwind fix | [teams](https://leavemanagement-git-claude-rc-p5-forecast-atiyk-a.vercel.app) |
+| [#61](https://github.com/Atiyk/PTO-Optimizer/pull/61) | `claude/rc-p6-api` | REST/OpenAPI, MCP, 4 webhooks, security and privacy pass, axe | [teams](https://leavemanagement-git-claude-rc-p6-api-atiyk-a.vercel.app) |
+| Phase 7 PR | `claude/rc-p7-demo` | Clinic seed, landing, live demo, RC1–RC12 | `https://leavemanagement-git-claude-rc-p7-demo-atiyk-a.vercel.app` |
+
+**Previews and Vercel's daily limit.** At about 06:26 UTC the account hit the Hobby plan's 100
+deployments a day ("api-deployments-free-per-day"). Some previews on #58–#61 failed for that
+reason, not because of the code; every gate built locally. They come back on the next push, or:
+Vercel → the project → Deployments → the failed deployment → ⋯ → Redeploy, after the limit
+resets (24 h). Each push to a stacked branch deploys two projects, so stacking 8 branches uses
+the allowance fast (Q19).
+
+### What broke, what surprised me
+- Tailwind in Days Off scanned `PROGRESS.md`, so writing notes changed the live site's CSS
+  (fixed in Phase 5, Q12). The Phase 4 gate claim "dist identical" was wrong for that reason;
+  it was caught and corrected.
+- The injection guard shared with the MVP handbook reader never matched "Assistant:" lines
+  (fixed in Phase 4, with a test).
+- Three security problems found and fixed in Phase 6: an SSRF via push endpoints, removed staff
+  still counting toward ratios, erasure/export missing the coverage tables.
+- Official CA, TX and NY sites refuse the sandbox's fetches, so most childcare numbers come
+  from mirrors (Justia, Cornell LII), each labelled.
+- Not done from C5: the forecast covers approved and pending leave and credential expiries,
+  but not holiday bridges or expiring balances. Its causes are staff-hours short by reason; a
+  "bridge" risk (leave likely around a public holiday) needs a likelihood model I didn't want
+  to invent. Q20.
+
+## RC1–RC12
+All pass. Details, evidence and the bugs they found: `docs/teams/ACCEPTANCE.md`.
+
+| RC | Result | Key number |
+|---|---|---|
+| RC1 | Pass | 28 clicks, 33 fields, 10 picks, 3 files: about 6.2 min at a person's pace |
+| RC2 | Pass | Toddlers short 1, 14:00–18:00, H&S Code § 1596.955 |
+| RC3 | Pass | Expired CPR and an 11 h rest breach excluded with reasons; deterministic |
+| RC4 | Pass | One `filled`, one `already_filled`; late leave → `no_longer_eligible` |
+| RC5 | Pass | 2 taps at 375 px; no reason stored |
+| RC6 | Pass | CA 72 → 78 → cap 80; NYC 40 → 46 → 76 → cap 80 |
+| RC7 | Pass | Ratios 4/6/12 cited; injection rejected; group size becomes a question |
+| RC8 | Pass | 14-day band; forecast gap from 11 Nov, 3 days |
+| RC9 | Pass | 0 AI calls with AI off |
+| RC10 | Pass after a fix | Offers are a draft; no pay values; other org `not_found` |
+| RC11 | Pass | Teams 200 passed (A1–A12 included); Days Off dist identical |
+| RC12 | Pass | Clinic gap filled by configuration only |
+
+## Rule packs shipped
+Full list with every URL and retrieval date (all retrieved 2026-10-30): `docs/teams/RULE-PACKS.md`.
+Not legal advice.
+
+| Pack | Rules | Source | Needs verification |
+|---|---|---|---|
+| `childcare-us-ca` | 5: infants 1:4, toddlers 1:6 group 12, preschool 1:12, school age 1:14, mixed ages | 22 CCR §§ 101416.5(b), 101216.3(a), 101516.5(b)(1) (Justia mirror); H&S Code § 1596.955 (AB 762 enrolled text) | **Mixed ages** (youngest-child rule borrowed from the school-age section) |
+| `childcare-us-tx` | 10: 9 age bands with ratio and group size, mixed ages (core child) | 26 TAC §§ 746.1601, 746.1609 (Justia PDF), 746.1603 (Cornell) | none |
+| `childcare-us-ny` | 8: 7 age bands, mixed ages at day start/end | 18 NYCRR § 418-1.8(k), (l) (Cornell) | none |
+| `clinic-template` | 5, all "your policy" | none (org policy) | n/a |
+| `labor-us-ca` | Sick leave (1 per 30, day 90, use 40, cap 80); overtime 8/40 | Lab. Code §§ 246, 510(a) (public.law mirror) | none |
+| `labor-us-wa` | Sick leave (1 per 40, carryover 40); overtime 40 | RCW 49.46.210, 49.46.130 (official) | none |
+| `labor-us-ny` | Sick leave 5–99 (40 h) and 100+ (56 h); overtime 40 | Labor Law § 196-b via ny.gov guidance; 12 NYCRR § 142-2.2 | **Both sick-leave rules: carryover** (statute text not fetchable; carryover left unset) |
+| `labor-us-ny-nyc` | Safe and sick leave 5–99 / 100+ with carryover and use caps; overtime 40 | DCWP FAQs; 12 NYCRR § 142-2.2 | none |
+| `labor-us-co` | Sick leave (1 per 30, 48 h); overtime 12/40 | C.R.S. § 8-13.3-403; 7 CCR 1103-1 Rule 4.1.1 | none |
+
+Rules drafted from pasted text are always "needs verification" until an official citation is
+added (Q11).
+
+## Capability catalog delta
+- `defineCapability` entries: 35 → 56.
+- New (21): `getCoverage`, `getCoverageSetup`, `listRulePacks`, `manageSchedule`,
+  `manageCredentials`, `getCredentials`, `importHoursWorked`, `getSickLeave`, `findCover`,
+  `requestCover`, `respondToCover`, `getCoverRequests`, `reportCallOff`, `getMySchedule`,
+  `setMyCoverPrefs`, `manageStaffSignIn`, `draftRulePackFromText`, `saveRulePack`,
+  `explainCoverInWords`, `parseCoverText`, `getCoverageForecast`. Extended: `draftLeaveRequest`
+  and `decideLeaveRequest` (block-level coverage), `importCsv` (credentials, shifts, hours,
+  undo), `runTeamPlan` (block-level re-check at regulated sites).
+- **External MCP tools: 17 → 24** (limit 25): `getCoverage`, `findCover`, `requestCover`,
+  `respondToCover`, `reportCallOff`, `draftRulePackFromText`, `getCoverageForecast`.
+
+## Evals and AI spend
+| Capability | Model | Mock | Live (one run, 2026-10-30) |
+|---|---|---|---|
+| Rules from text (8 texts incl. conflicting clauses and an injection) | `claude-sonnet-5-5` | recall 100%, precision 100% | recall 100%, precision 100%, injected kept 0; **$0.11** |
+| Call-off / cover phrasings (32) | `claude-haiku-5-5` | 32/32 | 31/32; **$0.01** |
+
+Total live AI spend this run: about **$0.12** (plus an earlier rules run at 91% recall that
+led to a fix, within the same few cents). Explanations are number-checked against engine
+facts and fall back to a template.
+
+## Security and privacy
+- **Children:** counts per age group per room per 30-minute block only. A deny-list test runs
+  over every column and every capability schema; no name, birthday or child identifier exists.
+- **Pay rates:** stored only when cost-aware ranking is on, admin-only, deleted when it's
+  turned off, never sent to the LLM; ranking outputs only a cost band. RC10 checks no rate value
+  leaves through MCP. No screen writes rates yet (Q15).
+- **Call-off reasons:** not stored; no reason field exists.
+- **Staff sign-in:** passkeys (`@simplewebauthn`), admin-issued one-time codes (hashed,
+  single-use, rate-limited, expiring).
+- **Agents:** service agents read coverage and find cover; every commit is a draft a named
+  person confirms; owner/admin tools are closed; kill switch and per-class rate limits apply.
+- **Fixed:** push SSRF, removed staff counting toward ratios, erasure/export gaps (Phase 6).
+- **Accessibility:** axe WCAG 2.2 AA, 0 violations on 26 page-widths.
+- **Known gaps:** the privacy policy and DPA are drafts needing legal review; the MVP's open
+  items still apply (sessions not revocable, webhook secrets derived from `SESSION_SECRET`,
+  a DNS-rebinding window on webhooks, inline scripts in the CSP, no SSO beyond Slack); a push
+  endpoint re-subscribed by another person moves to them (Q16); most childcare citations are
+  mirrors.
+
+## Your setup checklist
+1. **App URL (needed for passkeys).** Passkeys are bound to the domain in `APP_URL`; without
+   it they bind to each deployment's own URL and stop working after a redeploy. Vercel →
+   `leave_management` → Settings → Environment Variables → `APP_URL` = `https://<your
+   production domain>` (Production only) → Save → Deployments → latest → ⋯ → Redeploy. If you
+   later move domains, staff must add a new passkey (sign in once with an admin code).
+2. **Web Push (free).** Locally: `npx web-push generate-vapid-keys`. Vercel → Settings →
+   Environment Variables → `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
+   (`mailto:you@yourdomain`) → Redeploy. iPhone staff must add the app to the Home Screen first
+   (iOS 16.4+).
+3. **Cover waves every 5 minutes (free).** Vercel → Settings → Environment Variables →
+   `CRON_SECRET` = a long random string. Then cron-job.org → Sign up → Create cronjob → URL
+   `https://<domain>/api/cron/cover` → every 5 minutes → Advanced → Headers → `Authorization:
+   Bearer <CRON_SECRET>` → Save. (Hobby crons run once a day.)
+4. **Texts (optional, paid, off by default).** Options and costs, from Twilio's pages
+   ([SMS pricing](https://www.twilio.com/en-us/sms/pricing/us),
+   [10DLC fees](https://support.twilio.com/hc/en-us/articles/1260803965530)):
+   - Twilio SMS: $0.0083 per segment plus carrier fees of about $0.0035–0.005; a number is
+     $1.15 a month; A2P 10DLC registration is $4.50 once for the brand, $15 per campaign
+     vetting, and $1.50–2 a month per campaign. A 40-person centre sending 200 offers a month
+     costs roughly $4–5 a month after setup.
+   - WhatsApp through Twilio: per-message Meta fees on top; no 10DLC, but a Meta business
+     verification.
+   - Who pays: I recommend you pass it through as an add-on, or include a monthly allowance in a
+     higher tier. Push plus the app is free and covers most staff.
+   - Click-path: Twilio Console → Phone Numbers → Buy a number → Messaging → Regulatory
+     Compliance → A2P 10DLC → register brand and campaign → copy Account SID and Auth Token →
+     Vercel → Environment Variables → `MESSAGING_PROVIDER=twilio`, `TWILIO_ACCOUNT_SID`,
+     `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` (E.164, or `whatsapp:+1…`) → Redeploy.
+5. **AI (already set for the MVP).** `ANTHROPIC_API_KEY` as before. Optional model overrides:
+   `AI_MODEL_*`. `AI_DISABLED=1` turns every AI path off; forms keep working (RC9).
+6. **Never set in production:** `DEV_LOGIN`, `ALLOW_PGLITE`, `WEBHOOK_ALLOW_HTTP`.
+
+## Questions for Atiyk (new in Phase 7; Q1–Q16 are under each phase above)
+- **Q17: Service agents and manager-level tools.** A service agent now counts as a manager for
+  role checks, within its scopes (so `findCover` works for a `coverage:read` key). API keys can
+  still never get `leave:approve` or `admin`. *Recommendation:* keep it; the alternative is a
+  separate "agent role" setting per key, worth building when a customer asks.
+- **Q18: Rest between shifts.** A shift that runs straight into the cover is now treated as one
+  stretch, so a 03:00–07:00 shift plus a 07:00 cover counts rest from 03:00 back to the previous
+  shift. Should a long continuous stretch also be checked against max hours a day? It already
+  is, through `max_hours_day`. *Recommendation:* keep as is.
+- **Q19: Vercel deployment limit.** Stacked branches deploy two projects per push and hit the
+  Hobby limit of 100 a day. *Recommendation:* in Vercel → each project → Settings → Git →
+  Ignored Build Step, use `git diff HEAD^ HEAD --quiet -- apps/teams packages` for
+  `leave_management` and the Days Off paths for `pto-optimizer`, so a project builds only when
+  its files change. That's a setting I may not change; it's yours.
+- **Q20: Holiday bridges and expiring balances in the forecast** (from C5) aren't built.
+  *Recommendation:* add "likely leave" from last year's pattern around each public holiday and
+  from balances that lapse at year end, shown as a separate, clearly labelled band, after a
+  design partner confirms they'd use it.
+- **Q21: Childcare first or clinic first?** *Recommendation:* childcare. The ratio is state law
+  with a citation and an inspector, so a gap has a cost a director already feels; the clinic
+  rule is the clinic's own policy, which any scheduler can approximate. The clinic pack stays
+  as proof the model generalises.
+- **Q22: Pricing.** General schedulers charge per user: When I Work $2.50–5, Sling $0–4,
+  Deputy $5.50–10 a month, with Homebase, 7shifts and Connecteam on flat plans from $0 to $149
+  ([costbench](https://costbench.com/stats/employee-scheduling-pricing-2026/)). The childcare
+  suites don't publish prices (Brightwheel is a custom quote; Procare and Kangarootime publish
+  none), and none of them, from their own pages, ranks legal cover:
+  - Brightwheel: per-classroom weekly schedules, "real-time staffing levels", and substitutes
+    "assigned and notified directly"; nothing about checking the ratio before assigning or about
+    credential expiry ([staff scheduling](https://mybrightwheel.com/childcare-centers/childcare-staff-scheduling-software)).
+  - Procare: real-time ratio monitoring and alerts by room, day or time; no cover finding or
+    shift scheduling described ([ratios](https://www.procaresoftware.com/capabilities/monitor-staff-child-ratios/));
+    training-hours tracking ([blog, 2017](https://www.procaresoftware.com/blog/stay-current-with-training-and-safety-certifications-using-child-care-management-solutions/)).
+  - Kangarootime: multi-centre scheduling, time-off requests, and "required staff per classroom
+    based on scheduled staff and students" with what-if planning; no cover or substitutes
+    ([staff management](https://kangarootime.com/staff-management/),
+    [scheduling tool, May 2024](https://kangarootime.com/blog/kangarootimes-scheduling-optimization-tool-advances-insights-for-schools)).
+  *Recommendation (a hypothesis to test with design partners):* price **per site**, with a
+  staff band, e.g. $99 a site a month up to 30 staff and $179 up to 80. Per staff ($3–5)
+  invites a comparison with When I Work on price; per site matches how centres buy (Brightwheel
+  and Procare sell per centre) and how they feel the risk (one licence per site). Sell it as an
+  add-on that sits next to Brightwheel or Procare, not a replacement.
+- **Q23: Which states next?** *Recommendation:* Washington and Colorado childcare first, because
+  their labour packs already exist, so a centre there gets ratios and sick leave together. Then
+  Illinois and New Jersey (large centre counts and their own paid-leave laws). Each needs the
+  official sources fetched from a machine the state sites don't block.
+- **Q24: Time clock?** *Recommendation:* integrate, don't build. Hours worked already import
+  from CSV (and undo); next, read hours from the time clocks centres already use (the childcare
+  suites' and Homebase's). A time clock means kiosks, geofencing and pay disputes, which is a
+  different product.

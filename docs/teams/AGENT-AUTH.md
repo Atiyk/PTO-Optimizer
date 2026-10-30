@@ -26,6 +26,13 @@ OAuth sign-in) is designed here and not built in this run; the reasons and the p
   `WWW-Authenticate: Bearer resource_metadata="…"`.
 - Service agents can never commit for a member (R3): every commit becomes a draft addressed to the
   `forMemberId` they name, and only that person can confirm it in the app.
+- Role-gated tools (regulated coverage, Phase 7): a service agent has no member role, so it is
+  treated as `manager` for capabilities limited to roles, still within its scopes. That lets a
+  `coverage:read` + `cover:request` key call `getCoverage`, `findCover` and
+  `getCoverageForecast`, and propose `requestCover` for a manager (`forMemberId`). Owner/admin-only
+  capabilities (`saveRulePack`, `manageSchedule`, `manageCredentials`, `draftRulePackFromText`,
+  `exportData`) stay closed, and every commit is still a draft only the named person confirms.
+  Pay rates never leave the engine (only a cost band), so no tool returns them.
 
 ## Why Stage 2 matters
 
