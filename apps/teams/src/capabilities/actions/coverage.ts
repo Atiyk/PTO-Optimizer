@@ -94,6 +94,7 @@ export const getCoverage = defineCapability({
       z.object({
         date: z.string(),
         regulated: z.boolean(),
+        open: z.boolean().describe('False when no children or bookings are expected all day (closed).'),
         gaps: z.array(gapOut),
         grid: z
           .array(
@@ -131,7 +132,7 @@ export const getCoverage = defineCapability({
       rooms: ctx.rooms.map((r) => ({ id: r.id, name: r.name, groupKey: r.groupKey })),
       days: days.map((day, i) => {
         const date = addDays(start, i);
-        if (!day) return { date, regulated: false, gaps: [], grid: null };
+        if (!day) return { date, regulated: false, open: false, gaps: [], grid: null };
         const gaps = gapWindows(day).map((g) => ({ ...g, roomName: g.roomId ? (roomName.get(g.roomId) ?? null) : null }));
         let grid = null;
         if (input.detail === 'blocks') {
@@ -148,7 +149,7 @@ export const getCoverage = defineCapability({
               siteGap: day.site.find((s) => s.block.key === b.key)?.gap ?? 0,
             }));
         }
-        return { date, regulated: true, gaps, grid };
+        return { date, regulated: true, open: day.rooms.some((r) => r.children > 0), gaps, grid };
       }),
       notice: NOT_LEGAL_ADVICE,
     };

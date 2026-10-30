@@ -43,7 +43,11 @@ export default async function CoveragePage({ searchParams }: { searchParams: Pro
         </Card>
       ) : (
         <>
-          <Card title={`Gaps, ${formatRange(start, addDays(start, 6))}`} actions={<Badge tone={gapCount ? 'bad' : 'neutral'}>{gapCount ? `${gapCount} gap${gapCount === 1 ? '' : 's'}` : 'in ratio'}</Badge>}>
+          <Card title={`Gaps, ${formatRange(start, addDays(start, 6))}`} actions={
+              <span className="shrink-0 whitespace-nowrap">
+                <Badge tone={gapCount ? 'bad' : 'neutral'}>{gapCount ? `${gapCount} gap${gapCount === 1 ? '' : 's'}` : 'in ratio'}</Badge>
+              </span>
+            }>
             <ol className="space-y-1 text-sm">
               {week.days.map((d) => (
                 <li key={d.date} className="rounded-md border border-line p-2">
@@ -51,7 +55,7 @@ export default async function CoveragePage({ searchParams }: { searchParams: Pro
                     {formatRange(d.date, d.date)}
                   </Link>
                   {d.gaps.length === 0 ? (
-                    <span className="ml-2 text-muted">{d.regulated ? 'no gaps' : 'no rules on this date'}</span>
+                    <span className="ml-2 text-muted">{!d.regulated ? 'no rules on this date' : d.open ? 'no gaps' : 'closed'}</span>
                   ) : (
                     <ul className="mt-1 space-y-1">
                       {d.gaps.map((g, i) => (

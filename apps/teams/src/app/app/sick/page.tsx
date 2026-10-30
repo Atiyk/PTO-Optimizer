@@ -37,7 +37,7 @@ export default async function SickLeavePage({ searchParams }: { searchParams: Pr
               <Stat label="Used this year" value={fmt(s.useCap.usedThisYear, u)} hint={s.useCap.cap != null ? `Yearly use limit ${fmt(s.useCap.cap, u)}` : 'No yearly use limit'} />
               <Stat label="Left to use this year" value={s.useCap.remaining == null ? '—' : fmt(s.useCap.remaining, u)} />
             </div>
-            {s.source && <p className="mt-3 text-xs text-muted">Source: {s.source}. {s.notice}</p>}
+            {s.source && <p className="mt-3 text-xs break-words text-muted [overflow-wrap:anywhere]">Source: {s.source}. {s.notice}</p>}
           </Card>
           <Card title="How it adds up">
             {s.entries.length === 0 ? (

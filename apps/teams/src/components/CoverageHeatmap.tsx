@@ -12,7 +12,7 @@ export function CoverageHeatmap({ rooms, grid, date }: { rooms: Out['rooms']; gr
   if (grid.length === 0) return <p className="text-sm text-muted">No children or staff scheduled on {date}.</p>;
   const shown = rooms.filter((r) => grid.some((b) => b.rooms.some((x) => x.roomId === r.id)));
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="border-separate border-spacing-0.5 text-center text-[11px] tabular-nums">
         <caption className="sr-only">Staff present and required per room and half hour on {date}</caption>
         <thead>

@@ -1931,3 +1931,89 @@ them (Questions for Atiyk).
 - Root + engine: 587 passed, the same 2 Days Off solver timing tests fail (environment).
 - Teams: 131 passed, 2 skipped.
 - No screens changed (no screenshots this phase).
+
+## Phase 2: coverage core in the web app (`claude/rc-p2-core`)
+
+### What was built
+- **Capabilities** (registry, all with RBAC and tenant checks):
+  - `getCoverage` (coverage:read; ui/rest/mcp/slack/assistant). Staff see only their own site.
+  - `manageSchedule`: timezone, rooms, rule pack per site (a labour pack also creates the
+    site's sick policy), weekly demand, demand exceptions, shifts, shift exceptions.
+  - `manageCredentials`, `getCredentials` (expiry bands: expired, 7, 14, 30 days).
+  - `importHoursWorked`: preview, commit with a batch id, undo.
+  - `getSickLeave`, `listRulePacks`, `getCoverageSetup`.
+  - Only `getCoverage` is on MCP, so MCP has 18 tools.
+- **CSV import**: `importCsv` gains `credentials`, `shifts` and `hours`, plus `stage: 'undo'`
+  with a batch id.
+  - Coverage kinds use their own synonym list, so "From/To" means a time there and a date
+    for leave.
+  - Undoing a batch id that the org never wrote returns not_found.
+- **Leave impact at block level (D4)**:
+  - `evaluateRequest` computes `blockCoverage` for the member's regulated sites: the new
+    ratio and role gaps this absence opens, each with its rule and citation.
+  - `draftLeaveRequest` returns it, and the gaps show as warnings in the request form. An
+    employee can still ask.
+  - Any such gap blocks auto-approval.
+  - `decideLeaveRequest` returns the gaps when a manager approves anyway.
+  - Hours requests can carry `startTime`/`endTime`. They are stored in
+    `leave_requests.start_minute/end_minute`.
+  - The auto-approval basis text is unchanged, so MVP test A4 stays as it was.
+- **Pages**:
+  - `/app/coverage`: a 7-day gap list with citations, plus a room × 30-minute heatmap for
+    one day. Gaps read in greyscale (−N, heavy border, stripes). Site, date and "count
+    pending" are in the URL and update live.
+  - `/app/admin/coverage`: setup in four steps (rules, rooms, children expected as counts
+    only, staff schedules). It uses a weekly pattern editor where one line covers Mon–Fri.
+  - `/app/admin/credentials`: expiry dashboard and forms.
+  - `/app/sick`: balance, usable, the annual use cap and every accrual line ("1 per 30 hours
+    worked × 77 hours (period)").
+  - The import page has the new kinds, org-specific samples and an Undo button.
+  - Nav: Coverage and Sick leave appear only when the org's vertical is not "general".
+- **Demo seed** `seedChildcareCentre` (Sunbeam Early Learning, Oakland CA):
+  - 3 rooms and 18 staff, with the CA childcare and labour packs.
+  - CPR records: one expired and three expiring within 30 days.
+  - Hours worked since January.
+  - An approved toddler-teacher absence next Monday, which opens a cited 15:30–16:30 gap
+    (H&S § 1596.955).
+  - Available from `/dev/login` and tested in `seedCoverage.test.ts`.
+- **Tests**:
+  - `coverage.test.ts`: a staffed day has no gaps; a cited gap for pending leave; hours
+    windows; D4; RBAC; credential CSV with bands and undo; shift CSV mapping; CA hourly
+    accrual from imported hours, then undo; no child-data field in any capability schema.
+  - The isolation test gains 17 attacks on the new capabilities, as a human and through
+    agent tokens; snapshotOrg now covers the coverage tables.
+
+### Setup click count (RC1, counted from the UI, not yet timed)
+For one site with 3 rooms by hand:
+- Pack: 2 interactions.
+- Timezone: 2.
+- Rooms: 3 × 3 = 9.
+- Demand: each room is 1 line × 3 time bands, about 13 interactions, so about 39.
+- **Total before staff: about 52 interactions.**
+
+Staff schedules are about 6 per person by hand, or one CSV import (4 clicks).
+Credentials take one CSV import. RC1 (under 10 minutes) gets a timed Playwright run in
+Phase 7.
+
+### Gate
+- Typecheck clean for every workspace. The lint warnings are the existing `Date` purity
+  pattern.
+- Root `npm run build` passes, and `verify:dist` is identical (690 files).
+- Teams: 141 passed, 2 skipped.
+- Root: 587 passed, with the same 2 Days Off timing tests failing (environment, Q1).
+- Screenshots are in `docs/screenshots/rc-p2/`:
+  - Coverage, likely view, setup, demand editor open, credentials, import, credential
+    import preview, sick leave, employee home (draft showing the toddler gap) and employee
+    coverage.
+  - Each at 1440/768/375 (import preview at 1440/375).
+  - No horizontal overflow at 375 (checked with scrollWidth).
+- "Before" for the changed MVP views (import page and request form) is
+  `docs/screenshots/smb-p2/` and `smb-p6/`. The other views are new.
+
+### Questions for Atiyk (Phase 2)
+- Q4: A ratio gap warns the employee but does not stop them from asking. It only blocks
+  auto-approval, and the manager sees it. The other option is to block the request
+  outright. I recommend warning only, because the director may already have cover lined
+  up.
+- Q5: The CA labour citation regulation was renamed from "Cal. Labor Code § 246" to "Cal.
+  Labor Code" (the section carries the §). This is a data fix with no behaviour change.

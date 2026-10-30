@@ -10,8 +10,8 @@ const R = '2026-10-30';
 
 const CA_246 = 'https://california.public.law/codes/labor_code_section_246';
 const CA_510 = 'https://california.public.law/codes/ca_lab_code_section_510';
-const ca = (code: string, section: string, url: string, quote: string): Citation => ({
-  regulation: `Cal. Labor Code ${code}`,
+const ca = (section: string, url: string, quote: string): Citation => ({
+  regulation: 'Cal. Labor Code',
   section,
   url,
   retrievedOn: R,
@@ -41,7 +41,6 @@ export const LABOR_US_CA: RulePack = {
       annualAccrualCap: null,
       basis: 'law',
       citation: ca(
-        '§ 246',
         '§ 246(b)(1), (c), (d), (j)',
         CA_246,
         'not less than one hour per every 30 hours worked … beginning on the 90th day … 40 hours or five days … 80 hours or 10 days',
@@ -54,7 +53,7 @@ export const LABOR_US_CA: RulePack = {
       dailyHours: 8,
       weeklyHours: 40,
       basis: 'law',
-      citation: ca('§ 510', '§ 510(a)', CA_510, 'Any work in excess of eight hours in one workday and any work in excess of 40 hours in any one workweek'),
+      citation: ca('§ 510(a)', CA_510, 'Any work in excess of eight hours in one workday and any work in excess of 40 hours in any one workweek'),
     },
   ],
   notes: [
