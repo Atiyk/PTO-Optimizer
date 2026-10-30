@@ -233,8 +233,11 @@ async function rc5() {
   const list = (await run(mgr, 'getCoverRequests', {})).requests;
   expect(list.length).toBe(out.coverRequests.length);
   for (const r of list) {
-    expect(r.offers.length).toBeGreaterThan(0);
-    expect(r.offers.map((o) => o.rank)).toEqual([...r.offers.map((o) => o.rank)].sort((a, b) => a - b));
+    // The first wave went to the top of the engine's ranking for that window, in rank order.
+    const ranked = await run(mgr, 'findCover', { locationId: S.locationId, roomId: S.rooms[r.roomName], date: r.date, start: r.start, end: r.end, absentMemberId: S.staffIds[9] });
+    const top = ranked.candidates.filter((c) => c.eligible).slice(0, r.offers.length).map((c) => c.name!.untrusted_text);
+    expect(r.offers.map((o) => o.wave)).toEqual(r.offers.map(() => 1));
+    expect(r.offers.map((o) => o.name!.untrusted_text).sort()).toEqual([...top].sort());
   }
   expect(JSON.stringify(list)).not.toMatch(/migraine|sick/i);
   return { S };

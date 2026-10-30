@@ -49,7 +49,7 @@ function withForMember(input: z.ZodType): z.ZodType {
   if (input instanceof z.ZodObject) return input.extend(FOR_MEMBER);
   if (input instanceof z.ZodDiscriminatedUnion) {
     const options = (input.options as z.ZodObject[]).map((o) => o.extend(FOR_MEMBER));
-    return z.discriminatedUnion(input.def.discriminator, options as [z.ZodObject, ...z.ZodObject[]]);
+    return z.discriminatedUnion(input.def.discriminator, options as unknown as [z.ZodObject, ...z.ZodObject[]]);
   }
   return input;
 }
