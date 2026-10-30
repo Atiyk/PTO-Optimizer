@@ -11,6 +11,11 @@ const KIND: Record<string, string> = {
   ratio: 'Ratio', role_present: 'Required role', min_rest_between_shifts: 'Rest between shifts', max_hours_per_day: 'Hours per day',
   max_hours_per_week: 'Hours per week', max_consecutive_days: 'Days in a row', overtime_flag: 'Overtime', sick_accrual: 'Sick leave',
 };
+const FIELD: Record<string, string> = {
+  ageGroup: 'group', childrenPerStaff: 'per staff member', maxGroupSize: 'max group', credential: 'credential', min: 'at least', scope: 'per',
+  hours: 'hours', days: 'days', dailyHours: 'over hours/day', weeklyHours: 'over hours/week', hoursPerUnit: 'hours worked per hour earned',
+  annualUseCap: 'use cap/year', balanceCap: 'balance cap', annualAccrualCap: 'earn cap/year', usableFromDay: 'usable from day',
+};
 const SOURCE = { ai: 'Read by AI', demo: 'Demo mode (built-in rules stand in for AI)', rules: 'Read by the built-in rules (AI off)' } as const;
 
 /**
@@ -86,7 +91,7 @@ export function RuleDraft() {
                 <li key={i} className="rounded-md border border-line p-2">
                   <div className="flex flex-wrap items-baseline gap-2">
                     <span className="font-medium text-ink">{KIND[r.kind] ?? r.kind}</span>
-                    <span className="text-ink">{Object.entries(r.values).map(([k, v]) => `${k} ${v}`).join(' · ')}</span>
+                    <span className="text-ink">{Object.entries(r.values).map(([k, v]) => `${FIELD[k] ?? k}: ${v}`).join(' · ')}</span>
                     {basis === 'law' && <Badge tone="warn">needs verification</Badge>}
                   </div>
                   {r.quote && <blockquote className="mt-1 border-l-2 border-line pl-2 break-words text-muted [overflow-wrap:anywhere]">“{r.quote.untrusted_text}”</blockquote>}
