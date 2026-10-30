@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import type { Db } from '@/db/client';
-import { leaveRequests, leaveTypes, locations, members } from '@/db/schema';
+import { leaveRequests, leaveTypes, locations, memberCoverPrefs, members } from '@/db/schema';
 import { invokeCapability, type CapabilityName } from '@/capabilities/registry';
 import { ROLE_SCOPES } from '@/capabilities/scopes';
 import type { Actor } from '@/capabilities/types';
@@ -151,4 +151,97 @@ export async function seedChildcareCentre(db: Db, today: string, opts: { orgName
     });
   }
   return { org, ownerId: owner.id, managerId: ids[1]!, staffIds: ids, locationId: location.id, rooms: room, nextMonday };
+}
+
+/*
+ * Demo for the second vertical: a dental practice with two sites using the clinic pack.
+ * Configuration only (no clinic code): posts with a service each, demand as booked chairs,
+ * licences as credentials. Every rule is the practice's own policy, as the pack says.
+ * Next Tuesday a hygienist at the first site is on approved leave, so Hygiene 2 is a
+ * clinician short all day; the second site's part-time hygienist is free on Tuesdays and is
+ * the one cover can come from.
+ */
+const CLINIC_SITES = ['Harbor Dental Oakland', 'Harbor Dental Alameda'] as const;
+type ClinicStaff = [name: string, role: 'owner' | 'manager' | 'employee', post: 'Hygiene 1' | 'Hygiene 2' | 'Surgery' | null, licence: 'dds_licence' | 'rdh_licence' | null, days: number[]];
+const FULL = [0, 1, 2, 3, 4];
+const CLINIC_STAFF: ClinicStaff[][] = [
+  [
+    ['Rosa Delgado', 'owner', 'Surgery', 'dds_licence', FULL],
+    ['Ben Okafor', 'employee', 'Surgery', 'dds_licence', FULL],
+    ['Mia Chen', 'employee', 'Hygiene 1', 'rdh_licence', FULL],
+    ['Jonah Weiss', 'employee', 'Hygiene 2', 'rdh_licence', FULL],
+    ['Leila Haddad', 'employee', 'Surgery', null, FULL],
+    ['Carmen Ruiz', 'manager', null, null, []],
+  ],
+  [
+    ['Sam Patel', 'employee', 'Surgery', 'dds_licence', FULL],
+    ['Grace Liu', 'employee', 'Surgery', 'dds_licence', FULL],
+    ['Ines Moreau', 'employee', 'Hygiene 1', 'rdh_licence', FULL],
+    ['Theo Nakamura', 'employee', 'Hygiene 2', 'rdh_licence', [0, 2, 4]],
+    ['Ada Brooks', 'employee', 'Surgery', null, FULL],
+  ],
+];
+
+export async function seedClinic(db: Db, today: string, opts: { orgName?: string } = {}) {
+  const [[owner0]] = CLINIC_STAFF as [[ClinicStaff]];
+  const { org, owner, team, location } = await createOrganization(
+    db,
+    { provider: 'dev', subject: `clinic-owner-${opts.orgName ?? 'harbor'}`, name: owner0[0], email: null, slackTeamId: null, issuedAt: 0 },
+    { orgName: opts.orgName ?? 'Harbor Dental', countryCode: 'US', subdivisionCode: 'US-CA', teamName: 'Clinical staff', today },
+  );
+  const orgId = org.id;
+  const actor: Actor = { type: 'human', orgId, memberId: owner.id, role: 'owner', clientId: null, onBehalfOfMemberId: null, scopes: ROLE_SCOPES.owner };
+  const now = new Date(`${today}T16:00:00Z`);
+  const run = <N extends CapabilityName>(name: N, input: unknown) => invokeCapability(name, { db, actor, now }, input);
+
+  await run('manageSchedule', { op: 'setVertical', vertical: 'clinic' });
+  await db.update(locations).set({ name: CLINIC_SITES[0] }).where(eq(locations.id, location.id));
+  const siteIds: string[] = [location.id, (await run('manageOrgSetup', { op: 'addLocation', name: CLINIC_SITES[1], countryCode: 'US', subdivisionCode: 'US-CA' })).id!];
+  await run('manageCredentials', { op: 'define', key: 'dds_licence', name: 'Dentist licence (DDS/DMD)' });
+  await run('manageCredentials', { op: 'define', key: 'rdh_licence', name: 'Registered dental hygienist licence' });
+
+  const posts: Record<string, string>[] = [];
+  const ids: string[][] = [];
+  for (const [s, siteId] of siteIds.entries()) {
+    await run('manageSchedule', { op: 'setTimezone', locationId: siteId, timezone: 'America/Los_Angeles' });
+    await run('manageSchedule', { op: 'selectRulePack', locationId: siteId, packKey: 'clinic-template', effectiveFrom: '2026-01-01' });
+    await run('manageSchedule', { op: 'selectRulePack', locationId: siteId, packKey: 'labor-us-ca', sickPolicy: 'accrue', effectiveFrom: '2026-01-01' });
+    const post: Record<string, string> = {};
+    for (const [name, group] of [['Hygiene 1', 'hygiene'], ['Hygiene 2', 'hygiene'], ['Surgery', 'surgery']] as const) {
+      post[name] = (await run('manageSchedule', { op: 'upsertRoom', locationId: siteId, name, kind: 'post', groupKey: group })).id!;
+      // Bookings (counts only): a chair booked all day; one procedure every morning. Alameda's
+      // second hygiene chair runs on Theo's days only.
+      const rows = name === 'Surgery' ? [['09:00', '12:00', 1]] : [['08:00', '17:00', 1]];
+      const days = s === 1 && name === 'Hygiene 2' ? [0, 2, 4] : FULL;
+      await run('manageSchedule', { op: 'setDemand', roomId: post[name], rows: days.flatMap((weekday) => rows.map(([start, end, count]) => ({ weekday, start, end, group, count }))) });
+    }
+    posts.push(post);
+    const siteIdsOut: string[] = [];
+    for (const [i, [name, role, p, licence, days]] of CLINIC_STAFF[s]!.entries()) {
+      let id = owner.id;
+      if (!(s === 0 && i === 0)) {
+        const [m] = await db
+          .insert(members)
+          .values({ orgId, name, role, teamId: team.id, locationId: siteId, startDate: `${2019 + i}-0${(i % 9) + 1}-01`, tags: [licence === 'dds_licence' ? 'dentist' : licence ? 'hygienist' : role === 'manager' ? 'office' : 'assistant'], employmentType: role === 'employee' ? 'hourly' : 'salaried', hoursPerDay: '8' })
+          .returning();
+        id = m!.id;
+      }
+      siteIdsOut.push(id);
+      if (p) await run('manageSchedule', { op: 'setShifts', memberId: id, rows: days.map((weekday) => ({ roomId: post[p], weekday, start: '08:00', end: '17:00' })) });
+      if (licence) await run('manageCredentials', { op: 'grant', memberId: id, credentialKey: licence, issuedOn: '2020-01-01', expiresOn: `${Number(today.slice(0, 4)) + 1}-0${(i % 9) + 1}-28`, verified: true });
+    }
+    ids.push(siteIdsOut);
+  }
+  // Theo (Alameda, Mon/Wed/Fri) may cover at Oakland on his days off.
+  await db.insert(memberCoverPrefs).values({ orgId, memberId: ids[1]![3]!, optIn: 'yes', allowedLocationIds: siteIds });
+
+  const nextTuesday = addDays(today, ((1 - mondayIndexedDow(today) + 7) % 7) || 7);
+  const [vac] = (await db.select().from(leaveTypes).where(eq(leaveTypes.orgId, orgId))).filter((t) => t.key === 'vacation');
+  const jonah = await getMember(db, orgId, ids[0]![3]!);
+  const ev = await evaluateRequest(db, orgId, jonah, { leaveTypeKey: 'vacation', start: nextTuesday, end: nextTuesday, part: 'full' }, today);
+  await db.insert(leaveRequests).values({
+    orgId, memberId: jonah.id, leaveTypeId: vac!.id, status: 'approved', startDate: nextTuesday, endDate: nextTuesday,
+    engineSnapshot: { amount: ev.cost.amount, unit: ev.unit, chargedDates: ev.cost.chargedDates, excluded: ev.cost.excluded },
+  });
+  return { org, ownerId: owner.id, managerId: ids[0]![5]!, staffIds: ids, siteIds, posts, nextTuesday };
 }

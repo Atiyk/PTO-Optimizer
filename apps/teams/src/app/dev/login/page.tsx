@@ -6,7 +6,7 @@ import { members, organizations } from '@/db/schema';
 import { btnPrimary, btnSecondary, Card, input, label } from '@/components/ui';
 import { cookieOptions, devLoginEnabled, encodeIdentity, encodeSession, IDENTITY_COOKIE, IDENTITY_MAX_AGE, SESSION_COOKIE, SESSION_MAX_AGE_SEC } from '@/lib/session';
 import { seedDemoOrg } from '@/server/seed';
-import { seedChildcareCentre } from '@/server/seedCoverage';
+import { seedChildcareCentre, seedClinic } from '@/server/seedCoverage';
 
 /* Dev-only sign-in for local work and tests. Disabled in production unless DEV_LOGIN=1. */
 
@@ -50,6 +50,15 @@ async function seedChildcare() {
   redirect('/app/coverage');
 }
 
+async function seedClinicDemo() {
+  'use server';
+  if (!devLoginEnabled()) notFound();
+  const db = await getDb();
+  const { ownerId, org } = await seedClinic(db, new Date().toISOString().slice(0, 10));
+  (await cookies()).set(SESSION_COOKIE, encodeSession({ memberId: ownerId, orgId: org.id, issuedAt: Math.floor(Date.now() / 1000) }), cookieOptions(SESSION_MAX_AGE_SEC));
+  redirect('/app/coverage');
+}
+
 export const dynamic = 'force-dynamic';
 
 export default async function DevLogin({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
@@ -76,6 +85,9 @@ export default async function DevLogin({ searchParams }: { searchParams: Promise
         </form>
         <form action={seedChildcare} className="mt-3">
           <button className={btnSecondary}>Create the 18-person childcare centre (California)</button>
+        </form>
+        <form action={seedClinicDemo} className="mt-3">
+          <button className={btnSecondary}>Create the 2-site dental clinic (clinic pack)</button>
         </form>
       </Card>
       {orgs.map((o) => (
