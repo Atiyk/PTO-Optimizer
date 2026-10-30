@@ -52,6 +52,12 @@ export const organizations = pgTable('organizations', {
   isDemo: boolean('is_demo').notNull().default(false),
   /** Minutes an auto-approval stays reversible by the manager. */
   autoApprovalReversibleMinutes: integer('auto_approval_reversible_minutes').notNull().default(48 * 60),
+  /** Regulated coverage (COVERAGE-SPEC): `general` = MVP behaviour, unchanged. */
+  vertical: text('vertical', { enum: ['general', 'childcare', 'clinic'] }).notNull().default('general'),
+  /** Pay rates are stored only while this is on (COVERAGE-SPEC §6). */
+  costAwareRanking: boolean('cost_aware_ranking').notNull().default(false),
+  /** Health-data minimisation: call-off reasons are not stored unless enabled. */
+  callOffReasonsEnabled: boolean('call_off_reasons_enabled').notNull().default(false),
   createdAt: createdAt(),
 });
 
@@ -116,6 +122,8 @@ export const members = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
+    /** Hourly staff accrue sick leave from imported hours worked. */
+    employmentType: text('employment_type', { enum: ['salaried', 'hourly'] }).notNull().default('salaried'),
     createdAt: createdAt(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
@@ -217,6 +225,11 @@ export const leaveRequests = pgTable(
     reversibleUntil: timestamp('reversible_until', { withTimezone: true }),
     replacesRequestId: uuid('replaces_request_id'),
     idempotencyKey: text('idempotency_key'),
+    /** `call_off`: created by reportCallOff (no reason stored by default). */
+    source: text('source', { enum: ['request', 'call_off'] }).notNull().default('request'),
+    /** Local start/end minutes for `part = hours`, so leave maps onto coverage blocks. */
+    startMinute: smallint('start_minute'),
+    endMinute: smallint('end_minute'),
     createdAt: createdAt(),
   },
   (t) => [
@@ -454,7 +467,16 @@ export const rateCounters = pgTable('rate_counters', {
   count: integer('count').notNull().default(0),
 });
 
-export const WEBHOOK_EVENTS = ['leave.requested', 'leave.decided', 'balance.expiring', 'plan.proposed'] as const;
+export const WEBHOOK_EVENTS = [
+  'leave.requested',
+  'leave.decided',
+  'balance.expiring',
+  'plan.proposed',
+  'coverage.gap_detected',
+  'cover.requested',
+  'cover.filled',
+  'credential.expiring',
+] as const;
 
 export const webhookEndpoints = pgTable(
   'webhook_endpoints',
@@ -539,4 +561,387 @@ export const slackStatusGrants = pgTable(
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex('slack_status_grants_member_idx').on(t.memberId)],
+);
+
+// ─── Regulated coverage (docs/teams/COVERAGE-SPEC.md §2) ──────────────────────────────────
+// Child data rule: demand tables hold COUNTS per group only. No child names, birthdays or
+// identifiers anywhere (enforced by schema.childData.test.ts).
+
+const localMinute = (name: string) => smallint(name).notNull();
+
+/** A room (childcare) or post (clinic) at a site (= location). */
+export const rooms = pgTable(
+  'rooms',
+  {
+    id: id(),
+    orgId: orgRef(),
+    locationId: uuid('location_id')
+      .notNull()
+      .references(() => locations.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    kind: text('kind', { enum: ['room', 'post'] }).notNull().default('room'),
+    /** Pack demand group: an age group (childcare) or a service (clinic). */
+    groupKey: text('group_key'),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('rooms_org_loc_idx').on(t.orgId, t.locationId)],
+);
+
+/** Credential types an org tracks, e.g. `cpr`, `fully_qualified_teacher`, `rdh_licence`. */
+export const credentials = pgTable(
+  'credentials',
+  {
+    id: id(),
+    orgId: orgRef(),
+    key: text('key').notNull(),
+    name: text('name').notNull(),
+    needsExpiry: boolean('needs_expiry').notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('credentials_org_key_idx').on(t.orgId, t.key)],
+);
+
+export const memberCredentials = pgTable(
+  'member_credentials',
+  {
+    id: id(),
+    orgId: orgRef(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    credentialId: uuid('credential_id')
+      .notNull()
+      .references(() => credentials.id, { onDelete: 'cascade' }),
+    issuedOn: date('issued_on'),
+    expiresOn: date('expires_on'),
+    /** Where the evidence is kept (e.g. "binder, office"). Never a copy of an ID document. */
+    evidenceRef: text('evidence_ref'),
+    verifiedByMemberId: uuid('verified_by_member_id'),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    importBatchId: uuid('import_batch_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('member_creds_org_member_idx').on(t.orgId, t.memberId), index('member_creds_expiry_idx').on(t.orgId, t.expiresOn)],
+);
+
+/** An org's immutable copy of a rule pack version (seeded, edited or drafted from text). */
+export const rulePacks = pgTable(
+  'rule_packs',
+  {
+    id: id(),
+    orgId: orgRef(),
+    key: text('key').notNull(),
+    version: integer('version').notNull(),
+    /** The full engine RulePack JSON. Versions are never updated; edits insert a new version. */
+    pack: jsonb('pack').notNull(),
+    source: text('source', { enum: ['seed', 'edited', 'drafted'] }).notNull().default('seed'),
+    createdByMemberId: uuid('created_by_member_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('rule_packs_org_key_version_idx').on(t.orgId, t.key, t.version)],
+);
+
+/** Which packs apply at a site, from a date (a childcare pack plus a labour pack, typically). */
+export const siteRulePacks = pgTable(
+  'site_rule_packs',
+  {
+    id: id(),
+    orgId: orgRef(),
+    locationId: uuid('location_id')
+      .notNull()
+      .references(() => locations.id, { onDelete: 'cascade' }),
+    rulePackId: uuid('rule_pack_id')
+      .notNull()
+      .references(() => rulePacks.id, { onDelete: 'cascade' }),
+    effectiveFrom: date('effective_from').notNull(),
+    effectiveTo: date('effective_to'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('site_packs_org_loc_idx').on(t.orgId, t.locationId)],
+);
+
+/** Weekly demand template: COUNTS per group per local time window. */
+export const demandTemplates = pgTable(
+  'demand_templates',
+  {
+    id: id(),
+    orgId: orgRef(),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    /** Monday = 0. */
+    weekday: smallint('weekday').notNull(),
+    startMinute: localMinute('start_minute'),
+    endMinute: localMinute('end_minute'),
+    groupKey: text('group_key').notNull(),
+    count: integer('count').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index('demand_tpl_org_room_idx').on(t.orgId, t.roomId)],
+);
+
+/** Dated demand exceptions (counts) or closures. */
+export const demandExceptions = pgTable(
+  'demand_exceptions',
+  {
+    id: id(),
+    orgId: orgRef(),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    date: date('date').notNull(),
+    closed: boolean('closed').notNull().default(false),
+    startMinute: smallint('start_minute'),
+    endMinute: smallint('end_minute'),
+    groupKey: text('group_key'),
+    count: integer('count'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('demand_ex_org_room_date_idx').on(t.orgId, t.roomId, t.date)],
+);
+
+/** Weekly shift template per member. `end_minute ≤ start_minute` crosses midnight. */
+export const shiftTemplates = pgTable(
+  'shift_templates',
+  {
+    id: id(),
+    orgId: orgRef(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    weekday: smallint('weekday').notNull(),
+    startMinute: localMinute('start_minute'),
+    endMinute: localMinute('end_minute'),
+    effectiveFrom: date('effective_from'),
+    effectiveTo: date('effective_to'),
+    importBatchId: uuid('import_batch_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('shift_tpl_org_member_idx').on(t.orgId, t.memberId), index('shift_tpl_org_room_idx').on(t.orgId, t.roomId)],
+);
+
+/** Dated schedule changes: an extra/changed shift, or `off`. Accepted cover lands here. */
+export const shiftExceptions = pgTable(
+  'shift_exceptions',
+  {
+    id: id(),
+    orgId: orgRef(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    date: date('date').notNull(),
+    kind: text('kind', { enum: ['shift', 'off'] }).notNull().default('shift'),
+    roomId: uuid('room_id').references(() => rooms.id, { onDelete: 'cascade' }),
+    startMinute: smallint('start_minute'),
+    endMinute: smallint('end_minute'),
+    coverRequestId: uuid('cover_request_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('shift_ex_org_member_date_idx').on(t.orgId, t.memberId, t.date), index('shift_ex_org_date_idx').on(t.orgId, t.date)],
+);
+
+/** Hours actually worked, imported per pay period (payroll / time clock CSV). Append-only. */
+export const hoursWorked = pgTable(
+  'hours_worked',
+  {
+    id: id(),
+    orgId: orgRef(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    periodStart: date('period_start').notNull(),
+    periodEnd: date('period_end').notNull(),
+    hours: numeric('hours', { precision: 7, scale: 2 }).notNull(),
+    importBatchId: uuid('import_batch_id'),
+    /** Rolled-back imports are voided, never deleted. */
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('hours_org_member_idx').on(t.orgId, t.memberId, t.periodEnd)],
+);
+
+export const COVER_SOURCES = ['leave_request', 'call_off', 'credential_lapse', 'manual'] as const;
+export const COVER_EVENT_KINDS = [
+  'created',
+  'ranked',
+  'offers_sent',
+  'accepted',
+  'declined',
+  'rule_recheck_failed',
+  'filled',
+  'cancelled',
+  'reverted',
+] as const;
+
+export const coverRequests = pgTable(
+  'cover_requests',
+  {
+    id: id(),
+    orgId: orgRef(),
+    locationId: uuid('location_id')
+      .notNull()
+      .references(() => locations.id, { onDelete: 'cascade' }),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    date: date('date').notNull(),
+    startMinute: localMinute('start_minute'),
+    endMinute: localMinute('end_minute'),
+    /** Engine snapshot of the gap: rule broken, required, present, citation. */
+    gap: jsonb('gap').notNull(),
+    source: text('source', { enum: COVER_SOURCES }).notNull(),
+    sourceId: uuid('source_id'),
+    absentMemberId: uuid('absent_member_id'),
+    waveSize: smallint('wave_size').notNull().default(3),
+    waveWaitMinutes: smallint('wave_wait_minutes').notNull().default(15),
+    createdByMemberId: uuid('created_by_member_id'),
+    /** Retries of requestCover with the same key return the same request. */
+    idempotencyKey: text('idempotency_key'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('cover_req_org_date_idx').on(t.orgId, t.date), uniqueIndex('cover_req_idem_idx').on(t.orgId, t.idempotencyKey)],
+);
+
+export const coverOffers = pgTable(
+  'cover_offers',
+  {
+    id: id(),
+    orgId: orgRef(),
+    coverRequestId: uuid('cover_request_id')
+      .notNull()
+      .references(() => coverRequests.id, { onDelete: 'cascade' }),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    wave: smallint('wave').notNull(),
+    rank: smallint('rank').notNull(),
+    channel: text('channel').notNull(),
+    sentAt: timestamp('sent_at', { withTimezone: true }).notNull(),
+    response: text('response', { enum: ['accepted', 'declined', 'expired', 'superseded'] }),
+    respondedAt: timestamp('responded_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('cover_offer_req_member_idx').on(t.coverRequestId, t.memberId), index('cover_offer_org_member_idx').on(t.orgId, t.memberId)],
+);
+
+/** APPEND-ONLY cover history. A request's state is a fold over its events. */
+export const coverEvents = pgTable(
+  'cover_events',
+  {
+    id: id(),
+    orgId: orgRef(),
+    coverRequestId: uuid('cover_request_id')
+      .notNull()
+      .references(() => coverRequests.id, { onDelete: 'cascade' }),
+    at: timestamp('at', { withTimezone: true }).notNull(),
+    kind: text('kind', { enum: COVER_EVENT_KINDS }).notNull(),
+    memberId: uuid('member_id'),
+    actorType: text('actor_type', { enum: ACTOR_TYPES }).notNull().default('human'),
+    actorMemberId: uuid('actor_member_id'),
+    data: jsonb('data'),
+  },
+  (t) => [
+    index('cover_events_req_idx').on(t.coverRequestId, t.at),
+    // Exactly one `filled` per request: two simultaneous accepts cannot both win (RC4).
+    uniqueIndex('cover_events_one_fill_idx').on(t.coverRequestId).where(sql`kind = 'filled'`),
+    index('cover_events_org_member_idx').on(t.orgId, t.memberId, t.kind),
+  ],
+);
+
+/** Cover preferences per member. */
+export const memberCoverPrefs = pgTable(
+  'member_cover_prefs',
+  {
+    id: id(),
+    orgId: orgRef(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    optIn: text('opt_in', { enum: ['yes', 'no', 'ask'] }).notNull().default('ask'),
+    allowedLocationIds: uuid('allowed_location_ids')
+      .array()
+      .notNull()
+      .default(sql`'{}'::uuid[]`),
+    /** Text-message cover offers: only with explicit opt-in, and only once an SMS provider is configured. */
+    smsOptIn: boolean('sms_opt_in').notNull().default(false),
+    smsPhone: text('sms_phone'),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('cover_prefs_org_member_idx').on(t.orgId, t.memberId)],
+);
+
+/** WebAuthn passkeys for staff without Slack (public keys only; never a secret). */
+export const passkeys = pgTable(
+  'passkeys',
+  {
+    id: id(),
+    orgId: orgRef(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    credentialId: text('credential_id').notNull(),
+    publicKey: text('public_key').notNull(),
+    counter: integer('counter').notNull().default(0),
+    transports: text('transports').array().notNull().default(sql`'{}'::text[]`),
+    name: text('name'),
+    createdAt: createdAt(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  },
+  (t) => [uniqueIndex('passkeys_credential_idx').on(t.credentialId), index('passkeys_org_member_idx').on(t.orgId, t.memberId)],
+);
+
+/** Admin-issued one-time sign-in codes (fallback to passkeys). Hashed, short-lived, single use. */
+export const loginCodes = pgTable(
+  'login_codes',
+  {
+    id: id(),
+    orgId: orgRef(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    codeHash: text('code_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    attempts: smallint('attempts').notNull().default(0),
+    createdByMemberId: uuid('created_by_member_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('login_codes_member_idx').on(t.memberId, t.createdAt)],
+);
+
+/** Web Push subscriptions for cover offers. */
+export const pushSubscriptions = pgTable(
+  'push_subscriptions',
+  {
+    id: id(),
+    orgId: orgRef(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    endpoint: text('endpoint').notNull(),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('push_endpoint_idx').on(t.endpoint), index('push_org_member_idx').on(t.orgId, t.memberId)],
+);
+
+/** Pay rates: only while the org has cost-aware ranking on; owner/admin only; never to the LLM. */
+export const memberPayRates = pgTable(
+  'member_pay_rates',
+  {
+    id: id(),
+    orgId: orgRef(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    hourlyRate: numeric('hourly_rate', { precision: 8, scale: 2 }).notNull(),
+    effectiveFrom: date('effective_from').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index('pay_rates_org_member_idx').on(t.orgId, t.memberId)],
 );

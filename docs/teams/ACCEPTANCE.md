@@ -31,3 +31,44 @@ build with `DEV_LOGIN=1` in place of Slack sign-in. Screens are in
    came out. The injection was never obeyed (the checks rejected it), but it did knock out a value.
    The reader now ignores sentences that read like instructions to a model.
 3. **Grammar:** auto-approval reasons said "1 days". They now say "1 day".
+
+# Regulated coverage: acceptance scenarios RC1–RC12
+
+Last run: 2026-10-30, on `claude/rc-p7-demo`. Tests run with PGlite in memory and AI off unless
+stated (`src/acceptance/rc.test.ts`, 11 tests). Browser runs use the production build with
+`DEV_LOGIN=1` (`e2e/rc-setup.mjs`, `e2e/rc-acceptance.mjs`). Screens are in
+`docs/screenshots/rc-p7/` at 1440/768/375 (the staff app at 375, its design target). Not legal
+advice: the rule packs are listed with their citations in `RULE-PACKS.md`.
+
+| # | Scenario | Proven by | Result |
+|---|---|---|---|
+| RC1 | A 15-person centre set up from forms and CSV in under 10 minutes | `rc.test.ts` "RC1" (sign-up, the three sample CSVs, the CA childcare and labour packs, 3 rooms, demand); browser: `e2e/rc-setup.mjs` (screens `rc1-setup`, `rc1-coverage`, counts in `rc1-counts.json`) | **Pass.** 28 clicks, 33 typed fields, 10 picks and 3 file picks. That is about 6.2 minutes at a person's pace (3 s a click, 6 s a field, 20 s to find a file); the script took 7 s. All 5 weekdays show no gaps |
+| RC2 | Approved leave opens a toddler ratio gap 14:00–18:00, shown with the citation | `rc.test.ts` "RC2"; screen `rc2-coverage-gap` | **Pass.** Toddlers short 1 from 14:00 to 18:00 on Thu 5 Nov, citing H&S Code § 1596.955 |
+| RC3 | findCover excludes an expired CPR and a rest-rule breach, says why, ranks deterministically | `rc.test.ts` "RC3"; `packages/engine/src/coverage/ranking.test.ts`; screen `rc3-find-cover` | **Pass.** "pediatric_cpr expired on 2026-10-29"; "10 h rest next to the cover; minimum 11 h" (your policy, drafted from pasted text); the same order whatever the input order |
+| RC4 | Two simultaneous accepts: exactly one wins; rules re-checked at accept | `rc.test.ts` "RC4"; `src/capabilities/cover.test.ts` | **Pass.** One `filled`, one `already_filled`, one fill event; someone whose leave was approved after the offer went out gets `no_longer_eligible` at accept |
+| RC5 | Two-tap call-off at 375 px; the manager gets a ranked request; no reason stored | `rc.test.ts` "RC5" (the reason "migraine" is in no table); browser: `e2e/rc-acceptance.mjs` (screens `rc5-m-today`, `rc5-m-calloff-confirm`, `rc5-m-calloff-done`, `rc5-manager-cover-requests`) | **Pass.** 2 taps, no reason field; the wave-1 offers go to findCover's top eligible people |
+| RC6 | CA and NYC sick leave from imported hours match hand-computed numbers, incl. cap and carryover | `rc.test.ts` "RC6" | **Pass.** CA: 72 h on 31 Dec, 78 h on 31 Jan, then capped at 80. NYC (20 staff): 40, 46, 76, then capped at 80 |
+| RC7 | Pasted regulation → cited draft; "not stated" → question; injection does nothing | `rc.test.ts` "RC7" (the built-in reader with AI off, then a scripted model run through the same checks); screen `rc7-rules-draft` | **Pass.** Ratios 4, 6 and 12 kept with their quotes; the injected ratio rejected; a group size the quote doesn't state becomes a question |
+| RC8 | A credential expiring in 10 days is in the alerts and the forecast | `rc.test.ts` "RC8"; screens `rc8-credential-alerts`, `rc8-forecast` | **Pass.** In the 14-day band; the forecast's first gap is 11 Nov, 3 days short |
+| RC9 | AI off: RC1–RC6 and RC8 work through forms | `rc.test.ts` "RC9" (`AI_DISABLED=1`, no provider override) | **Pass.** No AI usage rows, and no request to the Anthropic API |
+| RC10 | A service agent reads coverage and finds cover; offers become a draft; no pay rates; no other org | `rc.test.ts` "RC10" (an MCP client with a `coverage:read` + `cover:request` key, cost-aware ranking on and pay rates stored) | **Pass after a fix** (below). 24 tools at most, no admin tools; `requestCover` returns `confirmation_required` and sends nothing until the manager confirms (3 offers then); no rate value in any output; the other org's site is `not_found` |
+| RC11 | Non-regulated MVP orgs unchanged: regression green, A1–A12 pass | The whole teams suite (`src/acceptance.test.ts` A1–A12, `isolation.test.ts`, `agents.test.ts`); Days Off `verify:dist` | **Pass.** Teams 200 passed, 3 skipped (live evals); Days Off dist identical (690 files) |
+| RC12 | The clinic pack runs the same flow with configuration only | `rc.test.ts` "RC12" (the two-site dental clinic seed); screens `rc12-clinic-coverage`, `rc12-clinic-find-cover` | **Pass.** Oakland Hygiene 2 short 08:00–17:00 (your policy); Theo ranked first, accepts, gap closed. No clinic word appears in engine, domain or capability code |
+
+## Bugs the RC run found (fixed on `claude/rc-p7-demo`)
+
+1. **Service agents couldn't use manager-level coverage tools.** A service agent has no member
+   role, so `findCover` and `requestCover` were refused even with the right scopes, and the MCP
+   tool list showed tools it couldn't call. Service agents now pass the role gate for
+   manager-level capabilities only, still within their scopes; the tool list hides what an actor
+   can't call (`roleAllows`).
+2. **A service agent couldn't name the manager for a `requestCover` draft.** `forMemberId` was
+   only added to object-shaped inputs, and `requestCover` is an op-style union. It is now added
+   to each branch.
+3. **The rest rule counted a shift that runs straight into the cover as "0 h rest".** A shift
+   ending when the cover starts (or starting when it ends) is now one stretch of work, and rest is
+   measured from the whole stretch.
+4. **Coverage dates accepted impossible days** such as 2027-02-30. They are now validated as real
+   dates.
+5. **Onboarding named the first site "US-US-CA"** when the region code already had the country
+   prefix.

@@ -36,6 +36,20 @@
       "when": 1793334187820,
       "tag": "0004_demo_org",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793337999946,
+      "tag": "0005_regulated_coverage",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793341313973,
+      "tag": "0006_cover_workflow",
+      "breakpoints": true
     }
   ]
 }

@@ -14,6 +14,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     ['/app', 'My leave'],
     ['/app/calendar', 'Calendar'],
   ];
+  if (org.vertical !== 'general') links.push(['/app/coverage', 'Coverage'], ['/app/sick', 'Sick leave']);
   if (actor.role !== 'employee') links.push(['/app/approvals', 'Approvals'], ['/app/planner', 'Planner']);
   links.push(['/app/agents', 'My agents']);
   if (actor.role === 'owner' || actor.role === 'admin') links.push(['/app/admin', 'Admin']);

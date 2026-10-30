@@ -6,6 +6,9 @@ import type { AiTask } from './task';
 import { verifyHandbookProposal } from './handbook';
 import { HANDBOOK_FIELDS, importHandbookTask, type HandbookProposal } from './tasks/importHandbook';
 import { parseLeaveRequestTask, type ParsedRequest } from './tasks/parseLeaveRequest';
+import { verifyRulePackProposal } from './rulePack';
+import { parseCoverTextTask, type ParsedCover } from './tasks/parseCoverText';
+import { rulePackFromTextTask, type DraftRule, type RulePackProposal, type RulePackTextInput } from './tasks/rulePackFromText';
 
 /**
  * R7: evals run the same task definitions through any provider. CI uses the mock provider
@@ -142,4 +145,109 @@ export async function evalHandbooks(provider: AiProvider): Promise<EvalReport & 
     })),
   );
   return { ...report, fieldAccuracy: fieldsTotal ? fieldsOk / fieldsTotal : 0 };
+}
+
+// ---- Regulated coverage (Phase 4) ----
+
+interface RuleExpect {
+  kind: DraftRule['kind'];
+  ageGroup?: string;
+  credential?: string;
+  [field: string]: unknown;
+}
+interface RegulationExpect {
+  vertical: RulePackTextInput['vertical'];
+  basis?: 'law' | 'org_policy';
+  rules: RuleExpect[];
+  optional?: RuleExpect[];
+  forbidden?: RuleExpect[];
+}
+
+export function loadRegulationCases(): Array<{ file: string; text: string; expect: RegulationExpect }> {
+  const expected = JSON.parse(readFileSync(join(EVAL_DIR, 'regulations.expected.json'), 'utf8')) as Record<string, RegulationExpect | string>;
+  return Object.entries(expected)
+    .filter(([k]) => !k.startsWith('_'))
+    .map(([file, expect]) => ({ file, text: readFileSync(join(EVAL_DIR, 'regulations', file), 'utf8'), expect: expect as RegulationExpect }));
+}
+
+const ruleMatches = (r: DraftRule, e: RuleExpect) =>
+  r.kind === e.kind &&
+  (!e.ageGroup || (r.ageGroup ?? '').toLowerCase().includes(e.ageGroup)) &&
+  (!e.credential || (r.credential ?? '').toLowerCase().includes(e.credential)) &&
+  Object.entries(e).every(([k, v]) => k === 'kind' || k === 'ageGroup' || k === 'credential' || (r as unknown as Record<string, unknown>)[k] === v);
+
+/**
+ * Scores the VERIFIED rules (model + quote, number and bounds checks): recall over expected
+ * rules, precision over kept rules, and any forbidden (injected) rule kept is a failure.
+ */
+export async function evalRegulations(provider: AiProvider) {
+  let expected = 0;
+  let found = 0;
+  let kept = 0;
+  let correct = 0;
+  let injected = 0;
+  const report = await runCases(
+    provider,
+    rulePackFromTextTask,
+    loadRegulationCases().map((c) => ({
+      id: c.file,
+      input: { text: c.text, vertical: c.expect.vertical },
+      check: (o: RulePackProposal) => {
+        const v = verifyRulePackProposal(c.text, o, {
+          name: c.file, key: 'org-eval', vertical: c.expect.vertical, basis: c.expect.basis ?? 'law', effectiveFrom: '2026-01-01',
+          jurisdiction: { country: 'US' }, credentials: [],
+        });
+        const ok = v.checked.filter((x) => x.status === 'verified').map((x) => x.rule);
+        const problems: string[] = [];
+        for (const e of c.expect.rules) {
+          expected++;
+          if (ok.some((r) => ruleMatches(r, e))) found++;
+          else problems.push(`missing ${JSON.stringify(e)}`);
+        }
+        for (const r of ok) {
+          kept++;
+          // A kept rule is correct when it carries some expected (or optional) fact; sick and overtime rules are split across sentences.
+          if ([...c.expect.rules, ...(c.expect.optional ?? [])].some((e) => e.kind === r.kind && (r.kind === 'sick_accrual' || r.kind === 'overtime_flag' ? Object.entries(e).some(([k, val]) => k !== 'kind' && (r as unknown as Record<string, unknown>)[k] === val) : ruleMatches(r, e)))) correct++;
+          else problems.push(`unexpected ${r.kind} ${JSON.stringify({ g: r.ageGroup, n: r.childrenPerStaff, h: r.hours, d: r.days, q: r.quote?.slice(0, 60) })}`);
+        }
+        for (const f of c.expect.forbidden ?? []) {
+          if (ok.some((r) => ruleMatches(r, f))) {
+            injected++;
+            problems.push(`INJECTED rule kept ${JSON.stringify(f)}`);
+          }
+        }
+        return problems.length ? problems.join('; ') : null;
+      },
+    })),
+  );
+  return { ...report, recall: expected ? found / expected : 0, precision: kept ? correct / kept : 1, injectedKept: injected };
+}
+
+interface CoverCase {
+  text: string;
+  manager: boolean;
+  expect: Partial<ParsedCover> & { question?: boolean };
+}
+
+export function loadCoverCases() {
+  return JSON.parse(readFileSync(join(EVAL_DIR, 'cover.cases.json'), 'utf8')) as { today: string; rooms: string[]; cases: CoverCase[] };
+}
+
+export async function evalCoverText(provider: AiProvider): Promise<EvalReport> {
+  const doc = loadCoverCases();
+  return runCases(
+    provider,
+    parseCoverTextTask,
+    doc.cases.map((c, i) => ({
+      id: `${i + 1}: ${c.text}${c.manager ? ' (manager)' : ''}`,
+      input: { text: c.text, today: doc.today, rooms: doc.rooms, canRequestCover: c.manager },
+      check: (o: ParsedCover) => {
+        const { question, ...want } = c.expect;
+        const bad = Object.entries(want).filter(([k, v]) => (o as Record<string, unknown>)[k] !== v);
+        if (question && !o.clarifyingQuestion) bad.push(['clarifyingQuestion', 'expected a question']);
+        if (!question && want.intent !== 'other' && o.clarifyingQuestion && !(want.intent === 'cover_request' && o.room && o.date && o.start && o.end)) bad.push(['clarifyingQuestion', 'unexpected question']);
+        return bad.length ? `got ${JSON.stringify(o)}` : null;
+      },
+    })),
+  );
 }

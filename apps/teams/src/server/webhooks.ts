@@ -236,6 +236,19 @@ export function requestEventData(x: RequestEventInput): object {
   };
 }
 
+const NOT_LEGAL_ADVICE_SHORT = 'Not legal advice. Each rule shows its source or "needs verification".';
+const SAMPLE_GAP = {
+  site: { id: '00000000-0000-4000-8000-000000000005', name: 'Sample Site' },
+  room: { id: '00000000-0000-4000-8000-000000000006', name: 'Toddlers' },
+  date: '2026-12-21',
+  start: '15:30',
+  end: '16:30',
+  rule: { id: 'ca-toddler-ratio', label: 'Toddler program: 1 teacher per 6', kind: 'ratio', basis: 'law', needsVerification: false, citation: null },
+  required: 2,
+  present: 1,
+  short: 1,
+};
+
 /** Sample bodies for "send test event". */
 export function sampleEventData(event: WebhookEvent): object {
   const member = { id: '00000000-0000-4000-8000-000000000001', name: { untrusted_text: 'Sample Person' } };
@@ -250,6 +263,17 @@ export function sampleEventData(event: WebhookEvent): object {
       return { test: true, member, leaveType: 'vacation', amount: 4, unit: 'days', deadline: '2026-12-31', daysLeft: 30 };
     case 'plan.proposed':
       return { test: true, member, leaveType: 'vacation', deadline: '2026-12-31', blocks: [{ start: '2026-12-21', end: '2026-12-23' }], proposalId: '00000000-0000-4000-8000-000000000003' };
+    case 'coverage.gap_detected':
+      return { test: true, ...SAMPLE_GAP, notice: NOT_LEGAL_ADVICE_SHORT };
+    case 'cover.requested':
+    case 'cover.filled':
+      return {
+        test: true,
+        coverRequest: { id: '00000000-0000-4000-8000-000000000004', site: SAMPLE_GAP.site, room: SAMPLE_GAP.room, date: SAMPLE_GAP.date, start: SAMPLE_GAP.start, end: SAMPLE_GAP.end, source: 'call_off', rule: SAMPLE_GAP.rule, short: 1 },
+        ...(event === 'cover.filled' ? { filledBy: member } : {}),
+      };
+    case 'credential.expiring':
+      return { test: true, member, credential: { key: 'pediatric_cpr', name: 'Pediatric CPR and first aid' }, expiresOn: '2026-12-31', daysLeft: 14 };
   }
 }
 

@@ -21,12 +21,48 @@ export const requestInput = z.object({
     .default('full')
     .describe('full days, a morning (am) or afternoon (pm) half day, or a number of hours on one day.'),
   hours: z.number().positive().max(24).optional().describe('Only when part = "hours".'),
+  startTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'HH:MM')
+    .optional()
+    .describe('Only when part = "hours": local start time, HH:MM. With endTime, lets regulated sites check the exact staffing blocks.'),
+  endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'HH:MM').optional().describe('Only when part = "hours": local end time, HH:MM.'),
   note: z
     .string()
     .max(500)
     .nullable()
     .optional()
     .describe('Optional note for the approver. Not allowed on sick/health leave unless the org enabled notes.'),
+});
+
+export const blockGapOutput = z.object({
+  date: z.string(),
+  start: z.string(),
+  end: z.string(),
+  roomName: z.string().nullable(),
+  ruleId: z.string(),
+  label: z.string(),
+  required: z.number(),
+  present: z.number(),
+  short: z.number(),
+  basis: z.enum(['law', 'org_policy']),
+  needsVerification: z.boolean(),
+  citation: z.object({ regulation: z.string(), section: z.string(), url: z.string(), retrievedOn: z.string() }).nullable(),
+});
+
+export const toBlockGapOutput = (g: Evaluation['blockCoverage'][number]): z.infer<typeof blockGapOutput> => ({
+  date: g.date,
+  start: g.start,
+  end: g.end,
+  roomName: g.roomName,
+  ruleId: g.ruleId,
+  label: g.label,
+  required: g.required,
+  present: g.present,
+  short: g.short,
+  basis: g.basis,
+  needsVerification: g.needsVerification,
+  citation: g.citation ? { regulation: g.citation.regulation, section: g.citation.section, url: g.citation.url, retrievedOn: g.citation.retrievedOn } : null,
 });
 
 export const evaluationOutput = z.object({
@@ -40,6 +76,9 @@ export const evaluationOutput = z.object({
   balanceAfter: z.number().nullable(),
   yearEndAfter: z.object({ yearEnd: z.string(), balance: z.number(), wouldForfeit: z.number() }).nullable(),
   coverage: z.array(z.object({ date: z.string(), required: z.number(), present: z.number(), tag: z.string().nullable() })),
+  blockCoverage: z
+    .array(blockGapOutput)
+    .describe('Regulated sites only: staffing-ratio or required-role gaps this absence would open, per time window, with the rule and its citation. Not legal advice.'),
   blackouts: z.array(z.object({ start: z.string(), end: z.string(), reason: z.object({ untrusted_text: z.string() }).nullable(), hard: z.boolean() })),
   retroactive: z.boolean(),
   problems: z.array(z.string()).describe('Blocking. The request cannot be submitted until these are fixed.'),
@@ -59,6 +98,7 @@ export function evaluationToOutput(e: Evaluation): z.infer<typeof evaluationOutp
     balanceAfter: e.balanceAfter,
     yearEndAfter: e.yearEndAfter,
     coverage: e.coverage.map((c) => ({ date: c.date, required: c.required, present: c.present, tag: c.tag })),
+    blockCoverage: e.blockCoverage.map(toBlockGapOutput),
     blackouts: e.blackouts.map((b) => ({ start: b.start, end: b.end, reason: untrusted(b.reason), hard: b.hard })),
     retroactive: e.retroactive,
     problems: e.problems,
@@ -73,15 +113,23 @@ const toEval = (i: z.infer<typeof requestInput>) => ({
   end: i.end,
   part: i.part,
   hours: i.hours,
+  startMinute: i.startTime ? minuteOf(i.startTime) : undefined,
+  endMinute: i.endTime ? minuteOf(i.endTime) : undefined,
   note: i.note ?? null,
 });
+
+const minuteOf = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+/** Hours given, or derived from the start and end times. */
+const hoursOf = (i: z.infer<typeof requestInput>) =>
+  i.hours ?? (i.part === 'hours' && i.startTime && i.endTime ? (minuteOf(i.endTime) - minuteOf(i.startTime)) / 60 : null);
 
 export const draftLeaveRequest = defineCapability({
   name: 'draftLeaveRequest',
   description:
     'Checks a leave request WITHOUT submitting it: the engine computes the working days it deducts ' +
     '(holidays and weekends are never deducted), the balance before and after, the year-end outlook, ' +
-    'blackouts, team coverage conflicts and overlaps with existing requests. Call it as dates change, and ' +
+    'blackouts, team coverage conflicts, staffing-ratio gaps at regulated sites (blockCoverage, with citations) ' +
+    'and overlaps with existing requests. Call it as dates change, and ' +
     'before submitLeaveRequest. It never creates or changes anything.',
   input: requestInput,
   output: evaluationOutput,
@@ -193,7 +241,9 @@ export const submitLeaveRequest = defineCapability({
           startDate: input.start,
           endDate: input.end,
           part: input.part,
-          hours: input.hours == null ? null : String(input.hours),
+          hours: hoursOf(input) == null ? null : String(hoursOf(input)),
+          startMinute: input.part === 'hours' && input.startTime ? minuteOf(input.startTime) : null,
+          endMinute: input.part === 'hours' && input.endTime ? minuteOf(input.endTime) : null,
           note,
           engineSnapshot: snapshot,
           createdByActorType: actor.type,

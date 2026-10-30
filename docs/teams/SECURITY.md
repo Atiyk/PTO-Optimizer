@@ -1,7 +1,7 @@
 # Security: Days Off for Teams
 
 What protects customer data today, and what a SOC 2 Type I/II audit would still need. Written for
-the owner and for security questionnaires. Last reviewed 2026-10-30 (Phase 6).
+the owner and for security questionnaires. Last reviewed 2026-10-30 (Phase 6; regulated coverage reviewed in RC Phase 6).
 
 ## Data we hold
 
@@ -67,7 +67,7 @@ health-related leave only as "out".
 `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET` (Phase 7), `ANTHROPIC_API_KEY`, `CRON_SECRET`. None are
 in the repository. The cron route compares its secret in constant time.
 
-**Logging.** Server logs carry error class names only (four `console.error` calls, all checked):
+**Logging.** Server logs carry error class names only (five `console.error` calls, all checked):
 no tokens, no request bodies, no names or emails. The audit log is the record of business actions.
 
 **Data rights.** Admins export everything for the org or one member (CSV/JSON) and can delete a
@@ -80,6 +80,61 @@ deliveries older than 90 days, and marks expired drafts.
 moderate advisories in `esbuild@0.18`, pulled in by `drizzle-kit` (a developer CLI for migrations,
 never deployed); the fix is a breaking drizzle-kit downgrade, so it's accepted until drizzle-kit drops
 `@esbuild-kit`.
+
+## Regulated coverage (childcare and clinics)
+
+Reviewed 2026-10-30, RC Phase 6. The tests named here are in `apps/teams/src`.
+
+| Data | Where | Notes |
+|---|---|---|
+| Rooms or posts, and demand per room and time block | Postgres | Children are **counts per age group** only, never names, birthdays or anything that identifies a child. The schema has no column that could hold one. |
+| Rule packs | Postgres | Each rule cites its source, or is marked "needs verification" or "your policy". Drafts from pasted text quote their source sentence (prompt-injection checks in `coverAi.test.ts`). |
+| Weekly shifts and dated changes | Postgres | |
+| Staff credentials (e.g. CPR) | Postgres | Key, issue date, expiry date and verified flag. No document images. |
+| Hours worked | Postgres | For sick-leave accrual only. |
+| Cover requests, offers and events | Postgres | Append-only events. A call-off has **no reason field** anywhere (input, table, message, webhook). |
+| Staff phone (SMS opt-in) | Postgres | Only if the person opts in. SMS is behind an adapter that is a mock unless Twilio is configured, and it is off by default. |
+| Passkeys and sign-in codes | Postgres | Public keys only. Codes are single-use, stored hashed, short-lived and rate-limited per IP. |
+| Push subscriptions | Postgres | Endpoint plus its public keys. |
+| Pay rates | Postgres | The table exists only for cost-aware ranking. Nothing in the app writes to it yet, it is owner/admin only, and it is never sent to the LLM. Turning cost-aware ranking off deletes every rate (`security.test.ts`). |
+
+Controls added or checked in this pass:
+- **Tenant isolation.** Every coverage, cover, forecast and rule capability is in the cross-org
+  attack list (`isolation.test.ts`).
+- **Push endpoints (SSRF), fixed in this pass.** The browser supplies the push endpoint, and the
+  server POSTs to it. Before this fix, any https URL was accepted, so a signed-in person could have
+  made the server call an internal address. Now only the browsers' push services are allowed: FCM,
+  Mozilla autopush, Apple (`*.push.apple.com`, as Apple's web push documentation says to allow) and
+  WNS (`*.notify.windows.com`). The list is checked when a device subscribes and again before each
+  send.
+- **Removed staff, fixed in this pass.** A removed person's weekly shifts used to keep counting
+  toward ratios. That could show a room "in ratio" when it was not. They now stop counting from the
+  day of removal (`forecast.test.ts`).
+- **Erasure and export, fixed in this pass.**
+  - Erasing a person now also deletes their passkeys, sign-in codes, phone number and cover
+    preferences, push devices, credentials, pay rates and rota.
+  - Hours worked and past cover events stay, under "Former member", because CA sick-leave law
+    requires keeping records.
+  - Per-person export now includes credentials, shifts, hours worked, cover preferences, cover
+    offers and pay rates (`privacy.test.ts`).
+- **Webhooks.** `coverage.gap_detected`, `cover.requested`, `cover.filled` and
+  `credential.expiring` carry rule facts and staff ids only. Tests check every real payload against
+  its published schema, with no extra keys, and check that no child, pay or reason data appears
+  (`coverageEvents.test.ts`).
+- **The LLM.** It drafts rules, explanations and parsed messages; the engine computes every number.
+  Explanations get anonymised facts ("#1", "#2", no names, no pay, overtime only as a yes/no).
+  Numbers in output are checked against the facts.
+- **No real messages in tests or demos.** The SMS channel is a mock, and push is off without VAPID
+  keys and stubbed in tests.
+
+Known gaps specific to coverage:
+1. **Push endpoint takeover.** Subscribing with an endpoint that is already stored moves it to the
+   new person. Endpoints are unguessable capability URLs, so the risk is low. A stricter fix is
+   to refuse an endpoint owned by another member.
+2. **Credential documents.** Uploading and checking certificates is out of scope. "Verified" is an
+   admin's yes/no.
+3. **Rules accuracy.** Seed packs cite primary sources with the date they were read, but they are
+   not legal advice and need periodic review. There is no automatic change detection.
 
 ## Known gaps (fix before selling to security-sensitive customers)
 

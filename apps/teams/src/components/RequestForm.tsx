@@ -33,6 +33,9 @@ export function RequestForm({
   const [end, setEnd] = useState(iso(initial?.end));
   const [part, setPart] = useState<Part>('full');
   const [hours, setHours] = useState(4);
+  // Optional clock times for an hours request: regulated sites check the exact staffing blocks.
+  const [fromT, setFromT] = useState('');
+  const [toT, setToT] = useState('');
   const [note, setNote] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,9 +69,18 @@ export function RequestForm({
   }
 
   const effectiveEnd = part === 'full' ? end || start : start;
+  const timed = part === 'hours' && !!fromT && !!toT;
   const payload = useMemo(
-    () => ({ leaveType, start, end: effectiveEnd, part, hours: part === 'hours' ? hours : undefined, note: note.trim() || null }),
-    [leaveType, start, effectiveEnd, part, hours, note],
+    () => ({
+      leaveType,
+      start,
+      end: effectiveEnd,
+      part,
+      hours: part === 'hours' && !timed ? hours : undefined,
+      ...(timed ? { startTime: fromT, endTime: toT } : {}),
+      note: note.trim() || null,
+    }),
+    [leaveType, start, effectiveEnd, part, hours, timed, fromT, toT, note],
   );
 
   useEffect(() => {
@@ -160,9 +172,31 @@ export function RequestForm({
         ) : part === 'hours' ? (
           <div>
             <label className={label} htmlFor={`${id}-hours`}>Hours</label>
-            <input id={`${id}-hours`} type="number" step="0.25" min="0.25" max="24" className={`${input} mt-1`} value={hours} onChange={(e) => setHours(Number(e.target.value))} />
+            <input
+              id={`${id}-hours`}
+              type="number"
+              step="0.25"
+              min="0.25"
+              max="24"
+              className={`${input} mt-1`}
+              value={timed ? Math.max(0, (Number(toT.slice(0, 2)) * 60 + Number(toT.slice(3)) - Number(fromT.slice(0, 2)) * 60 - Number(fromT.slice(3))) / 60) : hours}
+              disabled={timed}
+              onChange={(e) => setHours(Number(e.target.value))}
+            />
           </div>
         ) : null}
+        {part === 'hours' && (
+          <>
+            <div>
+              <label className={label} htmlFor={`${id}-from`}>From <span className="font-normal text-muted">(optional)</span></label>
+              <input id={`${id}-from`} type="time" className={`${input} mt-1`} value={fromT} onChange={(e) => setFromT(e.target.value)} />
+            </div>
+            <div>
+              <label className={label} htmlFor={`${id}-to`}>To <span className="font-normal text-muted">(optional)</span></label>
+              <input id={`${id}-to`} type="time" className={`${input} mt-1`} value={toT} onChange={(e) => setToT(e.target.value)} />
+            </div>
+          </>
+        )}
       </div>
       <div>
         <label className={label} htmlFor={`${id}-note`}>Note for your manager <span className="font-normal text-muted">(optional)</span></label>

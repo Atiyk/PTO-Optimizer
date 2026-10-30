@@ -33,7 +33,7 @@ export async function createOrganization(db: Db, identity: Identity, input: Crea
     const orgId = org!.id;
     const [loc] = await tx
       .insert(locations)
-      .values({ orgId, name: input.subdivisionCode ? `${input.countryCode}-${input.subdivisionCode}` : input.countryCode, countryCode: input.countryCode, subdivisionCode: input.subdivisionCode ?? null })
+      .values({ orgId, name: !input.subdivisionCode ? input.countryCode : input.subdivisionCode.startsWith(`${input.countryCode}-`) ? input.subdivisionCode : `${input.countryCode}-${input.subdivisionCode}`, countryCode: input.countryCode, subdivisionCode: input.subdivisionCode ?? null })
       .returning();
     const [team] = await tx.insert(teams).values({ orgId, name: input.teamName?.trim() || 'Team' }).returning();
     const [owner] = await tx

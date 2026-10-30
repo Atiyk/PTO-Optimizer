@@ -6,15 +6,22 @@ import {
   balanceLedger,
   blackouts,
   coverageRules,
+  coverOffers,
+  credentials,
   extraClosures,
+  hoursWorked,
   invites,
   leavePolicies,
   leaveRequests,
   leaveTypes,
   locations,
+  memberCoverPrefs,
+  memberCredentials,
   memberLocationHistory,
+  memberPayRates,
   members,
   organizations,
+  shiftTemplates,
   teams,
 } from '@/db/schema';
 import { autonomyFor } from '@/domain/autonomy';
@@ -406,6 +413,21 @@ export const exportData = defineCapability({
         deducted: (r.engineSnapshot as { amount?: number } | null)?.amount ?? null, auto_approved: r.autoApproved, decided_at: r.decidedAt?.toISOString() ?? null, created_at: r.createdAt.toISOString(),
       })),
       ledger: byMember(await db.select().from(balanceLedger).where(eq(balanceLedger.orgId, orgId))).map((l) => ({ id: l.id, member_id: l.memberId, leave_type_id: l.leaveTypeId, kind: l.kind, amount: l.amount, unit: l.unit, effective_date: l.effectiveDate, request_id: l.requestId, reason: l.reason, created_at: l.createdAt.toISOString() })),
+      // Regulated coverage: what we hold per person. Children appear only as counts per room,
+      // which are not anyone's personal data, so they are not here.
+      credentials: byMember(
+        await db
+          .select({ memberId: memberCredentials.memberId, key: credentials.key, name: credentials.name, issuedOn: memberCredentials.issuedOn, expiresOn: memberCredentials.expiresOn })
+          .from(memberCredentials)
+          .innerJoin(credentials, eq(credentials.id, memberCredentials.credentialId))
+          .where(eq(memberCredentials.orgId, orgId)),
+      ).map((c) => ({ member_id: c.memberId, credential: c.key, name: c.name, issued_on: c.issuedOn, expires_on: c.expiresOn })),
+      shifts: byMember(await db.select().from(shiftTemplates).where(eq(shiftTemplates.orgId, orgId))).map((t) => ({ member_id: t.memberId, room_id: t.roomId, weekday: t.weekday, start_minute: t.startMinute, end_minute: t.endMinute, effective_from: t.effectiveFrom, effective_to: t.effectiveTo })),
+      hours_worked: byMember(await db.select().from(hoursWorked).where(eq(hoursWorked.orgId, orgId))).map((h) => ({ member_id: h.memberId, period_start: h.periodStart, period_end: h.periodEnd, hours: h.hours })),
+      cover_preferences: byMember(await db.select().from(memberCoverPrefs).where(eq(memberCoverPrefs.orgId, orgId))).map(({ orgId: _o, ...p }) => plain(p)),
+      cover_offers: byMember(await db.select().from(coverOffers).where(eq(coverOffers.orgId, orgId))).map((o) => ({ member_id: o.memberId, cover_request_id: o.coverRequestId, wave: o.wave, rank: o.rank, channel: o.channel, sent_at: o.sentAt.toISOString(), response: o.response, responded_at: o.respondedAt?.toISOString() ?? null })),
+      // Pay rates exist only while cost-aware ranking is on; exports are admin-only.
+      pay_rates: byMember(await db.select().from(memberPayRates).where(eq(memberPayRates.orgId, orgId))).map((r) => ({ member_id: r.memberId, hourly_rate: r.hourlyRate, effective_from: r.effectiveFrom })),
       audit_log: input.memberId
         ? []
         : (await db.select().from(auditLog).where(eq(auditLog.orgId, orgId)).orderBy(asc(auditLog.at))).map((a) => ({ at: a.at.toISOString(), actor_type: a.actorType, actor_member_id: a.actorMemberId, client_id: a.clientId, on_behalf_of: a.onBehalfOfMemberId, capability: a.capability, outcome: a.outcome, summary: a.summary })),
@@ -416,6 +438,13 @@ export const exportData = defineCapability({
     return { format: 'csv' as const, files };
   },
 });
+
+/** A row as export values: dates as ISO strings, arrays and objects as JSON. */
+function plain(row: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(row).map(([k, v]) => [k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`), v instanceof Date ? v.toISOString() : v !== null && typeof v === 'object' ? JSON.stringify(v) : v]),
+  );
+}
 
 export function toCsv(rows: Record<string, unknown>[]): string {
   if (rows.length === 0) return '';

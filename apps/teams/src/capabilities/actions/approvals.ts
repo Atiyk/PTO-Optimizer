@@ -2,6 +2,8 @@ import { and, asc, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { balanceLedger, coverageRules, leaveRequests, leaveTypes, members } from '@/db/schema';
 import { autoApprovalCheck, autonomyFor } from '@/domain/autonomy';
+import { blockImpact } from '@/domain/coverage';
+import { blockGapOutput, toBlockGapOutput } from './requests';
 import { balanceView, evaluateRequest, getLeaveTypeById, getMember, isoDate, teamCoverageMembers } from '@/domain/leave';
 import { coverageViolations } from '@daysoff/engine/leave/coverage';
 
@@ -184,7 +186,15 @@ async function suggestion(
     db,
     orgId,
     member,
-    { leaveTypeKey: typeKey, start: req.startDate, end: req.endDate, part: req.part, hours: req.hours == null ? undefined : Number(req.hours) },
+    {
+      leaveTypeKey: typeKey,
+      start: req.startDate,
+      end: req.endDate,
+      part: req.part,
+      hours: req.hours == null ? undefined : Number(req.hours),
+      startMinute: req.startMinute ?? undefined,
+      endMinute: req.endMinute ?? undefined,
+    },
     today,
     { excludeRequestId: req.id },
   );
@@ -203,7 +213,13 @@ export const decideLeaveRequest = defineCapability({
     decision: z.enum(['approve', 'decline']),
     note: z.string().max(500).optional(),
   }),
-  output: z.object({ request: z.object({ id: z.uuid(), status: z.string(), start: z.string(), end: z.string(), leaveType: z.string() }) }),
+  output: z.object({
+    request: z.object({ id: z.uuid(), status: z.string(), start: z.string(), end: z.string(), leaveType: z.string() }),
+    blockCoverage: z
+      .array(blockGapOutput)
+      .optional()
+      .describe('On approval at a regulated site: the staffing-ratio or required-role gaps this absence opens. Not legal advice.'),
+  }),
   scope: 'leave:approve',
   roles: ['owner', 'admin', 'manager'],
   effect: 'commit',
@@ -232,7 +248,22 @@ export const decideLeaveRequest = defineCapability({
       throw new CapabilityError('conflict', `This request is already ${r.req.status}.`);
     }
     const type = await getLeaveTypeById(db, actor.orgId, r.req.leaveTypeId);
-    const snap = r.req.engineSnapshot as { amount: number; unit: 'days' | 'hours' };
+    const snap = r.req.engineSnapshot as { amount: number; unit: 'days' | 'hours'; chargedDates?: string[] };
+    // A manager may approve past a gap (it is their call), but the output says so, with citations.
+    const gaps =
+      status === 'approved'
+        ? (
+            await blockImpact(
+              db,
+              actor.orgId,
+              target.id,
+              snap.chargedDates ?? [],
+              r.req.part,
+              r.req.startMinute != null && r.req.endMinute != null ? { startMinute: r.req.startMinute, endMinute: r.req.endMinute } : null,
+              { excludeRequestId: r.req.id },
+            )
+          ).filter((g) => g.kind !== 'group_size')
+        : [];
     await db.transaction(async (tx) => {
       await tx
         .update(leaveRequests)
@@ -273,7 +304,7 @@ export const decideLeaveRequest = defineCapability({
       await notifyDecision(db, actor.orgId, r.req.id);
       if (status === 'approved') await syncSlackStatuses(db, actor.orgId, now);
     });
-    return view(status);
+    return gaps.length ? { ...view(status), blockCoverage: gaps.map(toBlockGapOutput) } : view(status);
   },
 });
 

@@ -2,7 +2,7 @@ import { createMcpHandler, McpServer, type AuthInfo, type CallToolResult } from 
 import { z } from 'zod';
 import { getDb } from '@/db/client';
 import { CapabilityError } from '@/capabilities/errors';
-import { CAPABILITIES, invokeCapability } from '@/capabilities/registry';
+import { CAPABILITIES, invokeCapability, roleAllows } from '@/capabilities/registry';
 import type { Actor, CapabilityDef } from '@/capabilities/types';
 import { describePolicy } from '@/domain/describePolicy';
 import { PRODUCT_NAME } from '@/lib/brand';
@@ -26,7 +26,7 @@ const COMMIT_NOTE =
 /** Tool list for an actor: only tools whose scope the token has, in a fixed order (cache-friendly). */
 export function mcpToolsFor(actor: Actor): CapabilityDef[] {
   return Object.values(CAPABILITIES as Record<string, CapabilityDef>)
-    .filter((c) => (c.surfaces as readonly string[]).includes('mcp') && actor.scopes.includes(c.scope))
+    .filter((c) => (c.surfaces as readonly string[]).includes('mcp') && actor.scopes.includes(c.scope) && roleAllows(actor, c))
     .sort((a, b) => (a.name < b.name ? -1 : 1));
 }
 
@@ -40,6 +40,18 @@ function fail(err: unknown): CallToolResult {
   }
   console.error('mcp tool error', err instanceof Error ? err.name : 'unknown');
   return { isError: true, content: [{ type: 'text', text: 'internal: Internal error.' }] };
+}
+
+const FOR_MEMBER = { forMemberId: z.uuid().describe('Service agents only: the member who must confirm this action in the app.') };
+
+/** Adds forMemberId to a commit tool's input, including each branch of an op-style union. */
+function withForMember(input: z.ZodType): z.ZodType {
+  if (input instanceof z.ZodObject) return input.extend(FOR_MEMBER);
+  if (input instanceof z.ZodDiscriminatedUnion) {
+    const options = (input.options as z.ZodObject[]).map((o) => o.extend(FOR_MEMBER));
+    return z.discriminatedUnion(input.def.discriminator, options as unknown as [z.ZodObject, ...z.ZodObject[]]);
+  }
+  return input;
 }
 
 export function buildMcpServer(auth: { actor: Actor; tokenId: string }, now: () => Date = () => new Date()): McpServer {
@@ -56,9 +68,7 @@ export function buildMcpServer(auth: { actor: Actor; tokenId: string }, now: () 
 
   for (const cap of mcpToolsFor(actor)) {
     let input = cap.input as z.ZodType;
-    if (cap.effect === 'commit' && actor.type === 'service-agent' && input instanceof z.ZodObject) {
-      input = input.extend({ forMemberId: z.uuid().describe('Service agents only: the member who must confirm this action in the app.') });
-    }
+    if (cap.effect === 'commit' && actor.type === 'service-agent') input = withForMember(input);
     server.registerTool(
       cap.name,
       {

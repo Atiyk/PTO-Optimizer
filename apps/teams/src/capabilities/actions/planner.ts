@@ -1,11 +1,14 @@
-import { and, asc, eq, gte, isNull, lte, or } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNull, lte, or } from 'drizzle-orm';
 import { z } from 'zod';
-import { planTeam, type PlannerMember } from '@daysoff/engine/leave/teamPlan';
+import { planShape, planTeam, type PlannerMember, type TeamPlanResult } from '@daysoff/engine/leave/teamPlan';
 import { addDays, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { untracedIn } from '@/ai/provenance';
 import { AiUnavailableError, runAiTask } from '@/ai/run';
 import { summarizePlanTask, templatePlanSummary, type PlanFacts } from '@/ai/tasks/summarizePlan';
-import { blackouts, coverageRules, drafts, members, teams } from '@/db/schema';
+import { blackouts, coverageRules, drafts, members, rooms, shiftTemplates, teams } from '@/db/schema';
+import { plannedDayConflicts } from '@/domain/forecast';
+import { sitePacks } from '@/domain/coverage';
+import type { Db } from '@/db/client';
 import { forfeitureRisk, getLeaveTypeByKey, getMember, isoDate, teamCoverageMembers } from '@/domain/leave';
 import { newToken } from '@/lib/tokens';
 import { CapabilityError } from '../errors';
@@ -33,13 +36,46 @@ async function plannableTeam(db: Parameters<typeof getMember>[0], actor: Actor, 
   return { team, teams: allowed };
 }
 
+const MAX_REPLANS = 3;
+
+/** Regulated sites where these members have a weekly shift. */
+async function rotaSites(db: Db, orgId: string, memberIds: string[]): Promise<string[]> {
+  if (memberIds.length === 0) return [];
+  const rows = await db
+    .selectDistinct({ locationId: rooms.locationId })
+    .from(shiftTemplates)
+    .innerJoin(rooms, and(eq(rooms.id, shiftTemplates.roomId), eq(rooms.orgId, orgId)))
+    .where(and(eq(shiftTemplates.orgId, orgId), inArray(shiftTemplates.memberId, memberIds)));
+  const out: string[] = [];
+  for (const r of rows.sort((a, b) => (a.locationId < b.locationId ? -1 : 1))) if ((await sitePacks(db, orgId, r.locationId)).length) out.push(r.locationId);
+  return out;
+}
+
+/** Removes days the block-level check still rejects after the last re-plan. */
+function dropDays(result: TeamPlanResult, members: readonly PlannerMember[], drop: ReadonlyMap<string, ReadonlySet<string>>): TeamPlanResult {
+  const byId = new Map(members.map((m) => [m.id, m]));
+  const removed = new Map<string, number>();
+  const plans = result.plans.map((p) => {
+    const bad = drop.get(p.memberId);
+    if (!bad || !p.days.some((d) => bad.has(d))) return p;
+    const days = p.days.filter((d) => !bad.has(d));
+    for (const d of p.days) if (bad.has(d)) removed.set(d, (removed.get(d) ?? 0) + 1);
+    return { ...p, ...planShape(byId.get(p.memberId)!, days), days, placed: days.length, unplaced: p.need - days.length };
+  });
+  const totalPlaced = plans.reduce((s, p) => s + p.placed, 0);
+  const heatmap = result.heatmap.map((h) => (removed.has(h.date) ? { ...h, out: h.out - removed.get(h.date)!, planned: h.planned - removed.get(h.date)! } : h));
+  return { ...result, plans, totalPlaced, totalForfeited: result.totalNeed - totalPlaced, heatmap, exact: false };
+}
+
 export const runTeamPlan = defineCapability({
   name: 'runTeamPlan',
   description:
     'Plans how a team can use leave that would otherwise be forfeited, without breaking coverage rules. ' +
     'For each person with days at risk (from the engine: carried days expiring, or year-end above the ' +
     'carry-over limit) it proposes working days before the deadline: fewest days lost first, then long ' +
-    'breaks bridging weekends and holidays. Returns per-person plans, a coverage heatmap and totals. ' +
+    'breaks bridging weekends and holidays. At sites with a staffing rule pack every planned day is also ' +
+    're-checked per 30-minute block (ratios, required roles) and moved if it would open a gap. ' +
+    'Returns per-person plans, a coverage heatmap and totals. ' +
     'Reads only; deterministic for the same inputs. Use sendPlanProposals to offer the plans to people.',
   input: z.object({
     teamId: z.uuid().optional().describe('Defaults to the first team the caller may plan.'),
@@ -143,13 +179,41 @@ export const runTeamPlan = defineCapability({
       };
     });
     const rules = await db.select().from(coverageRules).where(and(eq(coverageRules.orgId, actor.orgId), eq(coverageRules.teamId, team.id)));
-    const result = planTeam({
-      members: planMembers,
-      rules: rules.map((x) => ({ id: x.id, teamId: x.teamId, minPresent: x.minPresent, tag: x.tag, weekdays: x.weekdays, effectiveFrom: x.effectiveFrom, effectiveTo: x.effectiveTo })),
-      start,
-      timeBudgetMs: 1_500,
-    });
+    const ruleInputs = rules.map((x) => ({ id: x.id, teamId: x.teamId, minPresent: x.minPresent, tag: x.tag, weekdays: x.weekdays, effectiveFrom: x.effectiveFrom, effectiveTo: x.effectiveTo }));
+    const t0 = performance.now();
+    let result = planTeam({ members: planMembers, rules: ruleInputs, start, timeBudgetMs: 1_500 });
 
+    // Regulated sites: the day-level plan is re-checked block by block against each site's rule
+    // pack. Days that would open a ratio or role gap become unavailable for that person and the
+    // team is re-planned (up to MAX_REPLANS times); anything still conflicting is dropped.
+    const sites = await rotaSites(db, actor.orgId, roster.map((m) => m.id));
+    const blockReason = new Map<string, string>();
+    let blockAdjusted = false;
+    if (sites.length) {
+      const extra = new Map<string, Set<string>>();
+      for (let round = 0; ; round++) {
+        const conflicts = await plannedDayConflicts(db, actor.orgId, new Map(result.plans.map((p) => [p.memberId, p.days])), sites);
+        if (conflicts.length === 0) break;
+        blockAdjusted = true;
+        for (const c of conflicts) {
+          extra.set(c.memberId, (extra.get(c.memberId) ?? new Set()).add(c.date));
+          if (!blockReason.has(c.memberId)) blockReason.set(c.memberId, `${c.site}: ${c.gap.label}, ${c.date} ${c.gap.start}–${c.gap.end}`);
+        }
+        if (round === MAX_REPLANS) {
+          result = dropDays(result, planMembers, extra);
+          break;
+        }
+        result = planTeam({
+          members: planMembers.map((m) => (extra.has(m.id) ? { ...m, unavailable: new Set([...(m.unavailable ?? []), ...extra.get(m.id)!]) } : m)),
+          rules: ruleInputs,
+          start,
+          timeBudgetMs: 500,
+        });
+      }
+    }
+
+    // Includes the block-level re-check and any re-plans.
+    const planMs = performance.now() - t0;
     const name = new Map(roster.map((m) => [m.id, m.name]));
     const people = result.plans.map((p) => {
       const r = risk.get(p.memberId)!;
@@ -163,7 +227,10 @@ export const runTeamPlan = defineCapability({
         days: p.days,
         blocks: p.blocks,
         requests: p.requests,
-        shortfallReason: p.shortfallReason ?? (r.amount % 1 ? `${Math.round((r.amount % 1) * 100) / 100} of a day is left over; book it as part of a day.` : null),
+        shortfallReason:
+          p.unplaced > 0 && blockReason.has(p.memberId)
+            ? `Staffing rules leave room for only ${p.placed} of ${p.need} days before ${r.deadline} (for example ${blockReason.get(p.memberId)}).`
+            : (p.shortfallReason ?? (r.amount % 1 ? `${Math.round((r.amount % 1) * 100) / 100} of a day is left over; book it as part of a day.` : null)),
       };
     });
     // Fully booked people with fractional risk only (need 0) are still worth showing.
@@ -198,7 +265,7 @@ export const runTeamPlan = defineCapability({
       longestBreakDays: Math.max(0, ...people.flatMap((p) => p.blocks.map((b) => b.daysOff))),
       latestDeadline: people.length ? lastDeadline : null,
       tightestDate: tightest && tightest.slack === 0 ? tightest.date : null,
-      exact: result.exact,
+      exact: result.exact && !blockAdjusted,
     };
     let summary: { text: string; source: 'ai' | 'demo' | 'rules' } = { text: templatePlanSummary(facts).text, source: 'rules' };
     if (people.length) {
@@ -217,11 +284,11 @@ export const runTeamPlan = defineCapability({
       start,
       people,
       totals,
-      exact: result.exact,
+      exact: result.exact && !blockAdjusted,
       rules: rules.map((r) => ({ id: r.id, label: `At least ${r.minPresent} ${r.tag ? `${r.tag}${r.minPresent === 1 ? '' : 's'}` : r.minPresent === 1 ? 'person' : 'people'} in` })),
       heatmap: result.heatmap,
       summary,
-      stats: { ms: Math.round(result.stats.ms), stoppedEarly: result.stats.stoppedEarly },
+      stats: { ms: Math.round(planMs), stoppedEarly: result.stats.stoppedEarly },
     };
   },
 });

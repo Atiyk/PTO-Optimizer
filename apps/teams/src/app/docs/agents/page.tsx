@@ -117,7 +117,9 @@ export default function AgentDocs() {
       <h2 className={h2}>Webhooks</h2>
       <p className={p}>
         Admin → Agents &amp; API → Webhooks. Events: <code className={code}>leave.requested</code>, <code className={code}>leave.decided</code>,{' '}
-        <code className={code}>balance.expiring</code>, <code className={code}>plan.proposed</code>. Signed per the Standard Webhooks spec, so its libraries verify them:
+        <code className={code}>balance.expiring</code>, <code className={code}>plan.proposed</code>, <code className={code}>coverage.gap_detected</code>,{' '}
+        <code className={code}>cover.requested</code>, <code className={code}>cover.filled</code>, <code className={code}>credential.expiring</code>. Coverage events carry
+        the rule, its citation or &quot;needs verification&quot;, and staff ids only: never children, pay or why someone is out. Signed per the Standard Webhooks spec, so its libraries verify them:
       </p>
       <pre className={pre} tabIndex={0} role="region" aria-label="Code example">{`import { Webhook } from 'standardwebhooks';
 const event = new Webhook(process.env.DAYS_OFF_WEBHOOK_SECRET) // whsec_…

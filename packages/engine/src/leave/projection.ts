@@ -39,6 +39,14 @@ export interface MemberFacts {
   hoursPerDay: number;
   /** Holidays for the member's location(s): excluded from hours worked for per-hour accrual. */
   holidays?: ReadonlyMap<ISODate, string>;
+  /** Hours actually worked (imported), for `per_hour_worked` with `hoursSource: 'imported'`. */
+  hoursWorked?: readonly HoursWorkedRow[];
+}
+
+export interface HoursWorkedRow {
+  periodStart: ISODate;
+  periodEnd: ISODate;
+  hours: number;
 }
 
 export interface ProjectionInput {
@@ -310,6 +318,10 @@ export function projectBalance(input: ProjectionInput): Projection {
     // Per-period methods: period list from the policy in force at the year start.
     const a0 = vAtStart?.policy.accrual ?? policyAt(policies, simStart)?.policy.accrual;
     if (!a0 || (a0.method !== 'per_pay_period' && a0.method !== 'per_hour_worked')) return;
+    if (a0.method === 'per_hour_worked' && a0.hoursSource === 'imported') {
+      emitImportedHours(year);
+      return;
+    }
     const periods = payPeriodsInYear(year, a0.payPeriod);
     const n = periods.length;
     periods.forEach((period, idx) => {
@@ -352,6 +364,46 @@ export function projectBalance(input: ProjectionInput): Projection {
         },
       });
     });
+  }
+
+  /**
+   * Hours actually worked: one accrual per imported period, on its end date. Cumulative
+   * rounding inside the plan year (round(H_k/N) − round(H_{k−1}/N)) keeps the year exact,
+   * and the annual accrual cap applies to what is earned.
+   */
+  function emitImportedHours(year: DateRange) {
+    const rows = [...(member.hoursWorked ?? [])]
+      .filter((r) => r.periodEnd >= year.start && r.periodEnd <= year.end && r.periodEnd >= simStart)
+      .sort((a, b) => (a.periodEnd < b.periodEnd ? -1 : a.periodEnd > b.periodEnd ? 1 : a.periodStart < b.periodStart ? -1 : 1));
+    let cumHours = 0;
+    let cumUnits = 0;
+    for (const row of rows) {
+      const v = policyAt(policies, row.periodEnd);
+      if (!v) continue;
+      const p = v.policy;
+      const acc = p.accrual;
+      if (acc.method !== 'per_hour_worked') continue;
+      if (blockedByWaiting(p, row.periodEnd)) continue;
+      cumHours += row.hours;
+      const earnedTotal = acc.hoursPerUnit ? Math.round(toUnits(cumHours) / acc.hoursPerUnit) : Math.round(toUnits(cumHours) * acc.ratePerHour);
+      const capUnits = acc.annualAccrualCap != null ? toUnits(acc.annualAccrualCap) : Infinity;
+      const nextCum = Math.min(earnedTotal, capUnits);
+      const units = nextCum - cumUnits;
+      cumUnits = nextCum;
+      const rate = acc.hoursPerUnit ? `1 per ${acc.hoursPerUnit} hours worked` : `${acc.ratePerHour} per hour worked`;
+      const capNote = nextCum === capUnits && earnedTotal > capUnits ? ` (annual accrual cap of ${acc.annualAccrualCap} reached: accrual paused)` : '';
+      schedule({
+        key: `accrual:hours:${row.periodStart}:${row.periodEnd}`,
+        date: row.periodEnd,
+        kind: 'accrual',
+        order: ORDER.accrual!,
+        source: 'scheduled',
+        compute: (s) => {
+          const c = capped(units, s, p);
+          return { units: c.units, note: `${rate} × ${row.hours} hours (${row.periodStart} to ${row.periodEnd})${capNote}${c.capNote}` };
+        },
+      });
+    }
   }
 
   function blockedByWaiting(p: LeavePolicy, date: ISODate): boolean {

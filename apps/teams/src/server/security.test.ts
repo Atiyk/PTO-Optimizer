@@ -10,6 +10,7 @@ import { encodeSession, SESSION_COOKIE } from '@/lib/session';
 import { buildOrg, humanActor, NOW, run } from '@/test/fixtures';
 import { freshDb } from '@/test/db';
 import { housekeeping } from './housekeeping';
+import { pushEndpointAllowed } from './messaging';
 
 /* Phase 6 security checks that sit outside the capability layer: CSRF, rate limits, cleanup. */
 
@@ -76,5 +77,34 @@ describe('housekeeping', () => {
     const r = await housekeeping(db, NOW);
     expect(r).toMatchObject({ rateWindows: 1, accessTokens: 1, draftsExpired: 1 });
     expect(await db.select().from(apiTokens).where(eq(apiTokens.id, pat.created!.id))).toHaveLength(1);
+  });
+});
+
+describe('regulated coverage (RC Phase 6)', () => {
+  it('push subscriptions only to the browsers\' push services (no SSRF through the endpoint)', () => {
+    for (const ok of [
+      'https://fcm.googleapis.com/fcm/send/abc:def',
+      'https://updates.push.services.mozilla.com/wpush/v2/gAAA',
+      'https://web.push.apple.com/QGuQyavXutnMfk',
+      'https://wns2-by3p.notify.windows.com/w/?token=x',
+    ]) expect(pushEndpointAllowed(ok), ok).toBe(true);
+    for (const bad of [
+      'http://fcm.googleapis.com/fcm/send/abc',
+      'https://169.254.169.254/latest/meta-data',
+      'https://localhost/x',
+      'https://fcm.googleapis.com.evil.example/x',
+      'https://evilpush.apple.com.example/x',
+      'https://user:pw@fcm.googleapis.com/x',
+      'https://fcm.googleapis.com:8443/x',
+      'not a url',
+    ]) expect(pushEndpointAllowed(bad), bad).toBe(false);
+  });
+
+  it('turning cost-aware ranking off deletes stored pay rates', async () => {
+    const { memberPayRates } = await import('@/db/schema');
+    await run(db, humanActor(A.owner), 'manageSchedule', { op: 'setVertical', vertical: 'childcare', costAwareRanking: true });
+    await db.insert(memberPayRates).values({ orgId: A.org.id, memberId: A.emp.id, hourlyRate: '25.00', effectiveFrom: '2026-01-01' });
+    await run(db, humanActor(A.owner), 'manageSchedule', { op: 'setVertical', vertical: 'childcare', costAwareRanking: false });
+    expect(await db.select().from(memberPayRates).where(eq(memberPayRates.orgId, A.org.id))).toEqual([]);
   });
 });

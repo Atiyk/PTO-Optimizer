@@ -10,7 +10,8 @@ import { appUrl } from '@/lib/appUrl';
 import { consumeRate } from '@/server/rateLimit';
 import { installationForTeam, slackActor, type Installation } from './actor';
 import { respond, slackApi } from './api';
-import { amount, approvalMessage, confirmRequestMessage, day, esc, HELP, range, whoIsOutText, type PendingItem } from './format';
+import { amount, approvalMessage, confirmActionMessage, confirmRequestMessage, day, esc, HELP, range, whoIsOutText, type PendingItem } from './format';
+import { getOrg } from '@/domain/leave';
 
 /*
  * Thin adapter (R1): every business step is a capability call as the Slack user's member, with
@@ -61,6 +62,34 @@ export async function handleText(db: Db, inst: Installation, slackUserId: string
       const lines = [`*Vacation*: ${amount(b.usable ?? b.balance, b.unit)} available now.`];
       if (b.yearEnd?.wouldForfeit) lines.push(`${amount(b.yearEnd.wouldForfeit, b.unit)} would be lost after ${day(b.yearEnd.date)}; plan some time off.`);
       return reply({ text: lines.join('\n') });
+    }
+    // Childcare and clinics: a call-off or a cover request in their own words, drafted then confirmed.
+    if ((await getOrg(db, actor.orgId)).vertical !== 'general') {
+      const c = await runAs(db, actor, 'parseCoverText', { text: text.slice(0, 500) }, now);
+      const key = (v: unknown) => createHash('sha256').update(`${inst.teamId}:${slackUserId}:${today}:${JSON.stringify(v)}`).digest('base64url').slice(0, 32);
+      if (c.intent === 'call_off') {
+        if (!c.callOff) return reply({ text: esc(c.clarifyingQuestion ?? 'Is that for today or tomorrow?') });
+        return reply(
+          confirmActionMessage(
+            `Tell your manager you can't come in on ${day(c.callOff.date)}? You don't need to give a reason, and cover is arranged for you.`,
+            'Yes, tell my manager',
+            'calloff_confirm',
+            JSON.stringify({ d: c.callOff.date, k: key(c.callOff) }),
+          ),
+        );
+      }
+      if (c.intent === 'cover_request') {
+        if (!c.cover) return reply({ text: esc(c.clarifyingQuestion ?? 'Which room, day and time should be covered?') });
+        const { roomName, ...target } = c.cover;
+        return reply(
+          confirmActionMessage(
+            `Ask for cover in *${esc(roomName)}*, ${day(target.date)}, ${target.start}–${target.end}? Offers go to the first 3 people who can legally and fairly take it.`,
+            'Ask for cover',
+            'cover_confirm',
+            JSON.stringify({ c: target, k: key(target) }),
+          ),
+        );
+      }
     }
     // Anything else is a request in their own words (the same pipeline as the web form, 3A).
     const parsed = await runAs(db, actor, 'parseLeaveRequestText', { text: text.slice(0, 500) }, now);
@@ -114,6 +143,17 @@ export async function processInteraction(db: Db, p: BlockActions, now: Date): Pr
       const r = await runAs(db, actor, 'submitLeaveRequest', { ...f, hours: f.hours ?? undefined, note: f.note ?? undefined, idempotencyKey: k }, now);
       const what = `${esc(r.request.leaveType)}, ${range(r.request.start, r.request.end)}`;
       return replace({ text: r.request.status === 'approved' ? `:white_check_mark: ${what}: approved.` : `:outbox_tray: ${what}: sent for approval. I'll message you when it's decided.` });
+    }
+    if (a.action_id === 'calloff_confirm') {
+      const { d, k } = JSON.parse(a.value ?? '{}') as { d: string; k: string };
+      const r = await runAs(db, actor, 'reportCallOff', { date: d, idempotencyKey: k }, now);
+      const cover = r.coverRequests.length ? `Cover has been asked for ${r.coverRequests.length} time slot${r.coverRequests.length === 1 ? '' : 's'}; you don't need to find it.` : 'No cover is needed for your shift.';
+      return replace({ text: `:white_check_mark: Your manager knows you're out on ${day(r.date)}. ${cover}${r.balanceNote ? ` ${esc(r.balanceNote)}` : ''}` });
+    }
+    if (a.action_id === 'cover_confirm') {
+      const { c, k } = JSON.parse(a.value ?? '{}') as { c: Record<string, string>; k: string };
+      const r = await runAs(db, actor, 'requestCover', { op: 'create', ...c, idempotencyKey: k }, now);
+      return replace({ text: r.offersSent ? `:outbox_tray: Offers sent to ${r.offersSent} ${r.offersSent === 1 ? 'person' : 'people'}. I'll keep asking the next ones if nobody takes it.` : ':warning: Nobody can take this legally right now, so no offers went out.' });
     }
     if (a.action_id === 'approve' || a.action_id === 'decline') {
       const r = await runAs(db, actor, 'decideLeaveRequest', { requestId: a.value, decision: a.action_id }, now);

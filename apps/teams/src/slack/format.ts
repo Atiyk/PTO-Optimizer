@@ -128,3 +128,20 @@ export const HELP = [
   '• `/daysoff balance`: your balance',
   'You can also DM me the same things.',
 ].join('\n');
+
+/** A yes/cancel prompt for a drafted action (call-off, cover request). Nothing happens until "yes". */
+export function confirmActionMessage(text: string, yes: string, actionId: string, actionValue: string) {
+  return {
+    text,
+    blocks: [
+      { type: 'section', text: { type: 'mrkdwn', text } },
+      {
+        type: 'actions',
+        elements: [
+          { type: 'button', style: 'primary', text: { type: 'plain_text', text: yes }, action_id: actionId, value: actionValue },
+          { type: 'button', text: { type: 'plain_text', text: 'Cancel' }, action_id: 'request_cancel', value: 'cancel' },
+        ],
+      },
+    ],
+  };
+}

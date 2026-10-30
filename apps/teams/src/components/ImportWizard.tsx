@@ -9,10 +9,14 @@ import { Badge, btnPrimary, btnSecondary, input, label } from './ui';
 type Preview = CapabilityOutput<'importCsv'>;
 
 /** Upload → map columns → preview with per-row errors → import all or nothing. */
-export function ImportWizard({ samples }: { samples: { name: string; kind: 'members' | 'leave'; csv: string }[] }) {
+type Kind = 'members' | 'leave' | 'credentials' | 'shifts' | 'hours';
+const UNDOABLE: Kind[] = ['credentials', 'shifts', 'hours'];
+
+export function ImportWizard({ samples, coverage = false }: { samples: { name: string; kind: Kind; csv: string }[]; coverage?: boolean }) {
   const id = useId();
   const router = useRouter();
-  const [kind, setKind] = useState<'members' | 'leave'>('members');
+  const [kind, setKind] = useState<Kind>('members');
+  const [lastBatch, setLastBatch] = useState<{ kind: Kind; batchId: string; count: number } | null>(null);
   const [csv, setCsv] = useState('');
   const [dayFirst, setDayFirst] = useState(true);
   const [mapping, setMapping] = useState<Record<string, number> | undefined>();
@@ -32,8 +36,20 @@ export function ImportWizard({ samples }: { samples: { name: string; kind: 'memb
       setMapping(r.data.mapping);
       if (stage === 'commit') {
         setMsg(r.data.committed ? `Imported ${r.data.committed} rows.` : `Nothing imported: fix the ${r.data.errorCount} errors below first.`);
+        if (r.data.committed && r.data.batchId) setLastBatch({ kind: k, batchId: r.data.batchId, count: r.data.committed });
         if (r.data.committed) router.refresh();
       } else setMsg(null);
+    });
+
+  const undo = () =>
+    lastBatch &&
+    start(async () => {
+      const r = await runCapability('importCsv', { stage: 'undo', kind: lastBatch.kind, batchId: lastBatch.batchId });
+      setMsg(r.ok ? `Undone: ${r.data.undone ?? 0} rows removed.` : r.error.message);
+      if (r.ok) {
+        setLastBatch(null);
+        router.refresh();
+      }
     });
 
   async function onFile(f: File | undefined) {
@@ -49,9 +65,16 @@ export function ImportWizard({ samples }: { samples: { name: string; kind: 'memb
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <label className={label} htmlFor={`${id}-kind`}>What’s in the file</label>
-          <select id={`${id}-kind`} className={`${input} mt-1`} value={kind} onChange={(e) => { setKind(e.target.value as 'members'); setPreview(null); setMapping(undefined); }}>
+          <select id={`${id}-kind`} className={`${input} mt-1`} value={kind} onChange={(e) => { setKind(e.target.value as Kind); setPreview(null); setMapping(undefined); }}>
             <option value="members">People (and remaining balances)</option>
             <option value="leave">Booked leave</option>
+            {coverage && (
+              <>
+                <option value="credentials">Staff credentials (CPR, permits)</option>
+                <option value="shifts">Weekly schedules</option>
+                <option value="hours">Hours worked (for sick leave)</option>
+              </>
+            )}
           </select>
         </div>
         <div>
@@ -130,6 +153,9 @@ export function ImportWizard({ samples }: { samples: { name: string; kind: 'memb
         </>
       )}
       {msg && <p role="status" className="text-sm font-medium text-ink">{msg}</p>}
+      {lastBatch && UNDOABLE.includes(lastBatch.kind) && (
+        <button className={btnSecondary} disabled={pending} onClick={undo}>Undo this import ({lastBatch.count} rows)</button>
+      )}
     </div>
   );
 }

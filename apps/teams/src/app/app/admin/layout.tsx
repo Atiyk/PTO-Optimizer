@@ -8,6 +8,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const tabs: [string, string][] = [
     ['/app/admin', 'People'],
     ['/app/admin/setup', 'Setup'],
+    ['/app/admin/coverage', 'Coverage setup'],
+    ['/app/admin/credentials', 'Credentials'],
     ['/app/admin/import', 'Import'],
     ['/app/admin/handbook', 'Handbook'],
     ['/app/admin/data', 'Balances, export & audit'],

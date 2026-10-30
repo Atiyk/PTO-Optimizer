@@ -13,7 +13,7 @@ import type { Evaluation } from './leave';
 export type AutonomyLevel = 0 | 1 | 2 | 3;
 
 /** Actions that change data and that agents can reach (kept in step with the registry by a test). */
-export const AGENT_COMMIT_CAPABILITIES = ['submitLeaveRequest', 'cancelLeaveRequest', 'decideLeaveRequest', 'respondToProposal', 'sendPlanProposals'] as const;
+export const AGENT_COMMIT_CAPABILITIES = ['submitLeaveRequest', 'cancelLeaveRequest', 'decideLeaveRequest', 'respondToProposal', 'sendPlanProposals', 'requestCover', 'respondToCover', 'reportCallOff'] as const;
 export type ActorClass = 'agent' | 'assistant';
 
 export const AUTONOMY_LABELS: Record<AutonomyLevel, string> = {
@@ -58,6 +58,8 @@ export function autoApprovalCheck(ev: Evaluation): AutoApprovalCheck {
   if (ev.problems.length) blockers.push(...ev.problems);
   if (ev.retroactive) blockers.push('Starts in the past.');
   if (ev.coverage.length) blockers.push('Would leave the team below its coverage minimum.');
+  // D4: a new ratio or required-role gap at a regulated site is a hard fail, never auto-approved.
+  if (ev.blockCoverage.length) blockers.push('Would break a staffing ratio or required-role rule.');
   if (ev.blackouts.length) blockers.push('Overlaps a blackout period.');
   if (ev.countsAgainstBalance && ev.balanceAfter != null && ev.balanceAfter < 0) blockers.push('Would take the balance below zero.');
   const basis =

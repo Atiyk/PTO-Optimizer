@@ -74,3 +74,30 @@ describe('privacy (P6.2)', () => {
     expect(await snapshotOrg(db, B.org.id)).toEqual(bBefore);
   });
 });
+
+describe('privacy for regulated coverage (RC Phase 6)', () => {
+  it('erasure removes coverage personal data and keeps hours worked; export includes it', async () => {
+    const { seedChildcareCentre } = await import('@/server/seedCoverage');
+    const S = await seedChildcareCentre(db, '2026-11-01');
+    const hannah = S.staffIds[6]!;
+    await db.insert(schema.memberCoverPrefs).values({ orgId: S.org.id, memberId: hannah, optIn: 'yes', smsOptIn: true, smsPhone: '+15555550123' });
+    await db.insert(schema.pushSubscriptions).values({ orgId: S.org.id, memberId: hannah, endpoint: 'https://fcm.googleapis.com/fcm/send/x', p256dh: 'k', auth: 'a' });
+    const owner = { type: 'human' as const, orgId: S.org.id, memberId: S.ownerId, role: 'owner' as const, clientId: null, onBehalfOfMemberId: null, scopes: (await import('./scopes')).ROLE_SCOPES.owner };
+
+    const mine = JSON.parse((await run(db, owner, 'exportData', { format: 'json', memberId: hannah })).files['export.json']!);
+    expect(mine.credentials.map((c: { credential: string }) => c.credential).sort()).toEqual(['ece_12_units', 'pediatric_cpr']);
+    expect(mine.shifts).toHaveLength(5);
+    expect(mine.cover_preferences[0]).toMatchObject({ sms_phone: '+15555550123' });
+    expect(mine.hours_worked.length).toBeGreaterThan(0);
+    expect(JSON.stringify(mine)).not.toContain(S.staffIds[7]!); // nobody else's rows
+
+    await run(db, owner, 'eraseMember', { memberId: hannah });
+    for (const t of [schema.memberCoverPrefs, schema.pushSubscriptions, schema.memberCredentials, schema.shiftTemplates, schema.passkeys, schema.loginCodes]) {
+      expect(await db.select().from(t).where(eq(t.memberId, hannah)), String(t)).toEqual([]);
+    }
+    expect((await db.select().from(schema.hoursWorked).where(eq(schema.hoursWorked.memberId, hannah))).length).toBeGreaterThan(0);
+    const all = (await run(db, owner, 'exportData', { format: 'json' })).files['export.json']!;
+    expect(all).not.toContain('+15555550123');
+    expect(all).not.toContain('Hannah Moore');
+  });
+});

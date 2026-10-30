@@ -7,6 +7,7 @@ import { parseCsv } from '@/lib/csv';
 import type { Db } from '@/db/client';
 import { CapabilityError } from '../errors';
 import { defineCapability } from '../types';
+import { COVERAGE_SYNONYMS, COVERAGE_TARGETS, commitCoverageRows, undoCoverageBatch, validateCoverageRows, type CoverageKind } from './coverageCsv';
 
 /*
  * CSV import for switching from Timetastic, Vacation Tracker or a spreadsheet.
@@ -18,6 +19,7 @@ import { defineCapability } from '../types';
 const TARGETS = {
   members: ['name', 'email', 'role', 'team', 'location', 'startDate', 'manager', 'workWeek', 'hoursPerDay', 'tags', 'balance'],
   leave: ['member', 'leaveType', 'start', 'end', 'part', 'status'],
+  ...COVERAGE_TARGETS,
 } as const;
 
 const SYNONYMS: Record<string, string[]> = {
@@ -41,12 +43,15 @@ const SYNONYMS: Record<string, string[]> = {
 };
 
 type Kind = keyof typeof TARGETS;
+const isCoverageKind = (k: Kind): k is CoverageKind => k in COVERAGE_TARGETS;
 
 function autoMap(kind: Kind, header: string[]): Record<string, number> {
   const norm = header.map((h) => h.trim().toLowerCase());
   const out: Record<string, number> = {};
   for (const t of TARGETS[kind]) {
-    const idx = norm.findIndex((h) => SYNONYMS[t]!.includes(h));
+    // Coverage kinds use their own synonym list ("start" means a shift time there, a leave date here).
+    const syn = (isCoverageKind(kind) ? COVERAGE_SYNONYMS[t] : undefined) ?? SYNONYMS[t]!;
+    const idx = norm.findIndex((h) => syn.includes(h));
     if (idx >= 0 && !Object.values(out).includes(idx)) out[t] = idx;
   }
   return out;
@@ -180,13 +185,15 @@ async function validate(db: Db, orgId: string, kind: Kind, rows: string[][], map
 export const importCsv = defineCapability({
   name: 'importCsv',
   description:
-    'Admin-only CSV import (members with optional starting balances, or booked leave). stage "preview" parses, ' +
-    'maps columns and validates every row without changing anything; stage "commit" writes all rows in one ' +
-    'transaction and rejects the whole file if any row has an error.',
+    'Admin-only CSV import: members (with optional starting balances), booked leave, staff credentials, weekly ' +
+    'schedules or hours worked. stage "preview" parses, maps columns and validates every row without changing ' +
+    'anything; stage "commit" writes all rows in one transaction and rejects the whole file if any row has an ' +
+    'error. Credentials, schedules and hours commits return a batchId; stage "undo" with that batchId reverses it.',
   input: z.object({
-    stage: z.enum(['preview', 'commit']),
-    kind: z.enum(['members', 'leave']),
-    csv: z.string().min(1).max(1_000_000),
+    stage: z.enum(['preview', 'commit', 'undo']),
+    kind: z.enum(['members', 'leave', 'credentials', 'shifts', 'hours']),
+    csv: z.string().max(1_000_000).default(''),
+    batchId: z.uuid().optional().describe('For stage "undo": the batchId a coverage import returned.'),
     mapping: z.record(z.string(), z.number().int().min(0)).optional().describe('target field → column index; auto-detected when omitted'),
     dayFirst: z.boolean().default(true).describe('Interpret 03/04/2026 as 3 April (true) or March 4 (false).'),
     balanceLeaveType: z.string().default('vacation'),
@@ -198,6 +205,8 @@ export const importCsv = defineCapability({
     rows: z.array(z.object({ line: z.number(), values: z.record(z.string(), z.string()), errors: z.array(z.string()) })),
     errorCount: z.number(),
     committed: z.number(),
+    batchId: z.string().nullable().optional(),
+    undone: z.number().optional(),
   }),
   scope: 'admin',
   roles: ['owner', 'admin'],
@@ -208,11 +217,34 @@ export const importCsv = defineCapability({
   surfaces: ['ui', 'rest'],
   audit: (i, o) => `CSV import (${i.kind}, ${i.stage}): ${o.committed} rows written, ${o.errorCount} errors`,
   async handler({ db, actor, now }, input) {
+    if (input.stage === 'undo') {
+      if (!isCoverageKind(input.kind) || !input.batchId) throw new CapabilityError('invalid_input', 'Undo needs a credentials, shifts or hours batchId.');
+      const undone = await undoCoverageBatch(db, actor.orgId, input.kind, input.batchId, now);
+      return { header: [], mapping: {}, targets: [...TARGETS[input.kind]], rows: [], errorCount: 0, committed: 0, batchId: input.batchId, undone };
+    }
     const rows = parseCsv(input.csv);
     if (rows.length < 2) throw new CapabilityError('invalid_input', 'The CSV needs a header row and at least one data row.');
     if (rows.length > 2001) throw new CapabilityError('invalid_input', 'At most 2000 rows per import.');
     const mapping = input.mapping ?? autoMap(input.kind, rows[0]!);
     const today = isoDate(now);
+    if (isCoverageKind(input.kind)) {
+      const kind = input.kind;
+      const missing = TARGETS[kind].filter((t) => t !== 'evidence' && t !== 'issued' && t !== 'expires' && mapping[t] == null);
+      if (missing.length) throw new CapabilityError('invalid_input', `Map columns to: ${missing.join(', ')}.`, { header: rows[0] });
+      const results = await validateCoverageRows(
+        db,
+        actor.orgId,
+        kind,
+        rows.slice(1).map((r, i) => ({ line: i + 2, get: (k: string) => (mapping[k] == null ? '' : (r[mapping[k]!] ?? '').trim()) })),
+        (s) => parseDate(s, input.dayFirst),
+      );
+      const errorCount = results.reduce((n, r) => n + r.errors.length, 0);
+      const base = { header: rows[0]!, mapping, targets: [...TARGETS[kind]], rows: results.map(({ line, values, errors }) => ({ line, values, errors })), errorCount, undone: 0 };
+      if (input.stage === 'preview' || errorCount > 0) return { ...base, committed: 0, batchId: null };
+      const batchId = crypto.randomUUID();
+      const committed = await commitCoverageRows(db, actor.orgId, kind, results, batchId, actor.memberId, now);
+      return { ...base, committed, batchId };
+    }
     const { header, results } = await validate(db, actor.orgId, input.kind, rows, mapping, input.dayFirst, today);
     const errorCount = results.reduce((n, r) => n + r.errors.length, 0);
     const base = { header, mapping, targets: [...TARGETS[input.kind]], rows: results, errorCount };

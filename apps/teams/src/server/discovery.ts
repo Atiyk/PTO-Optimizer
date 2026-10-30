@@ -70,7 +70,7 @@ export function llmsTxt(base = appUrl()): string {
     '',
     '## Optional',
     '',
-    `- Webhooks: signed per the Standard Webhooks spec (headers \`webhook-id\`, \`webhook-timestamp\`, \`webhook-signature\`); events leave.requested, leave.decided, balance.expiring, plan.proposed`,
+    `- Webhooks: signed per the Standard Webhooks spec (headers \`webhook-id\`, \`webhook-timestamp\`, \`webhook-signature\`); events leave.requested, leave.decided, balance.expiring, plan.proposed, coverage.gap_detected, cover.requested, cover.filled, credential.expiring`,
     '',
   ].join('\n');
 }

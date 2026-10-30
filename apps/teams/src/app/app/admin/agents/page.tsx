@@ -22,6 +22,10 @@ const EVENTS = [
   { event: 'leave.decided', description: 'a request is approved or declined' },
   { event: 'balance.expiring', description: 'leave will be lost in 30 or 7 days' },
   { event: 'plan.proposed', description: 'a manager sends leave suggestions' },
+  { event: 'coverage.gap_detected', description: 'a room breaks a staffing rule in the next 14 days (daily, and at once after a call-off)' },
+  { event: 'cover.requested', description: 'cover is requested for a gap or a call-off' },
+  { event: 'cover.filled', description: 'someone accepts a cover offer' },
+  { event: 'credential.expiring', description: 'a credential expires in 30, 14 or 7 days, or has just expired' },
 ];
 
 const KIND: Record<string, string> = { pat: 'Personal', api_key: 'API key', access: 'OAuth token' };
@@ -169,7 +173,7 @@ export default async function AgentsAndApi() {
 
       <Card title="Webhooks">
         <p className="mb-3 text-sm text-muted">
-          Signed per the Standard Webhooks spec. Payloads never include notes, and health-related leave shows only as &ldquo;out&rdquo;.
+          Signed per the Standard Webhooks spec. Payloads never include notes, children, pay or why someone is out, and health-related leave shows only as &ldquo;out&rdquo;. Schemas for every event are in the <a className="text-accent underline" href="/api/v1/openapi.json">OpenAPI document</a> under <code>webhooks</code>.
         </p>
         <WebhookCreator events={EVENTS} />
         {w.endpoints.length > 0 && (
