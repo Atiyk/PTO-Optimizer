@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evalParsing, loadParsingCases } from './evalHarness';
+import { evalHandbooks, evalParsing, loadHandbookCases, loadParsingCases } from './evalHarness';
 import { mockProvider } from './provider';
 
 describe('AI evals (mock provider, CI)', () => {
@@ -12,5 +12,13 @@ describe('AI evals (mock provider, CI)', () => {
     console.log(`accuracy ${r.passed}/${r.total}`);
     if (r.failures.length) console.log(r.failures.map((f) => `${f.id} → ${f.detail}`).join('\n'));
     expect(r.accuracy).toBeGreaterThanOrEqual(0.85);
+  });
+
+  it('has at least 5 handbooks; the rules reader gets every field right on them', async () => {
+    expect(loadHandbookCases().length).toBeGreaterThanOrEqual(5);
+    const r = await evalHandbooks(mockProvider);
+    console.log(`handbooks ${r.passed}/${r.total}, fields ${(r.fieldAccuracy * 100).toFixed(1)}%`);
+    if (r.failures.length) console.log(r.failures.map((f) => `${f.id} → ${f.detail}`).join('\n'));
+    expect(r.fieldAccuracy).toBeGreaterThanOrEqual(0.95);
   });
 });

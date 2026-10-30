@@ -9,6 +9,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     ['/app/admin', 'People'],
     ['/app/admin/setup', 'Setup'],
     ['/app/admin/import', 'Import'],
+    ['/app/admin/handbook', 'Handbook'],
     ['/app/admin/data', 'Balances, export & audit'],
     ['/app/admin/ai', 'AI usage'],
   ];

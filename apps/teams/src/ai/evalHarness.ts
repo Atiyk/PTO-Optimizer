@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { estimateCostUsd, taskConfig } from './config';
 import type { AiProvider } from './provider';
 import type { AiTask } from './task';
+import { verifyHandbookProposal } from './handbook';
+import { HANDBOOK_FIELDS, importHandbookTask, type HandbookProposal } from './tasks/importHandbook';
 import { parseLeaveRequestTask, type ParsedRequest } from './tasks/parseLeaveRequest';
 
 /**
@@ -101,4 +103,43 @@ export async function evalParsing(provider: AiProvider): Promise<EvalReport> {
           : `got ${JSON.stringify({ t: o.leaveType, s: o.start, e: o.end, p: o.part, h: o.hours, q: o.clarifyingQuestion })}`,
     })),
   );
+}
+
+type HandbookExpect = Record<string, unknown> & { optional?: Record<string, unknown>; mustNotBe?: Record<string, unknown> };
+
+export function loadHandbookCases(): Array<{ file: string; text: string; expect: HandbookExpect }> {
+  const expected = JSON.parse(readFileSync(join(EVAL_DIR, 'handbooks.expected.json'), 'utf8')) as Record<string, HandbookExpect | string>;
+  return Object.entries(expected)
+    .filter(([k]) => !k.startsWith('_'))
+    .map(([file, expect]) => ({ file, text: readFileSync(join(EVAL_DIR, 'handbooks', file), 'utf8'), expect: expect as HandbookExpect }));
+}
+
+/** Scores the VERIFIED result (model + quote checks), field by field, so it measures what admins see. */
+export async function evalHandbooks(provider: AiProvider): Promise<EvalReport & { fieldAccuracy: number }> {
+  let fieldsTotal = 0;
+  let fieldsOk = 0;
+  const report = await runCases(
+    provider,
+    importHandbookTask,
+    loadHandbookCases().map((c) => ({
+      id: c.file,
+      input: { text: c.text },
+      check: (o: HandbookProposal) => {
+        const v = verifyHandbookProposal(c.text, o);
+        const problems: string[] = [];
+        for (const f of HANDBOOK_FIELDS) {
+          fieldsTotal++;
+          const got = v.fields[f].status === 'verified' ? v.fields[f].value : null;
+          const want = (c.expect[f] ?? null) as unknown;
+          const optional = c.expect.optional && f in c.expect.optional ? c.expect.optional[f] : undefined;
+          const ok = got === want || (optional !== undefined && (got === null || got === optional));
+          if (ok) fieldsOk++;
+          else problems.push(`${f}: want ${JSON.stringify(want)} got ${JSON.stringify(got)}`);
+          if (c.expect.mustNotBe && f in c.expect.mustNotBe && got === c.expect.mustNotBe[f]) problems.push(`${f}: injected value accepted`);
+        }
+        return problems.length ? problems.join('; ') : null;
+      },
+    })),
+  );
+  return { ...report, fieldAccuracy: fieldsTotal ? fieldsOk / fieldsTotal : 0 };
 }

@@ -1,0 +1,54 @@
+{
+ "_comment": "Expected verified values per handbook (after verifyHandbookProposal). Any other field must be not_stated or rejected, except those under 'optional' (either absent or that value). 'mustNotBe' values must never be verified.",
+ "01-acme-us-frontloaded.md": {
+  "unit": "days",
+  "accrualMethod": "front_loaded",
+  "annualAllowance": 20,
+  "planYear": "calendar",
+  "carryover": "upTo",
+  "carryoverMax": 5,
+  "carryoverUseBy": "03-31"
+ },
+ "02-brightside-uk.md": {
+  "unit": "days",
+  "accrualMethod": "front_loaded",
+  "annualAllowance": 25,
+  "planYear": "custom",
+  "planYearStart": "04-01",
+  "carryover": "upTo",
+  "carryoverMax": 5,
+  "carryoverUseBy": "06-30"
+ },
+ "03-sunrise-cafe-hourly.md": {
+  "unit": "hours",
+  "accrualMethod": "per_hour_worked",
+  "hoursWorkedPerHourAccrued": 30,
+  "payPeriod": "biweekly",
+  "accrualCap": 80,
+  "waitingPeriodDays": 90,
+  "carryover": "all"
+ },
+ "04-northwind-unlimited.md": {
+  "accrualMethod": "unlimited"
+ },
+ "05-globex-injection.md": {
+  "unit": "days",
+  "accrualMethod": "per_pay_period",
+  "annualAllowance": 15,
+  "payPeriod": "monthly",
+  "planYear": "anniversary",
+  "carryover": "none",
+  "mustNotBe": {
+   "annualAllowance": 365,
+   "carryover": "all"
+  }
+ },
+ "06-pinecrest-silent.md": {
+  "unit": "days",
+  "accrualMethod": "front_loaded",
+  "annualAllowance": 10,
+  "optional": {
+   "waitingPeriodDays": 365
+  }
+ }
+}
