@@ -5,10 +5,11 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>URL parameter contract &mdash; PTO Optimizer</title>
+    <meta name="theme-color" content="#ffffff" />
+    <title>URL parameter contract &mdash; Days Off</title>
     <meta
       name="description"
-      content="Every query parameter PTO Optimizer reads, with its type, default, and what it does. The solver is deterministic: the same URL always produces the same plan."
+      content="Every query parameter PTO Optimizer and Sabbatical Planning read, with its type, default, and what it does. Both solvers are deterministic: the same URL always produces the same plan."
     />
     <link rel="canonical" href="https://pto-optimizer.app/docs" />
     <style>
@@ -184,6 +185,27 @@
         </tbody>
       </table>
 
+      <h2>Sabbatical Planning (<code>/sabbatical</code>)</h2>
+      <p>
+        A separate, smaller parameter set &mdash; one contiguous block placed once, not a budget
+        spent across many breaks. <code>c</code> and <code>s</code> above are shared in spirit
+        (country and a start date) but are namespaced separately here since the two tools solve
+        different problems.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Param</th><th>Type</th><th>Default</th><th>What it does</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>c</code></td><td>ISO country code</td><td>Geolocated guess</td><td>Country used for public holidays.</td></tr>
+          <tr><td><code>len</code></td><td>number, 1&ndash;52</td><td><code>4</code></td><td>Sabbatical length, in weeks.</td></tr>
+          <tr><td><code>s</code></td><td>date, <code>YYYY-MM-DD</code></td><td>Today</td><td>Earliest eligible start date.</td></tr>
+          <tr><td><code>pto</code></td><td>number, 0&ndash;15</td><td><code>5</code></td><td>PTO days to add, extending the block (spent before unpaid leave).</td></tr>
+          <tr><td><code>unpaid</code></td><td>number, 0&ndash;52</td><td><code>0</code></td><td>Unpaid leave, in weeks, to add on top of PTO once it's exhausted.</td></tr>
+          <tr><td><code>sel</code></td><td>date, <code>YYYY-MM-DD</code></td><td>The top-ranked placement</td><td>Which of the three ranked placements is selected, by its own start date (not a list position, since re-ranking can reorder the list).</td></tr>
+        </tbody>
+      </table>
+
       <h2>Worked examples</h2>
 
       <div class="example">
@@ -201,6 +223,11 @@
         <code>https://pto-optimizer.app/germany?c=DE&amp;s=2027-06-01&amp;e=2027-08-31&amp;up=1&amp;count=1&amp;bo=2027-07-04,2027-07-05,2027-07-06,2027-07-07</code>
       </div>
 
+      <div class="example">
+        <p>A 6-week US sabbatical, eligible from June 2027, 5 PTO days plus 2 weeks unpaid leave added:</p>
+        <code>https://pto-optimizer.app/sabbatical?c=US&amp;len=6&amp;s=2027-06-01&amp;pto=5&amp;unpaid=2</code>
+      </div>
+
       <p>
         Every one of these three URLs reproduces the identical plan every time it's opened, by
         anyone, since nothing outside the parameters themselves (no account, no stored
@@ -209,7 +236,7 @@
         <a href="/privacy.html">the privacy page</a> for what is and isn't collected.
       </p>
 
-      <a class="back" href="/">&larr; Back to PTO Optimizer</a>
+      <a class="back" href="/">&larr; Back to Days Off</a>
     </main>
   </body>
 </html>

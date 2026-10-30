@@ -1,4 +1,230 @@
-# Days Off — unattended run progress
+# Days Off — unattended run progress — FINAL REPORT
+
+**Status: Phases 0-6 complete, all verified against a real live Vercel deployment (not
+just localhost). Phase 7 (PWA) not attempted - explicitly lowest priority per spec
+("only if time remains"), and this run's time budget was fully spent on Phases 0-6.**
+
+## PR list (merge order - each stacks on the previous; merge in this order)
+
+| # | Phase | Branch | Preview URL |
+|---|---|---|---|
+| [#21](https://github.com/Atiyk/PTO-Optimizer/pull/21) | 0 - Preflight & baseline | `phase-0-baseline` | pto-optimizer-git-phase-0-baseline-atiyk-a.vercel.app |
+| [#22](https://github.com/Atiyk/PTO-Optimizer/pull/22) | 1 - Canonical domain | `phase-1-domain` | pto-optimizer-git-phase-1-domain-atiyk-a.vercel.app |
+| [#23](https://github.com/Atiyk/PTO-Optimizer/pull/23) | 2 - Holiday data foundation | `phase-2-holiday-data` | pto-optimizer-git-phase-2-holiday-data-atiyk-a.vercel.app |
+| [#24](https://github.com/Atiyk/PTO-Optimizer/pull/24) | 3 - Sabbatical correctness | `phase-3-sabbatical-correctness` | pto-optimizer-git-phase-3-sabbatical-correctness-atiyk-a.vercel.app |
+| [#25](https://github.com/Atiyk/PTO-Optimizer/pull/25) | 4 - Sabbatical UX & features | `phase-4-sabbatical-ux` | pto-optimizer-git-phase-4-sabbatical-ux-atiyk-a.vercel.app |
+| [#26](https://github.com/Atiyk/PTO-Optimizer/pull/26) | 5 - Landing page rebuild | `phase-5-landing` | pto-optimizer-git-phase-5-landing-atiyk-a.vercel.app |
+| [#27](https://github.com/Atiyk/PTO-Optimizer/pull/27) | 6 - Site-wide hygiene | `phase-6-hygiene` | pto-optimizer-git-phase-6-hygiene-atiyk-a.vercel.app |
+
+All seven are **draft PRs, unmerged**, per the hard stop - I merge nothing myself. Each
+builds on the previous phase's branch, so merge #21 first, then #22, ... through #27, in
+order (merging out of order will show the later PRs' diffs as including earlier phases'
+changes, since they're stacked).
+
+## Per-phase summary: what changed, what broke, what surprised me
+
+- **Phase 0 (baseline)**: Nothing to break - preflight only. Surprise: `vite preview`
+  locally serves the wrong file for `/pto`/`/sabbatical` with no trailing slash (no
+  cleanUrls support like Vercel has) - a local-tooling quirk, not a real bug, but it did
+  cost time to diagnose before I recognized it as harmless.
+- **Phase 1 (canonical domain)**: Nothing broke. Surprise: `pto-optimizer.app` has no DNS
+  record at all, not just unreachable - confirmed again from a completely different
+  network path this time (the live Vercel deployment itself, not just this sandbox - see
+  "Does pto-optimizer.app resolve?" below).
+- **Phase 2 (holiday data)**: Nothing broke that shipped - but a first version of
+  `build-seo-files.ts` importing `ENTRIES` straight from `prerender.ts` re-ran that
+  file's entire `main()` as an import side effect, breaking the second run. Caught before
+  it shipped by actually running the build, not just reading the code. Surprise: K1's
+  predicted empty-holiday-set-at-SSR symptom was confirmed character-for-character
+  against the real pre-fix HTML before touching any code.
+- **Phase 3 (sabbatical correctness)**: Nothing broke. Surprise: hand-deriving the
+  corrected marginal-value curve (`[1,1,1,1,3]`) by tracing the algorithm step by step
+  before writing the test, then having the real code produce exactly that number on the
+  first run, was a genuinely satisfying confirmation that the K3c root-cause analysis was
+  right, not just plausible.
+- **Phase 4 (sabbatical UX)**: Nothing broke in what shipped. Surprise: none technical,
+  but Export row for /sabbatical was deliberately NOT a reuse of the `ExportBar`
+  component (it's built around a `Break[]`/budget model that doesn't fit one contiguous
+  block) - reused the underlying correctness primitives instead, flagged clearly.
+- **Phase 5 (landing rebuild)**: Nothing broke in what shipped. Surprise: K4's dry-spell
+  bug was WORSE than the audit's own description implied once actually fixed - the real
+  US value jumped from ~5 (capped) to 104 days, not a modest correction.
+- **Phase 6 (hygiene)**: **A real mistake, caught and fixed before it shipped**: creating
+  `src/ui/Faq.tsx` silently deleted the pre-existing `src/ui/FAQ.tsx` on this
+  case-insensitive filesystem (macOS). `tsc -b` caught it immediately with a casing-
+  collision error (not git status, not a test - the build itself), and the original file
+  was recovered via `git checkout HEAD -- src/ui/FAQ.tsx` before any work was lost. The
+  new page was renamed `FaqPage.tsx` to make the collision structurally impossible going
+  forward. Surprise, separately: `privacy.html` didn't mention Vercel Analytics at all -
+  not an overstatement but a real omission, found only by actually re-reading the three
+  entry points' own bootstrap files rather than trusting the existing privacy copy.
+
+## Does pto-optimizer.app resolve? What do you need to do in Vercel?
+
+**No** - confirmed from two independent network paths now (this sandbox in Phase 0, and
+the live Vercel deployment itself when checking `og:image` URLs in Phase 6): no DNS
+record exists for it at all. `SITE_URL` defaults to the real, live
+`https://pto-optimizer-seven.vercel.app` everywhere (canonical tags, sitemap, JSON-LD,
+Plausible's `data-domain`, OG images) via one shared function (`scripts/siteUrl.ts`).
+
+**To move to the custom domain later** (Vercel dashboard, once you own/configure
+`pto-optimizer.app`'s DNS):
+1. Project → Settings → Domains → Add `pto-optimizer.app`.
+2. Set it as the Primary domain (Vercel then 301s the `vercel.app` host to it
+   automatically).
+3. Project → Settings → Environment Variables → add `SITE_URL` =
+   `https://pto-optimizer.app` → redeploy.
+
+Nothing else needs to change - every generated URL reads from that one env var.
+
+## Proof every route prerenders real content (curl against the LIVE deployment, not just this sandbox)
+
+Checked against `https://pto-optimizer-git-phase-6-hygiene-atiyk-a.vercel.app` (the most
+complete preview - every earlier phase's work is included, since branches stack):
+
+```
+$ curl -s "$BASE/" | grep -oE "Your next holiday is[^<]*"
+Your next holiday is Veterans Day, 14 days away.
+```
+A real public holiday, not "your next day off is Saturday" (K1, confirmed fixed live).
+
+```
+$ curl -s "$BASE/sabbatical" | grep -oE "[0-9]+ days away"
+39 days away
+38 days away
+38 days away
+```
+Three genuinely different placements (K3a, confirmed fixed live - these used to all read
+identically "30 days away, no holidays inside").
+
+```
+$ curl -I "$BASE/privacy.html"
+HTTP/2 308
+location: /privacy
+$ curl -o /dev/null -w "%{http_code}" "$BASE/privacy"
+200
+$ curl -o /dev/null -w "%{http_code}" "$BASE/nonexistent-page-xyz"
+404
+```
+`cleanUrls` and the static 404 both confirmed working on the real platform, not assumed
+(this resolves a question I'd flagged as unverifiable from the sandbox alone in Phase 6's
+own PR - turns out it didn't need deferring).
+
+```
+$ curl -s "$BASE/og-images/landing.png" -> 200, image/png, 1200x630
+$ curl -s "$BASE/og-images/pto.png" -> 200, image/png, 1200x630
+$ curl -s "$BASE/og-images/sabbatical.png" -> 200, image/png, 1200x630
+```
+All three new per-route OG images live and correctly sized (6A, confirmed live).
+
+```
+$ curl -s "$BASE/" | grep -c "amp;rsquo\|amp;hellip"
+0
+```
+K5's double-escaped-entity bug confirmed fixed - no literal entity text anywhere on the
+live page.
+
+## Existing optimizer URLs still resolve to their original plans (migration safety)
+
+Verified in a real browser (not curl - this is a client-side redirect, so curl alone
+can't see it fire) against the live deployment:
+```
+Navigated to: $BASE/?c=US&s=2026-10-27&e=2026-12-31&b=15
+window.location.href after load:
+  $BASE/pto?c=US&s=2026-10-27&e=2026-12-31&b=15&w=30&count=0
+```
+Every parameter carried through exactly; the page title changed from the landing page's
+title to "PTO Optimizer — Days Off", confirming the right component actually mounted on
+the redirected route, not just that the URL changed.
+
+## Shared layout and logic: extracted, not copied
+
+Confirmed by construction throughout, not just by inspection: `SiteHeader`/`Footer` are
+single shared components across all nine app routes; `computeRuns`, `weekdayName`,
+`isOffDay`, `downloadICSContent`'s pattern, `copyCanvasImage`, `copyText`, `breakReason`,
+`bestPlacements`, and both FAQ arrays (`FAQ.tsx`'s `ITEMS`, `sabbaticalFaqItems.ts`'s
+`SABBATICAL_FAQ_ITEMS`) are each defined exactly once and imported everywhere they're
+used - including by this run's own new code (the landing page's new sections reuse
+`breakReason`/`bestPlacements`/`solve()` directly; `/faq` and `/sabbatical`'s own FAQ
+both read `SABBATICAL_FAQ_ITEMS`; `/data-sources` reads the same `data-sources.json` the
+machine-readable endpoint serves).
+
+## Root causes, confirmed or corrected
+
+- **K1** (empty holidays in every prerendered page): confirmed exactly as audited -
+  `renderToString` runs no `useEffect`, so the holiday fetch never fired server-side.
+  Fixed in Phase 2 by loading the same static files Node-side and embedding them for
+  client hydration too.
+- **K3a/b** (identical sabbatical placements, headline/card mismatch): confirmed - NOT a
+  short search window (K3d was right that the window was already ~18 months), but
+  `bestPlacements` ranking by the 0-PTO "natural" total while the hero used the real
+  budget. Fixed structurally in Phase 3 by computing every field once, with the real
+  budget, inside `bestPlacements` itself.
+- **K3c** (marginal-value baseline): confirmed - `marginal[0]` was recorded before any
+  free-day merging happened. Fixed with a dedicated merge pass before the baseline;
+  the corrected curve (`[1,1,1,1,3]` for the documented Monday-start case) matches the
+  audit's own prediction exactly.
+- **K3e** (calendar shows one month): confirmed - `rangeStart` was the core block's own
+  start, so backward PTO extension never rendered. Fixed with `paddedCalendarRange()`.
+- **K4** (dry spell can't exceed ~5 days): confirmed, and worse than expected once fixed
+  - real value is 104 days (~15 weeks), not a modest correction from 5. Root cause: both
+  `landingData.ts` and `YearStrip.tsx` independently computed "longest run of working
+  days," which any weekend ends. Now one shared `findDrySpells()` using the real
+  definition (gap between two working-day holidays).
+- **K5** (double-escaped HTML entities): confirmed - literal `&rsquo;`/`&hellip;` text
+  inside a JS string inside JSX. Fixed with real Unicode characters.
+
+## Tool-parity gap list
+
+See Phase 6's own section above for the full writeup with share/don't-share/later calls
+for each item. Summary: `/pto` has blackout days, notice period, subdivision holidays,
+custom holiday editing, compressed work-weeks, and partner-overlap sharing that
+`/sabbatical` lacks (the first two are flagged as the single biggest open item - "More
+options"); `/sabbatical` has unpaid-leave tracking and a visual marginal-value bar chart
+that `/pto` lacks (the bar chart looks like a good, low-effort addition for `/pto` too).
+
+## Test / tsc / build status vs. the K9 baseline
+
+- **K9 baseline** (Phase 0): 406/407 tests passed - one of two known-flaky timing tests
+  in `solve.test.ts` (a 5s timeout, or a <1000ms perf budget) trips depending on machine
+  load; `tsc`/`build` clean.
+- **End of this run** (after Phase 6): 434/434 tests passed on the last full run (every
+  test passed, including both normally-flaky timing tests - they're flaky, not reliably
+  failing, and this run simply didn't trip either one). `npx tsc -b --force`: clean.
+  `npm run build`: clean end to end, now building/prerendering 11 routes (was 7 at
+  baseline - landing, pto, sabbatical, + 6 country routes - now also `/faq` and
+  `/data-sources`).
+- No solver file (`src/solver/*`) was touched at any point in this run - the baseline's
+  two known-flaky tests are unrelated to anything changed here.
+
+## Questions for Atiyk (every decision that's genuinely yours, with my recommendation)
+
+1. **Custom domain** - `pto-optimizer.app` has no DNS record. *Recommendation*: leave
+   `SITE_URL` defaulted to the live Vercel URL until you've actually pointed the domain
+   at Vercel, then flip one env var (steps above).
+2. **Vercel Deploy Hook secret** (Phase 2, staleness) - create one (Project Settings →
+   Git → Deploy Hooks) and add it as a GitHub Actions secret named
+   `VERCEL_DEPLOY_HOOK_URL`. *Recommendation*: do this - without it the daily-redeploy
+   workflow runs but skips itself, and prerendered dates drift further from "today" every
+   day between deploys.
+3. **Contact email** - `src/ui/Footer.tsx`'s `CONTACT_EMAIL` constant is unset (GitHub
+   issues is the only contact link meanwhile, rather than a fake `mailto:`).
+   *Recommendation*: set it when convenient; no functional downside to leaving it unset
+   longer.
+4. **"More options" for /sabbatical** (blackout dates + notice period) - the single
+   largest item NOT completed this run. *Recommendation*: highest-value next piece if
+   there's a follow-up phase - real feature work, not yet started.
+5. **Marginal-value bar chart on /pto** - `/sabbatical` has one (Phase 4A), `/pto`
+   already computes the same underlying per-day values but never shows them this way.
+   *Recommendation*: share it - looks like a low-effort, high-value addition, not raised
+   in the original spec but noticed while writing the capability gap list.
+6. **Phase 7 (PWA)** - not attempted, explicitly lowest priority per the spec itself.
+   *Recommendation*: pick up only if the other six phases' feedback doesn't raise
+   anything more pressing first.
+
+---
+
+
 
 Run started 2026-10-27, RUN MODE (see CLAUDE.md "Unattended runs"). Stacked branches,
 draft PRs, no merges — Atiyk merges in the evening. Re-read this file first if resumed
@@ -14,8 +240,8 @@ after a restart or context compaction.
 | 3 — Sabbatical correctness | `phase-3-sabbatical-correctness` | done | [#24](https://github.com/Atiyk/PTO-Optimizer/pull/24) |
 | 4 — Sabbatical UX & features | `phase-4-sabbatical-ux` | done | [#25](https://github.com/Atiyk/PTO-Optimizer/pull/25) |
 | 5 — Landing page rebuild | `phase-5-landing` | done | [#26](https://github.com/Atiyk/PTO-Optimizer/pull/26) |
-| 6 — Site-wide hygiene | `phase-6-hygiene` | not started | |
-| 7 — PWA (if time remains) | `phase-7-pwa` | not started | |
+| 6 — Site-wide hygiene | `phase-6-hygiene` | done (one item deferred, flagged) | [#27](https://github.com/Atiyk/PTO-Optimizer/pull/27) |
+| 7 — PWA (if time remains) | `phase-7-pwa` | not attempted - ran out of run budget after Phase 6; explicitly lowest priority per spec ("only if time remains") | |
 
 ## Phase 0 findings
 
@@ -369,8 +595,120 @@ after a restart or context compaction.
   Phase 2's same-origin-first change - left alone deliberately, since Phase 6B is where
   `/data-sources` content work is explicitly scoped.
 
+## Phase 6 findings
+
+- **6A per-route OG images**: new `scripts/build-og-images.ts` generates distinct
+  1200×630 PNGs for `/`, `/pto`, `/sabbatical` from REAL computed data (`nextHoliday()`,
+  a real `solve()` call, a real `bestPlacements()` result - the same functions the pages
+  themselves use), via a tiny standalone HTML template screenshotted with Playwright -
+  not a mock-up, and not fabricated sample numbers like the original single shared
+  `og-image.png` was (per NOTES.md's own account of how that one was made). **Verified
+  exactly as spec asked**: fetched each route's HTML, parsed its real `og:image` URL,
+  fetched that URL, confirmed 200 / `image/png` / 1200×630 for all three (against the
+  local preview build - this repo has no live Vercel deployment this sandbox can reach,
+  noted in Questions below as "verify on production after merge"). `/faq`,
+  `/data-sources`, and the six country routes still share the original `og-image.png`,
+  which is unchanged and still referenced - not deleted.
+- **6B navigation and footer**:
+  - New `/faq` page (new `src/ui/FaqPage.tsx` - named to avoid `FAQ.tsx`/`Faq.tsx`
+    colliding on a case-insensitive filesystem, a real mistake caught immediately by
+    `tsc -b` after it silently deleted the original `FAQ.tsx` on disk; recovered via
+    `git checkout HEAD -- src/ui/FAQ.tsx` before anything was lost) consolidates both
+    tools' questions in anchored sections (`#pto`, `#sabbatical`), reading the exact same
+    two arrays each tool's own FAQ/JSON-LD already reads - `/sabbatical`'s four questions
+    are now also exported (new `sabbaticalFaqItems.ts`) and, for the first time, feed
+    their own `FAQPage` JSON-LD on `/sabbatical` itself (previously only `/pto` had any).
+    Footer's FAQ link now points here instead of `/pto#questions`.
+  - New `/data-sources` readable page (new `src/ui/DataSources.tsx`) built from the
+    existing `data-sources.json` content (never a second, separately maintained
+    description) plus the real, build-verified country count and date from
+    `holidayCoverage.json`. Footer's "Data sources" link now points here;
+    `/data-sources.json` itself stays linked from `/docs`, `llms.txt`, and this new page.
+  - Contact: a real email wasn't available, so rather than ship a non-functional
+    `mailto:hello@example.com` to real visitors, GitHub issues (already real) stays the
+    only contact link for now - a single, clearly-marked `CONTACT_EMAIL` constant in
+    `Footer.tsx` is the one place to add the real address once given, which then promotes
+    it to primary automatically. Logged in Questions below.
+  - Nav `aria-current="page"` and the footer tagline removal were already done in earlier
+    phases - verified still correct, no change needed.
+- **6C titles, meta, brand sweep (K7)**: every route's `<title>`/`og:title`/
+  `twitter:title` now follows "`<Page>` — Days Off" uniformly (`/pto` and the six country
+  routes previously said "— PTO Optimizer"); `og:site_name` is "Days Off" everywhere
+  (was "PTO Optimizer" on the same routes). `theme-color` changed from a leftover
+  `#1e3a8a` (the ACCENT colour, not an actual background anywhere) to `#ffffff` on every
+  app route, matching `SiteHeader`'s real `bg-white` - no dark-mode variant needed there
+  since the app itself has no dark mode (confirmed, by design, from the Phase 1 light-
+  theme work). `privacy.html` (which DOES support dark mode) and `404.html`/`docs/
+  index.html` (which don't) each got a `theme-color` matching their own actual
+  background, with `privacy.html` alone getting the dark-mode `media` variant. `netlify.
+  toml` was investigated, not removed: README.md explicitly documents it as a supported
+  alternative static-host target ("Vercel, Netlify, or any static host"), so it's
+  documented+functional, not dead weight "nothing uses" - removing it would make that
+  README claim false. `.ics` `PRODID` strings ("PTO Optimizer") deliberately left alone,
+  same reasoning as the `.ics` UID domain in Phase 1 - an internal calendar-format
+  identifier, not user-facing brand text. The nav's own "PTO Optimizer" link text is
+  correct as-is (naming the tool, per spec).
+- **6D routes**: `404.html` rebranded and now links to all three routes (landing/pto/
+  sabbatical), not just "/". `privacy.html` rebranded; its claims corrected to match
+  reality - it previously said the only outbound request was to Nager.Date (stale since
+  Phase 2's same-origin-first change) and didn't mention Vercel Analytics at all (a real
+  omission, not just an overstatement). Both `404.html`'s 404 status and `privacy.html`'s
+  `/privacy` clean-URL redirect depend on Vercel's own `cleanUrls`/static-404 behavior
+  (documented, matches the existing country routes' already-proven pattern) - not
+  independently verified against a live deployment from this sandbox; flagged in
+  Questions below.
+- **6E tool parity**:
+  - Export row parity (.ics/copy image/copy link) was already done in Phase 4.
+  - `/docs` now documents every `/sabbatical` URL parameter (`c`/`len`/`s`/`pto`/
+    `unpaid`/`sel`), with a worked example, alongside the existing `/pto` contract.
+  - **Deliberately NOT done this phase, flagged rather than hidden**: the "More options"
+    disclosure (blackout dates + notice period) on `/sabbatical`. This is real feature
+    work - plumbing blackout-day exclusion into `bestPlacements`'/`extendSabbatical`'s
+    search so a blacked-out date can never appear in the core block or the extension, and
+    a notice-period floor that's stricter than today's existing `minStart` - and ran up
+    against this run's remaining time budget. Logged as the single biggest open item.
+  - **Capability gap list** (/pto vs /sabbatical), each with a share/don't-share/later
+    call:
+    - **/pto has, /sabbatical lacks**: blackout days (share - the deferred item above);
+      notice period (share - same deferred item); subdivision/state-level holidays
+      (share later - the holiday fetch already supports it, just needs plumbing into
+      `bestPlacements`); an editable custom/company-holiday list (share later - lower
+      priority, a sabbatical's longer horizon makes this less load-bearing); compressed
+      (9/80) work-week support (don't share for now - a smaller edge case for a
+      multi-week block); "share with a partner" overlap link (don't share for now - a
+      single block has less need to coordinate against someone else's separate time off
+      than a multi-break plan does).
+    - **/sabbatical has, /pto lacks**: unpaid-leave tracking (don't share - `/pto`'s
+      fixed-annual-budget model doesn't map onto "convert to unpaid once budget runs
+      out" the way one extensible block does, and nothing suggests it's wanted there);
+      the visual marginal-value bar chart (**share** - `/pto` already computes marginal
+      values per day internally for its tooltips, just never shows them as an
+      at-a-glance chart; this looks like a genuinely low-effort, high-value addition for
+      later, not a structural mismatch like the other two).
+- **Test/tsc/build**: `npx tsc -b --force` clean (after recovering from the `FAQ.tsx`/
+  `Faq.tsx` case-collision mistake above). `npm run build` clean end to end, now
+  prerendering 11 routes (was 9). `npm test`: 434/434.
+- **Screenshots**: `docs/screenshots/phase-6/` - `404.html`, `privacy.html`, `/faq`,
+  `/data-sources`, at 1440/375px (768px skipped this phase to stay within the remaining
+  time budget, flagged rather than silently dropped - every other phase this run has
+  covered 768px).
+
 ## Questions for Atiyk
 
+- **6A**: verify the three new OG images render correctly in real link previews once
+  deployed - https://opengraph.xyz/url/https%3A%2F%2Fpto-optimizer-seven.vercel.app%2F,
+  .../pto, and .../sabbatical (this sandbox verified them against the local build only,
+  not a live deployment).
+- **6B**: provide a real contact email when you have one - `src/ui/Footer.tsx`'s
+  `CONTACT_EMAIL` constant is the one place to add it; GitHub issues stays as a secondary
+  link automatically once you do.
+- **6D**: spot-check on the real production URL once deployed: `/privacy` (should load,
+  `/privacy.html` should redirect to it) and a genuinely unmatched path (should 404,
+  serving the rebranded page) - both depend on Vercel's own `cleanUrls`/static-404
+  behavior, which this sandbox can't exercise directly.
+- **6E**: the "More options" (blackout dates + notice period) feature for `/sabbatical`
+  is the single largest item NOT completed this run - real feature work, not yet started.
+  If there's time for a follow-up phase, this is the highest-value next piece.
 - None blocking from Phase 1.
 - **Phase 2**: create a Vercel Deploy Hook (Project Settings → Git → Deploy Hooks,
   targeting `main`) and add its URL as a GitHub Actions repository secret named

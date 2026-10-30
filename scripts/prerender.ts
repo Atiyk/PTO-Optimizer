@@ -35,6 +35,7 @@ import { JSDOM } from 'jsdom';
 import { renderToString } from 'react-dom/server';
 import React from 'react';
 import { ITEMS as FAQ_ITEMS } from '../src/ui/FAQ.tsx';
+import { SABBATICAL_FAQ_ITEMS } from '../src/ui/sabbaticalFaqItems.ts';
 import { rawHolidaysToHolidays, type Holiday } from '../src/data/holidays.ts';
 import { getSiteUrl } from './siteUrl.ts';
 import { ENTRIES, type Entry } from './routes.ts';
@@ -88,7 +89,7 @@ function decodeEntities(s: string): string {
 }
 
 function extractMeta(html: string, fallbackUrl: string): { title: string; description: string; canonical: string } {
-  const title = decodeEntities(/<title>(.*?)<\/title>/s.exec(html)?.[1] ?? 'PTO Optimizer');
+  const title = decodeEntities(/<title>(.*?)<\/title>/s.exec(html)?.[1] ?? 'Days Off');
   const description = decodeEntities(/<meta\s+name="description"\s+content="([^"]*)"/s.exec(html)?.[1] ?? '');
   const canonical = /<link rel="canonical" href="([^"]*)"/.exec(html)?.[1] ?? fallbackUrl;
   return { title, description, canonical };
@@ -125,14 +126,23 @@ function buildJsonLd(entry: Entry, meta: { title: string; description: string; c
 
   const result: object[] = [webApplication, breadcrumbList];
 
-  // FAQPage only where FAQ.tsx's six questions are actually rendered (the /pto routes) -
-  // the landing page and /sabbatical have no FAQ section to describe (yet, for
-  // /sabbatical - its own short FAQ is a later phase).
-  if (entry.component === 'app') {
+  // FAQPage for whichever FAQ array(s) that route actually renders - /faq shows both
+  // tools' questions, so its own structured data combines both arrays rather than
+  // picking one. The landing page and /data-sources have no FAQ section, so neither
+  // gets this block at all.
+  const faqItems =
+    entry.component === 'app'
+      ? FAQ_ITEMS
+      : entry.component === 'sabbatical'
+        ? SABBATICAL_FAQ_ITEMS
+        : entry.component === 'faq'
+          ? [...FAQ_ITEMS, ...SABBATICAL_FAQ_ITEMS]
+          : null;
+  if (faqItems) {
     result.push({
       '@context': 'https://schema.org',
       '@type': 'FAQPage',
-      mainEntity: FAQ_ITEMS.map((item) => ({
+      mainEntity: faqItems.map((item) => ({
         '@type': 'Question',
         name: item.question,
         acceptedAnswer: { '@type': 'Answer', text: item.answer },
@@ -181,8 +191,16 @@ installWindow(`${SITE_URL}${ENTRIES[0].path}`, ENTRIES[0].countryPreset);
 const { App } = await import('../src/ui/App.tsx');
 const { Landing } = await import('../src/ui/Landing.tsx');
 const { Sabbatical } = await import('../src/ui/Sabbatical.tsx');
+const { FaqPage } = await import('../src/ui/FaqPage.tsx');
+const { DataSources } = await import('../src/ui/DataSources.tsx');
 
-const COMPONENTS: Record<ComponentKind, React.ComponentType> = { app: App, landing: Landing, sabbatical: Sabbatical };
+const COMPONENTS: Record<ComponentKind, React.ComponentType> = {
+  app: App,
+  landing: Landing,
+  sabbatical: Sabbatical,
+  faq: FaqPage,
+  dataSources: DataSources,
+};
 
 async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInjected: number }> {
   const url = `${SITE_URL}${entry.path}`;

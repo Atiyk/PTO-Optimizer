@@ -3,7 +3,7 @@
  * import from anywhere) between scripts/prerender.ts and scripts/build-seo-files.ts, so a
  * route can't exist in the sitemap but not be prerendered, or vice versa.
  */
-export type ComponentKind = 'landing' | 'app' | 'sabbatical';
+export type ComponentKind = 'landing' | 'app' | 'sabbatical' | 'faq' | 'dataSources';
 
 export interface Entry {
   /** Path relative to dist/ of the built HTML file to inject into. */
@@ -31,6 +31,8 @@ export const ENTRIES: Entry[] = [
   { file: 'index.html', path: '/', component: 'landing', sitemapPriority: 1.0 },
   { file: 'pto/index.html', path: '/pto', component: 'app', sitemapPriority: 0.9 },
   { file: 'sabbatical/index.html', path: '/sabbatical', component: 'sabbatical', sitemapPriority: 0.9 },
+  { file: 'faq/index.html', path: '/faq', component: 'faq', sitemapPriority: 0.6 },
+  { file: 'data-sources/index.html', path: '/data-sources', component: 'dataSources', sitemapPriority: 0.5 },
   { file: 'uk/index.html', path: '/uk', component: 'app', countryPreset: 'GB', countryName: 'United Kingdom', sitemapPriority: 0.8 },
   { file: 'canada/index.html', path: '/canada', component: 'app', countryPreset: 'CA', countryName: 'Canada', sitemapPriority: 0.8 },
   { file: 'australia/index.html', path: '/australia', component: 'app', countryPreset: 'AU', countryName: 'Australia', sitemapPriority: 0.8 },
