@@ -20,6 +20,13 @@ const LINK_CLASS = 'hover:text-slate-700';
 const CONTACT_EMAIL: string | null = null; // TODO(Atiyk): set the real address here
 
 /**
+ * The one link to the separate team product (apps/teams). Its domain doesn't exist yet (see
+ * PROGRESS.md's "Questions for Atiyk"), so like CONTACT_EMAIL the link renders only once this
+ * is set - never a guessed URL that might 404 for a real visitor.
+ */
+const TEAMS_URL: string | null = null; // TODO(Atiyk): e.g. 'https://teams.example.com'
+
+/**
  * Site restructure: the footer carries the navigational weight the header deliberately
  * doesn't - three columns, denser than the header, shared across all three routes. Product
  * links work from anywhere (not just a "you are here" indicator - the header already does
@@ -44,6 +51,13 @@ export function Footer({ onShowShortcuts }: FooterProps) {
                 Sabbatical Planning
               </a>
             </li>
+            {TEAMS_URL && (
+              <li>
+                <a href={TEAMS_URL} className={LINK_CLASS}>
+                  Days Off for Teams (early preview)
+                </a>
+              </li>
+            )}
           </ul>
         </div>
         <div>
