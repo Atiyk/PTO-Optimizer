@@ -790,9 +790,11 @@ export const coverRequests = pgTable(
     waveSize: smallint('wave_size').notNull().default(3),
     waveWaitMinutes: smallint('wave_wait_minutes').notNull().default(15),
     createdByMemberId: uuid('created_by_member_id'),
+    /** Retries of requestCover with the same key return the same request. */
+    idempotencyKey: text('idempotency_key'),
     createdAt: createdAt(),
   },
-  (t) => [index('cover_req_org_date_idx').on(t.orgId, t.date)],
+  (t) => [index('cover_req_org_date_idx').on(t.orgId, t.date), uniqueIndex('cover_req_idem_idx').on(t.orgId, t.idempotencyKey)],
 );
 
 export const coverOffers = pgTable(
@@ -855,9 +857,68 @@ export const memberCoverPrefs = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::uuid[]`),
+    /** Text-message cover offers: only with explicit opt-in, and only once an SMS provider is configured. */
+    smsOptIn: boolean('sms_opt_in').notNull().default(false),
+    smsPhone: text('sms_phone'),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex('cover_prefs_org_member_idx').on(t.orgId, t.memberId)],
+);
+
+/** WebAuthn passkeys for staff without Slack (public keys only; never a secret). */
+export const passkeys = pgTable(
+  'passkeys',
+  {
+    id: id(),
+    orgId: orgRef(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    credentialId: text('credential_id').notNull(),
+    publicKey: text('public_key').notNull(),
+    counter: integer('counter').notNull().default(0),
+    transports: text('transports').array().notNull().default(sql`'{}'::text[]`),
+    name: text('name'),
+    createdAt: createdAt(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  },
+  (t) => [uniqueIndex('passkeys_credential_idx').on(t.credentialId), index('passkeys_org_member_idx').on(t.orgId, t.memberId)],
+);
+
+/** Admin-issued one-time sign-in codes (fallback to passkeys). Hashed, short-lived, single use. */
+export const loginCodes = pgTable(
+  'login_codes',
+  {
+    id: id(),
+    orgId: orgRef(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    codeHash: text('code_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    attempts: smallint('attempts').notNull().default(0),
+    createdByMemberId: uuid('created_by_member_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('login_codes_member_idx').on(t.memberId, t.createdAt)],
+);
+
+/** Web Push subscriptions for cover offers. */
+export const pushSubscriptions = pgTable(
+  'push_subscriptions',
+  {
+    id: id(),
+    orgId: orgRef(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    endpoint: text('endpoint').notNull(),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('push_endpoint_idx').on(t.endpoint), index('push_org_member_idx').on(t.orgId, t.memberId)],
 );
 
 /** Pay rates: only while the org has cost-aware ranking on; owner/admin only; never to the LLM. */

@@ -5,6 +5,8 @@ import { authenticateBearer } from '@/lib/agentAuth';
 import { callAsAgent } from '@/server/agentGateway';
 import { buildOrg, humanActor, NOW, run, snapshotOrg } from '@/test/fixtures';
 import { freshDb } from '@/test/db';
+import { eq } from 'drizzle-orm';
+import { coverOffers } from '@/db/schema';
 
 /*
  * A6 / tenant isolation: an admin of org A tries to read or change org B's objects through
@@ -24,6 +26,8 @@ let bDeliveryId: string;
 let bRoomId: string;
 let bMemberCredId: string;
 let bHoursBatch: string;
+let bCoverId: string;
+let bOfferId: string;
 
 beforeAll(async () => {
   db = await freshDb();
@@ -50,6 +54,8 @@ beforeAll(async () => {
   await run(db, bo, 'manageSchedule', { op: 'setShifts', memberId: B.emp.id, rows: [{ roomId: bRoomId, weekday: 0, start: '08:00', end: '16:00' }] });
   await run(db, bo, 'manageCredentials', { op: 'define', key: 'cpr', name: 'CPR' });
   bMemberCredId = (await run(db, bo, 'manageCredentials', { op: 'grant', memberId: B.emp.id, credentialKey: 'cpr', expiresOn: '2027-06-01' })).id;
+  bCoverId = (await run(db, bo, 'requestCover', { op: 'create', locationId: B.location.id, roomId: bRoomId, date: '2026-11-09', start: '08:00', end: '12:00', idempotencyKey: 'b-cover-0001' })).requestId;
+  [{ id: bOfferId }] = await db.select({ id: coverOffers.id }).from(coverOffers).where(eq(coverOffers.coverRequestId, bCoverId)).limit(1) as [{ id: string }];
   bHoursBatch = (await run(db, bo, 'importHoursWorked', { stage: 'commit', rows: [{ member: B.emp.id, periodStart: '2026-10-01', periodEnd: '2026-10-07', hours: 40 }] })).batchId!;
 });
 
@@ -103,6 +109,14 @@ const attacks = (): [CapabilityName, unknown][] => [
   ['importHoursWorked', { stage: 'undo', batchId: bHoursBatch }],
   ['importCsv', { stage: 'undo', kind: 'hours', batchId: bHoursBatch }],
   ['listRulePacks', { locationId: B.location.id }],
+  ['findCover', { locationId: B.location.id, roomId: bRoomId, date: '2026-11-09', start: '08:00', end: '12:00' }],
+  ['findCover', { locationId: A.location.id, roomId: bRoomId, date: '2026-11-09', start: '08:00', end: '12:00' }],
+  ['requestCover', { op: 'create', locationId: B.location.id, roomId: bRoomId, date: '2026-11-09', start: '08:00', end: '12:00', idempotencyKey: 'a-attack-001' }],
+  ['requestCover', { op: 'create', locationId: A.location.id, roomId: bRoomId, date: '2026-11-09', start: '08:00', end: '12:00', idempotencyKey: 'a-attack-002' }],
+  ['requestCover', { op: 'create', locationId: A.location.id, roomId: bRoomId, date: '2026-11-09', start: '08:00', end: '12:00', absentMemberId: B.emp.id, idempotencyKey: 'a-attack-003' }],
+  ['requestCover', { op: 'cancel', requestId: bCoverId }],
+  ['respondToCover', { offerId: bOfferId, response: 'decline' }],
+  ['getCoverRequests', { locationId: B.location.id }],
 ];
 
 describe('tenant isolation (A6)', () => {

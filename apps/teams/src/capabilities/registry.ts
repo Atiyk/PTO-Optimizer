@@ -7,6 +7,7 @@ import { auditLog } from '@/db/schema';
 import { adjustBalance, exportData, getAuditLog, getOrgSetup, listMembers, manageMembers, manageOrgSetup } from './actions/admin';
 import { explainBalanceInWords, getAiUsage, importHandbook, parseLeaveRequestText } from './actions/ai';
 import { importCsv } from './actions/importCsv';
+import { findCover, getCoverRequests, reportCallOff, requestCover, respondToCover } from './actions/cover';
 import { getCoverage, getCoverageSetup, getCredentials, getSickLeave, importHoursWorked, listRulePacks, manageCredentials, manageSchedule } from './actions/coverage';
 import { listMyProposals, respondToProposal, runTeamPlan, sendPlanProposals } from './actions/planner';
 import { decideLeaveRequest, listPendingApprovals } from './actions/approvals';
@@ -64,6 +65,11 @@ export const CAPABILITIES = {
   getSickLeave,
   listRulePacks,
   getCoverageSetup,
+  findCover,
+  requestCover,
+  respondToCover,
+  reportCallOff,
+  getCoverRequests,
 } as const satisfies Record<string, CapabilityDef>;
 
 export type CapabilityName = keyof typeof CAPABILITIES;
