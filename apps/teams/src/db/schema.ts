@@ -496,3 +496,45 @@ export const webhookDeliveries = pgTable(
     uniqueIndex('webhook_deliveries_dedupe_idx').on(t.endpointId, t.dedupeKey),
   ],
 );
+
+// ── Slack app (Phase 7) ──────────────────────────────────────────────────────
+
+/** One Slack workspace per org: the bot token from "Add to Slack" (sealed, see lib/secretBox). */
+export const slackInstallations = pgTable(
+  'slack_installations',
+  {
+    id: id(),
+    orgId: orgRef(),
+    teamId: text('team_id').notNull(),
+    teamName: text('team_name'),
+    botUserId: text('bot_user_id').notNull(),
+    botToken: text('bot_token').notNull(),
+    scopes: text('scopes').array().notNull(),
+    installedByMemberId: uuid('installed_by_member_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('slack_installations_org_idx').on(t.orgId), uniqueIndex('slack_installations_team_idx').on(t.teamId)],
+);
+
+/** Event ids and interaction ids already handled, so Slack's retries do nothing twice. Pruned daily. */
+export const slackReceipts = pgTable('slack_receipts', {
+  key: text('key').primaryKey(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** A person's consent to let us set their Slack status while they're out (user token, sealed). */
+export const slackStatusGrants = pgTable(
+  'slack_status_grants',
+  {
+    id: id(),
+    orgId: orgRef(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    userToken: text('user_token').notNull(),
+    /** The leave request whose status we last set, so the daily run doesn't repeat it. */
+    lastRequestId: uuid('last_request_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('slack_status_grants_member_idx').on(t.memberId)],
+);

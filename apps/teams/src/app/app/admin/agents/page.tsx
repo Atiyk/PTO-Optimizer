@@ -30,6 +30,7 @@ export default async function AgentsAndApi() {
   const actor = await requireActor();
   const a = await call('manageAgentAccess', { op: 'list' }, actor);
   const w = await call('manageWebhooks', { op: 'list' }, actor);
+  const slack = await call('getSlackConnection', {}, actor);
   const serviceScopes = SCOPES.filter((s) => s !== 'admin' && s !== 'leave:approve').map((s) => ({ scope: s, description: SCOPE_DESCRIPTIONS[s] }));
   const live = a.tokens.filter((t) => !t.revokedAt);
   const endpointUrl = new Map(w.endpoints.map((e) => [e.id, e.url]));
@@ -55,6 +56,25 @@ export default async function AgentsAndApi() {
             ? 'Agents can connect with the tokens and clients below.'
             : 'Agent access is off. Every token and client is refused until you turn it back on.'}{' '}
           Setup steps for Claude, ChatGPT, Copilot Studio and Agentforce are in the <Link className="text-accent underline" href="/docs/agents">agent guide</Link>.
+        </p>
+      </Card>
+
+      <Card
+        title="Slack app"
+        actions={
+          slack.installed ? (
+            <ActionButton capability="manageSlack" input={{ op: 'uninstall' }} confirm="Disconnect Slack? The bot stops at once." doneMessage="Disconnected.">Disconnect</ActionButton>
+          ) : slack.configured ? (
+            <a className={btnPrimary} href="/api/slack/install?for=workspace">Add to Slack</a>
+          ) : null
+        }
+      >
+        <p className="text-sm text-muted">
+          {slack.installed
+            ? `Installed in ${slack.installed.teamName ?? slack.installed.teamId}. People request leave with /daysoff or by DM, managers approve from Slack, and /daysoff who shows who's out.`
+            : slack.configured
+              ? 'Add the bot so people can request leave and managers can approve without leaving Slack.'
+              : 'Slack isn’t set up on this deployment yet: the app needs SLACK_CLIENT_ID, SLACK_CLIENT_SECRET and SLACK_SIGNING_SECRET (see apps/teams/slack/README.md).'}
         </p>
       </Card>
 

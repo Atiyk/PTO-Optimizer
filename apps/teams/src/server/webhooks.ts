@@ -1,4 +1,5 @@
-import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
+import { openSecret } from '@/lib/secretBox';
 import { lookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
 import { and, asc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
@@ -27,30 +28,10 @@ const TIMEOUT_MS = 10_000;
 const CLAIM_LEASE_MS = 60_000;
 
 // ---------------------------------------------------------------------------------------------
-// Secrets: shown once as whsec_…, stored encrypted with a key derived from SESSION_SECRET.
-
-function secretKey(): Buffer {
-  const s = process.env.SESSION_SECRET;
-  if (!s) throw new Error('SESSION_SECRET is not set');
-  return Buffer.from(hkdfSync('sha256', s, 'daysoff-teams', 'webhook-secrets', 32));
-}
+// Secrets: shown once as whsec_…, stored sealed (src/lib/secretBox.ts).
 
 export function newWebhookSecret(): string {
   return `whsec_${randomBytes(24).toString('base64')}`;
-}
-
-export function sealSecret(secret: string): string {
-  const iv = randomBytes(12);
-  const c = createCipheriv('aes-256-gcm', secretKey(), iv);
-  const ct = Buffer.concat([c.update(secret, 'utf8'), c.final()]);
-  return `enc:v1:${iv.toString('base64')}:${c.getAuthTag().toString('base64')}:${ct.toString('base64')}`;
-}
-
-export function openSecret(stored: string): string {
-  const [, , iv, tag, ct] = stored.split(':');
-  const d = createDecipheriv('aes-256-gcm', secretKey(), Buffer.from(iv!, 'base64'));
-  d.setAuthTag(Buffer.from(tag!, 'base64'));
-  return Buffer.concat([d.update(Buffer.from(ct!, 'base64')), d.final()]).toString('utf8');
 }
 
 /** Standard Webhooks v1 signature. Exported so tests (and receivers) can verify. */

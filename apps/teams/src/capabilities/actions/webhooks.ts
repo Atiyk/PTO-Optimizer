@@ -1,7 +1,8 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { WEBHOOK_EVENTS, webhookDeliveries, webhookEndpoints } from '@/db/schema';
-import { deliverDue, emitWebhook, newWebhookSecret, sampleEventData, sealSecret, webhookUrlProblem } from '@/server/webhooks';
+import { sealSecret } from '@/lib/secretBox';
+import { deliverDue, emitWebhook, newWebhookSecret, sampleEventData, webhookUrlProblem } from '@/server/webhooks';
 import { CapabilityError } from '../errors';
 import { actingMemberId } from '../helpers';
 import { defineCapability } from '../types';

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { decideAgentDraft, listAgentDrafts, manageAgentAccess, managePersonalTokens } from './actions/agents';
 import { manageWebhooks } from './actions/webhooks';
 import { deleteWorkspace, eraseMember } from './actions/privacy';
+import { getSlackConnection, manageSlack } from './actions/slack';
 import { auditLog } from '@/db/schema';
 import { adjustBalance, exportData, getAuditLog, getOrgSetup, listMembers, manageMembers, manageOrgSetup } from './actions/admin';
 import { explainBalanceInWords, getAiUsage, importHandbook, parseLeaveRequestText } from './actions/ai';
@@ -50,6 +51,8 @@ export const CAPABILITIES = {
   manageWebhooks,
   eraseMember,
   deleteWorkspace,
+  manageSlack,
+  getSlackConnection,
   listAgentDrafts,
   decideAgentDraft,
 } as const satisfies Record<string, CapabilityDef>;

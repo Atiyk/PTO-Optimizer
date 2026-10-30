@@ -1,6 +1,6 @@
 import { and, eq, isNotNull, lt } from 'drizzle-orm';
 import type { Db } from '@/db/client';
-import { apiTokens, drafts, rateCounters, webhookDeliveries } from '@/db/schema';
+import { apiTokens, drafts, rateCounters, slackReceipts, webhookDeliveries } from '@/db/schema';
 
 /** Prunes rows that only matter for a short time. Run daily by the cron route. */
 export async function housekeeping(db: Db, now: Date) {
@@ -19,5 +19,6 @@ export async function housekeeping(db: Db, now: Date) {
     .where(and(eq(drafts.status, 'open'), lt(drafts.expiresAt, now)))
     .returning({ id: drafts.id });
   const deliveries = await db.delete(webhookDeliveries).where(lt(webhookDeliveries.createdAt, ninetyDays)).returning({ id: webhookDeliveries.id });
-  return { rateWindows: rate.length, accessTokens: access.length, draftsExpired: expired.length, deliveries: deliveries.length };
+  const receipts = await db.delete(slackReceipts).where(lt(slackReceipts.receivedAt, dayAgo)).returning({ k: slackReceipts.key });
+  return { slackReceipts: receipts.length, rateWindows: rate.length, accessTokens: access.length, draftsExpired: expired.length, deliveries: deliveries.length };
 }

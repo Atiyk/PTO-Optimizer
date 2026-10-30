@@ -1,7 +1,8 @@
 import { timingSafeEqual } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/db/client';
-import { webhookEndpoints } from '@/db/schema';
+import { slackStatusGrants, webhookEndpoints } from '@/db/schema';
+import { syncSlackStatuses } from '@/slack/notify';
 import { housekeeping } from '@/server/housekeeping';
 import { deliverDue, scanExpiringBalances } from '@/server/webhooks';
 
@@ -34,5 +35,9 @@ export async function GET(req: Request) {
   }
   // Housekeeping: old rate-limit windows, expired OAuth access tokens, stale drafts.
   const cleaned = await housekeeping(db, now);
-  return Response.json({ queued, ...sent, cleaned });
+  // Slack "out of office" statuses for people who allowed it.
+  const grantOrgs = await db.selectDistinct({ orgId: slackStatusGrants.orgId }).from(slackStatusGrants);
+  let statuses = 0;
+  for (const { orgId } of grantOrgs) statuses += await syncSlackStatuses(db, orgId, now);
+  return Response.json({ queued, ...sent, cleaned, statuses });
 }

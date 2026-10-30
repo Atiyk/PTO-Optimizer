@@ -10,6 +10,8 @@ import { actingMemberId, managesMember, untrusted } from '../helpers';
 import { defineCapability } from '../types';
 import { reverseUsage } from './requests';
 import { emitWebhook, kickWebhooks, requestEventData } from '@/server/webhooks';
+import { defer } from '@/server/defer';
+import { notifyDecision, syncSlackStatuses } from '@/slack/notify';
 
 const impact = z.object({
   balanceAfter: z.number().nullable().describe('Engine balance after this request, including other pending requests.'),
@@ -267,6 +269,10 @@ export const decideLeaveRequest = defineCapability({
       );
     });
     kickWebhooks(db, actor.orgId);
+    defer(async () => {
+      await notifyDecision(db, actor.orgId, r.req.id);
+      if (status === 'approved') await syncSlackStatuses(db, actor.orgId, now);
+    });
     return view(status);
   },
 });

@@ -7,6 +7,8 @@ import { CapabilityError } from '../errors';
 import { isAdmin, subjectMember, untrusted } from '../helpers';
 import { defineCapability } from '../types';
 import { emitWebhook, kickWebhooks, requestEventData } from '@/server/webhooks';
+import { defer } from '@/server/defer';
+import { notifyApprover, syncSlackStatuses } from '@/slack/notify';
 
 const isoDay = z.iso.date().describe('YYYY-MM-DD');
 
@@ -246,6 +248,8 @@ export const submitLeaveRequest = defineCapability({
       return row!;
     });
     kickWebhooks(db, actor.orgId);
+    if (request.status === 'pending') defer(() => notifyApprover(db, actor.orgId, request.id, now));
+    else defer(async () => void (await syncSlackStatuses(db, actor.orgId, now)));
     return { request: summarize(request, input.leaveType), evaluation: evaluationToOutput(ev) };
   },
 });
