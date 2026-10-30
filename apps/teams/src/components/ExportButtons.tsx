@@ -4,12 +4,13 @@ import { useState, useTransition } from 'react';
 import { runCapability } from '@/app/actions';
 import { btnSecondary } from './ui';
 
-export function ExportButtons() {
+/** Whole org, or one person when `memberId` is set (data-subject requests). */
+export function ExportButtons({ memberId }: { memberId?: string } = {}) {
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const go = (format: 'json' | 'csv') =>
     start(async () => {
-      const r = await runCapability('exportData', { format });
+      const r = await runCapability('exportData', { format, ...(memberId ? { memberId } : {}) });
       if (!r.ok) return setMsg(r.error.message);
       for (const [name, body] of Object.entries(r.data.files)) {
         const url = URL.createObjectURL(new Blob([body], { type: format === 'json' ? 'application/json' : 'text/csv' }));

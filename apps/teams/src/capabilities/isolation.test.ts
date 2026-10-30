@@ -74,6 +74,7 @@ const attacks = (): [CapabilityName, unknown][] => [
   ['manageWebhooks', { op: 'delete', endpointId: bHookId }],
   ['manageWebhooks', { op: 'sendTest', endpointId: bHookId, event: 'leave.requested' }],
   ['manageWebhooks', { op: 'retry', deliveryId: bDeliveryId }],
+  ['eraseMember', { memberId: B.emp.id }],
 ];
 
 describe('tenant isolation (A6)', () => {

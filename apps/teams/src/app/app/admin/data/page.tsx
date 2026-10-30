@@ -1,12 +1,16 @@
 import { CapabilityForm } from '@/components/CapabilityForm';
 import { ExportButtons } from '@/components/ExportButtons';
+import { PrivacyActions } from '@/components/PrivacyActions';
 import { Card } from '@/components/ui';
+import { getOrg } from '@/domain/leave';
+import { getDb } from '@/db/client';
 import { call, requireActor } from '@/server/page';
 
 export default async function DataPage() {
   const actor = await requireActor();
   const [{ members }, setup, { entries }] = await Promise.all([call('listMembers', {}, actor), call('getOrgSetup', {}, actor), call('getAuditLog', { limit: 50 }, actor)]);
   const name = new Map(members.map((m) => [m.id, m.name]));
+  const org = await getOrg(await getDb(), actor.orgId);
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card title="Adjust a balance">
@@ -27,6 +31,18 @@ export default async function DataPage() {
         <p className="mb-3 text-sm text-muted">Everything: people, leave types, policies, requests, the ledger and the audit log.</p>
         <ExportButtons />
       </Card>
+      <div className="lg:col-span-2">
+        <Card title="One person’s data">
+          <p className="mb-3 text-sm text-muted">
+            For access and erasure requests. Erasing keeps their leave dates (your records) under &ldquo;Former member&rdquo; and removes everything that identifies them.
+          </p>
+          <PrivacyActions
+            people={members.map((m) => ({ id: m.id, name: m.name, erasable: m.role !== 'owner' && m.id !== actor.memberId }))}
+            orgName={org.name}
+            isOwner={actor.role === 'owner'}
+          />
+        </Card>
+      </div>
       <div className="lg:col-span-2">
         <Card title="Audit log (latest 50)">
           <div className="overflow-x-auto">
