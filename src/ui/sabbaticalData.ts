@@ -176,14 +176,6 @@ function firstOfMonth(iso: string): string {
   return `${iso.slice(0, 7)}-01`;
 }
 
-function firstOfMonth(iso: string): string {
-  return `${iso.slice(0, 7)}-01`;
-}
-
-function firstOfMonth(iso: string): string {
-  return `${iso.slice(0, 7)}-01`;
-}
-
 /**
  * 3D/K3e: the calendar used to render from `selected.start` (the core block's own start),
  * so PTO days extending the trip BACKWARD never appeared at all, and a trip crossing a
