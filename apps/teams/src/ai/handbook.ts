@@ -1,5 +1,5 @@
 import { policySchema, type PolicyInput } from '@/domain/policySchema';
-import { HANDBOOK_FIELDS, type HandbookField, type HandbookProposal } from './tasks/importHandbook';
+import { HANDBOOK_FIELDS, INSTRUCTION_LIKE, type HandbookField, type HandbookProposal } from './tasks/importHandbook';
 
 export type FieldStatus = 'verified' | 'not_stated' | 'rejected';
 export interface VerifiedField {
@@ -39,8 +39,6 @@ function mentionsNumber(quote: string, n: number): boolean {
   return (NUMBER_WORDS[n] ?? []).some((w) => q.includes(w));
 }
 
-/** Text that reads like an instruction to a model rather than policy (R5 defence in depth). */
-const INSTRUCTION_LIKE = /\b(ignore (all |any |the )?(previous|prior|above)|disregard|system prompt|you are an? |as an ai|assistant:|system:|override|instructions?)\b/i;
 
 /** Sanity bounds: values outside them are not saved without a human typing them in. */
 const BOUNDS: Partial<Record<HandbookField, (v: number, unit: string) => boolean>> = {

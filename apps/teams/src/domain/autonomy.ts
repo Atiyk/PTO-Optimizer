@@ -61,7 +61,7 @@ export function autoApprovalCheck(ev: Evaluation): AutoApprovalCheck {
   if (ev.blackouts.length) blockers.push('Overlaps a blackout period.');
   if (ev.countsAgainstBalance && ev.balanceAfter != null && ev.balanceAfter < 0) blockers.push('Would take the balance below zero.');
   const basis =
-    `${t.name}, ${ev.cost.amount} ${ev.unit}` +
+    `${t.name}, ${ev.cost.amount} ${ev.cost.amount === 1 ? ev.unit.replace(/s$/, '') : ev.unit}` +
     (max != null ? ` (limit ${max})` : '') +
     (ev.countsAgainstBalance && ev.balanceAfter != null ? `, balance after ${ev.balanceAfter}` : '') +
     ', no coverage gap, no blackout';

@@ -53,8 +53,13 @@ function sentences(text: string): string[] {
     .filter(Boolean);
 }
 
+/** Text that reads like an instruction to a model rather than policy (R5 defence in depth). */
+export const INSTRUCTION_LIKE = /\b(ignore (all |any |the )?(previous|prior|above)|disregard|system prompt|you are an? |as an ai|assistant:|system:|override|instructions?)\b/i;
+
 function find(text: string, re: RegExp): { m: RegExpMatchArray; quote: string } | null {
   for (const s of sentences(text)) {
+    // An injected instruction is never policy, so the rules reader doesn't read it at all.
+    if (INSTRUCTION_LIKE.test(s)) continue;
     const m = s.toLowerCase().match(re);
     if (m) return { m, quote: s };
   }

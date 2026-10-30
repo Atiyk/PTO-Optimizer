@@ -47,7 +47,7 @@ export interface DateReading {
   question: string | null;
 }
 
-type Tok = { start: string; end?: string; at: number; len: number; explicitYear: boolean };
+type Tok = { start: string; end?: string; at: number; len: number; explicitYear: boolean; weekday?: number };
 
 const MONTH_RE = Object.keys(MONTHS).sort((a, b) => b.length - a.length).join('|');
 const WD_RE = Object.keys(WEEKDAYS).sort((a, b) => b.length - a.length).join('|');
@@ -145,7 +145,7 @@ export function readDates(raw: string, today: string): DateReading {
   }
   for (const m of text.matchAll(new RegExp(`\\b(?:(next|this|coming) )?(${WD_RE})\\b`, 'g'))) {
     const mod = m[1] === 'coming' ? undefined : m[1];
-    push({ start: weekdayOccurrence(today, WEEKDAYS[m[2]!]!, mod), at: m.index!, len: m[0].length, explicitYear: false });
+    push({ start: weekdayOccurrence(today, WEEKDAYS[m[2]!]!, mod), at: m.index!, len: m[0].length, explicitYear: false, weekday: m[1] ? undefined : WEEKDAYS[m[2]!] });
   }
 
   toks.sort((a, b) => a.at - b.at);
@@ -167,8 +167,10 @@ export function readDates(raw: string, today: string): DateReading {
   if (toks.length >= 2 && !first.end) {
     const second = toks[1]!;
     end = second.end ?? second.start;
+    // "next Friday and Monday", "Friday to Tuesday": a bare weekday after a start means the first one after it.
+    if (end < start && second.weekday !== undefined) end = addDays(start, ((second.weekday - dow(start) + 6) % 7) + 1);
     // "Dec 28 to Jan 3": no explicit year and end before start → end is next year.
-    if (end < start && !second.explicitYear) end = `${Number(end.slice(0, 4)) + 1}${end.slice(4)}`;
+    if (end < start && !second.explicitYear && second.weekday === undefined) end = `${Number(end.slice(0, 4)) + 1}${end.slice(4)}`;
     // "Friday to Tuesday" across a weekend.
     if (end < start) return { start: null, end: null, question: 'The end date is before the start date. Which dates did you mean?' };
   } else if (durationDays && durationDays > 1 && !first.end) {
