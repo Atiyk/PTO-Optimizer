@@ -18,7 +18,7 @@ import { explainBalance, getMyBalance } from './actions/balance';
 import { listHolidays, whoIsOut } from './actions/calendar';
 import { cancelLeaveRequest, draftLeaveRequest, listMyRequests, submitLeaveRequest } from './actions/requests';
 import { CapabilityError } from './errors';
-import type { CapabilityContext, CapabilityDef } from './types';
+import type { Actor, CapabilityContext, CapabilityDef } from './types';
 
 /**
  * R1: the single registry every surface calls (web UI server actions, REST, MCP, Slack,
@@ -121,10 +121,21 @@ export function describeZodError(capName: string, err: z.ZodError): string {
   return `Invalid input for ${capName}. ${parts.join('; ')}`;
 }
 
+/**
+ * Role gate. A service agent has no member role: it may use manager-level capabilities within
+ * the scopes an admin gave its key (its commits are still drafts a person confirms), never
+ * admin- or owner-only ones.
+ */
+export function roleAllows(actor: Actor, cap: Pick<CapabilityDef, 'roles'>): boolean {
+  if (!cap.roles) return true;
+  if (actor.type === 'service-agent') return cap.roles.includes('manager');
+  return !!actor.role && cap.roles.includes(actor.role);
+}
+
 /** Scope and role gate shared by direct calls and the agent gateway's draft path. Audits denials. */
 export async function authorize(ctx: CapabilityContext, cap: CapabilityDef): Promise<void> {
   const { actor } = ctx;
-  if (!actor.scopes.includes(cap.scope) || (cap.roles && (!actor.role || !cap.roles.includes(actor.role)))) {
+  if (!actor.scopes.includes(cap.scope) || !roleAllows(actor, cap)) {
     await writeAudit(ctx, cap, 'denied', `Denied ${cap.name}: missing scope ${cap.scope} or role`);
     throw new CapabilityError('forbidden', `${cap.name} requires the "${cap.scope}" scope${cap.roles ? ` and one of these roles: ${cap.roles.join(', ')}` : ''}.`);
   }

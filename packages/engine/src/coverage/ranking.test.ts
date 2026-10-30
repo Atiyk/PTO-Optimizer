@@ -65,6 +65,15 @@ describe('cover ranking (COVERAGE-SPEC §4)', () => {
     expect(rankCandidates(need, [...people].reverse(), { pack: work }).map((r) => r.memberId)).toEqual(ranked.map((r) => r.memberId));
   });
 
+  it('staying on straight after a shift is one stretch of work, not "0 h rest"; rest is measured from the whole stretch', () => {
+    // Cover 07:00–11:00. F works 03:00–07:00 the same day, then 21:00–23:00 the evening before.
+    const f = cand('F', { shifts: [{ date: DATE, interval: iv(DATE, 180, 420) }, { date: '2026-11-05', interval: iv('2026-11-05', 1260, 1380) }] });
+    const r = evaluateCandidate(need, f, { pack: work });
+    expect(r.checks.find((c) => c.id === 'min_rest')).toMatchObject({ passed: false, detail: '4 h rest next to the cover; minimum 10 h' });
+    const g = cand('G', { shifts: [{ date: DATE, interval: iv(DATE, 660, 900) }] }); // 11:00–15:00 straight after the cover
+    expect(evaluateCandidate(need, g, { pack: work }).checks.find((c) => c.id === 'min_rest')).toMatchObject({ passed: true, detail: 'No adjacent shift; minimum rest 10 h' });
+  });
+
   it('every candidate carries every check it went through', () => {
     const r = evaluateCandidate(need, cand('X'), { pack: work });
     expect(r.checks.map((c) => c.id)).toEqual([

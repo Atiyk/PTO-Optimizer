@@ -34,7 +34,7 @@ import { commitCoverageRows, undoCoverageBatch, validateCoverageRows } from './c
 export const NOT_LEGAL_ADVICE =
   'Not legal advice. Each rule shows its source and the date we read it, or "needs verification". Confirm the rules that apply to you with your licensing agency or an employment lawyer.';
 
-const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD');
+const isoDay = z.iso.date().describe('YYYY-MM-DD');
 const hhmmStr = z.string().regex(/^\d{1,2}:\d{2}$/, 'HH:MM');
 export const isManagerPlus = (a: Actor) => a.role === 'owner' || a.role === 'admin' || a.role === 'manager';
 

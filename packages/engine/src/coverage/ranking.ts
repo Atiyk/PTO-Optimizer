@@ -139,10 +139,25 @@ export function evaluateCandidate(need: CoverNeed, c: CandidateFacts, opts: Rank
   // Work-time rules from the pack (law or org policy).
   const rest = rulesOf(opts.pack, 'min_rest_between_shifts')[0];
   if (rest) {
+    // A shift that runs straight into (or on from) the cover is the same stretch of work, not
+    // "0 h rest": join them, then measure rest from that whole stretch to the other shifts.
+    let block = { ...need.interval };
+    const joined = new Set<number>();
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const [i, s] of c.shifts.entries()) {
+        if (joined.has(i) || overlaps(s.interval, block)) continue;
+        if (s.interval.end === block.start || s.interval.start === block.end) {
+          block = { start: Math.min(block.start, s.interval.start), end: Math.max(block.end, s.interval.end) };
+          joined.add(i);
+          grew = true;
+        }
+      }
+    }
     let minGap = Infinity;
-    for (const s of c.shifts) {
-      if (overlaps(s.interval, need.interval)) continue;
-      const gap = s.interval.end <= need.interval.start ? need.interval.start - s.interval.end : s.interval.start - need.interval.end;
+    for (const [i, s] of c.shifts.entries()) {
+      if (joined.has(i) || overlaps(s.interval, block)) continue;
+      const gap = s.interval.end <= block.start ? block.start - s.interval.end : s.interval.start - block.end;
       if (gap >= 0) minGap = Math.min(minGap, gap / 3_600_000);
     }
     const ok = minGap >= rest.hours;

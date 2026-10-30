@@ -19,7 +19,7 @@ import { NOT_LEGAL_ADVICE } from './coverage';
  * facts, record events and send offers. Pay rates never appear: only a cost band.
  */
 
-const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD');
+const isoDay = z.iso.date().describe('YYYY-MM-DD');
 const hhmmStr = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$|^24:00$/, 'HH:MM');
 const by = (a: Actor) => ({ actorType: a.type, memberId: actingMemberId(a) });
 const minute = (s: string) => parseHhmm(s);
