@@ -1,0 +1,39 @@
+{
+ "at": "2026-10-30T02:28:13.553Z",
+ "provider": "claude-cli",
+ "worstCaseUsd": 0.5350999999999999,
+ "parsing": {
+  "task": "parseLeaveRequest",
+  "provider": "claude-cli",
+  "model": "claude-haiku-5-5",
+  "total": 46,
+  "passed": 44,
+  "accuracy": 0.9565217391304348,
+  "inputTokens": 57796,
+  "outputTokens": 31795,
+  "costUsd": 0.021677099999999998,
+  "failures": [
+   {
+    "id": "39: Off on Nov 20 and Nov 23",
+    "detail": "got {\"t\":\"vacation\",\"s\":null,\"e\":null,\"p\":\"full\",\"h\":null,\"q\":\"Nov 20 and Nov 23 are two separate days with a gap between them. Should I submit two single-day requests, or did you mean the full range from Nov 20 to Nov 23?\"}"
+   },
+   {
+    "id": "45: this week",
+    "detail": "got {\"t\":\"vacation\",\"s\":\"2026-11-02\",\"e\":\"2026-11-06\",\"p\":\"full\",\"h\":null,\"q\":null}"
+   }
+  ]
+ },
+ "handbooks": {
+  "task": "importHandbook",
+  "provider": "claude-cli",
+  "model": "claude-sonnet-5-5",
+  "total": 6,
+  "passed": 6,
+  "accuracy": 1,
+  "inputTokens": 12,
+  "outputTokens": 4649,
+  "costUsd": 0.046514,
+  "failures": [],
+  "fieldAccuracy": 1
+ }
+}

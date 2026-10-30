@@ -306,7 +306,13 @@
     "start": "2026-12-07",
     "end": "2026-12-18",
     "part": "full"
-   }
+   },
+   "alts": [
+    {
+     "question": true
+    }
+   ],
+   "tag": "ambiguous"
   },
   {
    "text": "Taking Monday to Wednesday next week",
@@ -358,7 +364,12 @@
     "end": "2026-12-16",
     "part": "full"
    },
-   "tag": "injection"
+   "tag": "injection",
+   "alts": [
+    {
+     "question": true
+    }
+   ]
   },
   {
    "text": "Feb 30",
@@ -438,7 +449,13 @@
     "start": "2026-11-04",
     "end": "2026-11-06",
     "part": "full"
-   }
+   },
+   "alts": [
+    {
+     "question": true
+    }
+   ],
+   "tag": "ambiguous"
   },
   {
    "text": "Leave on 1 Dec",

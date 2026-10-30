@@ -37,7 +37,7 @@ function pickType(text: string, types: ParseInput['leaveTypes']): string | null 
 
 export const parseLeaveRequestTask = defineAiTask<ParseInput, ParsedRequest>({
   name: 'parseLeaveRequest',
-  promptVersion: 'p1',
+  promptVersion: 'p2',
   cache: false,
   system:
     'You turn one sentence from an employee into the fields of a leave request. Use the given ' +
@@ -46,8 +46,9 @@ export const parseLeaveRequestTask = defineAiTask<ParseInput, ParsedRequest>({
     'time that date occurs, unless the person writes in the past tense (then the most recent one). A range that ends in an earlier month crosses into the next year. ' +
     '"N days from <day>" counts N working days (Monday to Friday) starting that day. "Morning" is ' +
     'part "am", "afternoon" is "pm"; "half day" with no morning/afternoon needs a clarifying ' +
-    'question. Pick leaveType only from the listed keys; illness means the sick key if listed, ' +
-    'otherwise the vacation key. Never invent dates: if a date is missing or ambiguous (e.g. 03/04), ' +
+    'question. Pick leaveType only from the listed keys: a named type ("jury duty") → that key; ' +
+    'illness or a medical appointment → the sick key if listed; anything else, including no type ' +
+    'mentioned, → the vacation key. Do not ask about the type when it is not mentioned. Never invent dates: if a date is missing or ambiguous (e.g. 03/04), ' +
     'set it to null and ask one short clarifying question. Never put health details in note. ' +
     DATA_RULE,
   render: ({ text, today, leaveTypes }) =>

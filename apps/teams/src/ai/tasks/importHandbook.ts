@@ -148,7 +148,7 @@ function heuristic({ text }: HandbookInput): HandbookProposal {
 
 export const importHandbookTask = defineAiTask<HandbookInput, HandbookProposal>({
   name: 'importHandbook',
-  promptVersion: 'h1',
+  promptVersion: 'h2',
   cache: true,
   system:
     'You read an employee handbook and extract the VACATION / annual leave policy into the given ' +
@@ -156,7 +156,11 @@ export const importHandbookTask = defineAiTask<HandbookInput, HandbookProposal>(
     'character. If the handbook does not state a field, set value and quote to null. Never infer a ' +
     'value from general knowledge, the law, or what is typical. Convert number words to numbers. ' +
     'Months of waiting time are 30 days each. Put anything an admin must decide (silent or ' +
-    'contradictory points) in questions. ' +
+    'contradictory points) in questions. accrualMethod: "front_loaded" when the handbook gives a ' +
+    'yearly amount and does not say it builds up over time (quote the allowance sentence); ' +
+    '"per_pay_period" when the yearly amount is accrued monthly / per pay period (quote that ' +
+    'sentence, and set payPeriod from it, e.g. "accrued monthly" → monthly); "per_hour_worked" ' +
+    'for X hours per Y hours worked; "unlimited" when there is no set amount. ' +
     DATA_RULE,
   render: ({ text }) => asData('untrusted_handbook', text),
   output: handbookProposalSchema,
