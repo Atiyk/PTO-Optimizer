@@ -35,41 +35,13 @@ import { JSDOM } from 'jsdom';
 import { renderToString } from 'react-dom/server';
 import React from 'react';
 import { ITEMS as FAQ_ITEMS } from '../src/ui/FAQ.tsx';
+import { getSiteUrl } from './siteUrl.ts';
+import { ENTRIES, type Entry } from './routes.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '..');
 const distDir = resolve(projectRoot, 'dist');
-
-type ComponentKind = 'landing' | 'app' | 'sabbatical';
-
-interface Entry {
-  /** Path relative to dist/ of the built HTML file to inject into. */
-  file: string;
-  /** URL this route is served at, for window.location inside the render. */
-  url: string;
-  /** Which top-level component this route mounts. */
-  component: ComponentKind;
-  /** Matches the inline `window.__PTO_COUNTRY_PRESET__` each entry's own HTML sets. */
-  countryPreset?: string;
-  /** Human-readable name for the BreadcrumbList's second item - undefined on routes with no
-   * second breadcrumb level (the landing page, /pto, /sabbatical). */
-  countryName?: string;
-}
-
-// Site restructure: "/" is the landing page, the optimizer itself moved to /pto (same
-// App.tsx component it always was), and /sabbatical is new - every country route below is
-// untouched, since none of those links need to move.
-const ENTRIES: Entry[] = [
-  { file: 'index.html', url: 'https://pto-optimizer.app/', component: 'landing' },
-  { file: 'pto/index.html', url: 'https://pto-optimizer.app/pto', component: 'app' },
-  { file: 'sabbatical/index.html', url: 'https://pto-optimizer.app/sabbatical', component: 'sabbatical' },
-  { file: 'uk/index.html', url: 'https://pto-optimizer.app/uk', component: 'app', countryPreset: 'GB', countryName: 'United Kingdom' },
-  { file: 'canada/index.html', url: 'https://pto-optimizer.app/canada', component: 'app', countryPreset: 'CA', countryName: 'Canada' },
-  { file: 'australia/index.html', url: 'https://pto-optimizer.app/australia', component: 'app', countryPreset: 'AU', countryName: 'Australia' },
-  { file: 'germany/index.html', url: 'https://pto-optimizer.app/germany', component: 'app', countryPreset: 'DE', countryName: 'Germany' },
-  { file: 'ireland/index.html', url: 'https://pto-optimizer.app/ireland', component: 'app', countryPreset: 'IE', countryName: 'Ireland' },
-  { file: 'india/index.html', url: 'https://pto-optimizer.app/india', component: 'app', countryPreset: 'IN', countryName: 'India' },
-];
+const SITE_URL = getSiteUrl();
 
 /** Decodes the small, fixed set of HTML entities this project's own <title>/<meta> tags
  * actually use - JSON-LD is JSON text, not HTML, so "UK Bank Holidays 2027 &mdash; PTO
@@ -110,7 +82,7 @@ function buildJsonLd(entry: Entry, meta: { title: string; description: string; c
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
   };
 
-  const breadcrumbItems = [{ '@type': 'ListItem', position: 1, name: 'Days Off', item: 'https://pto-optimizer.app/' }];
+  const breadcrumbItems = [{ '@type': 'ListItem', position: 1, name: 'Days Off', item: `${SITE_URL}/` }];
   if (entry.countryName) {
     breadcrumbItems.push({ '@type': 'ListItem', position: 2, name: entry.countryName, item: meta.canonical });
   }
@@ -163,7 +135,7 @@ function installWindow(url: string, countryPreset?: string): void {
 // chains touches `window` at module-evaluation time rather than inside a function - using
 // the first entry's own URL/preset rather than a placeholder, so that if it DOES matter,
 // the very first render is still correct.
-installWindow(ENTRIES[0].url, ENTRIES[0].countryPreset);
+installWindow(`${SITE_URL}${ENTRIES[0].path}`, ENTRIES[0].countryPreset);
 const { App } = await import('../src/ui/App.tsx');
 const { Landing } = await import('../src/ui/Landing.tsx');
 const { Sabbatical } = await import('../src/ui/Sabbatical.tsx');
@@ -171,10 +143,11 @@ const { Sabbatical } = await import('../src/ui/Sabbatical.tsx');
 const COMPONENTS: Record<ComponentKind, React.ComponentType> = { app: App, landing: Landing, sabbatical: Sabbatical };
 
 async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInjected: number }> {
+  const url = `${SITE_URL}${entry.path}`;
   // Re-installed per entry (not reused from the bootstrap above) - window/navigator differ
   // per route (different URL, different country preset), and activeCountryPreset() /
   // geolocateCountry() read them fresh on every call rather than caching at module scope.
-  installWindow(entry.url, entry.countryPreset);
+  installWindow(url, entry.countryPreset);
 
   const html = renderToString(React.createElement(COMPONENTS[entry.component]));
 
@@ -189,7 +162,7 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
   }
   const withRoot = original.replace(marker, `<div id="root">${html}</div>`);
 
-  const meta = extractMeta(original, entry.url);
+  const meta = extractMeta(original, url);
   const jsonLdScripts = buildJsonLd(entry, meta)
     .map((obj) => `    <script type="application/ld+json">${JSON.stringify(obj)}</script>`)
     .join('\n');
