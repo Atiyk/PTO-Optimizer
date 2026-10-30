@@ -1,7 +1,7 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { sumAmounts } from '@daysoff/engine/ledger/fixedPoint';
-import { balanceLedger, members } from '@/db/schema';
+import { balanceLedger, leaveTypes, members } from '@/db/schema';
 import { CapabilityError } from '../errors';
 import { defineCapability } from '../types';
 
@@ -49,6 +49,14 @@ export const getMyBalance = defineCapability({
       .where(and(eq(members.id, memberId), eq(members.orgId, actor.orgId), isNull(members.deletedAt)));
     if (!member) throw new CapabilityError('not_found', 'Member not found in this organization.');
 
+    const [type] = await db
+      .select({ id: leaveTypes.id })
+      .from(leaveTypes)
+      .where(and(eq(leaveTypes.orgId, actor.orgId), eq(leaveTypes.key, input.leaveType)));
+    if (!type) {
+      throw new CapabilityError('not_found', `No leave type "${input.leaveType}" in this organization.`);
+    }
+
     const rows = await db
       .select({ amount: balanceLedger.amount, unit: balanceLedger.unit })
       .from(balanceLedger)
@@ -56,7 +64,7 @@ export const getMyBalance = defineCapability({
         and(
           eq(balanceLedger.orgId, actor.orgId),
           eq(balanceLedger.memberId, memberId),
-          eq(balanceLedger.leaveType, input.leaveType),
+          eq(balanceLedger.leaveTypeId, type.id),
         ),
       );
     return {
