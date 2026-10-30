@@ -13,7 +13,7 @@ after a restart or context compaction.
 | 2 — Holiday data foundation | `phase-2-holiday-data` | done | [#23](https://github.com/Atiyk/PTO-Optimizer/pull/23) |
 | 3 — Sabbatical correctness | `phase-3-sabbatical-correctness` | done | [#24](https://github.com/Atiyk/PTO-Optimizer/pull/24) |
 | 4 — Sabbatical UX & features | `phase-4-sabbatical-ux` | done | [#25](https://github.com/Atiyk/PTO-Optimizer/pull/25) |
-| 5 — Landing page rebuild | `phase-5-landing` | not started | |
+| 5 — Landing page rebuild | `phase-5-landing` | done | [#26](https://github.com/Atiyk/PTO-Optimizer/pull/26) |
 | 6 — Site-wide hygiene | `phase-6-hygiene` | not started | |
 | 7 — PWA (if time remains) | `phase-7-pwa` | not started | |
 
@@ -280,6 +280,94 @@ after a restart or context compaction.
 - **Screenshots**: `docs/screenshots/phase-4/` - default, PTO 0/5/10, and unpaid-leave-set,
   at 1440/768/375px. Mobile layout checked directly via `resize_window` + screenshot, not
   assumed from the desktop layout.
+
+## Phase 5 findings
+
+- **K1 (landing specifically)**: confirmed fixed by Phase 2's preload wiring - verified
+  live, the hero now genuinely leads with "Your next holiday is Veterans Day, 14 days
+  away" rather than a weekend.
+- **K4 (dry spell redefinition)**: root cause confirmed exactly as audited -
+  `longestDrySpell`/YearStrip's own SEPARATE copy of the same logic both computed "longest
+  run of consecutive WORKING days," which a weekend always ends, capping the result at
+  ~5 days and making the 8-day shading threshold unreachable. Rewrote `longestDrySpell`
+  (and factored out a new `findDrySpells`, returning every qualifying spell, not just the
+  longest - YearStrip now calls this directly instead of keeping its own second,
+  identically-broken copy) to the spec's definition: the stretch between two consecutive
+  *working-day* holidays (a holiday landing on a weekend doesn't count as a break, since it
+  created no new day off), with `today`/the horizon acting as implicit outer boundaries.
+  Verified live: "Longest dry spell (days)" now reads **104** (not ~5), and the year
+  strip visibly shows shaded regions for the first time. 5 new tests.
+- **K5 (double-escaped entities)**: confirmed and fixed - `'Loading the rest of the
+  year&rsquo;s holidays&hellip;'` was a literal HTML-entity string inside a JS string
+  inside JSX, which renders the literal characters. Replaced with real Unicode (’/…).
+  Verified: `grep -r 'amp;rsquo\|amp;hellip' dist/` now finds nothing.
+- **5G decision**: "longest stretch ahead" now uses the rolling 12-month window
+  (`stripEnd`, the same horizon the year strip itself uses) instead of the calendar
+  year's Dec 31 - in late October the old window only ever saw the Christmas stretch, so
+  the stat barely moved for two months regardless of what was actually coming up sooner.
+  The two "ahead" concepts (the stat and the visual right below it) now agree on what
+  "ahead" means.
+- **5A hero rebuilt**: added the required sentence, three factual chips ("Free, no
+  sign-up" · "`{N}` countries" - the REAL count of countries with holiday data after a
+  build, from new `src/data/holidayCoverage.json`, written by `build-holidays.ts` itself
+  each run (204 today), not `countries.json`'s raw length · "Your plan never leaves your
+  browser" - true because every input lives only in the URL/memory, chosen over "nothing
+  leaves your browser" since holiday lookups and analytics genuinely do leave it, K2/K8),
+  the country selector embedded in a sentence ("Showing holidays for [Country]") instead
+  of a bare label above the headline, and the hero visual rebuilt around `nextHoliday()`
+  (new function) instead of `nextDayOff()` - leads with the next real public holiday, its
+  run length, and its nearest bridge; falls back to the gap itself ("No public holiday for
+  N days...") when none falls in the next 12 months.
+- **5B year strip**: K4 fix above; added touch-tap support for the holiday ticks (a wider
+  invisible hit-rect per tick, toggling a text tooltip via state) - the old `<title>`-only
+  tooltip never worked on touch at all, since SVG `<title>` is a hover-only affordance.
+- **5C four new sections**, all built on real data, no mock-ups:
+  - **Optimize**: one `solve()` call (budget 10, shared with Understand below so both
+    describe the same plan), "Turn 10 days into `{total}`", with a new lightweight
+    `MiniBreakStrip` (plain divs, the same colour tokens `DayCell.tsx` uses - not the full
+    Calendar/DayCell component, which carries many interactive props this teaser doesn't
+    need) showing the actual best break's real days.
+  - **Understand**: reuses `breakReason.ts` directly on that same solved break - verified
+    live: "Bridges Thanksgiving Day — 1 PTO day for 4 days off."
+  - **Longer breaks**: reuses Phase 3/4's `bestPlacements()` directly (4 weeks, 5 PTO, from
+    today) - verified live: "Jan 4: 39 days away · includes Martin Luther King, Jr. Day ·
+    quiet travel."
+  - **Your calendar**: the same three export actions (.ics / copy image / copy link) that
+    were already on the page, relabelled/repositioned under this heading plus the required
+    "Free, no sign-up, no email" line.
+- **5D**: K5 above; each bridgeable remaining-holiday row now reads "Take `{weekday}` for
+  a `{N}`-day weekend · 1 PTO day" (previously a bare "Bridge it →"), linking to `/pto`
+  with that day pinned, matching the spec's own example format exactly.
+- **5E "what a few PTO days would buy"**: computed via three more `solve()` calls
+  (budgets 5/10/15). **Performance decision, made from real data, not a guess**:
+  `useAppState.ts`'s own comment documents a single `solve()` call at roughly 100ms: one
+  more call (Optimize's) stays within that budget and is computed synchronously
+  (`useMemo`, real in the prerendered HTML too); three MORE calls together would add
+  roughly 300ms on top, clearly past the ~100ms-on-a-phone guidance, so this section is
+  deliberately DEFERRED to a `useEffect` that fires after mount - the prerendered HTML
+  (and the first paint) show "Calculating…" instead of blocking on it, then fill in a
+  moment later. Verified live: the section does fill in correctly once mounted ("With 5
+  PTO days you'd get 20 days off. With 10, 38. With 15, 55."), each linking to `/pto` with
+  that budget.
+- **5F closing CTA**: one heading + the same primary CTA, nothing else. Deliberately
+  different heading text from the h1 ("Ready to see your own plan?", not a second "Make
+  every PTO day count.") - the core promise stays said exactly once, per the product rule.
+- **Verified live, not just read in the code**: loaded `/` and `/pto/` in the browser,
+  checked the console on both - no hydration-mismatch warnings, no new errors (only the
+  pre-existing, unrelated `_vercel/insights/script.js` 404). Checked the 375px mobile
+  layout directly via `resize_window`.
+- **Test/tsc/build**: `npx tsc -b --force` clean. `npm run build` clean end to end
+  (including the holiday-coverage write in `prebuild`). `npm test`: 434/434 - every test
+  passed this run (the K9 baseline timing tests are flaky, not reliably failing; no
+  solver file was touched this phase regardless).
+- **Deliberately scoped down, flagged**: `MiniBreakStrip` is a new small presentational
+  component, not a reuse of `Calendar`/`DayCell` (those require many interactive-only
+  props - click handlers, hover state, alternative-placement wiring - that don't apply to
+  a static landing-page teaser); it does reuse the same `COLORS` tokens so it can't drift
+  into a treatment the real calendar doesn't have. `data-sources.json`'s own prose
+  (`accessPattern: "Fetched live... one request per (country, year)"`) is now stale since
+  Phase 2's same-origin-first change - left alone deliberately, since Phase 6B is where
+  `/data-sources` content work is explicitly scoped.
 
 ## Questions for Atiyk
 
