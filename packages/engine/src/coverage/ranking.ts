@@ -3,6 +3,7 @@ import type { ISODate } from '../solver/types';
 import { holdsValid, type MemberCredentialFact } from './requiredStaff';
 import { hoursIn, overlaps, type Interval } from './timeBlocks';
 import { rulesOf, type Provenance, type RulePack } from './types';
+import { projectOvertime } from '../timeclock/overtime';
 
 /*
  * Cover ranking (COVERAGE-SPEC §4): hard filters H1–H10, then a deterministic integer
@@ -48,9 +49,18 @@ export interface CandidateFacts {
   fairness: { coverTaken: number; holidayCover: number; shortNotice: number };
 }
 
+/**
+ * What to do with a candidate the cover would push into overtime:
+ * `allow` ranks as before (a cost penalty only when cost-aware), `avoid` keeps them eligible
+ * but after everyone who stays at regular time, `exclude` makes overtime a hard filter.
+ */
+export type OvertimePolicy = 'allow' | 'avoid' | 'exclude';
+
 export interface RankingOptions {
   pack: Pick<RulePack, 'rules'>;
   costAware?: boolean;
+  /** Default `allow` (the behaviour before overtime policies existed). */
+  overtimePolicy?: OvertimePolicy;
 }
 
 export type CheckId =
@@ -63,7 +73,8 @@ export type CheckId =
   | 'min_rest'
   | 'max_hours_day'
   | 'max_hours_week'
-  | 'max_consecutive_days';
+  | 'max_consecutive_days'
+  | 'overtime';
 
 export interface Check {
   id: CheckId;
@@ -84,6 +95,9 @@ export interface RankedCandidate {
   scoreParts: { fairness: number; preference: number; cost: number; travel: number } | null;
   costBand: 'regular' | 'overtime';
   coverHours: number;
+  /** Premium hours this cover adds (hours only, never pay). */
+  overtimeHours: number;
+  doubleTimeHours: number;
   rank: number | null;
 }
 
@@ -93,6 +107,8 @@ export const SCORE_WEIGHTS = {
   shortNotice: 30,
   optInYes: -40,
   overtime: 200,
+  /** `avoid` policy: larger than any realistic fairness score, so overtime ranks last. */
+  overtimeAvoid: 100_000,
   otherSite: 25,
 } as const;
 
@@ -184,24 +200,36 @@ export function evaluateCandidate(need: CoverNeed, c: CandidateFacts, opts: Rank
     push('max_consecutive_days', run <= maxRun.days, `${run} days in a row with the cover; maximum ${maxRun.days}`, { ruleId: maxRun.id, provenance: maxRun });
   }
 
-  // Cost band from overtime flags (cost signal, not payroll).
+  // Overtime from the real week (daily, weekly, double time, 7th day): the premium hours this
+  // cover adds on top of the shifts already worked or scheduled that week.
   const ot = rulesOf(opts.pack, 'overtime_flag')[0];
-  const overtime = !!ot && ((ot.dailyHours != null && dayHours > ot.dailyHours) || (ot.weeklyHours != null && weekHours > ot.weeklyHours));
+  const policy = opts.overtimePolicy ?? 'allow';
+  let overtimeHours = 0;
+  let doubleTimeHours = 0;
+  if (ot) {
+    const days = c.shifts.filter((s) => s.date >= ws && s.date <= we).map((s) => ({ date: s.date, hours: hoursIn(s.interval) }));
+    const p = projectOvertime(days, { date: need.date, hours: coverHours }, ot);
+    overtimeHours = p.addedOvertime;
+    doubleTimeHours = p.addedDoubleTime;
+    const adds = overtimeHours > 0 || doubleTimeHours > 0;
+    push('overtime', policy !== 'exclude' || !adds, policy === 'avoid' && adds ? `${p.detail}; ranked after people at regular time` : p.detail, { ruleId: ot.id, provenance: ot });
+  }
+  const overtime = overtimeHours > 0 || doubleTimeHours > 0;
   const costBand = overtime ? 'overtime' : 'regular';
 
   const failed = checks.find((x) => !x.passed);
   if (failed) {
-    return { memberId: c.memberId, eligible: false, checks, excludedBy: failed.id, score: null, scoreParts: null, costBand, coverHours, rank: null };
+    return { memberId: c.memberId, eligible: false, checks, excludedBy: failed.id, score: null, scoreParts: null, costBand, coverHours, overtimeHours, doubleTimeHours, rank: null };
   }
   const W = SCORE_WEIGHTS;
   const scoreParts = {
     fairness: W.coverTaken * c.fairness.coverTaken + W.holidayCover * c.fairness.holidayCover + W.shortNotice * c.fairness.shortNotice,
     preference: c.optIn === 'yes' ? W.optInYes : 0,
-    cost: opts.costAware && overtime ? W.overtime : 0,
+    cost: overtime ? (policy === 'avoid' ? W.overtimeAvoid : opts.costAware ? W.overtime : 0) : 0,
     travel: c.homeSiteId === need.siteId ? 0 : W.otherSite,
   };
   const score = scoreParts.fairness + scoreParts.preference + scoreParts.cost + scoreParts.travel;
-  return { memberId: c.memberId, eligible: true, checks, excludedBy: null, score, scoreParts, costBand, coverHours, rank: null };
+  return { memberId: c.memberId, eligible: true, checks, excludedBy: null, score, scoreParts, costBand, coverHours, overtimeHours, doubleTimeHours, rank: null };
 }
 
 /** Rank every candidate: eligible ones by score then member id; excluded ones after, by id. */
