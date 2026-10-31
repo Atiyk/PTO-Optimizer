@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, isNull, lte, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { addDays } from '@daysoff/engine/solver/dateUtils';
-import { hhmm, localParts } from '@daysoff/engine/coverage/timeBlocks';
+import { hhmm, localParts, parseHhmm, zonedToUtc } from '@daysoff/engine/coverage/timeBlocks';
 import { allowedNext, checkBreaks, foldPunches, overtimeForWeek, workweekStart } from '@daysoff/engine/timeclock/index';
 import { LABOR_PACKS, seedPack } from '@daysoff/engine/rulepacks';
 import type { Db } from '@/db/client';
@@ -231,6 +231,10 @@ const personOut = z.object({
   openNow: z.boolean(),
   approval: z.object({ approvedAt: z.string(), stale: z.boolean() }).nullable(),
   rules: z.string(),
+  /** Only when one member is asked for: the raw punches, for corrections. */
+  punches: z
+    .array(z.object({ id: z.string(), kind: z.string(), breakKind: z.string().nullable(), date: z.string(), time: z.string(), source: z.string(), note: z.object({ untrusted_text: z.string() }).nullable() }))
+    .optional(),
 });
 
 export const getTimesheets = defineCapability({
@@ -258,6 +262,9 @@ export const getTimesheets = defineCapability({
     const approvals = ids.length
       ? await db.select().from(timesheetApprovals).where(and(eq(timesheetApprovals.orgId, actor.orgId), eq(timesheetApprovals.weekStart, weekStart), inArray(timesheetApprovals.memberId, ids)))
       : [];
+    const notes = input.memberId
+      ? new Map((await db.select({ id: timePunches.id, note: timePunches.note, source: timePunches.source }).from(timePunches).where(and(eq(timePunches.orgId, actor.orgId), eq(timePunches.memberId, input.memberId)))).map((r) => [r.id, r]))
+      : new Map<string, { note: string | null; source: string }>();
     const people = weeks
       // Show people with hours, or hourly staff (an empty week for them is worth seeing).
       .filter((w) => w.week.sessions.length || w.member.employmentType === 'hourly' || input.memberId)
@@ -272,12 +279,22 @@ export const getTimesheets = defineCapability({
           openNow: w.week.open,
           approval: a ? { approvedAt: a.approvedAt.toISOString(), stale: !!a.supersededAt } : null,
           rules: ruleSummary(w.rules).label,
+          ...(input.memberId ? { punches: punchList(w, notes) } : {}),
         };
       });
     const sum = (k: 'total' | 'regular' | 'overtime' | 'doubleTime') => r2(people.reduce((s, p) => s + p.bands[k], 0));
     return { weekStart, weekEnd: addDays(weekStart, 6), people, totals: { total: sum('total'), regular: sum('regular'), overtime: sum('overtime'), doubleTime: sum('doubleTime') }, notice: WORK_RULES_NOTICE };
   },
 });
+
+function punchList(w: MemberWeek, notes: Map<string, { note: string | null; source: string }>) {
+  const start = w.week.weekStart;
+  const end = w.week.weekEnd;
+  return w.punches
+    .map((p) => ({ p, lp: localParts(p.at, w.member.tz) }))
+    .filter(({ lp }) => lp.date >= addDays(start, -1) && lp.date <= addDays(end, 1))
+    .map(({ p, lp }) => ({ id: p.id, kind: p.kind, breakKind: p.breakKind ?? null, date: lp.date, time: hhmm(lp.minute), source: notes.get(p.id)?.source ?? 'self', note: untrusted(notes.get(p.id)?.note) }));
+}
 
 export const manageTimesheets = defineCapability({
   name: 'manageTimesheets',
@@ -290,7 +307,14 @@ export const manageTimesheets = defineCapability({
       op: z.literal('correct'),
       memberId: z.uuid(),
       voidPunchId: z.uuid().optional(),
-      add: z.object({ kind: z.enum(['in', 'out', 'break_start', 'break_end']), at: z.iso.datetime({ offset: true }), breakKind: z.enum(['meal', 'rest']).optional() }).optional(),
+      add: z
+        .object({
+          kind: z.enum(['in', 'out', 'break_start', 'break_end']),
+          date: isoDay.describe('Local date at the person’s site.'),
+          time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'HH:MM').describe('Local time at the person’s site.'),
+          breakKind: z.enum(['meal', 'rest']).optional(),
+        })
+        .optional(),
       note: z.string().min(3).max(500).describe('Why the correction was made (shown in the audit trail).'),
     }),
   ]),
@@ -353,7 +377,7 @@ export const manageTimesheets = defineCapability({
       weeks.add(weekOf(p.at, ctx!.tz));
     }
     if (input.add) {
-      const at = new Date(input.add.at);
+      const at = new Date(zonedToUtc(input.add.date, parseHhmm(input.add.time), ctx!.tz));
       if (at.getTime() > now.getTime() + 60_000) throw new CapabilityError('invalid_input', 'A corrected punch can’t be in the future.');
       await db.insert(timePunches).values({
         orgId: actor.orgId,

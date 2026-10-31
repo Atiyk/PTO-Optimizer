@@ -33,6 +33,11 @@ export interface WorkedShift {
   date: ISODate;
   interval: Interval;
   siteId?: string;
+  /**
+   * Paid hours when known (a clocked shift, meal breaks already deducted). Scheduled shifts
+   * leave it unset: overtime projections then deduct the pack's first meal break when owed.
+   */
+  paidHours?: number;
 }
 
 export interface CandidateFacts {
@@ -47,6 +52,8 @@ export interface CandidateFacts {
   credentials: readonly MemberCredentialFact[];
   /** From the fairness ledger (filled cover events), rolling 90 days. */
   fairness: { coverTaken: number; holidayCover: number; shortNotice: number };
+  /** Salaried (overtime-exempt) staff: no overtime projection. */
+  overtimeExempt?: boolean;
 }
 
 /**
@@ -206,8 +213,16 @@ export function evaluateCandidate(need: CoverNeed, c: CandidateFacts, opts: Rank
   const policy = opts.overtimePolicy ?? 'allow';
   let overtimeHours = 0;
   let doubleTimeHours = 0;
-  if (ot) {
-    const days = c.shifts.filter((s) => s.date >= ws && s.date <= we).map((s) => ({ date: s.date, hours: hoursIn(s.interval) }));
+  if (ot && c.overtimeExempt) {
+    push('overtime', true, 'Salaried (overtime-exempt): no overtime', { ruleId: ot.id, provenance: ot });
+  } else if (ot) {
+    const meal = rulesOf(opts.pack, 'meal_break').find((m) => (m.nth ?? 1) === 1);
+    const paid = (s: WorkedShift) => {
+      if (s.paidHours != null) return s.paidHours;
+      const h = hoursIn(s.interval);
+      return meal && h - meal.minutes / 60 > meal.whenOverHours ? r2(h - meal.minutes / 60) : h;
+    };
+    const days = c.shifts.filter((s) => s.date >= ws && s.date <= we).map((s) => ({ date: s.date, hours: paid(s) }));
     const p = projectOvertime(days, { date: need.date, hours: coverHours }, ot);
     overtimeHours = p.addedOvertime;
     doubleTimeHours = p.addedDoubleTime;

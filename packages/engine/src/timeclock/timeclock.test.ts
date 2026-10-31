@@ -225,8 +225,18 @@ describe('overtime-aware cover ranking', () => {
   it('CA double time and the 7th day count: a cover on a 12 h day adds 2× hours', () => {
     const DAY = '2026-11-04';
     const n: CoverNeed = { ...need, date: DAY, interval: localInterval(DAY, 1080, 1200, LA) }; // 18:00–20:00
-    const long = base('long', [{ date: DAY, interval: localInterval(DAY, 360, 1080, LA) }]); // 12 h already
+    const long = base('long', [{ date: DAY, interval: localInterval(DAY, 360, 1110, LA), paidHours: 12 }]); // clocked: 12 h paid already
     const [c] = rankCandidates(n, [long], { pack: LABOR_US_CA });
     expect([c!.overtimeHours, c!.doubleTimeHours]).toEqual([0, 2]);
+  });
+
+  it('a scheduled shift deducts the owed meal (CA: 07:00–15:30 is 8 paid hours), and salaried staff are exempt', () => {
+    const DAY = '2026-11-04';
+    const n: CoverNeed = { ...need, date: DAY, interval: localInterval(DAY, 930, 990, LA) }; // 15:30–16:30
+    const early = base('early', [{ date: DAY, interval: localInterval(DAY, 420, 930, LA) }]);
+    const [c] = rankCandidates(n, [early], { pack: LABOR_US_CA });
+    expect(c!.checks.find((x) => x.id === 'overtime')!.detail).toBe('Would reach 9 h this week: 1 h at 1.5×');
+    const [s] = rankCandidates(n, [{ ...early, memberId: 'boss', overtimeExempt: true }], { pack: LABOR_US_CA, overtimePolicy: 'exclude' });
+    expect([s!.eligible, s!.costBand, s!.checks.find((x) => x.id === 'overtime')!.detail]).toEqual([true, 'regular', 'Salaried (overtime-exempt): no overtime']);
   });
 });

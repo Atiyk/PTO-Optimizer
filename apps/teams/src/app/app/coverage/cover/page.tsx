@@ -19,7 +19,11 @@ function reasons(c: Candidate): { text: string; tone: 'ok' | 'warn' | 'neutral' 
   const p = c.scoreParts;
   out.push(p && p.fairness > 0 ? { text: 'Covered recently', tone: 'neutral' } : { text: 'No recent cover', tone: 'ok' });
   if (p && p.preference < 0) out.push({ text: 'Opted in', tone: 'ok' });
-  out.push(c.costBand === 'overtime' ? { text: 'Overtime', tone: 'warn' } : { text: 'Regular hours', tone: 'neutral' });
+  out.push(
+    c.costBand === 'overtime'
+      ? { text: `Overtime +${Math.round((c.overtimeHours + c.doubleTimeHours) * 100) / 100} h`, tone: 'warn' }
+      : { text: 'No overtime', tone: 'ok' },
+  );
   if (p && p.travel > 0) out.push({ text: 'From another site', tone: 'neutral' });
   return out;
 }
@@ -35,6 +39,7 @@ const EXCLUDED_GROUP: Record<string, string> = {
   max_hours_day: 'Too many hours that day',
   max_hours_week: 'Too many hours that week',
   max_consecutive_days: 'Too many days in a row',
+  overtime: 'Would go into overtime',
 };
 
 function groupExcluded(list: Candidate[]): [string, Candidate[]][] {
@@ -102,7 +107,15 @@ export default async function CoverPage({ searchParams }: { searchParams: Promis
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-ink">Can take it ({eligible.length})</h2>
-                <p className="text-sm text-muted">In fair order: whoever covered least lately goes first, then whoever opted in. Overtime only counts when cost-aware ranking is on.</p>
+                <p className="text-sm text-muted">
+                  In fair order: whoever covered least lately goes first, then whoever opted in.{' '}
+                  {found.overtimePolicy === 'avoid'
+                    ? 'Anyone this would push into overtime goes last.'
+                    : found.overtimePolicy === 'exclude'
+                      ? 'Anyone this would push into overtime is left out.'
+                      : 'Overtime is shown but does not change the order unless cost-aware ranking is on.'}{' '}
+                  <Link className="underline" href="/app/admin/work-rules">Change</Link>
+                </p>
               </div>
               <AskForCover target={target} eligible={eligible.length} />
             </div>
@@ -130,6 +143,7 @@ export default async function CoverPage({ searchParams }: { searchParams: Promis
                         </li>
                       ))}
                     </ul>
+                    {c.costBand === 'overtime' && <p className="mt-2 text-ink">{c.checks.find((x) => x.id === 'overtime')?.detail}</p>}
                     <details className="mt-2">
                       <summary className="cursor-pointer text-muted">Every rule checked</summary>
                       <p className="mt-1 text-muted">

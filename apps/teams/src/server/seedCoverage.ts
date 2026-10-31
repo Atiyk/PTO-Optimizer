@@ -1,7 +1,8 @@
 import { eq } from 'drizzle-orm';
 import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import type { Db } from '@/db/client';
-import { leaveRequests, leaveTypes, locations, memberCoverPrefs, members } from '@/db/schema';
+import { leaveRequests, leaveTypes, locations, memberCoverPrefs, members, organizations, timePunches } from '@/db/schema';
+import { parseHhmm, zonedToUtc } from '@daysoff/engine/coverage/timeBlocks';
 import { invokeCapability, type CapabilityName } from '@/capabilities/registry';
 import { ROLE_SCOPES } from '@/capabilities/scopes';
 import type { Actor } from '@/capabilities/types';
@@ -150,7 +151,47 @@ export async function seedChildcareCentre(db: Db, today: string, opts: { orgName
       engineSnapshot: { amount: ev.cost.amount, unit: ev.unit, chargedDates: ev.cost.chargedDates, excluded: ev.cost.excluded },
     });
   }
+  await seedPunches(db, orgId, ids, location.id, today);
   return { org, ownerId: owner.id, managerId: ids[1]!, staffIds: ids, locationId: location.id, rooms: room, nextMonday };
+}
+
+/**
+ * Time clock demo: last week and this week (before today) for hourly staff, mostly clean,
+ * with the things the compliance inbox is for: Kwame stays late Mon–Thu (CA daily overtime),
+ * Noah skips a meal, Mateo takes a late meal, Ava says she missed her rest breaks once, and
+ * Grace forgets to clock out on the last working day. Punches go straight in (no hours
+ * sync), so the imported hours behind sick-leave balances stay as they were.
+ */
+async function seedPunches(db: Db, orgId: string, ids: string[], locationId: string, today: string) {
+  await db.update(organizations).set({ timeClockEnabled: true, overtimePolicy: 'avoid' }).where(eq(organizations.id, orgId));
+  const tz = 'America/Los_Angeles';
+  const at = (d: string, hm: string) => new Date(zonedToUtc(d, parseHhmm(hm), tz));
+  const thisMonday = addDays(today, -mondayIndexedDow(today));
+  const days = [0, 1, 2, 3, 4].map((i) => addDays(addDays(thisMonday, -7), i)).concat([0, 1, 2, 3, 4].map((i) => addDays(thisMonday, i)).filter((d) => d < today));
+  const lastDay = days.at(-1)!;
+  const rows: (typeof timePunches.$inferInsert)[] = [];
+  for (const [i, [, role, , shift]] of STAFF.entries()) {
+    if (role !== 'employee' || shift === 'office') continue;
+    const [start, end] = SHIFT[shift];
+    const meal = shift === 'early' ? ['11:00', '11:30'] : ['13:00', '13:30'];
+    for (const [n, d] of days.entries()) {
+      const name = STAFF[i]![0];
+      const dow = mondayIndexedDow(d);
+      const out = name === 'Kwame Mensah' && dow < 4 ? '17:30' : end;
+      const skipMeal = name === 'Noah Fischer' && dow === 2;
+      const m = name === 'Mateo Alvarez' && dow === 1 ? ['15:45', '16:15'] : meal;
+      const p = (kind: 'in' | 'out' | 'break_start' | 'break_end', hm: string, extra: Partial<typeof timePunches.$inferInsert> = {}) =>
+        rows.push({ orgId, memberId: ids[i]!, locationId, kind, at: at(d, hm), source: 'self', createdByMemberId: ids[i]!, idempotencyKey: `seed-${n}-${i}-${kind}`, ...extra });
+      p('in', start);
+      if (!skipMeal) {
+        p('break_start', m[0]!, { breakKind: 'meal' });
+        p('break_end', m[1]!);
+      }
+      if (name === 'Grace Kim' && d === lastDay) continue; // forgot to clock out
+      p('out', out, { restBreaksTaken: !(name === 'Ava Bennett' && dow === 3 && d < thisMonday) });
+    }
+  }
+  if (rows.length) await db.insert(timePunches).values(rows);
 }
 
 /*

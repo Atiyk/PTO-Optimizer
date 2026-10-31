@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { addDays } from '@daysoff/engine/solver/dateUtils';
 import { CallOff } from '@/components/mobile/CallOff';
+import { ClockCard } from '@/components/mobile/ClockCard';
 import { Shell } from '@/components/mobile/Shell';
 import { getOrg } from '@/domain/leave';
 import { getDb } from '@/db/client';
@@ -19,6 +20,7 @@ export default async function StaffToday() {
   const org = await getOrg(await getDb(), actor.orgId);
   const { today, shifts } = await call('getMySchedule', { days: 7 }, actor);
   const { myOffers } = await call('getCoverRequests', {}, actor);
+  const clock = org.timeClockEnabled ? await call('getMyTimeClock', {}, actor) : null;
   const open = myOffers.filter((o) => o.requestStatus === 'open' && !o.response).length;
   const working = shifts.filter((s) => !s.onLeave);
   const next = working[0] ?? null;
@@ -31,6 +33,7 @@ export default async function StaffToday() {
           {open === 1 ? 'One cover offer is waiting for you' : `${open} cover offers are waiting for you`} →
         </Link>
       )}
+      {clock && <ClockCard initial={clock} />}
       <section aria-labelledby="next-shift" className="rounded-xl border border-line bg-page p-4 shadow-sm">
         <h2 id="next-shift" className="text-xs font-semibold tracking-wide text-muted uppercase">
           {next ? (next.date === today ? 'Your shift today' : `Your next shift · ${dayLabel(next.date, today)}`) : 'Your next shift'}

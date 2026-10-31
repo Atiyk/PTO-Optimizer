@@ -133,7 +133,7 @@ export async function rankForTarget(db: Db, orgId: string, t: CoverTarget, now: 
   };
 
   const people = await db
-    .select({ id: members.id, name: members.name, locationId: members.locationId, endDate: members.endDate })
+    .select({ id: members.id, name: members.name, locationId: members.locationId, endDate: members.endDate, employmentType: members.employmentType })
     .from(members)
     .where(and(eq(members.orgId, orgId), isNull(members.deletedAt), opts.onlyMemberIds ? inArray(members.id, opts.onlyMemberIds) : undefined));
   const ids = people.map((p) => p.id);
@@ -179,6 +179,7 @@ export async function rankForTarget(db: Db, orgId: string, t: CoverTarget, now: 
         ),
       credentials: creds.get(p.id) ?? [],
       fairness: fair.get(p.id) ?? { coverTaken: 0, holidayCover: 0, shortNotice: 0 },
+      overtimeExempt: p.employmentType === 'salaried',
     };
   });
   const costAware = !!org?.costAwareRanking;

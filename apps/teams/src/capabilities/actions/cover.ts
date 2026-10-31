@@ -50,6 +50,9 @@ const candidateOut = z.object({
   score: z.number().nullable(),
   scoreParts: z.object({ fairness: z.number(), preference: z.number(), cost: z.number(), travel: z.number() }).nullable(),
   costBand: z.enum(['regular', 'overtime']),
+  /** Premium hours this cover would add (hours, never pay). */
+  overtimeHours: z.number(),
+  doubleTimeHours: z.number(),
   excludedBy: z.string().nullable(),
   checks: z.array(checkOut),
 });
@@ -59,14 +62,16 @@ export const findCover = defineCapability({
   description:
     'Ranks who can legally and fairly cover a time window in a room: every person is checked against hard rules ' +
     '(active, allowed at the site, opted in, not on leave, not already scheduled, valid credential, minimum rest, ' +
-    'maximum hours per day and week, consecutive days), then scored for fairness (covers taken in 90 days, holiday ' +
-    'and short-notice covers), preference and overtime band. Every exclusion says why. Reads only; send offers with ' +
+    'maximum hours per day and week, consecutive days, overtime under the org policy), then scored for fairness (covers ' +
+    'taken in 90 days, holiday and short-notice covers) and preference. With the default overtime policy, people the ' +
+    'cover would push into overtime rank after everyone at regular time. Every exclusion says why. Reads only; send offers with ' +
     'requestCover. Quote these results; never rank people yourself.',
   input: target,
   output: z.object({
     window: z.object({ date: z.string(), start: z.string(), end: z.string(), roomName: z.string() }),
     gap: z.object({ label: z.string(), short: z.number(), citation: z.string().nullable() }).nullable(),
     candidates: z.array(candidateOut),
+    overtimePolicy: z.enum(['allow', 'avoid', 'exclude']),
     notice: z.string(),
   }),
   scope: 'cover:request',
@@ -94,9 +99,12 @@ export const findCover = defineCapability({
         score: c.score,
         scoreParts: c.scoreParts,
         costBand: c.costBand,
+        overtimeHours: c.overtimeHours,
+        doubleTimeHours: c.doubleTimeHours,
         excludedBy: c.excludedBy,
         checks: c.checks.map((x) => ({ id: x.id, passed: x.passed, detail: x.detail, rule: x.provenance?.citation ? `${x.provenance.citation.regulation} ${x.provenance.citation.section}` : x.ruleId ? 'your policy' : null })),
       })),
+      overtimePolicy: r.overtimePolicy,
       notice: NOT_LEGAL_ADVICE,
     };
   },

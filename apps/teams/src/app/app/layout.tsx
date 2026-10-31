@@ -20,9 +20,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const groups: NavGroup[] = [
     { title: 'You', links: [['/app', 'My leave'], ...(regulated ? ([['/app/sick', 'Sick leave']] as [string, string][]) : []), ['/app/calendar', 'Calendar']] },
   ];
+  if (org.timeClockEnabled && !manager) groups[0]!.links.push(['/app/time', 'My hours']);
   if (manager || regulated) {
     const team: [string, string][] = [];
+    if (manager) team.push(['/app/compliance', 'Compliance inbox']);
     if (regulated) team.push(['/app/coverage', 'Coverage']);
+    if (manager && org.timeClockEnabled) team.push(['/app/time', 'Timesheets']);
     if (manager) team.push(['/app/approvals', 'Approvals'], ['/app/planner', 'Planner']);
     groups.push({ title: 'Team', links: team });
   }

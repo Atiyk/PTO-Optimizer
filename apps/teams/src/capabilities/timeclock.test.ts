@@ -97,7 +97,7 @@ describe('timesheets, approvals and corrections', () => {
     expect(ts.people[0]!.approval).toMatchObject({ stale: false });
 
     const [outPunch] = await db.select().from(timePunches).where(and(eq(timePunches.memberId, O.emp.id), eq(timePunches.idempotencyKey, 'emp-out-002')));
-    await run(mgr, 'manageTimesheets', { op: 'correct', memberId: O.emp.id, voidPunchId: outPunch!.id, add: { kind: 'out', at: '2026-11-03T13:00:00Z' }, note: 'Left at 1 pm, forgot to clock out' }, day('09', '10:00'));
+    await run(mgr, 'manageTimesheets', { op: 'correct', memberId: O.emp.id, voidPunchId: outPunch!.id, add: { kind: 'out', date: '2026-11-03', time: '13:00' }, note: 'Left at 1 pm, forgot to clock out' }, day('09', '10:00'));
     ts = await run(mgr, 'getTimesheets', { week: '2026-11-02', memberId: O.emp.id }, day('09', '10:05'));
     expect(ts.people[0]!.bands.total).toBe(15);
     expect(ts.people[0]!.approval).toMatchObject({ stale: true });

@@ -1,6 +1,6 @@
 import { and, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 import { addDays } from '@daysoff/engine/solver/dateUtils';
-import { localInterval, zonedToUtc, type WorkedShift } from '@daysoff/engine/coverage/index';
+import { zonedToUtc, type WorkedShift } from '@daysoff/engine/coverage/index';
 import { foldPunches, timesheetWeek, workRulesOf, workweekStart, type Punch, type TimesheetWeek, type WorkRules } from '@daysoff/engine/timeclock/index';
 import { LABOR_US_FEDERAL, seedPack } from '@daysoff/engine/rulepacks';
 import type { Db } from '@/db/client';
@@ -19,8 +19,6 @@ export interface SiteRules {
   rules: WorkRules;
   source: RulesSource;
 }
-
-const H = 3_600_000;
 
 /**
  * Work rules for a site on a date: the site's linked packs (regulated sites) if they carry
@@ -77,11 +75,6 @@ export async function punchesFor(db: Db, orgId: string, memberIds: readonly stri
     out.set(r.memberId, list);
   }
   return out;
-}
-
-/** UTC bounds for loading a workweek, padded a day each side for shifts across midnight. */
-export function weekBounds(weekStart: string, tz: string): { from: Date; to: Date } {
-  return { from: new Date(zonedToUtc(addDays(weekStart, -1), 0, tz)), to: new Date(zonedToUtc(addDays(weekStart, 8), 0, tz)) };
 }
 
 export interface MemberWeek {
@@ -165,14 +158,9 @@ export async function clockedShifts(db: Db, orgId: string, memberIds: readonly s
       if (s.date < start || s.date > end || s.date >= today || s.missingOut) continue;
       dates.add(s.date);
       // An interval whose length is the worked time (meal breaks deducted), starting at clock-in.
-      shifts.push({ date: s.date, interval: { start: s.start, end: s.start + s.workedMinutes * 60_000 }, siteId: s.siteId ?? undefined });
+      shifts.push({ date: s.date, interval: { start: s.start, end: s.end ?? s.start + s.workedMinutes * 60_000 }, siteId: s.siteId ?? undefined, paidHours: Math.round((s.workedMinutes / 60) * 100) / 100 });
     }
     if (dates.size) out.set(p.memberId, { shifts, dates });
   }
   return out;
 }
-
-/** Hours since a timestamp, for "clocked in 3 h 20 min ago". */
-export const hoursSince = (from: number, now: Date) => Math.round(((now.getTime() - from) / H) * 100) / 100;
-
-export { localInterval };
