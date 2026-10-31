@@ -56,6 +56,9 @@ describe('punch fold', () => {
     const f = foldPunches(p, { tz: LA, now: at('2026-11-04', '08:00') });
     expect(f.anomalies.map((a) => a.kind)).toEqual(['out_without_in', 'missing_clock_out', 'forgotten_clock_out']);
     expect(f.sessions[0]).toMatchObject({ missingOut: true, workedMinutes: 0 });
+    // The forgotten one counts nothing and does not keep them on the clock.
+    expect(f.sessions[1]).toMatchObject({ missingOut: true, workedMinutes: 0 });
+    expect(f.state).toBe('off');
   });
 
   it('a shift across midnight counts to the day it started; DST fall-back counts the real 9 hours', () => {

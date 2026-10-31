@@ -488,7 +488,7 @@ export const getComplianceTasks = defineCapability({
       const names = new Map(people.map((p) => [p.memberId, p.name]));
       for (const c of creds) {
         const expired = c.expiresOn! <= today;
-        items.push({ id: `cred:${c.memberId}:${c.name}`, kind: 'credential_expiring', severity: expired ? 'action' : 'warning', title: expired ? 'Credential expired' : 'Credential expiring', detail: `${c.name} ${expired ? 'expired' : 'expires'} on ${c.expiresOn}`, href: '/app/coverage/credentials', who: untrusted(names.get(c.memberId)), rule: null });
+        items.push({ id: `cred:${c.memberId}:${c.name}`, kind: 'credential_expiring', severity: expired ? 'action' : 'warning', title: expired ? 'Credential expired' : 'Credential expiring', detail: `${c.name} ${expired ? 'expired' : 'expires'} on ${c.expiresOn}`, href: '/app/admin/credentials', who: untrusted(names.get(c.memberId)), rule: null });
       }
       const pending = await db.select({ id: leaveRequests.id }).from(leaveRequests).where(and(eq(leaveRequests.orgId, actor.orgId), eq(leaveRequests.status, 'pending'), inArray(leaveRequests.memberId, ids.filter((x) => x !== actingMemberId(actor)))));
       if (pending.length) items.push({ id: 'leave', kind: 'leave_approval', severity: 'action', title: `Leave requests to decide (${pending.length})`, detail: `${pending.length} pending ${pending.length === 1 ? 'request' : 'requests'}.`, href: '/app/approvals', who: null, rule: null });

@@ -105,7 +105,7 @@ export default async function TimesheetsPage({ searchParams }: { searchParams: P
             {ts.people.map((p) => (
               <tr key={p.memberId} className="align-top">
                 <th scope="row" className="px-3 py-2 text-left font-medium text-ink">
-                  <Link className="underline-offset-2 hover:underline" href={link({ member: p.memberId })}>{p.name?.untrusted_text}</Link>
+                  <Link prefetch={false} className="underline-offset-2 hover:underline" href={link({ member: p.memberId })}>{p.name?.untrusted_text}</Link>
                   {p.issues.length > 0 && (
                     <ul className="mt-1 space-y-0.5 text-xs font-normal text-ink">
                       {p.issues.map((i, n) => (

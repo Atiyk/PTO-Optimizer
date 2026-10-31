@@ -94,8 +94,8 @@ export const LABOR_US_CA: RulePack = {
       minShiftHours: 3.5,
       basis: 'law',
       citation: {
-        regulation: 'IWC Wage Orders § 12 (DLSE Rest Periods FAQ)',
-        section: '§ 12 Rest Periods',
+        regulation: 'IWC Wage Orders (DLSE Rest Periods FAQ)',
+        section: '§ 12',
         url: 'https://www.dir.ca.gov/dlse/faq_RestPeriods.htm',
         retrievedOn: V,
         publisher: 'agency_guidance',

@@ -49,7 +49,7 @@ export default async function CompliancePage() {
                   </div>
                   <span className="flex shrink-0 items-center gap-2">
                     <Badge tone={g.severity === 'action' ? 'bad' : g.severity === 'warning' ? 'warn' : 'neutral'}>{g.severity === 'action' ? 'Action' : g.severity === 'warning' ? 'Check' : 'FYI'}</Badge>
-                    <Link href={i.href} className="text-sm font-medium text-accent underline">
+                    <Link href={i.href} prefetch={false} className="text-sm font-medium text-accent underline">
                       Open<span className="sr-only">: {i.title}</span>
                     </Link>
                   </span>

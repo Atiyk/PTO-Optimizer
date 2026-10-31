@@ -38,7 +38,7 @@ export interface Session {
   restBreaksTaken: boolean | null;
   /** Worked minutes up to `end` (or `now` while open), minus unpaid meal breaks. */
   workedMinutes: number;
-  /** True when the session was closed by the next clock-in, not a clock-out. */
+  /** True when the session has no clock-out: closed by the next clock-in, or forgotten (open too long). */
   missingOut: boolean;
 }
 
@@ -125,13 +125,18 @@ export function foldPunches(punches: readonly Punch[], opts: FoldOptions): FoldR
     }
   }
 
-  // A session left open by a later clock-in has no end: count it as zero worked time until fixed.
+  // A session open longer than the limit is a forgotten clock-out: like one closed by a later
+  // clock-in, it has no end, counts as zero worked time until a manager fixes it, and does not
+  // keep the person "on the clock" (they can clock in for today's shift).
   const maxOpen = (opts.maxOpenHours ?? 16) * 3_600_000;
+  for (const s of sessions) {
+    if (s.end === null && !s.missingOut && opts.now - s.start > maxOpen) {
+      s.missingOut = true;
+      anomalies.push({ kind: 'forgotten_clock_out', at: s.start, detail: `Clocked in for more than ${opts.maxOpenHours ?? 16} h without clocking out` });
+    }
+  }
   const out: Session[] = sessions.map((s) => ({ ...s, workedMinutes: s.missingOut ? 0 : worked(s, opts.now) }));
   const open = out.find((s) => s.end === null && !s.missingOut) ?? null;
-  if (open && opts.now - open.start > maxOpen) {
-    anomalies.push({ kind: 'forgotten_clock_out', at: open.start, detail: `Clocked in for more than ${opts.maxOpenHours ?? 16} h without clocking out` });
-  }
   const state: ClockState = !open ? 'off' : open.breaks.some((b) => b.end === null) ? 'on_break' : 'working';
   return { sessions: out, state, current: open, anomalies };
 }

@@ -12,10 +12,12 @@ mkdirSync(out, { recursive: true });
 const browser = await chromium.launch(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {});
 const errors = [];
 const axeReport = {};
-const shoot = async (p, name, widths = [1440, 375]) => {
+const shoot = async (p, name, widths = [1440, 375], reload = true) => {
   for (const w of widths) {
-    await p.setViewportSize({ width: w, height: w === 375 ? 812 : 900 });
-    await p.reload({ waitUntil: 'networkidle' });
+    if (reload) {
+      await p.setViewportSize({ width: w, height: w === 375 ? 812 : 900 });
+      await p.reload({ waitUntil: 'networkidle' });
+    }
     await p.screenshot({ path: `${out}/${name}-${w}.png`, fullPage: true });
     const over = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     if (over > 0) errors.push(`${name}-${w} overflows by ${over}px`);
@@ -23,7 +25,7 @@ const shoot = async (p, name, widths = [1440, 375]) => {
     axeReport[`${name}@${w}`] = r.violations.map((v) => ({ id: v.id, nodes: v.nodes.length, sample: v.nodes[0]?.target.join(' '), summary: v.nodes[0]?.failureSummary }));
     if (r.violations.length) errors.push(`${name}-${w}: axe ${r.violations.map((v) => v.id).join(', ')}`);
   }
-  await p.setViewportSize({ width: 1440, height: 900 });
+  if (reload) await p.setViewportSize({ width: 1440, height: 900 });
 };
 const iso = (d) => d.toISOString().slice(0, 10);
 const today = new Date(`${iso(new Date())}T00:00:00Z`);
@@ -70,16 +72,18 @@ await m.goto(`${base}/m/signin`, { waitUntil: 'networkidle' });
 await m.getByLabel(/Sign-in code/).fill(code);
 await m.getByRole('button', { name: 'Sign in with code' }).click();
 await m.waitForURL(/\/m$/);
-await shoot(m, 'phone-clocked-out', [375]);
+await m.waitForLoadState('networkidle');
+await shoot(m, 'phone-clocked-out', [375], false);
 await m.getByRole('button', { name: 'Clock in' }).tap();
+await m.waitForLoadState('networkidle');
 await m.getByText(/On the clock since/).waitFor();
-await shoot(m, 'phone-clocked-in', [375]);
+await shoot(m, 'phone-clocked-in', [375], false);
 await m.getByRole('button', { name: 'Clock out' }).tap();
 await m.getByText(/paid rest breaks/).waitFor();
 await m.screenshot({ path: `${out}/phone-clock-out-question-375.png`, fullPage: true });
 await m.getByRole('button', { name: 'Not yet' }).tap();
 await m.goto(`${base}/m/time?week=${iso(lastMonday)}`, { waitUntil: 'networkidle' });
-await shoot(m, 'phone-hours', [375]);
+await shoot(m, 'phone-hours', [375], false);
 
 writeFileSync(`${out}/axe.json`, JSON.stringify(axeReport, null, 2));
 console.log(JSON.stringify({ errors }));
