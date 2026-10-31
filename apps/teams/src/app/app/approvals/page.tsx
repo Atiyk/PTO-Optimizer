@@ -11,7 +11,7 @@ export default async function Approvals() {
   const { requests, recentAutoApprovals } = await call('listPendingApprovals', {}, actor);
   const { toDecide } = await call('getProfileChanges', {}, actor);
   const { windows } = await call('getRequestWindows', {}, actor);
-  const clean = requests.filter((r) => r.decision.wouldAutoApprove && r.decision.route === 'needs_person');
+  const clean = requests.filter((r) => r.decision.wouldAutoApprove && r.decision.route === 'needs_person' && !r.requestWindow);
   const ready = windows.filter((w) => w.status === 'ready' && w.allocation.length);
   return (
     <div className="space-y-4">

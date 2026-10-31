@@ -44,7 +44,8 @@ export function approvalCard(r: PendingItem, lead?: string): OutActivity {
     type: 'Input.ChoiceSet',
     id: 'reason',
     label: 'If you decline, why?',
-    value: 'coverage',
+    // No default: a decline reason is the approver's own choice, never pre-filled.
+    placeholder: 'Pick a reason before declining',
     choices: [
       { title: 'Not enough cover', value: 'coverage' },
       { title: 'Not enough notice', value: 'notice' },

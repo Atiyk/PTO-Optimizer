@@ -1,6 +1,9 @@
 import { and, asc, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
-import { balanceLedger, coverageRules, DECLINE_REASONS, leaveRequests, leaveTypes, members, shadowDecisions } from '@/db/schema';
+import type { Db } from '@/db/client';
+import { balanceLedger, coverageRules, DECLINE_REASONS, leaveRequests, leaveTypes, members, policyRules, shadowDecisions, windowAllocations } from '@/db/schema';
+import { groupIdsByMember, ruleFromRow } from '@/domain/automations';
+import { inScope } from '@daysoff/engine/leave/rules';
 import { blockImpact } from '@/domain/coverage';
 import { buildDecisionPacket, type DecisionPacket, type DecisionSnapshot } from '@/domain/decisionFlow';
 import { advanceEscalations } from '@/domain/escalation';
@@ -51,6 +54,7 @@ export const listPendingApprovals = defineCapability({
           .describe('When the org turned on approval suggestions: whether the rules would auto-approve this, and why not.'),
         decision: decisionOutput.describe('Every check with its result, the engine recommendation and the policy. The approver decides.'),
         changedSinceSubmit: z.array(z.string()).describe('Checks whose result changed since the request was submitted.'),
+        requestWindow: z.string().nullable().describe('The request window (busy period) this falls in, until its allocation is confirmed; decide it there, not one by one.'),
         waiting: z.object({
           since: z.string(),
           hours: z.number(),
@@ -92,6 +96,8 @@ export const listPendingApprovals = defineCapability({
       .innerJoin(members, eq(members.id, leaveRequests.memberId))
       .where(and(eq(leaveRequests.orgId, actor.orgId), eq(leaveRequests.status, 'pending'), isNull(members.deletedAt)))
       .orderBy(asc(leaveRequests.startDate));
+    const windows = await openWindows(db, actor.orgId);
+    const groupsOf = windows.length ? await groupIdsByMember(db, actor.orgId) : new Map<string, string[]>();
     const out = [];
     for (const r of rows) {
       if (r.member.id === actingMemberId(actor)) continue; // nobody approves their own leave
@@ -155,6 +161,10 @@ export const listPendingApprovals = defineCapability({
             .map((o) => ({ member: { untrusted_text: o.name }, start: o.start, end: o.end, status: o.status })),
         },
         ...(await packetFields(db, actor.orgId, r.member, r.req, r.typeKey, today, now, prior)),
+        requestWindow:
+          windows.find(
+            (w) => r.req.startDate <= w.end && r.req.endDate >= w.start && inScope(w, { locationId: r.member.locationId, teamId: r.member.teamId, groupIds: groupsOf.get(r.member.id) ?? [] }, r.typeKey),
+          )?.name ?? null,
       });
     }
     const autoRows = await db
@@ -385,6 +395,19 @@ export const decideLeaveRequest = defineCapability({
 });
 
 
+/** Request-window rules whose allocation is not confirmed yet. */
+async function openWindows(db: Db, orgId: string) {
+  const rows = await db.select().from(policyRules).where(and(eq(policyRules.orgId, orgId), eq(policyRules.kind, 'request_window')));
+  if (!rows.length) return [];
+  const confirmed = new Set(
+    (await db.select({ ruleId: windowAllocations.ruleId, at: windowAllocations.confirmedAt }).from(windowAllocations).where(eq(windowAllocations.orgId, orgId))).filter((a) => a.at).map((a) => a.ruleId),
+  );
+  return rows
+    .filter((r) => !confirmed.has(r.id))
+    .map(ruleFromRow)
+    .flatMap((rule) => (rule.kind === 'request_window' ? [rule] : []));
+}
+
 export const approveAllClean = defineCapability({
   name: 'approveAllClean',
   description:
@@ -409,7 +432,8 @@ export const approveAllClean = defineCapability({
     let skipped = 0;
     for (const r of q.requests) {
       if (wanted && !wanted.has(r.id)) continue;
-      if (!r.decision.wouldAutoApprove || r.decision.route !== 'needs_person') {
+      // Requests in an unconfirmed request window are shared out by the allocation, never in bulk.
+      if (!r.decision.wouldAutoApprove || r.decision.route !== 'needs_person' || r.requestWindow) {
         skipped++;
         continue;
       }

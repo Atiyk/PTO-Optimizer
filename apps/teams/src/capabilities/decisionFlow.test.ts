@@ -248,6 +248,13 @@ describe('request windows (no first come, first served)', () => {
       [b.request.id, true],
       [a.request.id, false],
     ]);
+    // After collection closes the rule no longer warns, so both look clean: "approve all clean"
+    // must leave them to the allocation, never approve both.
+    const q = await at(humanActor(A.manager), 'listPendingApprovals', {}, later);
+    const mine = q.requests.filter((x) => x.id === a.request.id || x.id === b.request.id);
+    expect(mine.map((x) => x.requestWindow)).toEqual(['Holidays', 'Holidays']);
+    const bulk = await at(humanActor(A.manager), 'approveAllClean', { requestIds: [a.request.id, b.request.id] }, later);
+    expect(bulk).toMatchObject({ approved: [], skipped: 2 });
     const c = await at(humanActor(A.manager), 'confirmRequestWindow', { ruleId: rule.id }, later);
     expect(c).toEqual({ approved: 1, declined: 1, skipped: 0 });
     const [ra] = await db.select().from(leaveRequests).where(eq(leaveRequests.id, a.request.id));

@@ -25,10 +25,10 @@ export default async function StaffApprovals() {
   return (
     <Shell title={`Approvals (${requests.length + toDecide.length})`} org={org.name} active="/m">
       {requests.length === 0 && <p className="text-sm text-muted">No leave requests waiting.</p>}
-      {requests.some((r) => r.decision.wouldAutoApprove && r.decision.route === 'needs_person') && (
+      {requests.some((r) => r.decision.wouldAutoApprove && r.decision.route === 'needs_person' && !r.requestWindow) && (
         <ActionButton
           capability="approveAllClean"
-          input={{ requestIds: requests.filter((r) => r.decision.wouldAutoApprove && r.decision.route === 'needs_person').map((r) => r.id) }}
+          input={{ requestIds: requests.filter((r) => r.decision.wouldAutoApprove && r.decision.route === 'needs_person' && !r.requestWindow).map((r) => r.id) }}
           confirm="Approve every request that passes all checks?"
         >
           Approve all clean

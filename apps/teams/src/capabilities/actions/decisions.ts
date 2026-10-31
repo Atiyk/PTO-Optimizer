@@ -113,7 +113,8 @@ export const getShadowReplay = defineCapability({
       const d = decideRoute(factsOf(ev, null), policy, daysBetween(asked, r.startDate));
       if (!d.wouldAutoApprove) {
         for (const b of d.blockers.length ? d.blockers : ['Needs no approval or is protected leave']) {
-          const k = b.replace(/\d{4}-\d{2}-\d{2}/g, '…').replace(/\d+(\.\d+)?/g, 'N');
+          // Group by the rule, not the day: "Infant room cover: on 2026-11-19 4 people…" → "Infant room cover".
+          const k = b.includes(':') ? b.slice(0, b.indexOf(':')) : b.replace(/ on \d{4}-\d{2}-\d{2}/g, '');
           reasons.set(k, (reasons.get(k) ?? 0) + 1);
         }
         continue;

@@ -26,6 +26,7 @@ export function DecisionChecks({ r, compact = false }: { r: Item; compact?: bool
         {r.waiting.overdue && <Badge tone="warn">Waiting {r.waiting.hours} h</Badge>}
         {r.waiting.escalationLevel > 0 && <Badge>Escalated</Badge>}
         {r.waiting.review && <Badge>Review asked</Badge>}
+        {r.requestWindow && <Badge tone="warn">In {r.requestWindow}: decide with the allocation</Badge>}
       </p>
       <ul className="space-y-1" aria-label="Checks">
         {shown.map((c, i) => (
