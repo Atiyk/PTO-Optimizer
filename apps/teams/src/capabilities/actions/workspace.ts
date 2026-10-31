@@ -1,6 +1,7 @@
 import { and, asc, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import { absenceReport, type ReportAbsence } from '@daysoff/engine/leave/report';
+import { describeRule } from '@daysoff/engine/leave/rules';
 import { dateOption, suggestEventDates, type EventAttendee } from '@daysoff/engine/leave/events';
 import { rangeISO } from '@daysoff/engine/solver/dateUtils';
 import type { LeavePolicy } from '@daysoff/engine/leave/policy';
@@ -18,8 +19,7 @@ import {
   msteamsTenants,
   profileChangeRequests,
   teamEvents,
-  teams,
-} from '@/db/schema';
+  teams, hrTasks } from '@/db/schema';
 import { eventIncludes, groupIdsByMember, groupIdsFor, loadRules, othersOut } from '@/domain/automations';
 import { describePolicy } from '@/domain/describePolicy';
 import { balanceView, forfeitureRisk, getMember, isoDate, memberHolidays, policiesFor, type MemberRow } from '@/domain/leave';
@@ -70,6 +70,16 @@ const reportOutput = z.object({
   peakDays: z.array(z.object({ date: z.string(), away: z.number() })),
   approval: z.object({ decided: z.number(), approved: z.number(), declined: z.number(), approvalRatePct: z.number().nullable(), medianDaysToDecide: z.number().nullable() }),
   medianLeadDays: z.number().nullable(),
+  automation: z
+    .object({
+      autoApproved: z.number(),
+      autoRatePct: z.number().nullable(),
+      reversed: z.number(),
+      escalated: z.number(),
+      medianDaysToDecideByPerson: z.number().nullable(),
+      hrTasks: z.object({ due: z.number(), onTime: z.number(), overdue: z.number() }),
+    })
+    .describe('Decision flow: auto-approvals, reversals in the undo window (high = rules too loose), escalations, HR tasks on time.'),
   hoursWorked: z.object({ total: z.number(), people: z.number() }).nullable(),
   forfeitRisk: z.array(z.object({ memberId: z.string(), name: z.object({ untrusted_text: z.string() }), amount: z.number(), unit: z.enum(['days', 'hours']) })),
 });
@@ -116,6 +126,9 @@ async function buildReport(ctx: Parameters<typeof getAbsenceReport.handler>[0], 
       requestedOn: isoDate(r.createdAt),
       decidedOn: r.decidedAt ? isoDate(r.decidedAt) : null,
       start: r.startDate,
+      autoApproved: r.autoApproved,
+      reversed: r.autoApproved && r.status === 'declined',
+      escalated: r.escalationLevel > 0,
     };
   });
   const teamRows = await db.select({ id: teams.id, name: teams.name }).from(teams).where(eq(teams.orgId, orgId));
@@ -143,6 +156,14 @@ async function buildReport(ctx: Parameters<typeof getAbsenceReport.handler>[0], 
     absences,
     hoursWorked: hw.length ? [...hoursByMember].map(([memberId, hours]) => ({ memberId, hours })) : undefined,
     forfeitRisk: risk,
+    hrTasks: (
+      await db
+        .select({ due: hrTasks.dueAt, done: hrTasks.doneAt, m: hrTasks.memberId })
+        .from(hrTasks)
+        .where(and(eq(hrTasks.orgId, orgId), gte(hrTasks.dueAt, input.from), lte(hrTasks.dueAt, input.to)))
+    )
+      .filter((t) => t.due && (!t.m || ids.includes(t.m)))
+      .map((t) => ({ dueAt: t.due!, doneOn: t.done ? isoDate(t.done) : null })),
   });
   return rep;
 }
@@ -249,13 +270,7 @@ export const askPolicyQuestion = defineCapability({
     );
     const typeNames = new Map(types.map((t) => [t.key, t.name]));
     const forTypes = (keys: string[]) => (keys.length ? ` (${keys.map((k) => typeNames.get(k) ?? k).join(', ')})` : '');
-    const ruleText = mine.slice(0, 12).map((r) =>
-      r.kind === 'blackout'
-        ? `${r.hard ? 'No leave' : 'Leave is discouraged'} from ${r.start} to ${r.end}${forTypes(r.leaveTypeKeys)}.`
-        : r.kind === 'probation'
-          ? `Leave${forTypes(r.leaveTypeKeys)} can be taken ${r.minDays} days after the start date.`
-          : `At most ${r.maxOut} people from your group can be away on the same day${forTypes(r.leaveTypeKeys)}.`,
-    );
+    const ruleText = mine.slice(0, 12).map((r) => describeRule(r, forTypes));
     const route = await approvalRoute(db, actor.orgId, me);
     const facts: PolicyFacts = { today, policies, rules: ruleText, approver: route.primary?.name ?? null, question: input.question };
     try {

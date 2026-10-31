@@ -124,9 +124,21 @@ export default async function MyLeave({ searchParams }: { searchParams: Promise<
                       {formatRange(r.start, r.end)} <span className="text-muted">· {typeName.get(r.leaveType) ?? r.leaveType}{r.part !== 'full' ? ` · ${r.part === 'hours' ? `${r.hours} h` : r.part}` : ''}</span>
                     </div>
                     <div className="text-muted">{r.deducts > 0 ? `Uses ${fmt(r.deducts, r.unit)}` : 'No balance used'}</div>
+                    {r.status === 'declined' && (r.declineReason || r.otherDates.length > 0) && (
+                      <div className="text-muted">
+                        {r.declineReason && <>Reason: {DECLINE_TEXT[r.declineReason]}. </>}
+                        {r.decisionNote && <>&ldquo;{r.decisionNote.untrusted_text}&rdquo; </>}
+                        {r.otherDates.length > 0 && <>Dates that work: {r.otherDates.map((d) => formatRange(d.start, d.end)).join(', ')}.</>}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge tone={r.status === 'approved' ? 'accent' : r.status === 'pending' ? 'warn' : 'neutral'}>{r.status}</Badge>
+                    <Badge tone={r.status === 'approved' || r.status === 'recorded' ? 'accent' : r.status === 'pending' ? 'warn' : 'neutral'}>{r.status}</Badge>
+                    {r.canAskForReview && (
+                      <ActionButton capability="requestReview" input={{ requestId: r.id }} doneMessage="Sent for a second look.">
+                        Ask for review
+                      </ActionButton>
+                    )}
                     {(r.status === 'pending' || (r.status === 'approved' && r.start >= today)) && (
                       <ActionButton capability="cancelLeaveRequest" input={{ requestId: r.id }} confirm="Cancel this request?">
                         Cancel
@@ -148,3 +160,5 @@ export default async function MyLeave({ searchParams }: { searchParams: Promise<
     </div>
   );
 }
+
+const DECLINE_TEXT = { coverage: 'not enough cover on those days', notice: 'not enough notice', peak_period: 'a busy period', other: 'see the note' } as const;

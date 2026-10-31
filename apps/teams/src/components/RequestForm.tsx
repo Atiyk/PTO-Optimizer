@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useId, useMemo, useState, useTransition } from 'react';
 import { runCapability } from '@/app/actions';
 import type { CapabilityOutput } from '@/capabilities/registry';
-import { Badge, btnPrimary, btnSecondary, fmt, input, label } from './ui';
+import { Badge, btnPrimary, btnSecondary, fmt, formatRange, input, label } from './ui';
 
 type Draft = CapabilityOutput<'draftLeaveRequest'>;
 type Part = 'full' | 'am' | 'pm' | 'hours';
@@ -110,7 +110,16 @@ export function RequestForm({
     startTransition(async () => {
       const r = await runCapability('submitLeaveRequest', { ...payload, idempotencyKey: idemKey });
       if (r.ok) {
-        setResult(r.data.request.status === 'approved' ? 'Booked. It is in your balance already.' : 'Sent to your manager for approval.');
+        const st = r.data.request.status;
+        setResult(
+          st === 'recorded'
+            ? 'Recorded. HR will contact you about any paperwork.'
+            : st === 'approved'
+              ? r.data.request.autoApproved
+                ? 'Approved instantly: every check passed. It is in your balance already.'
+                : 'Booked. It is in your balance already.'
+              : 'Sent for approval. You will hear when it is decided.',
+        );
         setStart('');
         setEnd('');
         setNote('');
@@ -206,7 +215,16 @@ export function RequestForm({
       <div aria-live="polite" className="min-h-6 text-sm">
         {!start && <p className="text-muted">Pick dates to see exactly what this costs. Today is {today}.</p>}
         {error && <p className="font-medium text-ink">{error}</p>}
-        {draft && <DraftSummary d={draft} />}
+        {draft && (
+          <DraftSummary
+            d={draft}
+            onPick={(a) => {
+              setStart(a.start);
+              setEnd(a.end);
+              setResult(null);
+            }}
+          />
+        )}
         {result && <p className="font-medium text-ink">{result}</p>}
       </div>
       <button className={btnPrimary} disabled={!draft?.canSubmit || pending} onClick={submit}>
@@ -216,10 +234,16 @@ export function RequestForm({
   );
 }
 
-function DraftSummary({ d }: { d: Draft }) {
+const ROUTE_TONE = { auto_approve: 'ok', no_approval_needed: 'ok', recorded_protected: 'neutral', needs_person: 'warn', blocked: 'bad' } as const;
+const ROUTE_LABEL = { auto_approve: 'Instant', no_approval_needed: 'No approval needed', recorded_protected: 'Recorded for HR', needs_person: 'Needs a person', blocked: 'Fix first' } as const;
+const MARK = { pass: '✓', warn: '!', fail: '✕' } as const;
+const MARK_LABEL = { pass: 'Passes', warn: 'Heads-up', fail: 'Blocks' } as const;
+
+function DraftSummary({ d, onPick }: { d: Draft; onPick: (a: { start: string; end: string }) => void }) {
   const holidays = d.excluded.filter((e) => e.reason === 'holiday');
+  const dec = d.decision;
   return (
-    <div className="space-y-2 rounded-md border border-line bg-surface p-3">
+    <div className="space-y-3 rounded-md border border-line bg-surface p-3">
       <p className="text-ink">
         Uses <strong>{fmt(d.deducts, d.unit)}</strong>
         {d.countsAgainstBalance && d.balanceAfter != null && (
@@ -229,20 +253,52 @@ function DraftSummary({ d }: { d: Draft }) {
         )}
         {!d.countsAgainstBalance && <> · does not use your balance</>}
       </p>
-      {holidays.length > 0 && (
-        <p className="text-muted">
-          Includes {holidays.map((h) => h.name).join(', ')} (not deducted).
-        </p>
-      )}
+      {holidays.length > 0 && <p className="text-muted">Includes {holidays.map((h) => h.name).join(', ')} (not deducted).</p>}
       {d.yearEndAfter && d.yearEndAfter.wouldForfeit > 0 && (
         <p className="text-muted">You would still forfeit {fmt(d.yearEndAfter.wouldForfeit, d.unit)} at the end of the plan year ({d.yearEndAfter.yearEnd}).</p>
       )}
-      {d.problems.map((p) => (
-        <p key={p}><Badge tone="bad">Blocked</Badge> {p}</p>
-      ))}
-      {d.warnings.map((w) => (
-        <p key={w}><Badge tone="warn">Heads-up</Badge> {w}</p>
-      ))}
+      {dec ? (
+        <>
+          <p className="text-ink">
+            <Badge tone={ROUTE_TONE[dec.route]}>{ROUTE_LABEL[dec.route]}</Badge>{' '}
+            {dec.outcome}
+            {dec.route === 'needs_person' && dec.approver && <span className="text-muted"> Approver: {dec.approver.untrusted_text}{dec.backup ? `, backup ${dec.backup.untrusted_text}` : ''}.</span>}
+          </p>
+          <ul className="space-y-1" aria-label="Checks">
+            {dec.checklist.map((c, i) => (
+              <li key={`${c.kind}-${i}`} className="flex gap-2">
+                <span aria-hidden="true" className={`w-4 shrink-0 text-center font-semibold ${c.status === 'pass' ? 'text-ok-text' : 'text-ink'}`}>{MARK[c.status]}</span>
+                <span>
+                  <span className="sr-only">{MARK_LABEL[c.status]}: </span>
+                  <span className={c.status === 'pass' ? 'text-muted' : 'text-ink'}>{c.message}</span>
+                  {c.fix && c.status !== 'pass' && <span className="block text-muted">{c.fix}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {dec.alternatives.length > 0 && (
+            <div>
+              <p className="font-medium text-ink">Better dates</p>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {dec.alternatives.map((a) => (
+                  <button key={a.start} type="button" className={btnSecondary} onClick={() => onPick(a)}>
+                    {formatRange(a.start, a.end)} · {a.daysAway} days away{a.wouldAutoApprove ? ' · instant' : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {d.problems.map((p) => (
+            <p key={p}><Badge tone="bad">Blocked</Badge> {p}</p>
+          ))}
+          {d.warnings.map((w) => (
+            <p key={w}><Badge tone="warn">Heads-up</Badge> {w}</p>
+          ))}
+        </>
+      )}
     </div>
   );
 }

@@ -15,7 +15,8 @@ import { getCoverage, getCoverageSetup, getCredentials, getSickLeave, importHour
 import { listMyProposals, respondToProposal, runTeamPlan, sendPlanProposals } from './actions/planner';
 import { getCoverageForecast } from './actions/forecast';
 import { clockPunch, getComplianceTasks, getMyTimeClock, getTimesheets, getWorkRules, manageTimesheets, manageWorkRules } from './actions/timeclock';
-import { decideLeaveRequest, listPendingApprovals } from './actions/approvals';
+import { approveAllClean, decideLeaveRequest, listPendingApprovals, requestReview } from './actions/approvals';
+import { completeHrTask, confirmRequestWindow, getRequestWindows, getShadowReplay, listHrTasks } from './actions/decisions';
 import { explainBalance, getMyBalance } from './actions/balance';
 import { listHolidays, whoIsOut } from './actions/calendar';
 import { askPolicyQuestion, decideProfileChange, explainAbsenceReport, getAbsenceReport, getMsTeamsConnection, getProfileChanges, getTeamEvents, manageMsTeams, manageTeamEvents, requestProfileChange } from './actions/workspace';
@@ -48,6 +49,13 @@ export const CAPABILITIES = {
   listHolidays,
   listPendingApprovals,
   decideLeaveRequest,
+  approveAllClean,
+  requestReview,
+  getShadowReplay,
+  listHrTasks,
+  completeHrTask,
+  getRequestWindows,
+  confirmRequestWindow,
   getOrgSetup,
   manageOrgSetup,
   listMembers,

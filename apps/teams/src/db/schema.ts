@@ -22,6 +22,8 @@ import {
  * Balances are never stored: they are derived by packages/engine from balance_ledger.
  */
 
+import { PROTECTED_CATEGORIES, POLICY_MODES } from '@daysoff/engine/leave/decision';
+
 const id = () => uuid('id').primaryKey().defaultRandom();
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 const orgRef = () =>
@@ -31,7 +33,10 @@ const orgRef = () =>
 
 export const ROLES = ['owner', 'admin', 'manager', 'employee'] as const;
 export const ACTOR_TYPES = ['human', 'agent-on-behalf-of-user', 'service-agent'] as const;
-export const REQUEST_STATUSES = ['draft', 'pending', 'approved', 'declined', 'cancelled'] as const;
+/** `recorded`: statutory-protected leave, recorded and routed to HR, never approved or declined by rules. */
+export const REQUEST_STATUSES = ['draft', 'pending', 'approved', 'declined', 'cancelled', 'recorded'] as const;
+/** Statuses that mean the person is (or may be) away: coverage, "max away" and calendars count them. */
+export const AWAY_STATUSES = ['pending', 'approved', 'recorded'] as const;
 /** Industry presets (labels and suggested packs). `general` = MVP behaviour, unchanged. */
 export const VERTICALS = ['general', 'childcare', 'clinic', 'healthcare', 'retail', 'hospitality', 'security', 'manufacturing'] as const;
 export const OVERTIME_POLICIES = ['allow', 'avoid', 'exclude'] as const;
@@ -181,6 +186,8 @@ export const leaveTypes = pgTable(
     isHealthRelated: boolean('is_health_related').notNull().default(false),
     autoApprove: boolean('auto_approve').notNull().default(false),
     maxAutoApproveDays: numeric('max_auto_approve_days', { precision: 6, scale: 2 }),
+    /** Statutory-protected leave (FMLA, parental, jury, …): recorded and routed to HR (0009). */
+    protectedCategory: text('protected_category', { enum: PROTECTED_CATEGORIES }).notNull().default('none'),
     archived: boolean('archived').notNull().default(false),
     createdAt: createdAt(),
   },
@@ -246,6 +253,13 @@ export const leaveRequests = pgTable(
     /** Local start/end minutes for `part = hours`, so leave maps onto coverage blocks. */
     startMinute: smallint('start_minute'),
     endMinute: smallint('end_minute'),
+    /** Decision packet at submit (0009): checklist, route, policy and a hash of the rules. */
+    decisionSnapshot: jsonb('decision_snapshot'),
+    /** 0 = with the first approver; each escalation step adds one. */
+    escalationLevel: smallint('escalation_level').notNull().default(0),
+    lastRemindedAt: timestamp('last_reminded_at', { withTimezone: true }),
+    /** The approver's reason when declining (one of DECLINE_REASONS). */
+    declineReason: text('decline_reason'),
     createdAt: createdAt(),
   },
   (t) => [
@@ -1057,7 +1071,7 @@ export const groupMembers = pgTable(
   (t) => [uniqueIndex('group_members_idx').on(t.groupId, t.memberId), index('group_members_org_member_idx').on(t.orgId, t.memberId)],
 );
 
-export const POLICY_RULE_KINDS = ['probation', 'max_out'] as const;
+export const POLICY_RULE_KINDS = ['probation', 'max_out', 'min_notice', 'max_consecutive', 'request_window'] as const;
 
 /**
  * Policy automations beyond blackouts: probation (`params.minDays`) and "at most N away"
@@ -1153,4 +1167,90 @@ export const msteamsUsers = pgTable(
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex('msteams_users_member_idx').on(t.orgId, t.memberId), uniqueIndex('msteams_users_aad_idx').on(t.aadObjectId)],
+);
+
+// ── Automated decision flow (0009) ─────────────────────────────────────────────
+
+export const DECLINE_REASONS = ['coverage', 'notice', 'peak_period', 'other'] as const;
+
+/**
+ * Approval policies per scope. The most specific scope wins (team, then group, then location,
+ * then org-wide); ties go to the stricter one. With no rows, the org's autonomy level and each
+ * leave type's auto-approve flag apply exactly as before 0009.
+ */
+export const approvalPolicies = pgTable(
+  'approval_policies',
+  {
+    id: id(),
+    orgId: orgRef(),
+    name: text('name').notNull(),
+    mode: text('mode', { enum: POLICY_MODES }).notNull().default('suggest'),
+    leaveTypeKeys: text('leave_type_keys').array().notNull().default(sql`'{}'::text[]`),
+    locationIds: uuid('location_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    teamIds: uuid('team_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    groupIds: uuid('group_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    maxDays: numeric('max_days', { precision: 6, scale: 2 }),
+    minNoticeDays: integer('min_notice_days'),
+    toleratedWarnings: text('tolerated_warnings').array().notNull().default(sql`'{}'::text[]`),
+    reversibleMinutes: integer('reversible_minutes'),
+    slaHours: integer('sla_hours').notNull().default(24),
+    escalateAfterHours: integer('escalate_after_hours').notNull().default(48),
+    createdAt: createdAt(),
+  },
+  (t) => [index('approval_policies_org_idx').on(t.orgId)],
+);
+
+export const HR_TASK_KINDS = ['fmla_notice', 'protected_ack', 'approved_now_conflicts'] as const;
+
+/** Tasks for owners and admins (the HR role). Never carries a reason or diagnosis. */
+export const hrTasks = pgTable(
+  'hr_tasks',
+  {
+    id: id(),
+    orgId: orgRef(),
+    kind: text('kind', { enum: HR_TASK_KINDS }).notNull(),
+    requestId: uuid('request_id').references(() => leaveRequests.id, { onDelete: 'cascade' }),
+    memberId: uuid('member_id').references(() => members.id, { onDelete: 'cascade' }),
+    dueAt: date('due_at'),
+    doneAt: timestamp('done_at', { withTimezone: true }),
+    doneByMemberId: uuid('done_by_member_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('hr_tasks_org_idx').on(t.orgId, t.doneAt), uniqueIndex('hr_tasks_request_kind_idx').on(t.requestId, t.kind)],
+);
+
+/** What a policy in shadow mode would have done, next to what the person decided. */
+export const shadowDecisions = pgTable(
+  'shadow_decisions',
+  {
+    id: id(),
+    orgId: orgRef(),
+    requestId: uuid('request_id')
+      .notNull()
+      .references(() => leaveRequests.id, { onDelete: 'cascade' }),
+    policyId: uuid('policy_id'),
+    wouldAutoApprove: boolean('would_auto_approve').notNull(),
+    humanDecision: text('human_decision', { enum: ['approved', 'declined'] }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('shadow_decisions_request_idx').on(t.requestId), index('shadow_decisions_org_idx').on(t.orgId)],
+);
+
+/** A request window's allocation: computed once collection closes, confirmed by a person. */
+export const windowAllocations = pgTable(
+  'window_allocations',
+  {
+    id: id(),
+    orgId: orgRef(),
+    ruleId: uuid('rule_id')
+      .notNull()
+      .references(() => policyRules.id, { onDelete: 'cascade' }),
+    seed: integer('seed'),
+    /** { requestId, memberId, in, reason }[] from the engine. */
+    results: jsonb('results').notNull(),
+    confirmedByMemberId: uuid('confirmed_by_member_id'),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('window_allocations_rule_idx').on(t.ruleId)],
 );

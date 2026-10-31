@@ -126,7 +126,7 @@ export interface BlockActions {
   team: { id: string };
   user: { id: string };
   response_url: string;
-  actions: { action_id: string; value?: string }[];
+  actions: { action_id: string; value?: string; selected_option?: { value: string } }[];
 }
 
 export async function processInteraction(db: Db, p: BlockActions, now: Date): Promise<void> {
@@ -156,7 +156,10 @@ export async function processInteraction(db: Db, p: BlockActions, now: Date): Pr
       return replace({ text: r.offersSent ? `:outbox_tray: Offers sent to ${r.offersSent} ${r.offersSent === 1 ? 'person' : 'people'}. I'll keep asking the next ones if nobody takes it.` : ':warning: Nobody can take this legally right now, so no offers went out.' });
     }
     if (a.action_id === 'approve' || a.action_id === 'decline') {
-      const r = await runAs(db, actor, 'decideLeaveRequest', { requestId: a.value, decision: a.action_id }, now);
+      // Decline is a menu of reasons: "requestId|reason". The requester gets the reason and other dates.
+      const picked = a.selected_option?.value ?? a.value ?? '';
+      const [requestId, reason] = a.action_id === 'decline' ? picked.split('|') : [a.value, undefined];
+      const r = await runAs(db, actor, 'decideLeaveRequest', { requestId, decision: a.action_id, ...(reason ? { reason } : {}) }, now);
       const what = `${esc(r.request.leaveType)}, ${range(r.request.start, r.request.end)}`;
       return replace({ text: `${r.request.status === 'approved' ? ':white_check_mark: Approved' : ':x: Declined'}: ${what}.` });
     }

@@ -51,8 +51,9 @@ export default async function StaffLeave() {
                 <span className="text-ink">
                   {formatRange(r.start, r.end)}
                   <span className="block text-muted">{typeName.get(r.leaveType) ?? r.leaveType}</span>
+                  {r.status === 'declined' && r.otherDates.length > 0 && <span className="block text-muted">Dates that work: {r.otherDates.map((d) => formatRange(d.start, d.end)).join(', ')}</span>}
                 </span>
-                <Badge tone={r.status === 'approved' ? 'accent' : r.status === 'pending' ? 'warn' : 'neutral'}>{r.status}</Badge>
+                <Badge tone={r.status === 'approved' || r.status === 'recorded' ? 'accent' : r.status === 'pending' ? 'warn' : 'neutral'}>{r.status}</Badge>
               </li>
             ))}
           </ul>

@@ -22,7 +22,7 @@ async function conversationFor(db: Db, orgId: string, memberId: string) {
   return c ?? null;
 }
 
-export async function notifyTeamsApprovers(db: Db, orgId: string, requestId: string, approvers: MemberRow[], now: Date): Promise<number> {
+export async function notifyTeamsApprovers(db: Db, orgId: string, requestId: string, approvers: MemberRow[], now: Date, lead?: string): Promise<number> {
   if (!msTeamsConfigured()) return 0;
   let sent = 0;
   for (const mgr of approvers) {
@@ -32,7 +32,7 @@ export async function notifyTeamsApprovers(db: Db, orgId: string, requestId: str
     const q = await invokeCapability('listPendingApprovals', { db, actor: asHuman(mgr), now }, {});
     const item = q.requests.find((x) => x.id === requestId);
     if (!item) continue;
-    await sendActivity(conv.serviceUrl, conv.conversationId, approvalCard(item as PendingItem));
+    await sendActivity(conv.serviceUrl, conv.conversationId, approvalCard(item as PendingItem, lead));
     sent += 1;
   }
   return sent;
@@ -49,5 +49,6 @@ export async function notifyTeamsDecision(db: Db, orgId: string, requestId: stri
   const conv = await conversationFor(db, orgId, row.r.memberId);
   if (!conv) return;
   const ok = row.r.status === 'approved';
-  await sendActivity(conv.serviceUrl, conv.conversationId, text(`${ok ? '✅' : '❌'} Your ${md(row.type.name.toLowerCase())}, ${range(row.r.startDate, row.r.endDate)}, was ${ok ? 'approved' : 'declined'}.`));
+  const { declineDetails } = await import('@/slack/notify');
+  await sendActivity(conv.serviceUrl, conv.conversationId, text(`${ok ? '✅' : '❌'} Your ${md(row.type.name.toLowerCase())}, ${range(row.r.startDate, row.r.endDate)}, was ${ok ? 'approved' : 'declined'}.` + (ok ? '' : declineDetails(row.r, md))));
 }

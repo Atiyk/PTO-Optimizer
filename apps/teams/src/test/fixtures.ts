@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '@/db/client';
-import { apiTokens, blackouts, coverageRules, drafts, invites, leaveRequests, leaveTypes, members, oauthClients, teams, webhookDeliveries, webhookEndpoints, rooms, siteRulePacks, demandTemplates, shiftTemplates, shiftExceptions, memberCredentials, hoursWorked, coverRequests, coverOffers, coverEvents, groups, groupMembers, policyRules, teamEvents, profileChangeRequests, msteamsTenants } from '@/db/schema';
+import { apiTokens, blackouts, coverageRules, drafts, invites, leaveRequests, leaveTypes, members, oauthClients, teams, webhookDeliveries, webhookEndpoints, rooms, siteRulePacks, demandTemplates, shiftTemplates, shiftExceptions, memberCredentials, hoursWorked, coverRequests, coverOffers, coverEvents, groups, groupMembers, policyRules, teamEvents, profileChangeRequests, msteamsTenants, approvalPolicies, hrTasks, shadowDecisions, windowAllocations } from '@/db/schema';
 import { invokeCapability, type CapabilityName } from '@/capabilities/registry';
 import { ROLE_SCOPES } from '@/capabilities/scopes';
 import type { Actor } from '@/capabilities/types';
@@ -67,5 +67,9 @@ export async function snapshotOrg(db: Db, orgId: string) {
     teamEvents: await db.select().from(teamEvents).where(eq(teamEvents.orgId, orgId)),
     profileChanges: await db.select().from(profileChangeRequests).where(eq(profileChangeRequests.orgId, orgId)),
     msteamsTenants: await db.select().from(msteamsTenants).where(eq(msteamsTenants.orgId, orgId)),
+    approvalPolicies: await db.select().from(approvalPolicies).where(eq(approvalPolicies.orgId, orgId)),
+    hrTasks: await db.select().from(hrTasks).where(eq(hrTasks.orgId, orgId)),
+    shadowDecisions: await db.select().from(shadowDecisions).where(eq(shadowDecisions.orgId, orgId)),
+    windowAllocations: await db.select().from(windowAllocations).where(eq(windowAllocations.orgId, orgId)),
   };
 }

@@ -2712,3 +2712,32 @@ The migrator call is the same one `scripts/migrate.ts` uses; `/status` will show
   prefer the old one.
 - **Q26: Demo-only on production.** This is the right default until Neon is connected. Once
   `DATABASE_URL` is set, it disappears on its own.
+
+## Automated decision flow (`claude/decision-flow`)
+
+One decision packet for both sides. Requesters see every check live with "Better dates" they can
+click; approvers see the same checklist, a recommendation (never a decision), waiting time and
+escalation, and decline with a reason. Per-team approval policies (off → shadow → suggest → auto,
+autonomy L3 stays the master switch) with a 90-day replay. Protected leave is recorded and sent
+to HR; possible FMLA gets a 5-business-day notice task. Request windows share busy weeks by
+rotation, seniority or a seeded lottery. The route never declines (asserted by a test).
+
+Fixed on the way: soft warnings no longer auto-approve; evaluation now runs inside the insert
+transaction under an advisory lock (two concurrent submits against "max 1 away" give one approved,
+one pending). Setup steps: `decision-flow/setup-steps.md` in the project files.
+
+### Gate
+Teams 257+ tests, engine and root tests (two solver timing tests time out in this container on
+`main` too, unrelated), typecheck, lint (no new warnings), root build, Teams build. Days Off
+`dist/` is byte-identical to a build of `main`; `verify:dist` reports 14 files against the
+committed baseline on both `main` and this branch (date-dependent holiday data, see Q27). Axe:
+0 violations on 12 views (1440 and 375). Screenshots: `docs/screenshots/decision-flow/`.
+
+### Questions for Atiyk
+- **Q27: Stale `verify:dist` baseline.** `main` itself no longer matches
+  `scripts/days-off-dist.sha256` (holiday and data-source pages change with the date). Refresh it
+  with `npm run build && bash scripts/verify-days-off-dist.sh --write` on `main` when convenient.
+- **Q28: Frequent cron.** Reminders and escalations need `/api/cron/cover` every 15 minutes
+  (cron-job.org); daily only otherwise.
+- **Q29: Legal review.** Protected-leave handling is US-focused (FMLA, CA §246.5). Not legal
+  advice; worth a counsel check before EU customers.

@@ -5,6 +5,7 @@ import { slackStatusGrants, webhookEndpoints } from '@/db/schema';
 import { syncSlackStatuses } from '@/slack/notify';
 import { housekeeping } from '@/server/housekeeping';
 import { advanceWaves } from '@/domain/coverFlow';
+import { advanceEscalations } from '@/domain/escalation';
 import { deliverDue, scanExpiringBalances } from '@/server/webhooks';
 import { scanCoverageGaps, scanExpiringCredentials } from '@/server/coverageEvents';
 
@@ -47,5 +48,7 @@ export async function GET(req: Request) {
   let statuses = 0;
   for (const { orgId } of grantOrgs) statuses += await syncSlackStatuses(db, orgId, now);
   const coverWaves = await advanceWaves(db, null, now);
-  return Response.json({ queued, ...sent, cleaned, statuses, coverWaves });
+  // Reminders and escalations for requests nobody has decided (never auto-approves).
+  const escalations = (await advanceEscalations(db, null, now)).length;
+  return Response.json({ queued, ...sent, cleaned, statuses, coverWaves, escalations });
 }

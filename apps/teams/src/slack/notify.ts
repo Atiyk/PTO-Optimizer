@@ -6,6 +6,7 @@ import { ROLE_SCOPES } from '@/capabilities/scopes';
 import type { Actor } from '@/capabilities/types';
 import { openSecret } from '@/lib/secretBox';
 import { approvalRoute } from '@/domain/routing';
+import { awayToday } from '@/domain/decisionFlow';
 import { notifyTeamsApprovers, notifyTeamsDecision } from '@/msteams/notify';
 import { installationForOrg } from './actor';
 import { slackApi } from './api';
@@ -27,19 +28,29 @@ export async function notifyApprover(db: Db, orgId: string, requestId: string, n
   const [person] = await db.select().from(members).where(and(eq(members.orgId, orgId), eq(members.id, r.memberId)));
   if (!person) return;
   // Routing (team approver → backup → manager → admins); the primary and the backup are told.
+  // Approvers who are away today are skipped: the next in line is told instead.
   const route = await approvalRoute(db, orgId, person);
-  const targets = [route.primary, route.backup].filter((m): m is typeof members.$inferSelect => !!m);
-  await notifyTeamsApprovers(db, orgId, requestId, targets, now).catch(() => undefined);
+  const away = await awayToday(db, orgId, route.deciders.map((m) => m.id), now.toISOString().slice(0, 10));
+  let targets = [route.primary, route.backup].filter((m): m is typeof members.$inferSelect => !!m && !away.has(m.id));
+  if (!targets.length) targets = route.deciders.filter((m) => !away.has(m.id)).slice(0, 1);
+  await notifyDeciders(db, orgId, requestId, targets, now);
+}
+
+/** Sends the approval card to these deciders in Teams and Slack. `lead` is a first line (reminder, escalation). */
+export async function notifyDeciders(db: Db, orgId: string, requestId: string, targets: (typeof members.$inferSelect)[], now: Date, lead?: string): Promise<number> {
+  let sent = await notifyTeamsApprovers(db, orgId, requestId, targets, now, lead).catch(() => 0);
   const inst = await installationForOrg(db, orgId);
-  if (!inst) return;
+  if (!inst) return sent;
   for (const mgr of targets) {
     if (!mgr.slackUserId) continue;
     // Exactly what the approver's web queue shows, through the same capability.
     const q = await invokeCapability('listPendingApprovals', { db, actor: asHuman(mgr), now }, {});
     const item = q.requests.find((x) => x.id === requestId);
     if (!item) continue;
-    await slackApi('chat.postMessage', inst.token, { channel: mgr.slackUserId, ...approvalMessage(item as PendingItem) });
+    await slackApi('chat.postMessage', inst.token, { channel: mgr.slackUserId, ...approvalMessage(item as PendingItem, lead) });
+    sent += 1;
   }
+  return sent;
 }
 
 export async function notifyDecision(db: Db, orgId: string, requestId: string): Promise<void> {
@@ -56,7 +67,7 @@ export async function notifyDecision(db: Db, orgId: string, requestId: string): 
   const ok = row.r.status === 'approved';
   await slackApi('chat.postMessage', inst.token, {
     channel: row.person.slackUserId,
-    text: `${ok ? ':white_check_mark:' : ':x:'} Your ${esc(row.type.name.toLowerCase())}, ${range(row.r.startDate, row.r.endDate)}, was ${ok ? 'approved' : 'declined'}.`,
+    text: `${ok ? ':white_check_mark:' : ':x:'} Your ${esc(row.type.name.toLowerCase())}, ${range(row.r.startDate, row.r.endDate)}, was ${ok ? 'approved' : 'declined'}.` + (ok ? '' : declineDetails(row.r, esc)),
   });
 }
 
@@ -91,4 +102,24 @@ export async function syncSlackStatuses(db: Db, orgId: string, now: Date): Promi
     }
   }
   return set;
+}
+
+export const DECLINE_REASON_TEXT: Record<string, string> = {
+  coverage: 'not enough cover on those days',
+  notice: 'not enough notice',
+  peak_period: 'a busy period',
+  other: 'see the note',
+};
+
+/** Reason, the engine's other dates and how to ask for a review, for a decline message. */
+export function declineDetails(r: typeof leaveRequests.$inferSelect, escape: (s: string) => string): string {
+  const snap = (r.decisionSnapshot ?? {}) as { declineAlternatives?: { start: string; end: string }[]; reversed?: boolean };
+  if (snap.reversed) return '';
+  const parts: string[] = [];
+  if (r.declineReason) parts.push(` Reason: ${DECLINE_REASON_TEXT[r.declineReason] ?? r.declineReason}.`);
+  if (r.decisionNote) parts.push(` Note: "${escape(r.decisionNote)}".`);
+  const alts = snap.declineAlternatives ?? [];
+  if (alts.length) parts.push(` Dates that work: ${alts.map((a) => range(a.start, a.end)).join(', ')}.`);
+  parts.push(' You can ask for a review in Days Off, under My requests.');
+  return parts.join('');
 }

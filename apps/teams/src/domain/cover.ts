@@ -13,7 +13,7 @@ import {
   type WorkedShift,
 } from '@daysoff/engine/coverage/index';
 import type { Db } from '@/db/client';
-import { coverEvents, coverOffers, coverRequests, leaveRequests, locations, memberCoverPrefs, members, organizations, rooms, shiftExceptions, shiftTemplates } from '@/db/schema';
+import { coverEvents, coverOffers, coverRequests, leaveRequests, locations, memberCoverPrefs, members, organizations, rooms, shiftExceptions, shiftTemplates, AWAY_STATUSES } from '@/db/schema';
 import { CapabilityError } from '@/capabilities/errors';
 import { credentialFacts, getLocation, packsOn, sitePacks, type GapWindow } from './coverage';
 import { holidayMap } from './holidays';
@@ -153,7 +153,7 @@ export async function rankForTarget(db: Db, orgId: string, t: CoverTarget, now: 
           and(
             eq(leaveRequests.orgId, orgId),
             inArray(leaveRequests.memberId, ids),
-            inArray(leaveRequests.status, ['pending', 'approved']),
+            inArray(leaveRequests.status, [...AWAY_STATUSES]),
             lte(leaveRequests.startDate, addDays(t.date, 1)),
             gte(leaveRequests.endDate, addDays(t.date, -1)),
           ),

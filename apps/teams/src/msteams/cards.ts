@@ -1,5 +1,5 @@
 import type { PendingItem, Evaluation, Fields } from '@/slack/format';
-import { amount, day, range } from '@/slack/format';
+import { amount, checkLines, day, range, RECOMMENDATION_TEXT } from '@/slack/format';
 import type { OutActivity } from './api';
 
 /*
@@ -28,15 +28,30 @@ function card(body: unknown[], actions: unknown[] = []): OutActivity {
 const tb = (t: string, extra: Record<string, unknown> = {}) => ({ type: 'TextBlock', text: t, wrap: true, ...extra });
 
 /** The approver's card: the same impact facts as the web queue, then Approve / Decline. */
-export function approvalCard(r: PendingItem): OutActivity {
+export function approvalCard(r: PendingItem, lead?: string): OutActivity {
   const i = r.impact;
-  const lines = [tb(`**${nm(r.member.name)}** asks for **${md(r.leaveType)}**, ${range(r.start, r.end)}${PART[r.part] ?? ''} · ${amount(r.deducts, i.unit)}`)];
+  const lines: Record<string, unknown>[] = [tb(`**${nm(r.member.name)}** asks for **${md(r.leaveType)}**, ${range(r.start, r.end)}${PART[r.part] ?? ''} · ${amount(r.deducts, i.unit)}`)];
+  if (lead) lines.unshift(tb(md(lead), { isSubtle: true }));
+  if (r.decision?.recommendation) lines.push(tb(`**${RECOMMENDATION_TEXT[r.decision.recommendation]}**${r.decision.wouldAutoApprove ? ' (meets the auto-approval rules)' : ''}`));
   if (i.balanceAfter != null) lines.push(tb(`Balance after: ${amount(i.balanceAfter, i.unit)}${i.yearEndForfeit ? ` · would still lose ${amount(i.yearEndForfeit, i.unit)} at year end` : ''}`));
   const tight = i.coverage.filter((c) => c.present < c.required);
   lines.push(tb(tight.length ? `⚠️ Coverage short on ${tight.map((c) => `${day(c.date)} (${c.present}/${c.required}${c.tag ? ` ${md(c.tag)}` : ''})`).join(', ')}` : 'Coverage: fine on every day'));
   if (i.overlapping.length) lines.push(tb(`Also out: ${i.overlapping.map((o) => `${nm(o.member)} (${range(o.start, o.end)}${o.status === 'pending' ? ', pending' : ''})`).join(', ')}`));
+  for (const c of checkLines(r)) lines.push(tb(md(c)));
   if (r.retroactive) lines.push(tb('This is for past dates.'));
   if (r.note) lines.push(tb(`Note: "${nm(r.note)}"`, { isSubtle: true }));
+  lines.push({
+    type: 'Input.ChoiceSet',
+    id: 'reason',
+    label: 'If you decline, why?',
+    // No default: a decline reason is the approver's own choice, never pre-filled.
+    placeholder: 'Pick a reason before declining',
+    choices: [
+      { title: 'Not enough cover', value: 'coverage' },
+      { title: 'Not enough notice', value: 'notice' },
+      { title: 'Busy period', value: 'peak_period' },
+    ],
+  });
   return card(lines, [
     { type: 'Action.Submit', title: 'Approve', style: 'positive', data: { daysoff: 'approve', requestId: r.id } },
     { type: 'Action.Submit', title: 'Decline', style: 'destructive', data: { daysoff: 'decline', requestId: r.id } },

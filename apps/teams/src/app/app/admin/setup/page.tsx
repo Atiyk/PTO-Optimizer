@@ -6,6 +6,17 @@ import { AUTONOMY_LABELS, type AutonomyLevel } from '@/domain/autonomy';
 import { describePolicy } from '@/domain/describePolicy';
 import { call, requireActor } from '@/server/page';
 
+const PROTECTED_OPTIONS = [
+  { value: 'none', label: 'Not protected' },
+  { value: 'fmla_possible', label: 'Possible FMLA (US)' },
+  { value: 'parental', label: 'Parental' },
+  { value: 'jury', label: 'Jury duty' },
+  { value: 'military', label: 'Military' },
+  { value: 'bereavement', label: 'Bereavement' },
+  { value: 'voting', label: 'Voting' },
+  { value: 'other_statutory', label: 'Other statutory leave' },
+];
+
 export default async function Setup() {
   const actor = await requireActor();
   const s = await call('getOrgSetup', {}, actor);
@@ -37,6 +48,7 @@ export default async function Setup() {
                 <Badge>{t.countsAgainstBalance ? 'uses balance' : 'no balance'}</Badge>
                 <Badge>{t.requiresApproval ? 'needs approval' : 'no approval'}</Badge>
                 {t.isHealthRelated && <Badge tone="warn">health: no notes</Badge>}
+                {t.protectedCategory !== 'none' && <Badge tone="warn">protected: recorded and sent to HR</Badge>}
                 {t.autoApprove && <Badge tone="accent">auto-approve{t.maxAutoApproveDays != null ? ` ≤ ${t.maxAutoApproveDays}` : ''}</Badge>}
               </li>
             ))}
@@ -53,6 +65,12 @@ export default async function Setup() {
               { name: 'isHealthRelated', label: 'Health-related (no notes stored)', type: 'checkbox' },
               { name: 'autoApprove', label: 'Can be auto-approved (see Auto-approval)', type: 'checkbox' },
               { name: 'maxAutoApproveDays', label: 'Auto-approve up to (days or hours)', type: 'number', step: '0.5', placeholder: '2' },
+              {
+                name: 'protectedCategory',
+                label: 'Protected by law (recorded, never approved or declined by rules)',
+                type: 'select',
+                options: PROTECTED_OPTIONS,
+              },
             ]}
             submitLabel="Add or update leave type"
           />

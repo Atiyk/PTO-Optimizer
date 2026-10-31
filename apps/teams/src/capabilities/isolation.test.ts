@@ -34,6 +34,9 @@ let bRuleId: string;
 let bEventId: string;
 let bChangeId: string;
 let aGroupId: string;
+let bPolicyId: string;
+let bTaskId: string;
+let bWindowId: string;
 const B_TENANT = '11111111-2222-3333-4444-555555555555';
 
 beforeAll(async () => {
@@ -72,6 +75,11 @@ beforeAll(async () => {
   bChangeId = (await run(db, humanActor(B.emp), 'requestProfileChange', { op: 'create', field: 'name', value: 'B new name' })).id;
   await run(db, bo, 'manageMsTeams', { op: 'link', tenantId: B_TENANT });
   aGroupId = (await run(db, humanActor(A.owner), 'manageOrgSetup', { op: 'addGroup', name: 'A group' })).id!;
+  bPolicyId = (await run(db, bo, 'manageOrgSetup', { op: 'setApprovalPolicy', name: 'B auto', mode: 'auto', teamIds: [B.team.id] })).id!;
+  bWindowId = (await run(db, bo, 'manageOrgSetup', { op: 'addPolicyRule', kind: 'request_window', name: 'B holidays', start: '2026-12-21', end: '2026-12-31', collectUntil: '2026-11-15', slots: 1 })).id!;
+  await run(db, bo, 'manageOrgSetup', { op: 'upsertLeaveType', key: 'jury', name: 'Jury duty', countsAgainstBalance: false, protectedCategory: 'jury' });
+  await run(db, humanActor(B.emp2), 'submitLeaveRequest', { leaveType: 'jury', start: '2026-11-24', end: '2026-11-24', idempotencyKey: 'b-jury-0001' });
+  bTaskId = (await run(db, bo, 'listHrTasks', {})).tasks[0]!.id;
   bHoursBatch = (await run(db, bo, 'importHoursWorked', { stage: 'commit', rows: [{ member: B.emp.id, periodStart: '2026-10-01', periodEnd: '2026-10-07', hours: 40 }] })).batchId!;
 });
 
@@ -167,6 +175,15 @@ const attacks = (): [CapabilityName, unknown][] => [
   ['requestProfileChange', { op: 'create', field: 'location', value: B.location.id, effectiveFrom: '2026-12-01' }],
   ['decideProfileChange', { changeId: bChangeId, decision: 'approve' }],
   ['manageMsTeams', { op: 'link', tenantId: B_TENANT }],
+  ['manageOrgSetup', { op: 'setApprovalPolicy', policyId: bPolicyId, name: 'pwned', mode: 'off' }],
+  ['manageOrgSetup', { op: 'setApprovalPolicy', name: 'x', mode: 'auto', teamIds: [B.team.id] }],
+  ['manageOrgSetup', { op: 'removeApprovalPolicy', policyId: bPolicyId }],
+  ['getShadowReplay', { policyId: bPolicyId }],
+  ['getShadowReplay', { draft: { teamIds: [B.team.id] } }],
+  ['completeHrTask', { taskId: bTaskId }],
+  ['confirmRequestWindow', { ruleId: bWindowId }],
+  ['approveAllClean', { requestIds: [B.requestId] }],
+  ['requestReview', { requestId: B.requestId }],
 ];
 
 describe('tenant isolation (A6)', () => {
@@ -226,6 +243,9 @@ describe('tenant isolation (A6)', () => {
     expect(setup.groups.map((g) => g.id)).not.toContain(bGroupId);
     expect(setup.policyRules.map((r) => r.id)).not.toContain(bRuleId);
     expect(setup.teams.map((t) => t.id)).not.toContain(B.team.id);
+    expect(setup.approvalPolicies.map((p) => p.id)).not.toContain(bPolicyId);
+    expect((await run(db, owner, 'listHrTasks', { includeDone: true })).tasks.map((t) => t.id)).not.toContain(bTaskId);
+    expect((await run(db, owner, 'getRequestWindows', {})).windows.map((w) => w.ruleId)).not.toContain(bWindowId);
     const audit = await run(db, owner, 'getAuditLog', { limit: 500 });
     expect(JSON.stringify(audit)).not.toContain('Globex');
   });
