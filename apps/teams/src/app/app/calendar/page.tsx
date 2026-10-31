@@ -22,12 +22,26 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     call('whoIsOut', { from, to, teamId, includePending: true }, actor),
     call('listHolidays', { from, to }, actor),
   ]);
+  const { events } = await call('getTeamEvents', { from, to }, actor);
   const days = rangeISO(from, to);
   const qs = (o: Record<string, string | undefined>) =>
     '?' + new URLSearchParams(Object.entries({ team: teamId, range, from, ...o }).filter((e): e is [string, string] => !!e[1])).toString();
 
   return (
     <div className="space-y-4">
+      {events.length > 0 && (
+        <Card title={`Team events (${events.length})`}>
+          <ul className="space-y-1 text-sm text-ink">
+            {events.map((e) => (
+              <li key={e.id}>
+                <span className="tabular-nums">{formatRange(e.date, e.date)}</span>{e.start ? `, ${e.start}–${e.end}` : ''}: {e.title.untrusted_text}
+                {e.includesMe && <> <Badge tone="accent">You</Badge></>} <span className="text-muted">· {e.expected - e.away} of {e.expected} can make it</span>
+              </li>
+            ))}
+          </ul>
+          <Link href="/app/events" className="mt-2 inline-block text-sm font-medium text-accent underline-offset-2 hover:underline">All events</Link>
+        </Card>
+      )}
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Link className="rounded border border-line bg-page px-2 py-1" href={qs({ from: addDays(from, -RANGES[range]) })} aria-label="Earlier">←</Link>
         <span className="font-medium text-ink">{formatRange(from, to)}</span>

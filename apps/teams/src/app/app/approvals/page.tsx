@@ -1,5 +1,6 @@
 import { ActionButton } from '@/components/ActionButton';
 import { DecideButtons } from '@/components/DecideButtons';
+import { ProfileChangeQueue } from '@/components/ProfileChanges';
 import { Badge, Card, fmt, formatRange } from '@/components/ui';
 import { call, requireActor } from '@/server/page';
 
@@ -7,6 +8,7 @@ export default async function Approvals() {
   const actor = await requireActor();
   if (actor.role === 'employee') return <p className="text-sm text-muted">Approvals are for managers and admins.</p>;
   const { requests, recentAutoApprovals } = await call('listPendingApprovals', {}, actor);
+  const { toDecide } = await call('getProfileChanges', {}, actor);
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold text-ink">Waiting for you ({requests.length})</h1>
@@ -69,6 +71,9 @@ export default async function Approvals() {
           </div>
         </Card>
       ))}
+      <Card title={`Record changes (${toDecide.length})`}>
+        <ProfileChangeQueue changes={toDecide} />
+      </Card>
       {recentAutoApprovals.length > 0 && (
         <Card title={`Auto-approved, can still be undone (${recentAutoApprovals.length})`}>
           <ul className="space-y-2 text-sm">

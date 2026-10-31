@@ -57,6 +57,13 @@
       "when": 1793468488449,
       "tag": "0007_time_clock",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793473709425,
+      "tag": "0008_approvals_automations",
+      "breakpoints": true
     }
   ]
 }

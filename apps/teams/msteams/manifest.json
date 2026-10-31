@@ -1,0 +1,39 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.30/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.30",
+  "version": "1.0.0",
+  "id": "MSTEAMS_APP_ID",
+  "developer": {
+    "name": "Days Off",
+    "websiteUrl": "https://APP_DOMAIN",
+    "privacyUrl": "https://PRIVACY_URL",
+    "termsOfUseUrl": "https://TERMS_URL"
+  },
+  "name": { "short": "Days Off", "full": "Days Off: leave requests and approvals" },
+  "description": {
+    "short": "Ask for time off, check balances and approve leave in Teams.",
+    "full": "Ask for time off in plain words, check your balances, and approve or decline your team's leave requests with one click. Requests go to the approver set for each team in Days Off."
+  },
+  "icons": { "color": "color.png", "outline": "outline.png" },
+  "accentColor": "#1F5AA6",
+  "bots": [
+    {
+      "botId": "MSTEAMS_APP_ID",
+      "scopes": ["personal"],
+      "supportsFiles": false,
+      "isNotificationOnly": false,
+      "commandLists": [
+        {
+          "scopes": ["personal"],
+          "commands": [
+            { "title": "balance", "description": "Show my leave balances" },
+            { "title": "who", "description": "Who is away today" },
+            { "title": "help", "description": "What I can do" }
+          ]
+        }
+      ]
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": ["APP_DOMAIN"]
+}

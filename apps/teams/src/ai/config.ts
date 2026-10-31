@@ -3,7 +3,7 @@
  * eval is the default; override per task with AI_MODEL_<TASK> (e.g. AI_MODEL_IMPORT_HANDBOOK).
  * Model IDs verified against Anthropic's model list on 2026-10-30.
  */
-export const AI_TASKS = ['parseLeaveRequest', 'importHandbook', 'explainBalance', 'summarizePlan', 'rulePackFromText', 'explainCoverage', 'parseCoverText'] as const;
+export const AI_TASKS = ['parseLeaveRequest', 'importHandbook', 'explainBalance', 'summarizePlan', 'rulePackFromText', 'explainCoverage', 'parseCoverText', 'absenceReport', 'answerPolicyQuestion'] as const;
 export type AiTaskName = (typeof AI_TASKS)[number];
 
 interface TaskConfig {
@@ -28,6 +28,10 @@ const DEFAULTS: Record<AiTaskName, TaskConfig> = {
   explainCoverage: { model: 'claude-haiku-5-5', maxTokens: 350, maxInputChars: 8_000, effort: 'low' },
   // "can't make it tomorrow" / "need someone in toddlers 3:30-4:30 Monday": short extraction, Haiku.
   parseCoverText: { model: 'claude-haiku-5-5', maxTokens: 300, maxInputChars: 1_500, effort: 'low' },
+  // Absence report narrative: the latest Opus, by product decision (reports run rarely, budgets apply).
+  absenceReport: { model: 'claude-opus-5-5', maxTokens: 2_000, maxInputChars: 20_000, effort: 'medium' },
+  // A policy question answered from the engine's policy summary and balance facts: Haiku.
+  answerPolicyQuestion: { model: 'claude-haiku-5-5', maxTokens: 400, maxInputChars: 6_000, effort: 'low' },
 };
 
 const ENV_KEY: Record<AiTaskName, string> = {
@@ -38,6 +42,8 @@ const ENV_KEY: Record<AiTaskName, string> = {
   rulePackFromText: 'AI_MODEL_RULE_PACK_FROM_TEXT',
   explainCoverage: 'AI_MODEL_EXPLAIN_COVERAGE',
   parseCoverText: 'AI_MODEL_PARSE_COVER_TEXT',
+  absenceReport: 'AI_MODEL_ABSENCE_REPORT',
+  answerPolicyQuestion: 'AI_MODEL_ANSWER_POLICY_QUESTION',
 };
 
 export function taskConfig(task: AiTaskName): TaskConfig {

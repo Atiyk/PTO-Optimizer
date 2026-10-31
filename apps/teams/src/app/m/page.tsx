@@ -22,12 +22,18 @@ export default async function StaffToday() {
   const { myOffers } = await call('getCoverRequests', {}, actor);
   const clock = org.timeClockEnabled ? await call('getMyTimeClock', {}, actor) : null;
   const open = myOffers.filter((o) => o.requestStatus === 'open' && !o.response).length;
+  const toApprove = actor.role !== 'employee' ? (await call('listPendingApprovals', {}, actor)).requests.length + (await call('getProfileChanges', {}, actor)).toDecide.length : 0;
   const working = shifts.filter((s) => !s.onLeave);
   const next = working[0] ?? null;
   const later = shifts.filter((s) => s !== next);
 
   return (
     <Shell title="Today" org={org.name} active="/m" badge={open}>
+      {toApprove > 0 && (
+        <Link href="/m/approvals" className="block rounded-xl border-2 border-accent bg-page p-4 text-base font-semibold text-accent">
+          {toApprove === 1 ? 'One request is waiting for your approval' : `${toApprove} requests are waiting for your approval`} →
+        </Link>
+      )}
       {open > 0 && (
         <Link href="/m/offers" className="block rounded-xl border-2 border-accent bg-accent p-4 text-base font-semibold text-white">
           {open === 1 ? 'One cover offer is waiting for you' : `${open} cover offers are waiting for you`} →

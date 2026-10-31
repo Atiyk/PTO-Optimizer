@@ -20,6 +20,8 @@ export type Field =
       emptyLabel?: string;
     }
   | { name: string; label: string; type: 'checkbox'; defaultValue?: boolean }
+  /** Checkboxes sent as an array of the checked values (empty = none chosen). */
+  | { name: string; label: string; type: 'multiselect'; options: { value: string; label: string }[]; hint?: string; defaultValues?: string[] }
   | { name: string; label: string; type: 'tags'; placeholder?: string };
 
 /**
@@ -55,6 +57,7 @@ export function CapabilityForm({
     for (const f of fields) {
       const raw = fd.get(f.name);
       if (f.type === 'checkbox') payload[f.name] = raw === 'on';
+      else if (f.type === 'multiselect') payload[f.name] = fd.getAll(f.name).map(String);
       else if (f.type === 'number') payload[f.name] = raw === '' || raw == null ? undefined : Number(raw);
       else if (f.type === 'tags') payload[f.name] = String(raw ?? '').split(',').map((s) => s.trim()).filter(Boolean);
       else if (f.type === 'select' && raw === '__null') payload[f.name] = null;
@@ -79,8 +82,22 @@ export function CapabilityForm({
     <form onSubmit={onSubmit} className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         {fields.map((f) => (
-          <div key={f.name} className={f.type === 'checkbox' ? 'flex items-center gap-2 pt-6' : ''}>
-            {f.type === 'checkbox' ? (
+          <div key={f.name} className={f.type === 'checkbox' ? 'flex items-center gap-2 pt-6' : f.type === 'multiselect' ? 'sm:col-span-2' : ''}>
+            {f.type === 'multiselect' ? (
+              <fieldset>
+                <legend className={label}>{f.label}</legend>
+                {f.hint && <p className="text-xs text-muted">{f.hint}</p>}
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                  {f.options.map((o) => (
+                    <label key={o.value} className="flex min-h-8 items-center gap-2 text-sm text-ink">
+                      <input type="checkbox" name={f.name} value={o.value} defaultChecked={f.defaultValues?.includes(o.value)} className="h-4 w-4 accent-[var(--accent)]" />
+                      {o.label}
+                    </label>
+                  ))}
+                  {f.options.length === 0 && <span className="text-sm text-muted">None set up yet.</span>}
+                </div>
+              </fieldset>
+            ) : f.type === 'checkbox' ? (
               <>
                 <input id={`${id}-${f.name}`} name={f.name} type="checkbox" defaultChecked={f.defaultValue} className="h-4 w-4 accent-[var(--accent)]" />
                 <label className={label} htmlFor={`${id}-${f.name}`}>{f.label}</label>

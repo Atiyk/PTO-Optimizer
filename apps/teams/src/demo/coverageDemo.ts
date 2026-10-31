@@ -1,11 +1,11 @@
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, notLike, or } from 'drizzle-orm';
 import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import type { Db } from '@/db/client';
 import { coverOffers, coverRequests, leaveRequests, members, organizations } from '@/db/schema';
 import { invokeCapability, type CapabilityOutput } from '@/capabilities/registry';
 import { ROLE_SCOPES } from '@/capabilities/scopes';
 import type { Actor } from '@/capabilities/types';
-import { seedChildcareCentre } from '@/server/seedCoverage';
+import { DEMO_HISTORY_KEY, seedChildcareCentre } from '@/server/seedCoverage';
 
 /*
  * The public coverage demo: a shared sample childcare centre (made up, labelled as such). The
@@ -36,7 +36,7 @@ let pending: Promise<string> | null = null;
 
 /** The Monday the sample's story happens on: the date of its seeded approved leave. */
 async function storyMonday(db: Db, orgId: string): Promise<string | null> {
-  const [r] = await db.select({ d: leaveRequests.startDate }).from(leaveRequests).where(and(eq(leaveRequests.orgId, orgId), eq(leaveRequests.status, 'approved'))).orderBy(asc(leaveRequests.startDate)).limit(1);
+  const [r] = await db.select({ d: leaveRequests.startDate }).from(leaveRequests).where(and(eq(leaveRequests.orgId, orgId), eq(leaveRequests.status, 'approved'), or(isNull(leaveRequests.idempotencyKey), notLike(leaveRequests.idempotencyKey, `${DEMO_HISTORY_KEY}%`)))).orderBy(asc(leaveRequests.startDate)).limit(1);
   return r?.d ?? null;
 }
 
@@ -47,7 +47,7 @@ async function centreId(db: Db, today: string): Promise<string> {
     if (monday && monday > today) return o.id;
   }
   pending ??= (async () => {
-    const { org } = await seedChildcareCentre(db, today, { orgName: DEMO_CENTRE });
+    const { org } = await seedChildcareCentre(db, today, { orgName: DEMO_CENTRE, history: true });
     await db.update(organizations).set({ isDemo: true, agentAccessEnabled: false }).where(eq(organizations.id, org.id));
     // Older samples are stale (their Monday has passed): remove them.
     const old = orgs.map((o) => o.id).filter((id) => id !== org.id);

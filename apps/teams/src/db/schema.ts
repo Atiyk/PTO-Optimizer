@@ -35,6 +35,8 @@ export const REQUEST_STATUSES = ['draft', 'pending', 'approved', 'declined', 'ca
 /** Industry presets (labels and suggested packs). `general` = MVP behaviour, unchanged. */
 export const VERTICALS = ['general', 'childcare', 'clinic', 'healthcare', 'retail', 'hospitality', 'security', 'manufacturing'] as const;
 export const OVERTIME_POLICIES = ['allow', 'avoid', 'exclude'] as const;
+/** Plan tiers. No billing: a flag an operator sets (see the setup steps). */
+export const PLANS = ['starter', 'complete'] as const;
 export const LEDGER_KINDS = ['accrual', 'usage', 'adjustment', 'carryover', 'forfeiture', 'import'] as const;
 
 export const organizations = pgTable('organizations', {
@@ -65,6 +67,8 @@ export const organizations = pgTable('organizations', {
   timeClockEnabled: boolean('time_clock_enabled').notNull().default(false),
   /** Cover ranking: `avoid` = people the cover would push into overtime rank last. */
   overtimePolicy: text('overtime_policy', { enum: OVERTIME_POLICIES }).notNull().default('avoid'),
+  /** `complete` unlocks configurable accrual schedules (non-monthly pay-period accrual). */
+  plan: text('plan', { enum: PLANS }).notNull().default('starter'),
   createdAt: createdAt(),
 });
 
@@ -104,6 +108,9 @@ export const teams = pgTable(
     orgId: orgRef(),
     name: text('name').notNull(),
     parentTeamId: uuid('parent_team_id'),
+    /** Approval routing: this person decides the team's requests, then the backup. */
+    approverMemberId: uuid('approver_member_id'),
+    backupApproverMemberId: uuid('backup_approver_member_id'),
     createdAt: createdAt(),
   },
   (t) => [index('teams_org_idx').on(t.orgId)],
@@ -309,6 +316,10 @@ export const blackouts = pgTable(
     reason: text('reason').notNull(),
     /** hard = blocks the request; soft = warns. */
     hard: boolean('hard').notNull().default(false),
+    /** Scope (empty = all): leave type keys, locations, groups. `team_id` stays the team scope. */
+    leaveTypeKeys: text('leave_type_keys').array().notNull().default(sql`'{}'::text[]`),
+    locationIds: uuid('location_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    groupIds: uuid('group_ids').array().notNull().default(sql`'{}'::uuid[]`),
     createdAt: createdAt(),
   },
   (t) => [index('blackouts_org_idx').on(t.orgId)],
@@ -1015,4 +1026,131 @@ export const timesheetApprovals = pgTable(
     supersededAt: timestamp('superseded_at', { withTimezone: true }),
   },
   (t) => [index('ts_appr_org_week_idx').on(t.orgId, t.weekStart), index('ts_appr_org_member_idx').on(t.orgId, t.memberId)],
+);
+
+// ── Approvals everywhere, groups, policy automations, events (0008) ─────────────
+
+/** Groups: many-to-many, no cap. Used for reports and policy-rule scopes. */
+export const groups = pgTable(
+  'groups',
+  {
+    id: id(),
+    orgId: orgRef(),
+    name: text('name').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('groups_org_name_idx').on(t.orgId, t.name)],
+);
+
+export const groupMembers = pgTable(
+  'group_members',
+  {
+    id: id(),
+    orgId: orgRef(),
+    groupId: uuid('group_id')
+      .notNull()
+      .references(() => groups.id, { onDelete: 'cascade' }),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+  },
+  (t) => [uniqueIndex('group_members_idx').on(t.groupId, t.memberId), index('group_members_org_member_idx').on(t.orgId, t.memberId)],
+);
+
+export const POLICY_RULE_KINDS = ['probation', 'max_out'] as const;
+
+/**
+ * Policy automations beyond blackouts: probation (`params.minDays`) and "at most N away"
+ * (`params.maxOut`). Scope arrays: empty = all. Evaluated by packages/engine/src/leave/rules.
+ */
+export const policyRules = pgTable(
+  'policy_rules',
+  {
+    id: id(),
+    orgId: orgRef(),
+    kind: text('kind', { enum: POLICY_RULE_KINDS }).notNull(),
+    name: text('name').notNull(),
+    leaveTypeKeys: text('leave_type_keys').array().notNull().default(sql`'{}'::text[]`),
+    locationIds: uuid('location_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    teamIds: uuid('team_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    groupIds: uuid('group_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    params: jsonb('params').notNull(),
+    hard: boolean('hard').notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [index('policy_rules_org_idx').on(t.orgId)],
+);
+
+/** Team events (meetings, offsites). Attendees = the teams/groups/location named, or everyone. */
+export const teamEvents = pgTable(
+  'team_events',
+  {
+    id: id(),
+    orgId: orgRef(),
+    title: text('title').notNull(),
+    date: date('date').notNull(),
+    startMinute: smallint('start_minute'),
+    endMinute: smallint('end_minute'),
+    locationId: uuid('location_id').references(() => locations.id, { onDelete: 'set null' }),
+    teamIds: uuid('team_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    groupIds: uuid('group_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    createdByMemberId: uuid('created_by_member_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('team_events_org_date_idx').on(t.orgId, t.date)],
+);
+
+export const PROFILE_FIELDS = ['name', 'email', 'location'] as const;
+
+/** An employee's proposed change to their own record; applied only when a manager or admin approves. */
+export const profileChangeRequests = pgTable(
+  'profile_change_requests',
+  {
+    id: id(),
+    orgId: orgRef(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    field: text('field', { enum: PROFILE_FIELDS }).notNull(),
+    oldValue: text('old_value'),
+    newValue: text('new_value').notNull(),
+    /** For `location`: the date the move takes effect (location history keeps the old site before). */
+    effectiveFrom: date('effective_from'),
+    status: text('status', { enum: ['pending', 'approved', 'declined', 'cancelled'] }).notNull().default('pending'),
+    decidedByMemberId: uuid('decided_by_member_id'),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('profile_changes_org_status_idx').on(t.orgId, t.status)],
+);
+
+/** Microsoft Teams: which Microsoft 365 tenant belongs to which org (linked by an admin). */
+export const msteamsTenants = pgTable(
+  'msteams_tenants',
+  {
+    id: id(),
+    orgId: orgRef(),
+    tenantId: text('tenant_id').notNull(),
+    linkedByMemberId: uuid('linked_by_member_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('msteams_tenants_org_idx').on(t.orgId), uniqueIndex('msteams_tenants_tenant_idx').on(t.tenantId)],
+);
+
+/** A member's Teams identity and the 1:1 conversation reference used for approval cards. */
+export const msteamsUsers = pgTable(
+  'msteams_users',
+  {
+    id: id(),
+    orgId: orgRef(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    aadObjectId: text('aad_object_id').notNull(),
+    teamsUserId: text('teams_user_id').notNull(),
+    serviceUrl: text('service_url').notNull(),
+    conversationId: text('conversation_id').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('msteams_users_member_idx').on(t.orgId, t.memberId), uniqueIndex('msteams_users_aad_idx').on(t.aadObjectId)],
 );

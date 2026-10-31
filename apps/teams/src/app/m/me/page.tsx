@@ -2,6 +2,8 @@ import { CoverPrefs } from '@/components/mobile/CoverPrefs';
 import { AddPasskey } from '@/components/mobile/Passkeys';
 import { PushToggle } from '@/components/mobile/PushToggle';
 import { Shell } from '@/components/mobile/Shell';
+import { AskPolicy } from '@/components/AskPolicy';
+import { UpdateMyDetails } from '@/components/ProfileChanges';
 import { getOrg } from '@/domain/leave';
 import { getDb } from '@/db/client';
 import { call, requireActor } from '@/server/page';
@@ -14,7 +16,10 @@ export default async function StaffMe() {
   const actor = await requireActor('/m/signin');
   const org = await getOrg(await getDb(), actor.orgId);
   const prefs = await call('setMyCoverPrefs', {}, actor);
-  const { records } = await call('getCredentials', {}, actor).catch(() => ({ records: [] as never[] }));
+  // Managers and admins get everyone's records from getCredentials; this page is only about you.
+  const records = (await call('getCredentials', {}, actor).catch(() => ({ records: [] as never[] }))).records.filter((r) => r.memberId === actor.memberId);
+  const { mine } = await call('getProfileChanges', {}, actor);
+  const { locations } = await call('getOrgSetup', {}, actor);
 
   return (
     <Shell title="Me" org={org.name} active="/m/me">
@@ -23,6 +28,18 @@ export default async function StaffMe() {
           Sign-in
         </h2>
         <AddPasskey count={prefs.passkeyCount} />
+      </section>
+      <section aria-labelledby="ask" className="space-y-2 rounded-lg border border-line bg-page p-4">
+        <h2 id="ask" className="text-base font-semibold text-ink">
+          Ask about my policy
+        </h2>
+        <AskPolicy compact />
+      </section>
+      <section aria-labelledby="details" className="space-y-2 rounded-lg border border-line bg-page p-4">
+        <h2 id="details" className="text-base font-semibold text-ink">
+          Update my details
+        </h2>
+        <UpdateMyDetails mine={mine} locations={locations} />
       </section>
       <section aria-labelledby="notify" className="space-y-2 rounded-lg border border-line bg-page p-4">
         <h2 id="notify" className="text-base font-semibold text-ink">

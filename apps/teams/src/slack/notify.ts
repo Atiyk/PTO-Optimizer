@@ -1,10 +1,12 @@
-import { and, eq, isNull, lte, gte } from 'drizzle-orm';
+import { and, eq, lte, gte } from 'drizzle-orm';
 import type { Db } from '@/db/client';
 import { leaveRequests, leaveTypes, members, slackStatusGrants } from '@/db/schema';
 import { invokeCapability } from '@/capabilities/registry';
 import { ROLE_SCOPES } from '@/capabilities/scopes';
 import type { Actor } from '@/capabilities/types';
 import { openSecret } from '@/lib/secretBox';
+import { approvalRoute } from '@/domain/routing';
+import { notifyTeamsApprovers, notifyTeamsDecision } from '@/msteams/notify';
 import { installationForOrg } from './actor';
 import { slackApi } from './api';
 import { approvalMessage, day, esc, range, type PendingItem } from './format';
@@ -20,22 +22,28 @@ const asHuman = (m: typeof members.$inferSelect): Actor => ({
 });
 
 export async function notifyApprover(db: Db, orgId: string, requestId: string, now: Date): Promise<void> {
-  const inst = await installationForOrg(db, orgId);
-  if (!inst) return;
   const [r] = await db.select().from(leaveRequests).where(and(eq(leaveRequests.orgId, orgId), eq(leaveRequests.id, requestId)));
   if (!r || r.status !== 'pending') return;
   const [person] = await db.select().from(members).where(and(eq(members.orgId, orgId), eq(members.id, r.memberId)));
-  if (!person?.managerId) return;
-  const [mgr] = await db.select().from(members).where(and(eq(members.orgId, orgId), eq(members.id, person.managerId), isNull(members.deletedAt)));
-  if (!mgr?.slackUserId) return;
-  // Exactly what the manager's web queue shows, through the same capability.
-  const q = await invokeCapability('listPendingApprovals', { db, actor: asHuman(mgr), now }, {});
-  const item = q.requests.find((x) => x.id === requestId);
-  if (!item) return;
-  await slackApi('chat.postMessage', inst.token, { channel: mgr.slackUserId, ...approvalMessage(item as PendingItem) });
+  if (!person) return;
+  // Routing (team approver → backup → manager → admins); the primary and the backup are told.
+  const route = await approvalRoute(db, orgId, person);
+  const targets = [route.primary, route.backup].filter((m): m is typeof members.$inferSelect => !!m);
+  await notifyTeamsApprovers(db, orgId, requestId, targets, now).catch(() => undefined);
+  const inst = await installationForOrg(db, orgId);
+  if (!inst) return;
+  for (const mgr of targets) {
+    if (!mgr.slackUserId) continue;
+    // Exactly what the approver's web queue shows, through the same capability.
+    const q = await invokeCapability('listPendingApprovals', { db, actor: asHuman(mgr), now }, {});
+    const item = q.requests.find((x) => x.id === requestId);
+    if (!item) continue;
+    await slackApi('chat.postMessage', inst.token, { channel: mgr.slackUserId, ...approvalMessage(item as PendingItem) });
+  }
 }
 
 export async function notifyDecision(db: Db, orgId: string, requestId: string): Promise<void> {
+  await notifyTeamsDecision(db, orgId, requestId).catch(() => undefined);
   const inst = await installationForOrg(db, orgId);
   if (!inst) return;
   const [row] = await db

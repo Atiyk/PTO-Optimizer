@@ -18,7 +18,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const manager = actor.role !== 'employee';
   const regulated = org.vertical !== 'general';
   const groups: NavGroup[] = [
-    { title: 'You', links: [['/app', 'My leave'], ...(regulated ? ([['/app/sick', 'Sick leave']] as [string, string][]) : []), ['/app/calendar', 'Calendar']] },
+    { title: 'You', links: [['/app', 'My leave'], ...(regulated ? ([['/app/sick', 'Sick leave']] as [string, string][]) : []), ['/app/calendar', 'Calendar'], ['/app/events', 'Events']] },
   ];
   if (org.timeClockEnabled && !manager) groups[0]!.links.push(['/app/time', 'My hours']);
   if (manager || regulated) {
@@ -26,7 +26,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     if (manager) team.push(['/app/compliance', 'Compliance inbox']);
     if (regulated) team.push(['/app/coverage', 'Coverage']);
     if (manager && org.timeClockEnabled) team.push(['/app/time', 'Timesheets']);
-    if (manager) team.push(['/app/approvals', 'Approvals'], ['/app/planner', 'Planner']);
+    if (manager) team.push(['/app/approvals', 'Approvals'], ['/app/reports', 'Reports'], ['/app/planner', 'Planner']);
     groups.push({ title: 'Team', links: team });
   }
   const settings: [string, string][] = [['/app/agents', 'My agents']];

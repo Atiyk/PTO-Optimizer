@@ -2,6 +2,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '@/db/client';
 import { members } from '@/db/schema';
 import { getMember, type MemberRow } from '@/domain/leave';
+import { isTeamApprover } from '@/domain/routing';
 import { CapabilityError } from './errors';
 import type { Actor } from './types';
 
@@ -25,12 +26,16 @@ export async function subjectMember(db: Db, actor: Actor): Promise<MemberRow> {
 
 export const isAdmin = (actor: Actor) => actor.role === 'owner' || actor.role === 'admin';
 
-/** Managers manage their direct reports and the members of their own team. */
+/**
+ * Managers manage their direct reports, the members of their own team, and any team they are the
+ * approver or backup approver for (approval routing, domain/routing.ts).
+ */
 export async function managesMember(db: Db, actor: Actor, target: MemberRow): Promise<boolean> {
   if (isAdmin(actor)) return true;
   const meId = actingMemberId(actor);
   if (actor.role !== 'manager' || !meId) return false;
   if (target.managerId === meId) return true;
+  if (await isTeamApprover(db, actor.orgId, meId, target.teamId)) return true;
   const [me] = await db
     .select({ teamId: members.teamId })
     .from(members)
