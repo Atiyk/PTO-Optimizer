@@ -7,6 +7,7 @@ import { invokeCapability, type CapabilityName } from '@/capabilities/registry';
 import { ROLE_SCOPES } from '@/capabilities/scopes';
 import type { Actor } from '@/capabilities/types';
 import { evaluateRequest, getMember } from '@/domain/leave';
+import { advanceEscalations } from '@/domain/escalation';
 import { createOrganization } from './bootstrap';
 
 /*
@@ -153,7 +154,10 @@ export async function seedChildcareCentre(db: Db, today: string, opts: { orgName
   }
   await seedPunches(db, orgId, ids, location.id, today);
   await seedAutomations(db, orgId, run, { ids, teamId: team.id, locationId: location.id, nextMonday, today });
-  if (opts.history) await seedLeaveHistory(db, orgId, ids, today);
+  if (opts.history) {
+    await seedLeaveHistory(db, orgId, ids, today);
+    await seedDecisionFlow(db, orgId, run, { ids, teamId: team.id, nextMonday, today, now });
+  }
   return { org, ownerId: owner.id, managerId: ids[1]!, staffIds: ids, locationId: location.id, rooms: room, nextMonday };
 }
 
@@ -185,6 +189,82 @@ async function seedAutomations(
   const [m] = await db.select().from(members).where(eq(members.id, c.ids[5]!));
   if (m) {
     await db.insert(profileChangeRequests).values({ orgId, memberId: m.id, field: 'email', oldValue: m.email, newValue: `${m.name.split(' ')[0]!.toLowerCase()}@sunbeam.example` });
+  }
+}
+
+/**
+ * Decision flow demo (live demo and dev login only, like the history): the classroom team on
+ * `auto` for vacation up to 3 days with a week's notice (team events tolerated), the infant room on
+ * `suggest`; one request already auto-approved and still undoable, one waiting with a "max away"
+ * warning, one escalated after three days, a possible-FMLA request recorded for HR, and a request
+ * window with 4 requests for 2 places that closed yesterday.
+ */
+async function seedDecisionFlow(
+  db: Db,
+  orgId: string,
+  run: <N extends CapabilityName>(name: N, input: unknown) => Promise<unknown>,
+  c: { ids: string[]; teamId: string; nextMonday: string; today: string; now: Date },
+) {
+  const groupsList = (await run('getOrgSetup', {})) as { groups: { id: string; name: string }[] };
+  const infants = groupsList.groups.find((g) => g.name === 'Infant room')!;
+  await run('manageOrgSetup', { op: 'setAutonomy', capability: 'decideLeaveRequest', actorClass: 'assistant', level: 3 });
+  await run('manageOrgSetup', { op: 'setApprovalPolicy', name: 'Classroom short breaks', mode: 'auto', teamIds: [c.teamId], leaveTypeKeys: ['vacation'], maxDays: 3, minNoticeDays: 7, toleratedWarnings: ['event'] });
+  await run('manageOrgSetup', { op: 'setApprovalPolicy', name: 'Infant room', mode: 'suggest', groupIds: [infants.id], leaveTypeKeys: ['vacation'], maxDays: 3, minNoticeDays: 7 });
+  await run('manageOrgSetup', {
+    op: 'upsertLeaveType',
+    key: 'family-medical',
+    name: 'Family or medical leave',
+    paid: false,
+    countsAgainstBalance: false,
+    requiresApproval: true,
+    isHealthRelated: true,
+    protectedCategory: 'fmla_possible',
+  });
+  const base = addDays(c.nextMonday, 14);
+  const as = (i: number) => {
+    const role = STAFF[i]![1];
+    const actor: Actor = { type: 'human', orgId, memberId: c.ids[i]!, role, clientId: null, onBehalfOfMemberId: null, scopes: ROLE_SCOPES[role] };
+    return <N extends CapabilityName>(name: N, input: unknown) => invokeCapability(name, { db, actor, now: c.now }, input);
+  };
+  const submit = (i: number, leaveType: string, start: string, end: string) =>
+    as(i)('submitLeaveRequest', { leaveType, start, end, idempotencyKey: `demo-flow-${i}-${start}` }).catch(() => null);
+
+  // Auto-approved two weeks ahead: still inside the undo window.
+  await submit(10, 'vacation', addDays(base, 1), addDays(base, 2));
+  // Two infant-room teachers already off on Thursday; a third asks: waits with a "max away" warning.
+  const [vac] = (await db.select().from(leaveTypes).where(eq(leaveTypes.orgId, orgId))).filter((t) => t.key === 'vacation');
+  const thu = addDays(base, 3);
+  for (const i of [2, 3]) {
+    const member = await getMember(db, orgId, c.ids[i]!);
+    const ev = await evaluateRequest(db, orgId, member, { leaveTypeKey: 'vacation', start: thu, end: thu, part: 'full' }, c.today);
+    await db.insert(leaveRequests).values({ orgId, memberId: member.id, leaveTypeId: vac!.id, status: 'approved', startDate: thu, endDate: thu, decidedByMemberId: c.ids[1]!, decidedAt: c.now, engineSnapshot: { amount: ev.cost.amount, unit: ev.unit, chargedDates: ev.cost.chargedDates, excluded: ev.cost.excluded } });
+  }
+  await submit(4, 'vacation', thu, thu);
+  // Four days (over the auto limit) asked three days ago and not decided: escalated to the backup.
+  const late = (await submit(15, 'vacation', addDays(base, 14), addDays(base, 17))) as { request: { id: string } } | null;
+  if (late) await db.update(leaveRequests).set({ createdAt: new Date(c.now.getTime() - 3 * 86_400_000) }).where(eq(leaveRequests.id, late.request.id));
+  await advanceEscalations(db, orgId, c.now);
+  // Possible FMLA: recorded, never decided by rules; HR gets the notice task (5 business days).
+  await submit(5, 'family-medical', base, addDays(base, 4));
+  // A contested week: requests collected until yesterday, 2 places, 4 asked.
+  const ws = addDays(base, 7);
+  await run('manageOrgSetup', { op: 'addPolicyRule', kind: 'request_window', name: 'Holiday week', start: ws, end: addDays(ws, 4), collectUntil: addDays(c.today, -1), slots: 2, tieBreak: 'rotation', teamIds: [c.teamId], leaveTypeKeys: ['vacation'] });
+  for (const [n, i] of [13, 12, 11, 14].entries()) {
+    const member = await getMember(db, orgId, c.ids[i]!);
+    const start = addDays(ws, 1);
+    const end = addDays(ws, 2);
+    const ev = await evaluateRequest(db, orgId, member, { leaveTypeKey: 'vacation', start, end, part: 'full' }, c.today);
+    await db.insert(leaveRequests).values({
+      orgId,
+      memberId: member.id,
+      leaveTypeId: vac!.id,
+      status: 'pending',
+      startDate: start,
+      endDate: end,
+      createdAt: new Date(c.now.getTime() - (20 - n * 3) * 3_600_000),
+      lastRemindedAt: c.now,
+      engineSnapshot: { amount: ev.cost.amount, unit: ev.unit, chargedDates: ev.cost.chargedDates, excluded: ev.cost.excluded },
+    });
   }
 }
 

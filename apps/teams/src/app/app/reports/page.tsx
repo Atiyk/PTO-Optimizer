@@ -123,6 +123,14 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
               )}
             </Card>
           </div>
+          <Card title="Decision flow">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Stat label="Approved by rules" value={String(r.automation.autoApproved)} hint={r.automation.autoRatePct == null ? undefined : `${r.automation.autoRatePct}% of decisions`} />
+              <Stat label="Reversed in the undo window" value={String(r.automation.reversed)} hint="High means the rules are too loose" />
+              <Stat label="Escalated" value={String(r.automation.escalated)} hint={r.automation.medianDaysToDecideByPerson == null ? undefined : `People take a median of ${days(r.automation.medianDaysToDecideByPerson)}`} />
+              <Stat label="HR tasks on time" value={`${r.automation.hrTasks.onTime} of ${r.automation.hrTasks.due}`} hint={r.automation.hrTasks.overdue ? `${r.automation.hrTasks.overdue} overdue` : undefined} />
+            </div>
+          </Card>
           <p className="text-xs text-muted">Sick and other health-related leave is shown as one bucket and never per person.</p>
         </>
       )}

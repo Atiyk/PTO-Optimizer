@@ -44,6 +44,14 @@ const workWeek = z.string().regex(/^[01]{7}$/).describe('7 chars, Monday first: 
 
 // ── Org setup ────────────────────────────────────────────────────────────────
 
+/** The form's shorthand for notice tiers: a base notice and an optional longer one for long requests. */
+function noticeTiers(i: { noticeDays?: number; longRequestDays?: number; longNoticeDays?: number }) {
+  const tiers: { minDays: number; noticeDays: number }[] = [];
+  if (i.noticeDays != null) tiers.push({ minDays: 1, noticeDays: i.noticeDays });
+  if (i.longRequestDays != null && i.longNoticeDays != null) tiers.push({ minDays: i.longRequestDays, noticeDays: i.longNoticeDays });
+  return tiers;
+}
+
 const setupOp = z.discriminatedUnion('op', [
   z.object({ op: z.literal('updateSettings'), name: z.string().min(1).max(120).optional(), visibility: z.enum(['org', 'team', 'custom']).optional(), showLeaveType: z.boolean().optional(), sickNotesEnabled: z.boolean().optional(), weekStart: z.union([z.literal(0), z.literal(1)]).optional() }),
   z.object({ op: z.literal('addLocation'), name: z.string().min(1).max(120), countryCode: z.string().regex(/^[A-Z]{2}$/), subdivisionCode: z.string().max(10).nullable().optional(), timezone: z.string().max(64).optional() }),
@@ -99,6 +107,9 @@ const setupOp = z.discriminatedUnion('op', [
       .max(10)
       .optional()
       .describe('min_notice: requests of at least minDays working days need noticeDays days of notice.'),
+    noticeDays: z.number().int().min(0).max(365).optional().describe('min_notice shorthand (when tiers is omitted): every request needs this many days of notice.'),
+    longRequestDays: z.number().int().min(2).max(365).optional().describe('min_notice shorthand: requests of at least this many working days need longNoticeDays.'),
+    longNoticeDays: z.number().int().min(0).max(365).optional(),
     maxDays: z.number().int().min(1).max(365).optional().describe('max_consecutive: most working days in one request.'),
     start: z.iso.date().optional().describe('request_window: first day of the contested period.'),
     end: z.iso.date().optional().describe('request_window: last day.'),
@@ -288,13 +299,14 @@ export const manageOrgSetup = defineCapability({
             : input.kind === 'max_out'
               ? { maxOut: input.maxOut }
               : input.kind === 'min_notice'
-                ? { tiers: input.tiers ?? [] }
+                ? { tiers: input.tiers ?? noticeTiers(input) }
                 : input.kind === 'max_consecutive'
                   ? { maxDays: input.maxDays }
                   : { start: input.start, end: input.end, collectUntil: input.collectUntil, slots: input.slots, tieBreak: input.tieBreak ?? 'rotation' };
         const missing =
           (input.kind === 'probation' && input.minDays == null) ||
           (input.kind === 'max_out' && input.maxOut == null) ||
+          (input.kind === 'min_notice' && !(input.tiers ?? noticeTiers(input)).length) ||
           (input.kind === 'max_consecutive' && input.maxDays == null) ||
           (input.kind === 'request_window' && (!input.start || !input.end || !input.collectUntil || input.slots == null));
         if (missing) throw new CapabilityError('invalid_input', `A ${input.kind.replace('_', ' ')} rule is missing its numbers or dates.`);
