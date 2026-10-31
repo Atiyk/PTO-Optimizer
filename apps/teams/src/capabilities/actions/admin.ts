@@ -1,4 +1,5 @@
-import { and, asc, desc, eq, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { validateLeaveRule, type LeaveRule } from '@daysoff/engine/leave/rules';
 import { z } from 'zod';
 import {
   auditLog,
@@ -9,6 +10,8 @@ import {
   coverOffers,
   credentials,
   extraClosures,
+  groupMembers,
+  groups,
   hoursWorked,
   invites,
   leavePolicies,
@@ -21,6 +24,7 @@ import {
   memberPayRates,
   members,
   organizations,
+  policyRules,
   shiftTemplates,
   teams,
 } from '@/db/schema';
@@ -64,7 +68,35 @@ const setupOp = z.discriminatedUnion('op', [
   }),
   z.object({ op: z.literal('addCoverageRule'), teamId: z.uuid(), minPresent: z.number().int().min(1).max(500), tag: z.string().max(40).nullable().optional(), weekdays: workWeek.default('1111100') }),
   z.object({ op: z.literal('removeCoverageRule'), ruleId: z.uuid() }),
-  z.object({ op: z.literal('addBlackout'), teamId: z.uuid().nullable().optional(), start: z.iso.date(), end: z.iso.date(), reason: z.string().min(1).max(200), hard: z.boolean().default(false) }),
+  z.object({
+    op: z.literal('addBlackout'),
+    teamId: z.uuid().nullable().optional(),
+    start: z.iso.date(),
+    end: z.iso.date(),
+    reason: z.string().min(1).max(200),
+    hard: z.boolean().default(false),
+    leaveTypeKeys: z.array(z.string().max(64)).max(20).default([]).describe('Empty = every leave type.'),
+    locationIds: z.array(z.uuid()).max(50).default([]),
+    groupIds: z.array(z.uuid()).max(50).default([]),
+  }),
+  z.object({ op: z.literal('setTeamApprovers'), teamId: z.uuid(), approverMemberId: z.uuid().nullable().default(null), backupApproverMemberId: z.uuid().nullable().default(null) }),
+  z.object({
+    op: z.literal('addPolicyRule'),
+    kind: z.enum(['probation', 'max_out']),
+    name: z.string().min(1).max(120),
+    hard: z.boolean().default(true),
+    minDays: z.number().int().min(1).max(730).optional().describe('probation: days after the start date before this leave can be taken.'),
+    maxOut: z.number().int().min(1).max(1000).optional().describe('max_out: most people from the scope away on one day.'),
+    leaveTypeKeys: z.array(z.string().max(64)).max(20).default([]),
+    locationIds: z.array(z.uuid()).max(50).default([]),
+    teamIds: z.array(z.uuid()).max(50).default([]),
+    groupIds: z.array(z.uuid()).max(50).default([]),
+  }),
+  z.object({ op: z.literal('removePolicyRule'), ruleId: z.uuid() }),
+  z.object({ op: z.literal('addGroup'), name: z.string().min(1).max(80) }),
+  z.object({ op: z.literal('renameGroup'), groupId: z.uuid(), name: z.string().min(1).max(80) }),
+  z.object({ op: z.literal('removeGroup'), groupId: z.uuid() }),
+  z.object({ op: z.literal('setGroupMembers'), groupId: z.uuid(), memberIds: z.array(z.uuid()).max(5000) }),
   z.object({ op: z.literal('removeBlackout'), blackoutId: z.uuid() }),
   z.object({ op: z.literal('addClosure'), locationId: z.uuid().nullable().optional(), date: z.iso.date(), name: z.string().min(1).max(120) }),
   z.object({
@@ -79,8 +111,9 @@ const setupOp = z.discriminatedUnion('op', [
 export const manageOrgSetup = defineCapability({
   name: 'manageOrgSetup',
   description:
-    'Admin-only org configuration, one operation per call: settings, locations, teams, leave types, policies ' +
-    '(validated by the engine), coverage rules, blackouts and closures. Every change is audited.',
+    'Admin-only org configuration, one operation per call: settings, locations, teams and their approvers, ' +
+    'groups, leave types, policies (validated by the engine), coverage rules, blackouts, policy automations ' +
+    '(probation, most people away at once) and closures. Every change is audited.',
   input: setupOp,
   output: z.object({ ok: z.literal(true), id: z.string().nullable() }),
   scope: 'admin',
@@ -96,6 +129,18 @@ export const manageOrgSetup = defineCapability({
     const ensureTeam = async (teamId: string) => {
       const [t] = await db.select({ id: teams.id }).from(teams).where(and(eq(teams.orgId, orgId), eq(teams.id, teamId)));
       if (!t) throw new CapabilityError('not_found', 'Team not found.');
+    };
+    const ensureScope = async (sc: { leaveTypeKeys?: string[]; locationIds?: string[]; teamIds?: string[]; groupIds?: string[] }) => {
+      for (const k of sc.leaveTypeKeys ?? []) await getLeaveTypeByKey(db, orgId, k);
+      for (const id of sc.teamIds ?? []) await ensureTeam(id);
+      if (sc.locationIds?.length) {
+        const found = await db.select({ id: locations.id }).from(locations).where(and(eq(locations.orgId, orgId), inArray(locations.id, sc.locationIds)));
+        if (found.length !== new Set(sc.locationIds).size) throw new CapabilityError('not_found', 'Location not found.');
+      }
+      if (sc.groupIds?.length) {
+        const found = await db.select({ id: groups.id }).from(groups).where(and(eq(groups.orgId, orgId), inArray(groups.id, sc.groupIds)));
+        if (found.length !== new Set(sc.groupIds).size) throw new CapabilityError('not_found', 'Group not found.');
+      }
     };
     switch (input.op) {
       case 'updateSettings': {
@@ -129,6 +174,15 @@ export const manageOrgSetup = defineCapability({
       }
       case 'savePolicy': {
         const type = await getLeaveTypeByKey(db, orgId, input.leaveType);
+        // Plan gate: configurable accrual schedules (weekly, biweekly, semimonthly pay-period
+        // accrual) are on Complete. Health-related types are exempt: sick-leave laws require accrual.
+        const acc = input.policy.accrual as { method: string; payPeriod?: string };
+        if (acc.method === 'per_pay_period' && acc.payPeriod !== 'monthly' && !type.isHealthRelated) {
+          const [o] = await db.select({ plan: organizations.plan }).from(organizations).where(eq(organizations.id, orgId));
+          if (o?.plan !== 'complete') {
+            throw new CapabilityError('forbidden', 'Weekly, biweekly and semimonthly accrual schedules are on the Complete plan. Monthly accrual works on every plan.');
+          }
+        }
         const a = input.appliesTo as { teamIds?: string[]; locationIds?: string[] };
         for (const id of a.teamIds ?? []) await ensureTeam(id);
         for (const id of a.locationIds ?? []) {
@@ -154,8 +208,71 @@ export const manageOrgSetup = defineCapability({
       case 'addBlackout': {
         if (input.end < input.start) throw new CapabilityError('invalid_input', 'end must be on or after start.');
         if (input.teamId) await ensureTeam(input.teamId);
-        const [b] = await db.insert(blackouts).values({ orgId, teamId: input.teamId ?? null, startDate: input.start, endDate: input.end, reason: input.reason, hard: input.hard }).returning();
+        await ensureScope({ leaveTypeKeys: input.leaveTypeKeys, locationIds: input.locationIds, groupIds: input.groupIds });
+        const [b] = await db
+          .insert(blackouts)
+          .values({ orgId, teamId: input.teamId ?? null, startDate: input.start, endDate: input.end, reason: input.reason, hard: input.hard, leaveTypeKeys: input.leaveTypeKeys, locationIds: input.locationIds, groupIds: input.groupIds })
+          .returning();
         return { ok: true as const, id: b!.id };
+      }
+      case 'setTeamApprovers': {
+        await ensureTeam(input.teamId);
+        for (const id of [input.approverMemberId, input.backupApproverMemberId]) {
+          if (!id) continue;
+          const m = await getMember(db, orgId, id);
+          if (m.role === 'employee') throw new CapabilityError('invalid_input', `${m.name} is an employee. Make them a manager first, then set them as an approver.`);
+        }
+        await db
+          .update(teams)
+          .set({ approverMemberId: input.approverMemberId, backupApproverMemberId: input.backupApproverMemberId ?? null })
+          .where(and(eq(teams.orgId, orgId), eq(teams.id, input.teamId)));
+        return { ok: true as const, id: input.teamId };
+      }
+      case 'addPolicyRule': {
+        await ensureScope(input);
+        const params = input.kind === 'probation' ? { minDays: input.minDays } : { maxOut: input.maxOut };
+        const rule = { ...input, id: 'new', ...(input.kind === 'probation' ? { minDays: input.minDays ?? NaN } : { maxOut: input.maxOut ?? NaN }) } as unknown as LeaveRule;
+        const errs = validateLeaveRule(rule);
+        if (errs.length) throw new CapabilityError('invalid_input', errs.join(' '));
+        const [r] = await db
+          .insert(policyRules)
+          .values({ orgId, kind: input.kind, name: input.name, hard: input.hard, params, leaveTypeKeys: input.leaveTypeKeys, locationIds: input.locationIds, teamIds: input.teamIds, groupIds: input.groupIds })
+          .returning();
+        return { ok: true as const, id: r!.id };
+      }
+      case 'removePolicyRule': {
+        const res = await db.delete(policyRules).where(and(eq(policyRules.orgId, orgId), eq(policyRules.id, input.ruleId))).returning();
+        if (!res.length) throw new CapabilityError('not_found', 'Rule not found.');
+        return { ok: true as const, id: input.ruleId };
+      }
+      case 'addGroup': {
+        const [g] = await db.insert(groups).values({ orgId, name: input.name }).onConflictDoNothing().returning();
+        if (!g) throw new CapabilityError('conflict', 'A group with that name already exists.');
+        return { ok: true as const, id: g.id };
+      }
+      case 'renameGroup': {
+        const res = await db.update(groups).set({ name: input.name }).where(and(eq(groups.orgId, orgId), eq(groups.id, input.groupId))).returning();
+        if (!res.length) throw new CapabilityError('not_found', 'Group not found.');
+        return { ok: true as const, id: input.groupId };
+      }
+      case 'removeGroup': {
+        const res = await db.delete(groups).where(and(eq(groups.orgId, orgId), eq(groups.id, input.groupId))).returning();
+        if (!res.length) throw new CapabilityError('not_found', 'Group not found.');
+        return { ok: true as const, id: input.groupId };
+      }
+      case 'setGroupMembers': {
+        const [g] = await db.select({ id: groups.id }).from(groups).where(and(eq(groups.orgId, orgId), eq(groups.id, input.groupId)));
+        if (!g) throw new CapabilityError('not_found', 'Group not found.');
+        const ids = [...new Set(input.memberIds)];
+        if (ids.length) {
+          const found = await db.select({ id: members.id }).from(members).where(and(eq(members.orgId, orgId), inArray(members.id, ids), isNull(members.deletedAt)));
+          if (found.length !== ids.length) throw new CapabilityError('not_found', 'Member not found.');
+        }
+        await db.transaction(async (tx) => {
+          await tx.delete(groupMembers).where(and(eq(groupMembers.orgId, orgId), eq(groupMembers.groupId, input.groupId)));
+          if (ids.length) await tx.insert(groupMembers).values(ids.map((memberId) => ({ orgId, groupId: input.groupId, memberId })));
+        });
+        return { ok: true as const, id: input.groupId };
       }
       case 'removeBlackout': {
         const res = await db.delete(blackouts).where(and(eq(blackouts.orgId, orgId), eq(blackouts.id, input.blackoutId))).returning();
@@ -193,13 +310,30 @@ export const getOrgSetup = defineCapability({
   description: 'Reads the org configuration (settings, locations, teams, leave types, policies, coverage rules, blackouts) for the admin screens.',
   input: z.object({}),
   output: z.object({
-    org: z.object({ id: z.uuid(), name: z.string(), visibility: z.string(), showLeaveType: z.boolean(), sickNotesEnabled: z.boolean(), agentAccessEnabled: z.boolean() }),
+    org: z.object({ id: z.uuid(), name: z.string(), visibility: z.string(), showLeaveType: z.boolean(), sickNotesEnabled: z.boolean(), agentAccessEnabled: z.boolean(), plan: z.enum(['starter', 'complete']) }),
     locations: z.array(z.object({ id: z.uuid(), name: z.string(), countryCode: z.string(), subdivisionCode: z.string().nullable() })),
-    teams: z.array(z.object({ id: z.uuid(), name: z.string() })),
+    teams: z.array(z.object({ id: z.uuid(), name: z.string(), approverMemberId: z.uuid().nullable(), backupApproverMemberId: z.uuid().nullable() })),
+    groups: z.array(z.object({ id: z.uuid(), name: z.string(), memberIds: z.array(z.uuid()) })),
+    policyRules: z.array(
+      z.object({
+        id: z.uuid(),
+        kind: z.enum(['probation', 'max_out']),
+        name: z.string(),
+        hard: z.boolean(),
+        minDays: z.number().nullable(),
+        maxOut: z.number().nullable(),
+        leaveTypeKeys: z.array(z.string()),
+        locationIds: z.array(z.uuid()),
+        teamIds: z.array(z.uuid()),
+        groupIds: z.array(z.uuid()),
+      }),
+    ),
     leaveTypes: z.array(z.object({ id: z.uuid(), key: z.string(), name: z.string(), paid: z.boolean(), countsAgainstBalance: z.boolean(), requiresApproval: z.boolean(), isHealthRelated: z.boolean(), autoApprove: z.boolean(), maxAutoApproveDays: z.number().nullable() })),
     policies: z.array(z.object({ id: z.uuid(), leaveType: z.string(), name: z.string(), effectiveFrom: z.string(), appliesTo: z.unknown(), policy: z.unknown(), citations: z.unknown() })),
     coverageRules: z.array(z.object({ id: z.uuid(), teamId: z.uuid(), minPresent: z.number(), tag: z.string().nullable(), weekdays: z.string() })),
-    blackouts: z.array(z.object({ id: z.uuid(), teamId: z.uuid().nullable(), start: z.string(), end: z.string(), reason: z.string(), hard: z.boolean() })),
+    blackouts: z.array(
+      z.object({ id: z.uuid(), teamId: z.uuid().nullable(), start: z.string(), end: z.string(), reason: z.string(), hard: z.boolean(), leaveTypeKeys: z.array(z.string()), locationIds: z.array(z.uuid()), groupIds: z.array(z.uuid()) }),
+    ),
     autoApproval: z.object({ level: z.number().int(), reversibleMinutes: z.number().int() }).describe('The approval assistant (decideLeaveRequest, assistant class).'),
   }),
   scope: 'policy:read',
@@ -215,13 +349,21 @@ export const getOrgSetup = defineCapability({
     const lt = await db.select().from(leaveTypes).where(eq(leaveTypes.orgId, orgId)).orderBy(asc(leaveTypes.createdAt));
     const key = new Map(lt.map((t) => [t.id, t.key]));
     return {
-      org: { id: org!.id, name: org!.name, visibility: org!.visibility, showLeaveType: org!.showLeaveType, sickNotesEnabled: org!.sickNotesEnabled, agentAccessEnabled: org!.agentAccessEnabled },
+      org: { id: org!.id, name: org!.name, visibility: org!.visibility, showLeaveType: org!.showLeaveType, sickNotesEnabled: org!.sickNotesEnabled, agentAccessEnabled: org!.agentAccessEnabled, plan: org!.plan },
       locations: (await db.select().from(locations).where(eq(locations.orgId, orgId)).orderBy(asc(locations.createdAt))).map((l) => ({ id: l.id, name: l.name, countryCode: l.countryCode, subdivisionCode: l.subdivisionCode })),
-      teams: (await db.select().from(teams).where(eq(teams.orgId, orgId)).orderBy(asc(teams.name))).map((t) => ({ id: t.id, name: t.name })),
+      teams: (await db.select().from(teams).where(eq(teams.orgId, orgId)).orderBy(asc(teams.name))).map((t) => ({ id: t.id, name: t.name, approverMemberId: t.approverMemberId, backupApproverMemberId: t.backupApproverMemberId })),
+      groups: await (async () => {
+        const gm = await db.select().from(groupMembers).where(eq(groupMembers.orgId, orgId));
+        return (await db.select().from(groups).where(eq(groups.orgId, orgId)).orderBy(asc(groups.name))).map((g) => ({ id: g.id, name: g.name, memberIds: gm.filter((x) => x.groupId === g.id).map((x) => x.memberId) }));
+      })(),
+      policyRules: (await db.select().from(policyRules).where(eq(policyRules.orgId, orgId)).orderBy(asc(policyRules.createdAt))).map((r) => {
+        const p = r.params as { minDays?: number; maxOut?: number };
+        return { id: r.id, kind: r.kind, name: r.name, hard: r.hard, minDays: p.minDays ?? null, maxOut: p.maxOut ?? null, leaveTypeKeys: r.leaveTypeKeys, locationIds: r.locationIds, teamIds: r.teamIds, groupIds: r.groupIds };
+      }),
       leaveTypes: lt.map((t) => ({ id: t.id, key: t.key, name: t.name, paid: t.paid, countsAgainstBalance: t.countsAgainstBalance, requiresApproval: t.requiresApproval, isHealthRelated: t.isHealthRelated, autoApprove: t.autoApprove, maxAutoApproveDays: t.maxAutoApproveDays == null ? null : Number(t.maxAutoApproveDays) })),
       policies: (await db.select().from(leavePolicies).where(eq(leavePolicies.orgId, orgId)).orderBy(asc(leavePolicies.effectiveFrom))).map((p) => ({ id: p.id, leaveType: key.get(p.leaveTypeId) ?? '?', name: p.name, effectiveFrom: p.effectiveFrom, appliesTo: p.appliesTo, policy: p.policy, citations: p.citations })),
       coverageRules: (await db.select().from(coverageRules).where(eq(coverageRules.orgId, orgId))).map((r) => ({ id: r.id, teamId: r.teamId, minPresent: r.minPresent, tag: r.tag, weekdays: r.weekdays })),
-      blackouts: (await db.select().from(blackouts).where(eq(blackouts.orgId, orgId)).orderBy(asc(blackouts.startDate))).map((b) => ({ id: b.id, teamId: b.teamId, start: b.startDate, end: b.endDate, reason: b.reason, hard: b.hard })),
+      blackouts: (await db.select().from(blackouts).where(eq(blackouts.orgId, orgId)).orderBy(asc(blackouts.startDate))).map((b) => ({ id: b.id, teamId: b.teamId, start: b.startDate, end: b.endDate, reason: b.reason, hard: b.hard, leaveTypeKeys: b.leaveTypeKeys, locationIds: b.locationIds, groupIds: b.groupIds })),
       autoApproval: { level: await autonomyFor(db, orgId, 'decideLeaveRequest', 'assistant'), reversibleMinutes: org!.autoApprovalReversibleMinutes },
     };
   },

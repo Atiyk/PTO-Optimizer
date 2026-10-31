@@ -18,6 +18,7 @@ import { clockPunch, getComplianceTasks, getMyTimeClock, getTimesheets, getWorkR
 import { decideLeaveRequest, listPendingApprovals } from './actions/approvals';
 import { explainBalance, getMyBalance } from './actions/balance';
 import { listHolidays, whoIsOut } from './actions/calendar';
+import { askPolicyQuestion, decideProfileChange, explainAbsenceReport, getAbsenceReport, getMsTeamsConnection, getProfileChanges, getTeamEvents, manageMsTeams, manageTeamEvents, requestProfileChange } from './actions/workspace';
 import { cancelLeaveRequest, draftLeaveRequest, listMyRequests, submitLeaveRequest } from './actions/requests';
 import { CapabilityError } from './errors';
 import type { Actor, CapabilityContext, CapabilityDef } from './types';
@@ -27,6 +28,16 @@ import type { Actor, CapabilityContext, CapabilityDef } from './types';
  * the in-app assistant). No surface touches the DB for business actions directly.
  */
 export const CAPABILITIES = {
+  getAbsenceReport,
+  explainAbsenceReport,
+  askPolicyQuestion,
+  getTeamEvents,
+  manageTeamEvents,
+  requestProfileChange,
+  getProfileChanges,
+  decideProfileChange,
+  getMsTeamsConnection,
+  manageMsTeams,
   getMyBalance,
   explainBalance,
   draftLeaveRequest,

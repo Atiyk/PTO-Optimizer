@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '@/db/client';
-import { apiTokens, blackouts, coverageRules, drafts, invites, leaveRequests, leaveTypes, members, oauthClients, teams, webhookDeliveries, webhookEndpoints, rooms, siteRulePacks, demandTemplates, shiftTemplates, shiftExceptions, memberCredentials, hoursWorked, coverRequests, coverOffers, coverEvents } from '@/db/schema';
+import { apiTokens, blackouts, coverageRules, drafts, invites, leaveRequests, leaveTypes, members, oauthClients, teams, webhookDeliveries, webhookEndpoints, rooms, siteRulePacks, demandTemplates, shiftTemplates, shiftExceptions, memberCredentials, hoursWorked, coverRequests, coverOffers, coverEvents, groups, groupMembers, policyRules, teamEvents, profileChangeRequests, msteamsTenants } from '@/db/schema';
 import { invokeCapability, type CapabilityName } from '@/capabilities/registry';
 import { ROLE_SCOPES } from '@/capabilities/scopes';
 import type { Actor } from '@/capabilities/types';
@@ -61,5 +61,11 @@ export async function snapshotOrg(db: Db, orgId: string) {
     coverRequests: await db.select().from(coverRequests).where(eq(coverRequests.orgId, orgId)),
     coverOffers: await db.select().from(coverOffers).where(eq(coverOffers.orgId, orgId)),
     coverEvents: await db.select().from(coverEvents).where(eq(coverEvents.orgId, orgId)),
+    groups: await db.select().from(groups).where(eq(groups.orgId, orgId)),
+    groupMembers: await db.select().from(groupMembers).where(eq(groupMembers.orgId, orgId)),
+    policyRules: await db.select().from(policyRules).where(eq(policyRules.orgId, orgId)),
+    teamEvents: await db.select().from(teamEvents).where(eq(teamEvents.orgId, orgId)),
+    profileChanges: await db.select().from(profileChangeRequests).where(eq(profileChangeRequests.orgId, orgId)),
+    msteamsTenants: await db.select().from(msteamsTenants).where(eq(msteamsTenants.orgId, orgId)),
   };
 }

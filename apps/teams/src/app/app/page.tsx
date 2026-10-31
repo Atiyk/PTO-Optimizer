@@ -1,6 +1,8 @@
 import { ActionButton } from '@/components/ActionButton';
 import { RequestForm } from '@/components/RequestForm';
 import { ExplainBalance } from '@/components/ExplainBalance';
+import { AskPolicy } from '@/components/AskPolicy';
+import { UpdateMyDetails } from '@/components/ProfileChanges';
 import { Badge, btnPrimary, btnSecondary, Card, fmt, formatRange, Stat } from '@/components/ui';
 import { call, requireActor } from '@/server/page';
 
@@ -17,6 +19,7 @@ export default async function MyLeave({ searchParams }: { searchParams: Promise<
   const { proposals } = await call('listMyProposals', {}, actor);
   const { drafts: agentDrafts } = await call('listAgentDrafts', {}, actor);
   const typeName = new Map(types.map((t) => [t.key, t.name]));
+  const { mine: myChanges } = await call('getProfileChanges', {}, actor);
 
   return (
     <div className="grid gap-4 lg:grid-cols-5">
@@ -134,6 +137,12 @@ export default async function MyLeave({ searchParams }: { searchParams: Promise<
               ))}
             </ul>
           )}
+        </Card>
+        <Card title="Ask about my policy">
+          <AskPolicy />
+        </Card>
+        <Card title="Update my details">
+          <UpdateMyDetails mine={myChanges} locations={setup.locations} />
         </Card>
       </div>
     </div>

@@ -8,7 +8,6 @@ import { requestCost, type RequestCost, type RequestPart } from '@daysoff/engine
 import type { Db } from '@/db/client';
 import {
   balanceLedger,
-  blackouts,
   coverageRules,
   hoursWorked,
   extraClosures,
@@ -20,6 +19,7 @@ import {
   organizations,
 } from '@/db/schema';
 import { CapabilityError } from '@/capabilities/errors';
+import { evaluateAutomations, eventsFor } from './automations';
 import { blockImpact, type GapWindow } from './coverage';
 import { holidayMap } from './holidays';
 import { parseWorkWeek } from './workWeek';
@@ -367,21 +367,25 @@ export async function evaluateRequest(
     }
   }
 
-  // Blackouts for the org or the member's team.
-  const bl = await db
-    .select()
-    .from(blackouts)
-    .where(
-      and(
-        eq(blackouts.orgId, orgId),
-        lte(blackouts.startDate, input.end),
-        gte(blackouts.endDate, input.start),
-        member.teamId ? or(isNull(blackouts.teamId), eq(blackouts.teamId, member.teamId)) : isNull(blackouts.teamId),
-      ),
-    );
-  for (const b of bl) {
-    if (b.hard) problems.push(`Blackout ${b.startDate} to ${b.endDate}: ${b.reason}.`);
-    else warnings.push(`Overlaps a soft blackout (${b.reason}).`);
+  // Policy automations (engine): blackouts, probation and "max away" rules, scoped by leave
+  // type, location, team and group.
+  const auto = await evaluateAutomations(
+    db,
+    orgId,
+    member,
+    { leaveTypeKey: input.leaveTypeKey, start: input.start, end: input.end, chargedDates: finalCost.chargedDates },
+    { excludeRequestId: opts.excludeRequestId },
+  );
+  const bl = auto.blackouts;
+  for (const f of [...auto.problems, ...auto.warnings]) {
+    if (f.kind === 'blackout') {
+      const b = bl.find((x) => x.id === f.ruleId)!;
+      if (f.hard) problems.push(`Blackout ${b.startDate} to ${b.endDate}: ${b.reason}.`);
+      else warnings.push(`Overlaps a soft blackout (${b.reason}).`);
+    } else (f.hard ? problems : warnings).push(f.message);
+  }
+  for (const e of await eventsFor(db, orgId, member, input.start, input.end)) {
+    warnings.push(`Overlaps a team event: ${e.title} on ${e.date}.`);
   }
 
   // Own overlapping requests.

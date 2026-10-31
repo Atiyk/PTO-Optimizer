@@ -29,6 +29,12 @@ let bHoursBatch: string;
 let bCoverId: string;
 let bOfferId: string;
 let bPunchId: string;
+let bGroupId: string;
+let bRuleId: string;
+let bEventId: string;
+let bChangeId: string;
+let aGroupId: string;
+const B_TENANT = '11111111-2222-3333-4444-555555555555';
 
 beforeAll(async () => {
   db = await freshDb();
@@ -60,6 +66,12 @@ beforeAll(async () => {
   await run(db, bo, 'manageWorkRules', { op: 'setTimeClock', enabled: true });
   await run(db, humanActor(B.emp), 'clockPunch', { op: 'in', idempotencyKey: 'b-punch-0001' });
   [{ id: bPunchId }] = (await db.select({ id: timePunches.id }).from(timePunches).where(eq(timePunches.orgId, B.org.id)).limit(1)) as [{ id: string }];
+  bGroupId = (await run(db, bo, 'manageOrgSetup', { op: 'addGroup', name: 'B group' })).id!;
+  bRuleId = (await run(db, bo, 'manageOrgSetup', { op: 'addPolicyRule', kind: 'max_out', name: 'B max', maxOut: 3 })).id!;
+  bEventId = (await run(db, bo, 'manageTeamEvents', { op: 'create', title: 'B meeting', date: '2026-11-20' })).id;
+  bChangeId = (await run(db, humanActor(B.emp), 'requestProfileChange', { op: 'create', field: 'name', value: 'B new name' })).id;
+  await run(db, bo, 'manageMsTeams', { op: 'link', tenantId: B_TENANT });
+  aGroupId = (await run(db, humanActor(A.owner), 'manageOrgSetup', { op: 'addGroup', name: 'A group' })).id!;
   bHoursBatch = (await run(db, bo, 'importHoursWorked', { stage: 'commit', rows: [{ member: B.emp.id, periodStart: '2026-10-01', periodEnd: '2026-10-07', hours: 40 }] })).batchId!;
 });
 
@@ -133,6 +145,28 @@ const attacks = (): [CapabilityName, unknown][] => [
   ['manageTimesheets', { op: 'correct', memberId: B.emp.id, voidPunchId: bPunchId, note: 'pwned' }],
   ['manageTimesheets', { op: 'correct', memberId: A.emp.id, voidPunchId: bPunchId, note: 'pwned' }],
   ['manageWorkRules', { op: 'setSiteLaborPack', locationId: B.location.id, packKey: 'labor-us-ca' }],
+  ['manageOrgSetup', { op: 'setTeamApprovers', teamId: B.team.id, approverMemberId: null }],
+  ['manageOrgSetup', { op: 'setTeamApprovers', teamId: A.team.id, approverMemberId: B.manager.id }],
+  ['manageOrgSetup', { op: 'addBlackout', start: '2026-12-01', end: '2026-12-02', reason: 'x', locationIds: [B.location.id] }],
+  ['manageOrgSetup', { op: 'addBlackout', start: '2026-12-01', end: '2026-12-02', reason: 'x', groupIds: [bGroupId] }],
+  ['manageOrgSetup', { op: 'addPolicyRule', kind: 'max_out', name: 'x', maxOut: 1, teamIds: [B.team.id] }],
+  ['manageOrgSetup', { op: 'addPolicyRule', kind: 'probation', name: 'x', minDays: 30, locationIds: [B.location.id] }],
+  ['manageOrgSetup', { op: 'removePolicyRule', ruleId: bRuleId }],
+  ['manageOrgSetup', { op: 'renameGroup', groupId: bGroupId, name: 'pwned' }],
+  ['manageOrgSetup', { op: 'removeGroup', groupId: bGroupId }],
+  ['manageOrgSetup', { op: 'setGroupMembers', groupId: bGroupId, memberIds: [] }],
+  ['manageOrgSetup', { op: 'setGroupMembers', groupId: aGroupId, memberIds: [B.emp.id] }],
+  ['getAbsenceReport', { from: '2026-11-01', to: '2026-11-30', teamId: B.team.id }],
+  ['getAbsenceReport', { from: '2026-11-01', to: '2026-11-30', groupId: bGroupId }],
+  ['explainAbsenceReport', { from: '2026-11-01', to: '2026-11-30', teamId: B.team.id }],
+  ['getTeamEvents', { from: '2026-11-01', to: '2026-11-30', suggest: { from: '2026-11-01', to: '2026-11-30', teamIds: [B.team.id] } }],
+  ['getTeamEvents', { from: '2026-11-01', to: '2026-11-30', suggest: { from: '2026-11-01', to: '2026-11-30', locationId: B.location.id } }],
+  ['manageTeamEvents', { op: 'delete', eventId: bEventId }],
+  ['manageTeamEvents', { op: 'create', title: 'x', date: '2026-11-20', groupIds: [bGroupId] }],
+  ['requestProfileChange', { op: 'cancel', changeId: bChangeId }],
+  ['requestProfileChange', { op: 'create', field: 'location', value: B.location.id, effectiveFrom: '2026-12-01' }],
+  ['decideProfileChange', { changeId: bChangeId, decision: 'approve' }],
+  ['manageMsTeams', { op: 'link', tenantId: B_TENANT }],
 ];
 
 describe('tenant isolation (A6)', () => {
@@ -182,7 +216,15 @@ describe('tenant isolation (A6)', () => {
     const exp = await run(db, owner, 'exportData', { format: 'json' });
     expect(exp.files['export.json']).not.toContain(B.emp.id);
     expect(exp.files['export.json']).not.toContain('Globex');
+    const events = await run(db, owner, 'getTeamEvents', { from: '2026-11-01', to: '2026-11-30' });
+    expect(JSON.stringify(events)).not.toContain('B meeting');
+    const changes = await run(db, owner, 'getProfileChanges', {});
+    expect(changes.toDecide.map((c) => c.id)).not.toContain(bChangeId);
+    const report = await run(db, owner, 'getAbsenceReport', { from: '2026-11-01', to: '2026-11-30' });
+    expect(report.headcount).toBe(4);
     const setup = await run(db, owner, 'getOrgSetup', {});
+    expect(setup.groups.map((g) => g.id)).not.toContain(bGroupId);
+    expect(setup.policyRules.map((r) => r.id)).not.toContain(bRuleId);
     expect(setup.teams.map((t) => t.id)).not.toContain(B.team.id);
     const audit = await run(db, owner, 'getAuditLog', { limit: 500 });
     expect(JSON.stringify(audit)).not.toContain('Globex');

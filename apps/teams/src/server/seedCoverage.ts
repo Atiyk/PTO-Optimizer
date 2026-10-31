@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import type { Db } from '@/db/client';
-import { leaveRequests, leaveTypes, locations, memberCoverPrefs, members, organizations, timePunches } from '@/db/schema';
+import { leaveRequests, leaveTypes, locations, memberCoverPrefs, members, organizations, profileChangeRequests, timePunches } from '@/db/schema';
 import { parseHhmm, zonedToUtc } from '@daysoff/engine/coverage/timeBlocks';
 import { invokeCapability, type CapabilityName } from '@/capabilities/registry';
 import { ROLE_SCOPES } from '@/capabilities/scopes';
@@ -38,7 +38,7 @@ const STAFF: [name: string, role: 'owner' | 'admin' | 'manager' | 'employee', ro
 
 const SHIFT = { early: ['07:00', '15:30'], late: ['09:30', '18:00'] } as const;
 
-export async function seedChildcareCentre(db: Db, today: string, opts: { orgName?: string } = {}) {
+export async function seedChildcareCentre(db: Db, today: string, opts: { orgName?: string; history?: boolean } = {}) {
   const { org, owner, team, location } = await createOrganization(
     db,
     { provider: 'dev', subject: `childcare-owner-${opts.orgName ?? 'sunbeam'}`, name: STAFF[0]![0], email: null, slackTeamId: null, issuedAt: 0 },
@@ -152,7 +152,88 @@ export async function seedChildcareCentre(db: Db, today: string, opts: { orgName
     });
   }
   await seedPunches(db, orgId, ids, location.id, today);
+  await seedAutomations(db, orgId, run, { ids, teamId: team.id, locationId: location.id, nextMonday, today });
+  if (opts.history) await seedLeaveHistory(db, orgId, ids, today);
   return { org, ownerId: owner.id, managerId: ids[1]!, staffIds: ids, locationId: location.id, rooms: room, nextMonday };
+}
+
+/**
+ * Approvals and policies demo: the Complete plan, the director approves the classroom team (the
+ * owner is backup), an "Infant room" group with at most 2 away at once (soft), a 90-day
+ * probation for vacation, a soft vacation-only blackout over the winter break, a staff meeting
+ * next Thursday, and one pending change to a work email.
+ */
+async function seedAutomations(
+  db: Db,
+  orgId: string,
+  run: <N extends CapabilityName>(name: N, input: unknown) => Promise<unknown>,
+  c: { ids: string[]; teamId: string; locationId: string; nextMonday: string; today: string },
+) {
+  await db.update(organizations).set({ plan: 'complete' }).where(eq(organizations.id, orgId));
+  await run('manageOrgSetup', { op: 'setTeamApprovers', teamId: c.teamId, approverMemberId: c.ids[1], backupApproverMemberId: c.ids[0] });
+  const infants = (await run('manageOrgSetup', { op: 'addGroup', name: 'Infant room' })) as { id: string };
+  await run('manageOrgSetup', { op: 'setGroupMembers', groupId: infants.id, memberIds: c.ids.filter((_, i) => STAFF[i]![2] === 'Infants') });
+  await run('manageOrgSetup', { op: 'addGroup', name: 'Floaters' }).then((g) =>
+    run('manageOrgSetup', { op: 'setGroupMembers', groupId: (g as { id: string }).id, memberIds: c.ids.filter((_, i) => STAFF[i]![2] === null && STAFF[i]![3] !== 'office') }),
+  );
+  await run('manageOrgSetup', { op: 'addPolicyRule', kind: 'max_out', name: 'Infant room cover', maxOut: 2, hard: false, groupIds: [infants.id] });
+  await run('manageOrgSetup', { op: 'addPolicyRule', kind: 'probation', name: 'New-hire probation', minDays: 90, leaveTypeKeys: ['vacation'] });
+  const y = Number(c.today.slice(0, 4));
+  await run('manageOrgSetup', { op: 'addBlackout', start: `${y}-12-22`, end: `${y + 1}-01-02`, reason: 'Winter break enrollment', hard: false, leaveTypeKeys: ['vacation'], locationIds: [c.locationId] });
+  await run('manageTeamEvents', { op: 'create', title: 'Monthly staff meeting', date: addDays(c.nextMonday, 3), start: '18:15', end: '19:15' });
+  await run('manageTeamEvents', { op: 'create', title: 'Infant room CPR refresher', date: addDays(c.nextMonday, 10), start: '13:00', end: '14:00', groupIds: [infants.id] });
+  const [m] = await db.select().from(members).where(eq(members.id, c.ids[5]!));
+  if (m) {
+    await db.insert(profileChangeRequests).values({ orgId, memberId: m.id, field: 'email', oldValue: m.email, newValue: `${m.name.split(' ')[0]!.toLowerCase()}@sunbeam.example` });
+  }
+}
+
+/** Marks seeded past leave, so the demo's "story Monday" (its first upcoming approved request) skips it. */
+export const DEMO_HISTORY_KEY = 'demo-history-';
+
+/**
+ * Leave history for the absence report (live demo and dev login only; the test seed stays as it
+ * was so coverage and forecast tests keep their numbers): about two requests a month over the last
+ * nine months, mostly vacation with some sick and personal days, decided by the director a day or
+ * two after they were asked for, and two declined. Weekdays only; nothing on or after today.
+ */
+async function seedLeaveHistory(db: Db, orgId: string, ids: string[], today: string) {
+  const types = new Map((await db.select().from(leaveTypes).where(eq(leaveTypes.orgId, orgId))).map((t) => [t.key, t]));
+  const pick: Array<[key: string, days: number, status: 'approved' | 'declined']> = [
+    ['vacation', 3, 'approved'], ['sick', 1, 'approved'], ['vacation', 5, 'approved'], ['personal', 1, 'approved'],
+    ['vacation', 2, 'declined'], ['sick', 2, 'approved'], ['vacation', 4, 'approved'], ['vacation', 1, 'approved'],
+    ['personal', 1, 'approved'], ['vacation', 3, 'approved'], ['sick', 1, 'approved'], ['vacation', 2, 'approved'],
+    ['vacation', 5, 'approved'], ['sick', 1, 'approved'], ['vacation', 2, 'declined'], ['personal', 1, 'approved'],
+    ['vacation', 3, 'approved'], ['vacation', 1, 'approved'],
+  ];
+  const rows: (typeof leaveRequests.$inferInsert)[] = [];
+  for (const [n, [key, len, status]] of pick.entries()) {
+    const t = types.get(key);
+    const memberId = ids[2 + ((n * 7) % (ids.length - 2))]!;
+    if (!t) continue;
+    let start = addDays(today, -(270 - n * 14));
+    while (mondayIndexedDow(start) > 4) start = addDays(start, 1);
+    const dates: string[] = [];
+    for (let d = start; dates.length < len; d = addDays(d, 1)) if (mondayIndexedDow(d) < 5) dates.push(d);
+    if (dates.at(-1)! >= today) continue;
+    const lead = key === 'sick' ? 0 : 5 + ((n * 3) % 20);
+    const asked = new Date(`${addDays(start, -lead)}T16:00:00Z`);
+    const ev = await evaluateRequest(db, orgId, await getMember(db, orgId, memberId), { leaveTypeKey: key, start, end: dates.at(-1)!, part: 'full' }, start);
+    rows.push({
+      orgId,
+      memberId,
+      leaveTypeId: t.id,
+      status,
+      startDate: start,
+      endDate: dates.at(-1)!,
+      createdAt: asked,
+      decidedByMemberId: ids[1]!,
+      decidedAt: new Date(asked.getTime() + (1 + (n % 2)) * 86_400_000),
+      idempotencyKey: `${DEMO_HISTORY_KEY}${n}`,
+      engineSnapshot: { amount: ev.cost.amount, unit: ev.unit, chargedDates: ev.cost.chargedDates, excluded: ev.cost.excluded },
+    });
+  }
+  if (rows.length) await db.insert(leaveRequests).values(rows);
 }
 
 /**

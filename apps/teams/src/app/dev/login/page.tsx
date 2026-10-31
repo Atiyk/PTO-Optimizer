@@ -45,7 +45,7 @@ async function seedChildcare() {
   'use server';
   if (!devLoginEnabled()) notFound();
   const db = await getDb();
-  const { ownerId, org } = await seedChildcareCentre(db, new Date().toISOString().slice(0, 10));
+  const { ownerId, org } = await seedChildcareCentre(db, new Date().toISOString().slice(0, 10), { history: true });
   (await cookies()).set(SESSION_COOKIE, encodeSession({ memberId: ownerId, orgId: org.id, issuedAt: Math.floor(Date.now() / 1000) }), cookieOptions(SESSION_MAX_AGE_SEC));
   redirect('/app/coverage');
 }
