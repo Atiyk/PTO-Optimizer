@@ -1,6 +1,6 @@
 import { and, eq, gte, inArray, isNull, lte, ne } from 'drizzle-orm';
 import type { Db } from '@/db/client';
-import { blackouts, groupMembers, leaveRequests, leaveTypes, members, policyRules, teamEvents } from '@/db/schema';
+import { blackouts, groupMembers, leaveRequests, leaveTypes, members, policyRules, teamEvents, AWAY_STATUSES } from '@/db/schema';
 import { evaluateLeaveRules, type LeaveRule, type OtherAbsence, type RuleResult } from '@daysoff/engine/leave/rules';
 import { rangeISO, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import type { MemberRow } from './leave';
@@ -46,11 +46,7 @@ export async function loadRules(db: Db, orgId: string, window?: { start: string;
       }),
     ),
     ...pr.map((r): LeaveRule => {
-      const scope = { leaveTypeKeys: r.leaveTypeKeys, locationIds: r.locationIds, teamIds: r.teamIds, groupIds: r.groupIds };
-      const p = r.params as { minDays?: number; maxOut?: number };
-      return r.kind === 'probation'
-        ? { ...scope, id: r.id, name: r.name, hard: r.hard, kind: 'probation', minDays: p.minDays ?? 0 }
-        : { ...scope, id: r.id, name: r.name, hard: r.hard, kind: 'max_out', maxOut: p.maxOut ?? 1 };
+      return ruleFromRow(r);
     }),
   ];
   return { rules, blackoutRows: new Map(bl.map((b) => [b.id, b])) };
@@ -66,7 +62,7 @@ export async function othersOut(db: Db, orgId: string, start: string, end: strin
     .where(
       and(
         eq(leaveRequests.orgId, orgId),
-        inArray(leaveRequests.status, ['pending', 'approved']),
+        inArray(leaveRequests.status, [...AWAY_STATUSES]),
         lte(leaveRequests.startDate, end),
         gte(leaveRequests.endDate, start),
         isNull(members.deletedAt),
@@ -91,7 +87,7 @@ export async function evaluateAutomations(
   orgId: string,
   member: MemberRow,
   req: { leaveTypeKey: string; start: string; end: string; chargedDates: string[] },
-  opts: { excludeRequestId?: string } = {},
+  opts: { excludeRequestId?: string; today?: string; exempt?: boolean } = {},
 ): Promise<AutomationResult> {
   const { rules, blackoutRows } = await loadRules(db, orgId, { start: req.start, end: req.end });
   const needsOthers = rules.some((r) => r.kind === 'max_out');
@@ -102,6 +98,8 @@ export async function evaluateAutomations(
     end: req.end,
     chargedDates: req.chargedDates,
     others: needsOthers ? await othersOut(db, orgId, req.start, req.end, opts.excludeRequestId) : [],
+    today: opts.today,
+    exempt: opts.exempt,
   });
   const hit = new Set([...res.problems, ...res.warnings].filter((f) => f.kind === 'blackout').map((f) => f.ruleId));
   return { ...res, blackouts: [...hit].map((id) => blackoutRows.get(id)!).filter(Boolean) };
@@ -120,4 +118,36 @@ export function eventIncludes(e: typeof teamEvents.$inferSelect, who: { location
   const byGroup = e.groupIds.length > 0;
   if (!byTeam && !byGroup) return true;
   return (byTeam && !!who.teamId && e.teamIds.includes(who.teamId)) || (byGroup && who.groupIds.some((g) => e.groupIds.includes(g)));
+}
+
+export type PolicyRuleRow = typeof policyRules.$inferSelect;
+export interface RuleParams {
+  minDays?: number;
+  maxOut?: number;
+  tiers?: { minDays: number; noticeDays: number }[];
+  maxDays?: number;
+  start?: string;
+  end?: string;
+  collectUntil?: string;
+  slots?: number;
+  tieBreak?: 'rotation' | 'seniority' | 'lottery';
+}
+
+/** A policy_rules row as an engine rule. */
+export function ruleFromRow(r: PolicyRuleRow): LeaveRule {
+  const scope = { leaveTypeKeys: r.leaveTypeKeys, locationIds: r.locationIds, teamIds: r.teamIds, groupIds: r.groupIds };
+  const p = r.params as RuleParams;
+  const base = { ...scope, id: r.id, name: r.name, hard: r.hard };
+  switch (r.kind) {
+    case 'probation':
+      return { ...base, kind: 'probation', minDays: p.minDays ?? 0 };
+    case 'max_out':
+      return { ...base, kind: 'max_out', maxOut: p.maxOut ?? 1 };
+    case 'min_notice':
+      return { ...base, kind: 'min_notice', tiers: p.tiers ?? [] };
+    case 'max_consecutive':
+      return { ...base, kind: 'max_consecutive', maxDays: p.maxDays ?? 365 };
+    case 'request_window':
+      return { ...base, hard: false, kind: 'request_window', start: p.start!, end: p.end!, collectUntil: p.collectUntil!, slots: p.slots ?? 1, tieBreak: p.tieBreak ?? 'rotation' };
+  }
 }

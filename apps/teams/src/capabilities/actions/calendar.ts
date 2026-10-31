@@ -76,7 +76,7 @@ export const whoIsOut = defineCapability({
       .where(
         and(
           eq(leaveRequests.orgId, actor.orgId),
-          inArray(leaveRequests.status, input.includePending ? ['approved', 'pending'] : ['approved']),
+          inArray(leaveRequests.status, input.includePending ? ['approved', 'pending', 'recorded'] : ['approved', 'recorded']),
           lte(leaveRequests.startDate, input.to),
           gte(leaveRequests.endDate, input.from),
           isNull(members.deletedAt),
@@ -98,7 +98,8 @@ export const whoIsOut = defineCapability({
         start: r.req.startDate,
         end: r.req.endDate,
         part: r.req.part,
-        status: r.req.status as 'approved' | 'pending',
+        // Protected leave shows as plain approved time off: never its category.
+        status: r.req.status === 'pending' ? 'pending' : 'approved',
         leaveType: showType ? r.type.key : null,
       });
     }

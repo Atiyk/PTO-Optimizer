@@ -15,7 +15,12 @@ export interface ReportAbsence {
   groupIds: string[];
   leaveTypeName: string;
   isHealthRelated: boolean;
-  status: 'pending' | 'approved' | 'declined' | 'cancelled';
+  /** `recorded` = protected leave (counted like approved time away). */
+  status: 'pending' | 'approved' | 'declined' | 'cancelled' | 'recorded';
+  /** Decision flow (0009): approved by the rules; undone by the approver in the undo window; escalated. */
+  autoApproved?: boolean;
+  reversed?: boolean;
+  escalated?: boolean;
   /** Working days charged (part days count as fractions in `days`). */
   chargedDates: ISODate[];
   days: number;
@@ -36,6 +41,8 @@ export interface ReportInput {
   hoursWorked?: { memberId: string; hours: number }[];
   /** People who would lose leave at year-end (from the projection). Names are untrusted text. */
   forfeitRisk?: { memberId: string; name: string; amount: number; unit: 'days' | 'hours' }[];
+  /** HR tasks due in the window (possible-FMLA notices, protected leave acknowledgements). */
+  hrTasks?: { dueAt: ISODate; doneOn: ISODate | null }[];
 }
 
 export interface Bucket {
@@ -57,6 +64,15 @@ export interface AbsenceReport {
   peakDays: { date: ISODate; away: number }[];
   approval: { decided: number; approved: number; declined: number; approvalRatePct: number | null; medianDaysToDecide: number | null };
   medianLeadDays: number | null;
+  /** How the decision flow is doing: tune the rules when reversals climb. */
+  automation: {
+    autoApproved: number;
+    autoRatePct: number | null;
+    reversed: number;
+    escalated: number;
+    medianDaysToDecideByPerson: number | null;
+    hrTasks: { due: number; onTime: number; overdue: number };
+  };
   hoursWorked: { total: number; people: number } | null;
   forfeitRisk: { memberId: string; name: string; amount: number; unit: 'days' | 'hours' }[];
 }
@@ -96,7 +112,7 @@ export function absenceReport(input: ReportInput): AbsenceReport {
   const leads: number[] = [];
 
   for (const a of input.absences) {
-    if (a.status !== 'approved' && a.status !== 'pending') continue;
+    if (a.status !== 'approved' && a.status !== 'pending' && a.status !== 'recorded') continue;
     const dates = a.chargedDates.filter(inWindow);
     if (!dates.length) continue;
     // Pro-rate the request's days to the part inside the window.
@@ -123,6 +139,14 @@ export function absenceReport(input: ReportInput): AbsenceReport {
   const decided = input.absences.filter((a) => (a.status === 'approved' || a.status === 'declined') && a.decidedOn && inWindow(a.decidedOn));
   const approvedN = decided.filter((a) => a.status === 'approved').length;
   const toDecide = decided.map((a) => Math.max(0, isoToSerial(a.decidedOn!) - isoToSerial(a.requestedOn)));
+
+  const autoN = decided.filter((a) => a.autoApproved && a.status === 'approved').length;
+  const reversedN = decided.filter((a) => a.reversed).length;
+  const escalatedN = input.absences.filter((a) => a.escalated && inWindow(a.requestedOn)).length;
+  const byPerson = decided.filter((a) => !a.autoApproved).map((a) => Math.max(0, isoToSerial(a.decidedOn!) - isoToSerial(a.requestedOn)));
+  const tasks = (input.hrTasks ?? []).filter((t) => inWindow(t.dueAt));
+  const onTime = tasks.filter((t) => t.doneOn != null && t.doneOn <= t.dueAt).length;
+  const overdue = tasks.filter((t) => (t.doneOn ?? '9999-12-31') > t.dueAt && t.dueAt <= input.to).length;
 
   const peakDays = [...perDay.entries()]
     .map(([date, s]) => ({ date, away: s.size }))
@@ -155,6 +179,14 @@ export function absenceReport(input: ReportInput): AbsenceReport {
       medianDaysToDecide: median(toDecide),
     },
     medianLeadDays: median(leads),
+    automation: {
+      autoApproved: autoN,
+      autoRatePct: decided.length ? Math.round((autoN / decided.length) * 100) : null,
+      reversed: reversedN,
+      escalated: escalatedN,
+      medianDaysToDecideByPerson: median(byPerson),
+      hrTasks: { due: tasks.length, onTime, overdue },
+    },
     hoursWorked: hw ? { total: r1(hw.reduce((s, h) => s + h.hours, 0)), people: hw.length } : null,
     forfeitRisk: (input.forfeitRisk ?? []).filter((f) => f.amount > 0).sort((a, b) => b.amount - a.amount).slice(0, 10),
   };

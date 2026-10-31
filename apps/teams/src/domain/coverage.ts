@@ -30,6 +30,7 @@ import {
   shiftExceptions,
   shiftTemplates,
   siteRulePacks,
+  AWAY_STATUSES,
 } from '@/db/schema';
 import { CapabilityError } from '@/capabilities/errors';
 
@@ -181,7 +182,7 @@ export async function siteContext(db: Db, orgId: string, locationId: string, sta
         and(
           eq(leaveRequests.orgId, orgId),
           inArray(leaveRequests.memberId, memberIds),
-          inArray(leaveRequests.status, ['pending', 'approved']),
+          inArray(leaveRequests.status, [...AWAY_STATUSES]),
           lte(leaveRequests.startDate, end),
           gte(leaveRequests.endDate, from),
           opts.excludeRequestId ? ne(leaveRequests.id, opts.excludeRequestId) : undefined,

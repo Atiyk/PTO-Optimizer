@@ -1,7 +1,9 @@
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
-import { validateLeaveRule, type LeaveRule } from '@daysoff/engine/leave/rules';
+import { CHECK_KINDS, POLICY_MODES, PROTECTED_CATEGORIES, TOLERABLE_WARNINGS } from '@daysoff/engine/leave/decision';
+import { describeRule, validateLeaveRule } from '@daysoff/engine/leave/rules';
 import { z } from 'zod';
 import {
+  approvalPolicies,
   auditLog,
   autonomySettings,
   balanceLedger,
@@ -29,6 +31,7 @@ import {
   teams,
 } from '@/db/schema';
 import { autonomyFor } from '@/domain/autonomy';
+import { ruleFromRow, type RuleParams } from '@/domain/automations';
 import { getLeaveTypeByKey, getMember, isoDate } from '@/domain/leave';
 import { policySchema } from '@/domain/policySchema';
 import { newToken } from '@/lib/tokens';
@@ -56,6 +59,10 @@ const setupOp = z.discriminatedUnion('op', [
     isHealthRelated: z.boolean().default(false),
     autoApprove: z.boolean().default(false),
     maxAutoApproveDays: z.number().min(0).max(365).nullable().optional(),
+    protectedCategory: z
+      .enum(PROTECTED_CATEGORIES)
+      .default('none')
+      .describe('Statutory-protected leave (FMLA, parental, jury, military, bereavement, voting): recorded and routed to HR, never approved or declined by rules.'),
   }),
   z.object({
     op: z.literal('savePolicy'),
@@ -82,17 +89,45 @@ const setupOp = z.discriminatedUnion('op', [
   z.object({ op: z.literal('setTeamApprovers'), teamId: z.uuid(), approverMemberId: z.uuid().nullable().default(null), backupApproverMemberId: z.uuid().nullable().default(null) }),
   z.object({
     op: z.literal('addPolicyRule'),
-    kind: z.enum(['probation', 'max_out']),
+    kind: z.enum(['probation', 'max_out', 'min_notice', 'max_consecutive', 'request_window']),
     name: z.string().min(1).max(120),
     hard: z.boolean().default(true),
     minDays: z.number().int().min(1).max(730).optional().describe('probation: days after the start date before this leave can be taken.'),
     maxOut: z.number().int().min(1).max(1000).optional().describe('max_out: most people from the scope away on one day.'),
+    tiers: z
+      .array(z.object({ minDays: z.number().int().min(1).max(365), noticeDays: z.number().int().min(0).max(365) }))
+      .max(10)
+      .optional()
+      .describe('min_notice: requests of at least minDays working days need noticeDays days of notice.'),
+    maxDays: z.number().int().min(1).max(365).optional().describe('max_consecutive: most working days in one request.'),
+    start: z.iso.date().optional().describe('request_window: first day of the contested period.'),
+    end: z.iso.date().optional().describe('request_window: last day.'),
+    collectUntil: z.iso.date().optional().describe('request_window: requests are collected until this date, then allocated.'),
+    slots: z.number().int().min(1).max(1000).optional().describe('request_window: people who can be away on each day.'),
+    tieBreak: z.enum(['rotation', 'seniority', 'lottery']).optional(),
     leaveTypeKeys: z.array(z.string().max(64)).max(20).default([]),
     locationIds: z.array(z.uuid()).max(50).default([]),
     teamIds: z.array(z.uuid()).max(50).default([]),
     groupIds: z.array(z.uuid()).max(50).default([]),
   }),
   z.object({ op: z.literal('removePolicyRule'), ruleId: z.uuid() }),
+  z.object({
+    op: z.literal('setApprovalPolicy'),
+    policyId: z.uuid().optional().describe('Omit to create.'),
+    name: z.string().min(1).max(120),
+    mode: z.enum(POLICY_MODES).describe('off: a person decides everything; shadow: record what would happen; suggest: show it and allow "approve all clean"; auto: approve clean requests.'),
+    leaveTypeKeys: z.array(z.string().max(64)).max(20).default([]),
+    locationIds: z.array(z.uuid()).max(50).default([]),
+    teamIds: z.array(z.uuid()).max(50).default([]),
+    groupIds: z.array(z.uuid()).max(50).default([]),
+    maxDays: z.number().min(0.5).max(365).nullable().default(null),
+    minNoticeDays: z.number().int().min(0).max(365).nullable().default(null),
+    toleratedWarnings: z.array(z.enum(TOLERABLE_WARNINGS)).max(TOLERABLE_WARNINGS.length).default([]),
+    reversibleMinutes: z.number().int().min(5).max(14 * 24 * 60).nullable().default(null),
+    slaHours: z.number().int().min(1).max(24 * 14).default(24),
+    escalateAfterHours: z.number().int().min(1).max(24 * 21).default(48),
+  }),
+  z.object({ op: z.literal('removeApprovalPolicy'), policyId: z.uuid() }),
   z.object({ op: z.literal('addGroup'), name: z.string().min(1).max(80) }),
   z.object({ op: z.literal('renameGroup'), groupId: z.uuid(), name: z.string().min(1).max(80) }),
   z.object({ op: z.literal('removeGroup'), groupId: z.uuid() }),
@@ -113,7 +148,8 @@ export const manageOrgSetup = defineCapability({
   description:
     'Admin-only org configuration, one operation per call: settings, locations, teams and their approvers, ' +
     'groups, leave types, policies (validated by the engine), coverage rules, blackouts, policy automations ' +
-    '(probation, most people away at once) and closures. Every change is audited.',
+    '(probation, most people away at once, notice, longest request, request windows), approval policies ' +
+    '(per team: off, shadow, suggest or auto) and closures. Every change is audited.',
   input: setupOp,
   output: z.object({ ok: z.literal(true), id: z.string().nullable() }),
   scope: 'admin',
@@ -140,6 +176,19 @@ export const manageOrgSetup = defineCapability({
       if (sc.groupIds?.length) {
         const found = await db.select({ id: groups.id }).from(groups).where(and(eq(groups.orgId, orgId), inArray(groups.id, sc.groupIds)));
         if (found.length !== new Set(sc.groupIds).size) throw new CapabilityError('not_found', 'Group not found.');
+      }
+    };
+    // Sick and other health-related leave can't be blocked by a rule (e.g. California Labor Code
+    // §246.5(c)(1): an employer "shall not deny an employee the right to use accrued sick days").
+    const refuseHardOnHealth = async (keys: string[], hard: boolean) => {
+      if (!hard || !keys.length) return;
+      const types = await db.select().from(leaveTypes).where(and(eq(leaveTypes.orgId, orgId), inArray(leaveTypes.key, keys)));
+      const bad = types.filter((t) => t.isHealthRelated || t.protectedCategory !== 'none');
+      if (bad.length) {
+        throw new CapabilityError(
+          'invalid_input',
+          `A hard rule can't apply to ${bad.map((t) => t.name).join(', ')}: health-related and protected leave can't be blocked by rules (for example California Labor Code §246.5). Make it a soft rule or remove that leave type. Not legal advice.`,
+        );
       }
     };
     switch (input.op) {
@@ -209,6 +258,7 @@ export const manageOrgSetup = defineCapability({
         if (input.end < input.start) throw new CapabilityError('invalid_input', 'end must be on or after start.');
         if (input.teamId) await ensureTeam(input.teamId);
         await ensureScope({ leaveTypeKeys: input.leaveTypeKeys, locationIds: input.locationIds, groupIds: input.groupIds });
+        await refuseHardOnHealth(input.leaveTypeKeys, input.hard);
         const [b] = await db
           .insert(blackouts)
           .values({ orgId, teamId: input.teamId ?? null, startDate: input.start, endDate: input.end, reason: input.reason, hard: input.hard, leaveTypeKeys: input.leaveTypeKeys, locationIds: input.locationIds, groupIds: input.groupIds })
@@ -230,13 +280,30 @@ export const manageOrgSetup = defineCapability({
       }
       case 'addPolicyRule': {
         await ensureScope(input);
-        const params = input.kind === 'probation' ? { minDays: input.minDays } : { maxOut: input.maxOut };
-        const rule = { ...input, id: 'new', ...(input.kind === 'probation' ? { minDays: input.minDays ?? NaN } : { maxOut: input.maxOut ?? NaN }) } as unknown as LeaveRule;
+        const hard = input.kind === 'request_window' ? false : input.hard;
+        await refuseHardOnHealth(input.leaveTypeKeys, hard);
+        const params: RuleParams =
+          input.kind === 'probation'
+            ? { minDays: input.minDays }
+            : input.kind === 'max_out'
+              ? { maxOut: input.maxOut }
+              : input.kind === 'min_notice'
+                ? { tiers: input.tiers ?? [] }
+                : input.kind === 'max_consecutive'
+                  ? { maxDays: input.maxDays }
+                  : { start: input.start, end: input.end, collectUntil: input.collectUntil, slots: input.slots, tieBreak: input.tieBreak ?? 'rotation' };
+        const missing =
+          (input.kind === 'probation' && input.minDays == null) ||
+          (input.kind === 'max_out' && input.maxOut == null) ||
+          (input.kind === 'max_consecutive' && input.maxDays == null) ||
+          (input.kind === 'request_window' && (!input.start || !input.end || !input.collectUntil || input.slots == null));
+        if (missing) throw new CapabilityError('invalid_input', `A ${input.kind.replace('_', ' ')} rule is missing its numbers or dates.`);
+        const rule = ruleFromRow({ id: 'new', orgId, kind: input.kind, name: input.name, hard, params, leaveTypeKeys: input.leaveTypeKeys, locationIds: input.locationIds, teamIds: input.teamIds, groupIds: input.groupIds, createdAt: new Date() });
         const errs = validateLeaveRule(rule);
         if (errs.length) throw new CapabilityError('invalid_input', errs.join(' '));
         const [r] = await db
           .insert(policyRules)
-          .values({ orgId, kind: input.kind, name: input.name, hard: input.hard, params, leaveTypeKeys: input.leaveTypeKeys, locationIds: input.locationIds, teamIds: input.teamIds, groupIds: input.groupIds })
+          .values({ orgId, kind: input.kind, name: input.name, hard, params, leaveTypeKeys: input.leaveTypeKeys, locationIds: input.locationIds, teamIds: input.teamIds, groupIds: input.groupIds })
           .returning();
         return { ok: true as const, id: r!.id };
       }
@@ -287,6 +354,35 @@ export const manageOrgSetup = defineCapability({
         const [c] = await db.insert(extraClosures).values({ orgId, locationId: input.locationId ?? null, date: input.date, name: input.name }).returning();
         return { ok: true as const, id: c!.id };
       }
+      case 'setApprovalPolicy': {
+        await ensureScope(input);
+        const values = {
+          name: input.name,
+          mode: input.mode,
+          leaveTypeKeys: input.leaveTypeKeys,
+          locationIds: input.locationIds,
+          teamIds: input.teamIds,
+          groupIds: input.groupIds,
+          maxDays: input.maxDays == null ? null : String(input.maxDays),
+          minNoticeDays: input.minNoticeDays,
+          toleratedWarnings: [...new Set(input.toleratedWarnings)],
+          reversibleMinutes: input.reversibleMinutes,
+          slaHours: input.slaHours,
+          escalateAfterHours: Math.max(input.escalateAfterHours, input.slaHours),
+        };
+        if (input.policyId) {
+          const res = await db.update(approvalPolicies).set(values).where(and(eq(approvalPolicies.orgId, orgId), eq(approvalPolicies.id, input.policyId))).returning();
+          if (!res.length) throw new CapabilityError('not_found', 'Approval policy not found.');
+          return { ok: true as const, id: input.policyId };
+        }
+        const [p] = await db.insert(approvalPolicies).values({ orgId, ...values }).returning();
+        return { ok: true as const, id: p!.id };
+      }
+      case 'removeApprovalPolicy': {
+        const res = await db.delete(approvalPolicies).where(and(eq(approvalPolicies.orgId, orgId), eq(approvalPolicies.id, input.policyId))).returning();
+        if (!res.length) throw new CapabilityError('not_found', 'Approval policy not found.');
+        return { ok: true as const, id: input.policyId };
+      }
       case 'setAutonomy': {
         const [row] = await db
           .insert(autonomySettings)
@@ -317,18 +413,37 @@ export const getOrgSetup = defineCapability({
     policyRules: z.array(
       z.object({
         id: z.uuid(),
-        kind: z.enum(['probation', 'max_out']),
+        kind: z.enum(['probation', 'max_out', 'min_notice', 'max_consecutive', 'request_window']),
         name: z.string(),
         hard: z.boolean(),
         minDays: z.number().nullable(),
         maxOut: z.number().nullable(),
+        params: z.record(z.string(), z.unknown()),
+        description: z.string(),
         leaveTypeKeys: z.array(z.string()),
         locationIds: z.array(z.uuid()),
         teamIds: z.array(z.uuid()),
         groupIds: z.array(z.uuid()),
       }),
     ),
-    leaveTypes: z.array(z.object({ id: z.uuid(), key: z.string(), name: z.string(), paid: z.boolean(), countsAgainstBalance: z.boolean(), requiresApproval: z.boolean(), isHealthRelated: z.boolean(), autoApprove: z.boolean(), maxAutoApproveDays: z.number().nullable() })),
+    leaveTypes: z.array(z.object({ id: z.uuid(), key: z.string(), name: z.string(), paid: z.boolean(), countsAgainstBalance: z.boolean(), requiresApproval: z.boolean(), isHealthRelated: z.boolean(), autoApprove: z.boolean(), maxAutoApproveDays: z.number().nullable(), protectedCategory: z.enum(PROTECTED_CATEGORIES) })),
+    approvalPolicies: z.array(
+      z.object({
+        id: z.uuid(),
+        name: z.string(),
+        mode: z.enum(POLICY_MODES),
+        leaveTypeKeys: z.array(z.string()),
+        locationIds: z.array(z.uuid()),
+        teamIds: z.array(z.uuid()),
+        groupIds: z.array(z.uuid()),
+        maxDays: z.number().nullable(),
+        minNoticeDays: z.number().nullable(),
+        toleratedWarnings: z.array(z.enum(CHECK_KINDS)),
+        reversibleMinutes: z.number().nullable(),
+        slaHours: z.number(),
+        escalateAfterHours: z.number(),
+      }),
+    ),
     policies: z.array(z.object({ id: z.uuid(), leaveType: z.string(), name: z.string(), effectiveFrom: z.string(), appliesTo: z.unknown(), policy: z.unknown(), citations: z.unknown() })),
     coverageRules: z.array(z.object({ id: z.uuid(), teamId: z.uuid(), minPresent: z.number(), tag: z.string().nullable(), weekdays: z.string() })),
     blackouts: z.array(
@@ -357,10 +472,40 @@ export const getOrgSetup = defineCapability({
         return (await db.select().from(groups).where(eq(groups.orgId, orgId)).orderBy(asc(groups.name))).map((g) => ({ id: g.id, name: g.name, memberIds: gm.filter((x) => x.groupId === g.id).map((x) => x.memberId) }));
       })(),
       policyRules: (await db.select().from(policyRules).where(eq(policyRules.orgId, orgId)).orderBy(asc(policyRules.createdAt))).map((r) => {
-        const p = r.params as { minDays?: number; maxOut?: number };
-        return { id: r.id, kind: r.kind, name: r.name, hard: r.hard, minDays: p.minDays ?? null, maxOut: p.maxOut ?? null, leaveTypeKeys: r.leaveTypeKeys, locationIds: r.locationIds, teamIds: r.teamIds, groupIds: r.groupIds };
+        const p = r.params as RuleParams;
+        const names = new Map(lt.map((t) => [t.key, t.name]));
+        const forTypes = (keys: string[]) => (keys.length ? ` (${keys.map((k) => names.get(k) ?? k).join(', ')})` : '');
+        return {
+          id: r.id,
+          kind: r.kind,
+          name: r.name,
+          hard: r.hard,
+          minDays: p.minDays ?? null,
+          maxOut: p.maxOut ?? null,
+          params: p as Record<string, unknown>,
+          description: describeRule(ruleFromRow(r), forTypes),
+          leaveTypeKeys: r.leaveTypeKeys,
+          locationIds: r.locationIds,
+          teamIds: r.teamIds,
+          groupIds: r.groupIds,
+        };
       }),
-      leaveTypes: lt.map((t) => ({ id: t.id, key: t.key, name: t.name, paid: t.paid, countsAgainstBalance: t.countsAgainstBalance, requiresApproval: t.requiresApproval, isHealthRelated: t.isHealthRelated, autoApprove: t.autoApprove, maxAutoApproveDays: t.maxAutoApproveDays == null ? null : Number(t.maxAutoApproveDays) })),
+      approvalPolicies: (await db.select().from(approvalPolicies).where(eq(approvalPolicies.orgId, orgId)).orderBy(asc(approvalPolicies.createdAt))).map((p) => ({
+        id: p.id,
+        name: p.name,
+        mode: p.mode,
+        leaveTypeKeys: p.leaveTypeKeys,
+        locationIds: p.locationIds,
+        teamIds: p.teamIds,
+        groupIds: p.groupIds,
+        maxDays: p.maxDays == null ? null : Number(p.maxDays),
+        minNoticeDays: p.minNoticeDays,
+        toleratedWarnings: p.toleratedWarnings as (typeof CHECK_KINDS)[number][],
+        reversibleMinutes: p.reversibleMinutes,
+        slaHours: p.slaHours,
+        escalateAfterHours: p.escalateAfterHours,
+      })),
+      leaveTypes: lt.map((t) => ({ id: t.id, key: t.key, name: t.name, paid: t.paid, countsAgainstBalance: t.countsAgainstBalance, requiresApproval: t.requiresApproval, isHealthRelated: t.isHealthRelated, autoApprove: t.autoApprove, maxAutoApproveDays: t.maxAutoApproveDays == null ? null : Number(t.maxAutoApproveDays), protectedCategory: t.protectedCategory })),
       policies: (await db.select().from(leavePolicies).where(eq(leavePolicies.orgId, orgId)).orderBy(asc(leavePolicies.effectiveFrom))).map((p) => ({ id: p.id, leaveType: key.get(p.leaveTypeId) ?? '?', name: p.name, effectiveFrom: p.effectiveFrom, appliesTo: p.appliesTo, policy: p.policy, citations: p.citations })),
       coverageRules: (await db.select().from(coverageRules).where(eq(coverageRules.orgId, orgId))).map((r) => ({ id: r.id, teamId: r.teamId, minPresent: r.minPresent, tag: r.tag, weekdays: r.weekdays })),
       blackouts: (await db.select().from(blackouts).where(eq(blackouts.orgId, orgId)).orderBy(asc(blackouts.startDate))).map((b) => ({ id: b.id, teamId: b.teamId, start: b.startDate, end: b.endDate, reason: b.reason, hard: b.hard, leaveTypeKeys: b.leaveTypeKeys, locationIds: b.locationIds, groupIds: b.groupIds })),

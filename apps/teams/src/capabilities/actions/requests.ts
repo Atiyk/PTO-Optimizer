@@ -1,7 +1,9 @@
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { auditLog, balanceLedger, leaveRequests, leaveTypes } from '@/db/schema';
-import { autoApprovalCheck, autonomyFor } from '@/domain/autonomy';
+import { addBusinessDays, CHECK_KINDS } from '@daysoff/engine/leave/decision';
+import type { Db } from '@/db/client';
+import { auditLog, balanceLedger, hrTasks, leaveRequests, leaveTypes, REQUEST_STATUSES, shadowDecisions } from '@/db/schema';
+import { buildDecisionPacket, snapshotOf, type DecisionPacket } from '@/domain/decisionFlow';
 import { evaluateRequest, getMember, getOrg, isoDate, type Evaluation } from '@/domain/leave';
 import { CapabilityError } from '../errors';
 import { isAdmin, subjectMember, untrusted } from '../helpers';
@@ -84,7 +86,74 @@ export const evaluationOutput = z.object({
   problems: z.array(z.string()).describe('Blocking. The request cannot be submitted until these are fixed.'),
   warnings: z.array(z.string()).describe('Non-blocking; shown to the approver.'),
   canSubmit: z.boolean(),
+  decision: z
+    .lazy(() => decisionOutput)
+    .optional()
+    .describe('What happens on submit, every check with a fix, and better dates when these would wait for a person.'),
 });
+
+export const checkItemOutput = z.object({
+  kind: z.enum(CHECK_KINDS),
+  status: z.enum(['pass', 'warn', 'fail']),
+  message: z.string(),
+  fix: z.string().optional(),
+});
+
+export const decisionOutput = z.object({
+  route: z.enum(['blocked', 'no_approval_needed', 'recorded_protected', 'auto_approve', 'needs_person']).describe('Never a decline: a "no" always comes from a person.'),
+  wouldAutoApprove: z.boolean(),
+  blockers: z.array(z.string()).describe('Why it would not be approved automatically.'),
+  checklist: z.array(checkItemOutput),
+  recommendation: z.enum(['approve', 'look', 'likely_decline']).nullable().describe('For the approver, from the engine; the approver decides.'),
+  reasons: z.array(z.string()),
+  outcome: z.string().describe('Plain preview of what happens on submit.'),
+  approver: z.object({ untrusted_text: z.string() }).nullable(),
+  backup: z.object({ untrusted_text: z.string() }).nullable(),
+  typicalHours: z.number().nullable().describe("Median hours to a person's decision for this team (last 90 days)."),
+  overtimeBand: z.enum(['no_overtime', 'overtime', 'no_cover']).nullable(),
+  policy: z.object({ name: z.string(), mode: z.enum(['off', 'shadow', 'suggest', 'auto']) }),
+  alternatives: z.array(
+    z.object({ start: z.string(), end: z.string(), workingDays: z.number(), daysAway: z.number(), warnings: z.number(), wouldAutoApprove: z.boolean() }),
+  ),
+});
+
+const OUTCOME: Record<z.infer<typeof decisionOutput>['route'], string> = {
+  blocked: 'Fix the items marked above to submit.',
+  no_approval_needed: 'Recorded straight away. No approval needed.',
+  recorded_protected: 'Recorded. HR will contact you about any paperwork. Your manager sees the dates only.',
+  auto_approve: 'Approved instantly when you submit.',
+  needs_person: 'Goes to your approver.',
+};
+
+export function decisionToOutput(p: DecisionPacket): z.infer<typeof decisionOutput> {
+  const d = p.decision;
+  let outcome = OUTCOME[d.route];
+  if (d.route === 'needs_person') {
+    const window = p.evaluation.findings.find((f) => f.kind === 'request_window');
+    outcome = window
+      ? 'Waits until the collection date, then places are shared out fairly.'
+      : `Goes to your approver${p.backup ? ' (or the backup)' : ''}${p.typicalHours != null ? `, usually decided within ${p.typicalHours} hour${p.typicalHours === 1 ? '' : 's'}` : ''}.`;
+  }
+  return {
+    route: d.route,
+    wouldAutoApprove: d.wouldAutoApprove,
+    blockers: d.blockers,
+    checklist: d.checklist,
+    recommendation: d.recommendation,
+    reasons: d.reasons,
+    outcome,
+    approver: p.approver ? { untrusted_text: p.approver.name } : null,
+    backup: p.backup ? { untrusted_text: p.backup.name } : null,
+    typicalHours: p.typicalHours,
+    overtimeBand: p.overtimeBand,
+    policy: { name: p.choice.policy.name, mode: p.choice.policy.mode },
+    alternatives: p.alternatives,
+  };
+}
+
+export function packetToOutput(p: DecisionPacket): z.infer<typeof evaluationOutput> {
+  return { ...evaluationToOutput(p.evaluation), decision: decisionToOutput(p) };
+}
 
 export function evaluationToOutput(e: Evaluation): z.infer<typeof evaluationOutput> {
   return {
@@ -129,8 +198,9 @@ export const draftLeaveRequest = defineCapability({
     'Checks a leave request WITHOUT submitting it: the engine computes the working days it deducts ' +
     '(holidays and weekends are never deducted), the balance before and after, the year-end outlook, ' +
     'blackouts, team coverage conflicts, staffing-ratio gaps at regulated sites (blockCoverage, with citations) ' +
-    'and overlaps with existing requests. Call it as dates change, and ' +
-    'before submitLeaveRequest. It never creates or changes anything.',
+    'and overlaps with existing requests. It also says what will happen on submit (approved instantly, ' +
+    'goes to the approver, or recorded for HR), lists every check with a fix, and suggests better dates. ' +
+    'Call it as dates change, and before submitLeaveRequest. It never creates or changes anything.',
   input: requestInput,
   output: evaluationOutput,
   scope: 'leave:request',
@@ -142,14 +212,14 @@ export const draftLeaveRequest = defineCapability({
   audit: null,
   async handler({ db, actor, now }, input) {
     const member = await subjectMember(db, actor);
-    return evaluationToOutput(await evaluateRequest(db, actor.orgId, member, toEval(input), isoDate(now)));
+    return packetToOutput(await buildDecisionPacket(db, actor.orgId, member, toEval(input), isoDate(now), { now, withAlternatives: true }));
   },
 });
 
 const requestSummary = z.object({
   id: z.uuid(),
   leaveType: z.string(),
-  status: z.enum(['draft', 'pending', 'approved', 'declined', 'cancelled']),
+  status: z.enum(REQUEST_STATUSES),
   start: z.string(),
   end: z.string(),
   part: z.enum(['full', 'am', 'pm', 'hours']),
@@ -212,32 +282,32 @@ export const submitLeaveRequest = defineCapability({
       const ev = await evaluateRequest(db, actor.orgId, member, toEval(input), today, { excludeRequestId: existing.id });
       return { request: summarize(existing, input.leaveType), evaluation: evaluationToOutput(ev) };
     }
-    const ev = await evaluateRequest(db, actor.orgId, member, toEval(input), today);
-    if (ev.problems.length) throw new CapabilityError('invalid_input', `Request not submitted: ${ev.problems.join(' ')}`, { problems: ev.problems });
-
+    // Fast check before taking the lock, so a blocked request fails without waiting.
+    const pre = await evaluateRequest(db, actor.orgId, member, toEval(input), today);
+    if (pre.problems.length) throw new CapabilityError('invalid_input', `Request not submitted: ${pre.problems.join(' ')}`, { problems: pre.problems });
     const org = await getOrg(db, actor.orgId);
-    const note = ev.leaveType.isHealthRelated && !org.sickNotesEnabled ? null : (input.note ?? null);
-    let needsApproval = ev.leaveType.requiresApproval || ev.retroactive;
-    // 3D: at L3 the approval assistant approves clean requests, reversible within the window.
-    let auto: { basis: string; reversibleUntil: Date | null } | null = null;
-    if (needsApproval) {
-      const level = await autonomyFor(db, actor.orgId, 'decideLeaveRequest', 'assistant');
-      const check = level >= 3 ? autoApprovalCheck(ev) : null;
-      if (check?.eligible) {
-        auto = { basis: check.basis, reversibleUntil: new Date(now.getTime() + org.autoApprovalReversibleMinutes * 60_000) };
-        needsApproval = false;
-      }
-    }
-    const snapshot: Snapshot = { amount: ev.cost.amount, unit: ev.unit, chargedDates: ev.cost.chargedDates, excluded: ev.cost.excluded };
 
-    const request = await db.transaction(async (tx) => {
+    const { request, packet } = await db.transaction(async (txRaw) => {
+      const tx = txRaw as unknown as Db;
+      // One submit at a time per org: "max away" and coverage limits can't be passed twice by
+      // two requests at once. The checks run again inside the lock.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${'leave-submit:' + actor.orgId}))`);
+      const packet = await buildDecisionPacket(tx, actor.orgId, member, toEval(input), today, { now, withAlternatives: false, withRouting: false });
+      const ev = packet.evaluation;
+      if (ev.problems.length) throw new CapabilityError('invalid_input', `Request not submitted: ${ev.problems.join(' ')}`, { problems: ev.problems });
+      const note = ev.leaveType.isHealthRelated && !org.sickNotesEnabled ? null : (input.note ?? null);
+      const route = packet.decision.route;
+      const auto = route === 'auto_approve' ? { basis: packet.decision.basis, reversibleUntil: new Date(now.getTime() + packet.choice.reversibleMinutes * 60_000) } : null;
+      const status = route === 'auto_approve' || route === 'no_approval_needed' ? 'approved' : route === 'recorded_protected' ? 'recorded' : 'pending';
+      const settled = status !== 'pending';
+      const snapshot: Snapshot = { amount: ev.cost.amount, unit: ev.unit, chargedDates: ev.cost.chargedDates, excluded: ev.cost.excluded };
       const [row] = await tx
         .insert(leaveRequests)
         .values({
           orgId: actor.orgId,
           memberId: member.id,
           leaveTypeId: ev.leaveType.id,
-          status: needsApproval ? 'pending' : 'approved',
+          status,
           startDate: input.start,
           endDate: input.end,
           part: input.part,
@@ -246,9 +316,10 @@ export const submitLeaveRequest = defineCapability({
           endMinute: input.part === 'hours' && input.endTime ? minuteOf(input.endTime) : null,
           note,
           engineSnapshot: snapshot,
+          decisionSnapshot: snapshotOf(packet),
           createdByActorType: actor.type,
           createdByClientId: actor.clientId,
-          decidedAt: needsApproval ? null : now,
+          decidedAt: status === 'approved' ? now : null,
           idempotencyKey: input.idempotencyKey,
           autoApproved: auto != null,
           autoApprovalReason: auto?.basis ?? null,
@@ -264,12 +335,25 @@ export const submitLeaveRequest = defineCapability({
           capability: 'decideLeaveRequest',
           effect: 'commit',
           outcome: 'ok',
-          summary: `Auto-approved ${ev.leaveType.key} request ${input.start} to ${input.end}: ${auto.basis}` +
-            (auto.reversibleUntil ? `; manager can reverse until ${auto.reversibleUntil.toISOString()}` : ''),
-          data: { requestId: row!.id },
+          summary:
+            `Auto-approved ${ev.leaveType.key} request ${input.start} to ${input.end}: ${auto.basis}` +
+            `; manager can reverse until ${auto.reversibleUntil.toISOString()}`,
+          data: { requestId: row!.id, policyId: packet.choice.policy.id, rulesHash: packet.rulesHash },
         });
       }
-      if (!needsApproval && ev.countsAgainstBalance && ev.cost.amount > 0) {
+      // Shadow mode: record what the policy would have done; the approver's decision is added later.
+      if (packet.choice.policy.mode === 'shadow' && route === 'needs_person') {
+        await tx.insert(shadowDecisions).values({ orgId: actor.orgId, requestId: row!.id, policyId: packet.choice.policy.id, wouldAutoApprove: packet.decision.wouldAutoApprove });
+      }
+      // HR tasks: protected leave to acknowledge; a possible FMLA absence whose notice is due in 5 business days.
+      const due = addBusinessDays(today, 5);
+      if (route === 'recorded_protected') {
+        await tx.insert(hrTasks).values({ orgId: actor.orgId, kind: 'protected_ack', requestId: row!.id, memberId: member.id, dueAt: due }).onConflictDoNothing();
+      }
+      if (packet.possibleFmla) {
+        await tx.insert(hrTasks).values({ orgId: actor.orgId, kind: 'fmla_notice', requestId: row!.id, memberId: member.id, dueAt: due }).onConflictDoNothing();
+      }
+      if (settled && ev.countsAgainstBalance && ev.cost.amount > 0) {
         await tx.insert(balanceLedger).values({
           orgId: actor.orgId,
           memberId: member.id,
@@ -295,12 +379,12 @@ export const submitLeaveRequest = defineCapability({
       await emitWebhook(tx as never, actor.orgId, 'leave.requested', data(false), now);
       // Auto-approval is a decision too; requests that never needed one are not.
       if (auto) await emitWebhook(tx as never, actor.orgId, 'leave.decided', data(true), now);
-      return row!;
+      return { request: row!, packet };
     });
     kickWebhooks(db, actor.orgId);
     if (request.status === 'pending') defer(() => notifyApprover(db, actor.orgId, request.id, now));
     else defer(async () => void (await syncSlackStatuses(db, actor.orgId, now)));
-    return { request: summarize(request, input.leaveType), evaluation: evaluationToOutput(ev) };
+    return { request: summarize(request, input.leaveType), evaluation: packetToOutput(packet) };
   },
 });
 

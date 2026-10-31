@@ -4,7 +4,7 @@ import { kickWebhooks } from '@/server/webhooks';
 import { z } from 'zod';
 import { addDays, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { hhmm, parseHhmm } from '@daysoff/engine/coverage/timeBlocks';
-import { balanceLedger, coverOffers as offersTable, coverRequests, leaveRequests, locations, members, rooms, shiftExceptions, shiftTemplates } from '@/db/schema';
+import { balanceLedger, coverOffers as offersTable, coverRequests, leaveRequests, locations, members, rooms, shiftExceptions, shiftTemplates, AWAY_STATUSES } from '@/db/schema';
 import { coverStatus, memberToday, rankForTarget } from '@/domain/cover';
 import { acceptOffer, advanceWaves, cancelCoverRequest, createCoverRequest, declineOffer, offersFor } from '@/domain/coverFlow';
 import { blockImpact, coverageDays, gapWindows, getLocation, siteContext, type GapWindow } from '@/domain/coverage';
@@ -422,7 +422,7 @@ export const getMySchedule = defineCapability({
     const leave = await db
       .select()
       .from(leaveRequests)
-      .where(and(eq(leaveRequests.orgId, actor.orgId), eq(leaveRequests.memberId, me), inArray(leaveRequests.status, ['approved', 'pending']), lte(leaveRequests.startDate, end), gte(leaveRequests.endDate, today)));
+      .where(and(eq(leaveRequests.orgId, actor.orgId), eq(leaveRequests.memberId, me), inArray(leaveRequests.status, [...AWAY_STATUSES]), lte(leaveRequests.startDate, end), gte(leaveRequests.endDate, today)));
     const onLeave = (d: string) => leave.some((l) => l.startDate <= d && l.endDate >= d);
     const out: { date: string; start: string; end: string; roomName: string; siteName: string; cover: boolean; onLeave: boolean }[] = [];
     for (const d of rangeISO(today, end)) {

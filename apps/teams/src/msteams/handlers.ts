@@ -77,7 +77,8 @@ async function handleSubmit(db: Db, actor: Actor, a: Activity, v: Record<string,
       return reply(a, text(r.request.status === 'approved' ? `✅ ${what}: approved.` : `📤 ${what}: sent for approval. I'll message you when it's decided.`), true);
     }
     if ((v.daysoff === 'approve' || v.daysoff === 'decline') && typeof v.requestId === 'string') {
-      const r = await runAs(db, actor, 'decideLeaveRequest', { requestId: v.requestId, decision: v.daysoff }, now);
+      const reason = v.daysoff === 'decline' && typeof v.reason === 'string' && ['coverage', 'notice', 'peak_period'].includes(v.reason) ? v.reason : undefined;
+      const r = await runAs(db, actor, 'decideLeaveRequest', { requestId: v.requestId, decision: v.daysoff, ...(reason ? { reason } : {}) }, now);
       const what = `${md(r.request.leaveType)}, ${range(r.request.start, r.request.end)}`;
       return reply(a, text(`${r.request.status === 'approved' ? '✅ Approved' : '❌ Declined'}: ${what}.`), true);
     }

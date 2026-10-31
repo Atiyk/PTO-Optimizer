@@ -17,9 +17,12 @@ import {
   locations,
   members,
   organizations,
+  AWAY_STATUSES,
 } from '@/db/schema';
 import { CapabilityError } from '@/capabilities/errors';
 import { evaluateAutomations, eventsFor } from './automations';
+import type { CheckKind, Finding } from '@daysoff/engine/leave/decision';
+import type { RuleFinding } from '@daysoff/engine/leave/rules';
 import { blockImpact, type GapWindow } from './coverage';
 import { holidayMap } from './holidays';
 import { parseWorkWeek } from './workWeek';
@@ -109,11 +112,13 @@ export async function memberHolidays(db: Db, orgId: string, member: MemberRow, s
   return map;
 }
 
-export async function ledgerFor(db: Db, orgId: string, memberId: string, leaveTypeId: string): Promise<LedgerEntryInput[]> {
-  const rows = await db
-    .select()
-    .from(balanceLedger)
-    .where(and(eq(balanceLedger.orgId, orgId), eq(balanceLedger.memberId, memberId), eq(balanceLedger.leaveTypeId, leaveTypeId)));
+export async function ledgerFor(db: Db, orgId: string, memberId: string, leaveTypeId: string, excludeRequestId?: string): Promise<LedgerEntryInput[]> {
+  const rows = (
+    await db
+      .select()
+      .from(balanceLedger)
+      .where(and(eq(balanceLedger.orgId, orgId), eq(balanceLedger.memberId, memberId), eq(balanceLedger.leaveTypeId, leaveTypeId)))
+  ).filter((r) => !excludeRequestId || r.requestId !== excludeRequestId); // re-checking a decided request: its own rows don't count
   return rows.map((r) => ({ id: r.id, kind: r.kind, amount: r.amount, effectiveDate: r.effectiveDate, eventKey: r.eventKey, reason: r.reason }));
 }
 
@@ -164,7 +169,7 @@ export async function balanceView(
   const year = planYearContaining(pol.planYear, member.startDate, asOf);
   const holidays = pol.accrual.method === 'per_hour_worked' ? await memberHolidays(db, orgId, member, year.start, year.end) : undefined;
   const ledger = [
-    ...(await ledgerFor(db, orgId, member.id, leaveType.id)),
+    ...(await ledgerFor(db, orgId, member.id, leaveType.id, opts.excludeRequestId)),
     ...(opts.includePending ? await pendingUsage(db, orgId, member.id, leaveType.id, opts.excludeRequestId) : []),
     ...extraUsage,
   ];
@@ -266,6 +271,10 @@ export interface Evaluation {
   problems: string[];
   /** Non-blocking things the approver should see. */
   warnings: string[];
+  /** The same problems and warnings, with a check kind and a fix where there is one. */
+  findings: Finding[];
+  /** Health-related or protected: no coverage, notice or blackout rule can hold it back. */
+  exempt: boolean;
 }
 
 const RETRO_LIMIT_DAYS = 30;
@@ -282,19 +291,29 @@ export async function evaluateRequest(
   const leaveType = await getLeaveTypeByKey(db, orgId, input.leaveTypeKey);
   const problems: string[] = [];
   const warnings: string[] = [];
+  const findings: Finding[] = [];
+  const fail = (kind: CheckKind, message: string, fix?: string) => {
+    problems.push(message);
+    findings.push({ kind, severity: 'fail', message, ...(fix ? { fix } : {}) });
+  };
+  const warn = (kind: CheckKind, message: string, fix?: string) => {
+    warnings.push(message);
+    findings.push({ kind, severity: 'warn', message, ...(fix ? { fix } : {}) });
+  };
+  const exempt = leaveType.isHealthRelated || leaveType.protectedCategory !== 'none';
 
   if (input.note && leaveType.isHealthRelated && !org.sickNotesEnabled) {
-    problems.push(`Notes are not stored for ${leaveType.name.toLowerCase()} requests. Remove the note.`);
+    fail('other', `Notes are not stored for ${leaveType.name.toLowerCase()} requests. Remove the note.`, 'Remove the note.');
   }
 
   const window = input.startMinute != null && input.endMinute != null ? { startMinute: input.startMinute, endMinute: input.endMinute } : null;
-  if ((input.startMinute == null) !== (input.endMinute == null)) problems.push('Give both a start and an end time.');
+  if ((input.startMinute == null) !== (input.endMinute == null)) fail('other', 'Give both a start and an end time.');
   if (window) {
-    if (input.part !== 'hours') problems.push('Start and end times are only for part-day requests in hours.');
-    else if (input.start !== input.end) problems.push('A request in hours covers one day.');
-    else if (window.endMinute <= window.startMinute) problems.push('The end time must be after the start time.');
+    if (input.part !== 'hours') fail('other', 'Start and end times are only for part-day requests in hours.');
+    else if (input.start !== input.end) fail('other', 'A request in hours covers one day.');
+    else if (window.endMinute <= window.startMinute) fail('other', 'The end time must be after the start time.');
     else if (input.hours != null && Math.abs(input.hours - (window.endMinute - window.startMinute) / 60) > 0.01) {
-      problems.push(`${input.hours} hours does not match the times given (${(window.endMinute - window.startMinute) / 60} hours).`);
+      fail('other', `${input.hours} hours does not match the times given (${(window.endMinute - window.startMinute) / 60} hours).`);
     }
   }
   if (window && input.hours == null && window.endMinute > window.startMinute) input = { ...input, hours: (window.endMinute - window.startMinute) / 60 };
@@ -305,16 +324,16 @@ export async function evaluateRequest(
     { workWeek: parseWorkWeek(member.workWeek), hoursPerDay: Number(member.hoursPerDay), holidays },
     'days',
   );
-  problems.push(...cost.problems);
+  for (const p of cost.problems) fail('other', p);
 
   const retroactive = input.start < today;
   if (retroactive && input.start < addDays(today, -RETRO_LIMIT_DAYS)) {
-    problems.push(`Requests can start at most ${RETRO_LIMIT_DAYS} days in the past. Ask an admin for an adjustment instead.`);
+    fail('retro', `Requests can start at most ${RETRO_LIMIT_DAYS} days in the past. Ask an admin for an adjustment instead.`);
   } else if (retroactive) {
-    warnings.push('Starts in the past: needs manager approval.');
+    warn('retro', 'Starts in the past: needs manager approval.');
   }
   if (cost.problems.length === 0 && cost.chargedDates.length === 0) {
-    problems.push('Those dates contain no working days, so there is nothing to request.');
+    fail('other', 'Those dates contain no working days, so there is nothing to request.', 'Pick dates that include a working day.');
   }
 
   // Balance (unit from the policy; cost recomputed in that unit).
@@ -349,12 +368,14 @@ export async function evaluateRequest(
       balanceBefore = lowestBalance(before.projection, input.start, yearEnd);
       balanceAfter = lowestBalance(after.projection, input.start, yearEnd);
       const usable = before.projection.asOf;
-      if (usable.lockedUntil) problems.push(`Leave can be used from ${usable.lockedUntil} (waiting period).`);
+      if (usable.lockedUntil) fail('waiting_period', `Leave can be used from ${usable.lockedUntil} (waiting period).`, `Start on or after ${usable.lockedUntil}.`);
       const floor = -after.projection.negativeAllowance;
       if (balanceAfter < floor) {
-        problems.push(
-          `Not enough balance: this needs ${finalCost.amount} ${unit} and leaves ${balanceAfter}` +
-            (floor < 0 ? `, below the allowed ${floor}.` : '.'),
+        const short = Math.round((floor - balanceAfter) * 100) / 100;
+        fail(
+          'balance',
+          `Not enough balance: this needs ${finalCost.amount} ${unit} and leaves ${balanceAfter}` + (floor < 0 ? `, below the allowed ${floor}.` : '.'),
+          `Your balance is short by ${short} ${short === 1 ? unit.replace(/s$/, '') : unit}: ask for less, or use unpaid leave for the rest.`,
         );
       }
       if (after.projection.yearEnd) {
@@ -374,18 +395,18 @@ export async function evaluateRequest(
     orgId,
     member,
     { leaveTypeKey: input.leaveTypeKey, start: input.start, end: input.end, chargedDates: finalCost.chargedDates },
-    { excludeRequestId: opts.excludeRequestId },
+    { excludeRequestId: opts.excludeRequestId, today, exempt },
   );
   const bl = auto.blackouts;
   for (const f of [...auto.problems, ...auto.warnings]) {
     if (f.kind === 'blackout') {
       const b = bl.find((x) => x.id === f.ruleId)!;
-      if (f.hard) problems.push(`Blackout ${b.startDate} to ${b.endDate}: ${b.reason}.`);
-      else warnings.push(`Overlaps a soft blackout (${b.reason}).`);
-    } else (f.hard ? problems : warnings).push(f.message);
+      if (f.hard) fail('blackout', `Blackout ${b.startDate} to ${b.endDate}: ${b.reason}.`, `Pick dates outside ${b.startDate} to ${b.endDate}.`);
+      else warn('blackout', `Overlaps a soft blackout (${b.reason}).`);
+    } else (f.hard ? fail : warn)(ruleCheckKind(f.kind), f.message, ruleFix(f, today));
   }
   for (const e of await eventsFor(db, orgId, member, input.start, input.end)) {
-    warnings.push(`Overlaps a team event: ${e.title} on ${e.date}.`);
+    warn('event', `Overlaps a team event: ${e.title} on ${e.date}.`);
   }
 
   // Own overlapping requests.
@@ -396,23 +417,24 @@ export async function evaluateRequest(
       and(
         eq(leaveRequests.orgId, orgId),
         eq(leaveRequests.memberId, member.id),
-        inArray(leaveRequests.status, ['pending', 'approved']),
+        inArray(leaveRequests.status, [...AWAY_STATUSES]),
         lte(leaveRequests.startDate, input.end),
         gte(leaveRequests.endDate, input.start),
         opts.excludeRequestId ? ne(leaveRequests.id, opts.excludeRequestId) : undefined,
       ),
     );
-  if (overlapsRows.length) problems.push(`Overlaps your ${overlapsRows[0]!.status} request ${overlapsRows[0]!.start} to ${overlapsRows[0]!.end}.`);
+  if (overlapsRows.length) fail('overlap', `Overlaps your ${overlapsRows[0]!.status} request ${overlapsRows[0]!.start} to ${overlapsRows[0]!.end}.`);
 
   const coverage = await coverageImpact(db, orgId, member, finalCost.chargedDates, opts.excludeRequestId);
-  for (const v of coverage) warnings.push(`On ${v.date} the team would have ${v.present} of the ${v.required} needed${v.tag ? ` (${v.tag})` : ''}.`);
+  for (const v of coverage) warn('coverage', `On ${v.date} the team would have ${v.present} of the ${v.required} needed${v.tag ? ` (${v.tag})` : ''}.`);
 
   // Regulated sites: the engine's block-level check (ratios, required roles) against the schedule.
   const blockCoverage = (
     await blockImpact(db, orgId, member.id, finalCost.chargedDates.length ? finalCost.chargedDates : [], input.part, window, { excludeRequestId: opts.excludeRequestId })
   ).filter((g) => g.kind !== 'group_size');
   for (const g of blockCoverage) {
-    warnings.push(
+    warn(
+      'regulated',
       `On ${g.date} ${g.start}–${g.end}${g.roomName ? ` in ${g.roomName}` : ''}: ${g.present} of ${g.required} required staff (${g.label}` +
         `${g.citation ? `, ${g.citation.section}` : g.needsVerification ? ', needs verification' : ''}).`,
     );
@@ -433,7 +455,26 @@ export async function evaluateRequest(
     retroactive,
     problems,
     warnings,
+    findings,
+    exempt,
   };
+}
+
+function ruleCheckKind(kind: RuleFinding['kind']): CheckKind {
+  return kind === 'probation' || kind === 'max_out' || kind === 'max_consecutive' || kind === 'request_window' || kind === 'blackout' ? kind : kind === 'min_notice' ? 'notice' : 'other';
+}
+
+/** A one-line fix for a rule finding, from the engine's facts only. */
+function ruleFix(f: RuleFinding, today: string): string | undefined {
+  if (f.kind === 'min_notice') {
+    const m = /need[s]? (\d+) days' notice/.exec(f.message);
+    return m ? `Start on or after ${addDays(today, Number(m[1]))}, or ask your approver.` : undefined;
+  }
+  if (f.kind === 'max_out') return 'Try the suggested dates below: fewer people are away then.';
+  if (f.kind === 'max_consecutive') return 'Split it into shorter requests, or ask your approver.';
+  if (f.kind === 'probation') return 'Ask from the date shown.';
+  if (f.kind === 'request_window') return 'Nothing to do: you will hear on the date shown.';
+  return undefined;
 }
 
 /** Coverage members for a team over a window, with their pending/approved leave as "out". */
@@ -460,7 +501,7 @@ export async function teamCoverageMembers(
           leaveRequests.memberId,
           team.map((m) => m.id),
         ),
-        inArray(leaveRequests.status, ['pending', 'approved']),
+        inArray(leaveRequests.status, [...AWAY_STATUSES]),
         lte(leaveRequests.startDate, end),
         gte(leaveRequests.endDate, start),
         excludeRequestId ? ne(leaveRequests.id, excludeRequestId) : undefined,

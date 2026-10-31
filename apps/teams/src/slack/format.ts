@@ -75,16 +75,42 @@ export interface PendingItem {
     coverage: { date: string; required: number; present: number; tag: string | null }[];
     overlapping: { member: { untrusted_text: string }; start: string; end: string; status: string }[];
   };
+  /** The decision packet (0009): every check, the recommendation, the policy. */
+  decision?: {
+    wouldAutoApprove: boolean;
+    checklist: { kind: string; status: 'pass' | 'warn' | 'fail'; message: string }[];
+    recommendation: 'approve' | 'look' | 'likely_decline' | null;
+    overtimeBand: 'no_overtime' | 'overtime' | 'no_cover' | null;
+    policy: { name: string; mode: string };
+  };
+  changedSinceSubmit?: string[];
+  waiting?: { hours: number; escalationLevel: number; overdue: boolean; urgent: boolean; review: boolean };
+}
+
+export const RECOMMENDATION_TEXT = { approve: 'Every check passes', look: 'Worth a look', likely_decline: 'Usually a no' } as const;
+export const OVERTIME_TEXT = { no_overtime: 'Cover likely without overtime', overtime: 'Cover would mean overtime for someone', no_cover: 'Nobody eligible to cover' } as const;
+
+/** Check lines that are not a plain pass, for the chat cards (the web shows the full list). */
+export function checkLines(r: PendingItem): string[] {
+  const d = r.decision;
+  if (!d) return [];
+  const out = d.checklist.filter((c) => c.status !== 'pass' && !['coverage'].includes(c.kind)).map((c) => `${c.status === 'fail' ? '⛔' : '⚠️'} ${c.message}`);
+  if (d.overtimeBand) out.push(`${d.overtimeBand === 'no_overtime' ? '✅' : '⚠️'} ${OVERTIME_TEXT[d.overtimeBand]}`);
+  for (const c of r.changedSinceSubmit ?? []) out.push(`↻ Changed since submitted: ${c}`);
+  return out;
 }
 
 /** The approval message: the same impact facts as the web queue, then Approve / Decline. */
-export function approvalMessage(r: PendingItem) {
+export function approvalMessage(r: PendingItem, lead?: string) {
   const i = r.impact;
   const lines = [`*${name(r.member.name)}* asks for *${esc(r.leaveType)}*, ${range(r.start, r.end)}${PART[r.part] ?? ''} · ${amount(r.deducts, i.unit)}`];
+  if (lead) lines.unshift(`_${esc(lead)}_`);
+  if (r.decision?.recommendation) lines.push(`*${RECOMMENDATION_TEXT[r.decision.recommendation]}*${r.decision.wouldAutoApprove ? ' (meets the auto-approval rules)' : ''}`);
   if (i.balanceAfter != null) lines.push(`Balance after: ${amount(i.balanceAfter, i.unit)}${i.yearEndForfeit ? ` · would still lose ${amount(i.yearEndForfeit, i.unit)} at year end` : ''}`);
   const tight = i.coverage.filter((c) => c.present < c.required);
   lines.push(tight.length ? `:warning: Coverage short on ${tight.map((c) => `${day(c.date)} (${c.present}/${c.required}${c.tag ? ` ${esc(c.tag)}` : ''})`).join(', ')}` : 'Coverage: fine on every day');
   if (i.overlapping.length) lines.push(`Also out: ${i.overlapping.map((o) => `${name(o.member)} (${range(o.start, o.end)}${o.status === 'pending' ? ', pending' : ''})`).join(', ')}`);
+  for (const c of checkLines(r)) lines.push(esc(c));
   if (r.retroactive) lines.push('This is for past dates.');
   if (r.note) lines.push(`Note: "${name(r.note)}"`);
   return {
@@ -95,7 +121,16 @@ export function approvalMessage(r: PendingItem) {
         type: 'actions',
         elements: [
           { type: 'button', style: 'primary', text: { type: 'plain_text', text: 'Approve' }, action_id: 'approve', value: r.id },
-          { type: 'button', style: 'danger', text: { type: 'plain_text', text: 'Decline' }, action_id: 'decline', value: r.id },
+          {
+            type: 'static_select',
+            action_id: 'decline',
+            placeholder: { type: 'plain_text', text: 'Decline because…' },
+            options: [
+              { text: { type: 'plain_text', text: 'Not enough cover' }, value: `${r.id}|coverage` },
+              { text: { type: 'plain_text', text: 'Not enough notice' }, value: `${r.id}|notice` },
+              { text: { type: 'plain_text', text: 'Busy period' }, value: `${r.id}|peak_period` },
+            ],
+          },
         ],
       },
     ],
