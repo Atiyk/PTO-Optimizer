@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { isVerified, rulesOf, validateRulePack, type RulePack } from '../src/coverage/types';
 import { CHILDCARE_US_CA, CHILDCARE_US_NY, CHILDCARE_US_TX, CLINIC_TEMPLATE } from './childcare';
 import { SEED_PACKS, seedPack } from './index';
-import { LABOR_US_CA, LABOR_US_CO, LABOR_US_NY, LABOR_US_NY_NYC, LABOR_US_WA } from './labor';
+import { LABOR_US_CA, LABOR_US_CO, LABOR_US_FEDERAL, LABOR_US_NY, LABOR_US_NY_NYC, LABOR_US_WA } from './labor';
 
 /*
  * One assertion per cited number (build rule: "a test per cited number"). If a number
@@ -20,7 +20,7 @@ describe('seed rule packs', () => {
       for (const r of p.rules) {
         if (r.basis === 'law') expect(!!r.citation || r.needsVerification, `${p.key}/${r.id}`).toBe(true);
         if (r.citation) expect(r.citation.url).toMatch(/^https:\/\//);
-        if (r.citation) expect(r.citation.retrievedOn).toBe('2026-10-30');
+        if (r.citation) expect(r.citation.retrievedOn).toMatch(/^2026-10-3[01]$/);
       }
     }
     expect(new Set(SEED_PACKS.map((p) => p.key)).size).toBe(SEED_PACKS.length);
@@ -96,6 +96,27 @@ describe('seed rule packs', () => {
   it('CO: C.R.S. § 8-13.3-403 1 per 30, 48 a year, carry 48, use 48; COMPS Rule 4.1.1 12 h day / 40 h week', () => {
     expect(sick(LABOR_US_CO, 'co-sick-accrual')).toMatchObject({ hoursPerUnit: 30, annualAccrualCap: 48, carryoverMax: 48, annualUseCap: 48, usableFromDay: null });
     expect(ot(LABOR_US_CO)).toMatchObject({ dailyHours: 12, weeklyHours: 40, citation: { section: 'Rule 4.1.1(A)–(B)' } });
+  });
+
+  it('work rules re-verified 2026-10-31: FLSA § 207(a)(1); CA § 510(a) bands, § 512(a) meals, wage order § 12 rest; WAC 296-126-092; COMPS 5.1/5.2; NY § 162', () => {
+    expect(ot(LABOR_US_FEDERAL)).toMatchObject({ dailyHours: null, weeklyHours: 40, multiplier: 1.5, citation: { section: '§ 207(a)(1)' } });
+    expect(rulesOf(LABOR_US_FEDERAL, 'meal_break')).toEqual([]);
+    expect(rulesOf(LABOR_US_FEDERAL, 'rest_break')).toEqual([]);
+    expect(ot(LABOR_US_CA)).toMatchObject({ multiplier: 1.5, doubleTimeDailyHours: 12, doubleTimeMultiplier: 2, seventhDay: true });
+    const meal = (p: RulePack, id: string) => rulesOf(p, 'meal_break').find((r) => r.id === id)!;
+    const rest = (p: RulePack) => rulesOf(p, 'rest_break')[0]!;
+    expect(meal(LABOR_US_CA, 'ca-meal-1')).toMatchObject({ whenOverHours: 5, minutes: 30, nth: 1, startByHours: 5, citation: { section: '§ 512(a)' } });
+    expect(meal(LABOR_US_CA, 'ca-meal-2')).toMatchObject({ whenOverHours: 10, minutes: 30, nth: 2 });
+    expect(rest(LABOR_US_CA)).toMatchObject({ minutes: 10, perHours: 4, majorFraction: true, minShiftHours: 3.5 });
+    expect(meal(LABOR_US_WA, 'wa-meal')).toMatchObject({ minutes: 30, startAfterHours: 2, startByHours: 5, citation: { section: 'WAC 296-126-092(1)', publisher: 'official' } });
+    expect(rest(LABOR_US_WA)).toMatchObject({ minutes: 10, perHours: 4, majorFraction: false, citation: { section: 'WAC 296-126-092(4)' } });
+    expect(meal(LABOR_US_CO, 'co-meal')).toMatchObject({ whenOverHours: 5, minutes: 30, citation: { section: 'Rule 5.1' } });
+    expect(rest(LABOR_US_CO)).toMatchObject({ minutes: 10, perHours: 4, majorFraction: true, citation: { section: 'Rule 5.2' } });
+    for (const p of [LABOR_US_NY, LABOR_US_NY_NYC]) {
+      expect(meal(p, 'ny-meal-noon')).toMatchObject({ whenOverHours: 6, minutes: 30, window: { from: 660, to: 840 }, citation: { section: '§ 162(2)' } });
+      expect(meal(p, 'ny-meal-evening')).toMatchObject({ minutes: 20, window: { from: 1020, to: 1140 }, shiftStartsBefore: 660, shiftEndsAfter: 1140, citation: { section: '§ 162(3)' } });
+      expect(rulesOf(p, 'rest_break')).toEqual([]);
+    }
   });
 
   it('the clinic pack is configuration only: every rule is the org’s policy, none claims to be law', () => {

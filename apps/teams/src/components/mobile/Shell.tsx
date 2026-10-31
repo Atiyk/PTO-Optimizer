@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 
 const TABS: [href: string, label: string][] = [
   ['/m', 'Today'],
+  ['/m/time', 'Hours'],
   ['/m/offers', 'Offers'],
   ['/m/leave', 'Leave'],
   ['/m/me', 'Me'],
@@ -18,7 +19,7 @@ export function Shell({ title, org, active, badge, children }: { title: string; 
       </header>
       <main className="mx-auto max-w-md space-y-4 px-4 pt-4 pb-28">{children}</main>
       <nav aria-label="Staff app" className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-page pb-[env(safe-area-inset-bottom)]">
-        <ul className="mx-auto grid max-w-md grid-cols-4">
+        <ul className="mx-auto grid max-w-md grid-cols-5">
           {TABS.map(([href, label]) => (
             <li key={href}>
               <Link

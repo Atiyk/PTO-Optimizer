@@ -56,8 +56,12 @@ describe('findCover', () => {
     const eligible = out.candidates.filter((c) => c.eligible);
     expect(eligible.length).toBeGreaterThan(3);
     expect(eligible.map((c) => c.rank)).toEqual(eligible.map((_, i) => i + 1));
-    const ids = eligible.map((c) => c.memberId);
-    expect(ids).toEqual([...ids].sort()); // all score 0: tie-break by id
+    // Default overtime policy "avoid": everyone at regular time first (all score 0: tie-break by id), then overtime.
+    const regular = eligible.filter((c) => c.costBand === 'regular').map((c) => c.memberId);
+    const overtime = eligible.filter((c) => c.costBand === 'overtime');
+    expect(regular).toEqual([...regular].sort());
+    expect(eligible.slice(0, regular.length).map((c) => c.memberId)).toEqual(regular);
+    for (const c of overtime) expect(c.checks.find((x) => x.id === 'overtime')!.detail).toMatch(/^Would reach .* ranked after people at regular time$/);
     expect(JSON.stringify(out)).not.toMatch(/rate|wage|\$/i);
   });
 
@@ -149,7 +153,7 @@ describe('requestCover and respondToCover', () => {
     const me = next.candidates.find((c) => c.memberId === id(i))!;
     expect(me.eligible).toBe(true);
     expect(me.scoreParts!.fairness).toBe(100); // one cover taken; it started > 24 h after the request, so not short notice
-    expect(next.candidates.filter((c) => c.eligible).at(-1)!.memberId).toBe(id(i));
+    expect(next.candidates.filter((c) => c.eligible && c.costBand === 'regular').at(-1)!.memberId).toBe(id(i));
   });
 });
 

@@ -77,7 +77,7 @@ describe('cover ranking (COVERAGE-SPEC §4)', () => {
   it('every candidate carries every check it went through', () => {
     const r = evaluateCandidate(need, cand('X'), { pack: work });
     expect(r.checks.map((c) => c.id)).toEqual([
-      'active', 'site_allowed', 'opted_in', 'not_on_leave', 'available', 'credential_valid', 'min_rest', 'max_hours_day', 'max_hours_week', 'max_consecutive_days',
+      'active', 'site_allowed', 'opted_in', 'not_on_leave', 'available', 'credential_valid', 'min_rest', 'max_hours_day', 'max_hours_week', 'max_consecutive_days', 'overtime',
     ]);
     expect(r.checks.every((c) => c.passed)).toBe(true);
   });
@@ -118,7 +118,8 @@ describe('cover ranking (COVERAGE-SPEC §4)', () => {
   });
 
   it('score: fairness, opt-in, overtime cost (only when cost-aware) and travel; ties broken by member id', () => {
-    const otShifts = ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05'].map((d) => ({ date: d, interval: iv(d, 480, 1080) })); // 40 h
+    // 8 h Mon–Thu and Sat = 40 h: the Friday cover pushes Saturday's last 4 h past 40 (CA daily 8 h is not crossed).
+    const otShifts = ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-07'].map((d) => ({ date: d, interval: iv(d, 480, 960) }));
     const people = [cand('p2', { optIn: 'yes' }), cand('p1', { shifts: otShifts }), cand('p3', { fairness: { coverTaken: 0, holidayCover: 1, shortNotice: 1 } })];
     const plain = rankCandidates(need, people, { pack: work });
     expect(plain.map((r) => [r.memberId, r.score, r.costBand])).toEqual([

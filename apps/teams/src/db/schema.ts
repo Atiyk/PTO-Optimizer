@@ -32,6 +32,9 @@ const orgRef = () =>
 export const ROLES = ['owner', 'admin', 'manager', 'employee'] as const;
 export const ACTOR_TYPES = ['human', 'agent-on-behalf-of-user', 'service-agent'] as const;
 export const REQUEST_STATUSES = ['draft', 'pending', 'approved', 'declined', 'cancelled'] as const;
+/** Industry presets (labels and suggested packs). `general` = MVP behaviour, unchanged. */
+export const VERTICALS = ['general', 'childcare', 'clinic', 'healthcare', 'retail', 'hospitality', 'security', 'manufacturing'] as const;
+export const OVERTIME_POLICIES = ['allow', 'avoid', 'exclude'] as const;
 export const LEDGER_KINDS = ['accrual', 'usage', 'adjustment', 'carryover', 'forfeiture', 'import'] as const;
 
 export const organizations = pgTable('organizations', {
@@ -53,11 +56,15 @@ export const organizations = pgTable('organizations', {
   /** Minutes an auto-approval stays reversible by the manager. */
   autoApprovalReversibleMinutes: integer('auto_approval_reversible_minutes').notNull().default(48 * 60),
   /** Regulated coverage (COVERAGE-SPEC): `general` = MVP behaviour, unchanged. */
-  vertical: text('vertical', { enum: ['general', 'childcare', 'clinic'] }).notNull().default('general'),
+  vertical: text('vertical', { enum: VERTICALS }).notNull().default('general'),
   /** Pay rates are stored only while this is on (COVERAGE-SPEC §6). */
   costAwareRanking: boolean('cost_aware_ranking').notNull().default(false),
   /** Health-data minimisation: call-off reasons are not stored unless enabled. */
   callOffReasonsEnabled: boolean('call_off_reasons_enabled').notNull().default(false),
+  /** Time clock (clock in/out, timesheets): off for MVP orgs until an admin turns it on. */
+  timeClockEnabled: boolean('time_clock_enabled').notNull().default(false),
+  /** Cover ranking: `avoid` = people the cover would push into overtime rank last. */
+  overtimePolicy: text('overtime_policy', { enum: OVERTIME_POLICIES }).notNull().default('avoid'),
   createdAt: createdAt(),
 });
 
@@ -70,6 +77,8 @@ export const locations = pgTable(
     countryCode: text('country_code').notNull(),
     subdivisionCode: text('subdivision_code'),
     timezone: text('timezone').notNull().default('UTC'),
+    /** Seed labour pack for timesheets (overtime, meal, rest). Null = linked packs, else FLSA for US sites. */
+    laborPackKey: text('labor_pack_key'),
     createdAt: createdAt(),
   },
   (t) => [index('locations_org_idx').on(t.orgId)],
@@ -757,6 +766,8 @@ export const hoursWorked = pgTable(
     periodEnd: date('period_end').notNull(),
     hours: numeric('hours', { precision: 7, scale: 2 }).notNull(),
     importBatchId: uuid('import_batch_id'),
+    /** `import` (CSV) or `time_clock` (synced from punches on every clock-out or correction). */
+    source: text('source', { enum: ['import', 'time_clock'] }).notNull().default('import'),
     /** Rolled-back imports are voided, never deleted. */
     voidedAt: timestamp('voided_at', { withTimezone: true }),
     createdAt: createdAt(),
@@ -944,4 +955,64 @@ export const memberPayRates = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index('pay_rates_org_member_idx').on(t.orgId, t.memberId)],
+);
+
+export const PUNCH_KINDS = ['in', 'out', 'break_start', 'break_end'] as const;
+
+/**
+ * Time clock punches: append-only. A correction voids a punch (voided_at/by) and adds a new
+ * one with source `correction` and a note; sessions, hours and issues are derived by
+ * packages/engine/src/timeclock and never stored.
+ */
+export const timePunches = pgTable(
+  'time_punches',
+  {
+    id: id(),
+    orgId: orgRef(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    locationId: uuid('location_id').references(() => locations.id, { onDelete: 'set null' }),
+    kind: text('kind', { enum: PUNCH_KINDS }).notNull(),
+    breakKind: text('break_kind', { enum: ['meal', 'rest'] }),
+    at: timestamp('at', { withTimezone: true }).notNull(),
+    source: text('source', { enum: ['self', 'correction', 'import'] }).notNull().default('self'),
+    /** Rest-break attestation recorded with a clock-out (null = not asked). */
+    restBreaksTaken: boolean('rest_breaks_taken'),
+    /** Correction note (user text: returned delimited as untrusted). */
+    note: text('note'),
+    idempotencyKey: text('idempotency_key'),
+    createdByMemberId: uuid('created_by_member_id'),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidedByMemberId: uuid('voided_by_member_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('punch_org_member_at_idx').on(t.orgId, t.memberId, t.at),
+    index('punch_org_at_idx').on(t.orgId, t.at),
+    uniqueIndex('punch_idem_idx').on(t.orgId, t.memberId, t.idempotencyKey),
+  ],
+);
+
+/** A manager's approval of one person's workweek: a snapshot of the engine's totals at that moment. */
+export const timesheetApprovals = pgTable(
+  'timesheet_approvals',
+  {
+    id: id(),
+    orgId: orgRef(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    weekStart: date('week_start').notNull(),
+    totalHours: numeric('total_hours', { precision: 7, scale: 2 }).notNull(),
+    regularHours: numeric('regular_hours', { precision: 7, scale: 2 }).notNull(),
+    overtimeHours: numeric('overtime_hours', { precision: 7, scale: 2 }).notNull(),
+    doubleTimeHours: numeric('double_time_hours', { precision: 7, scale: 2 }).notNull(),
+    issueCount: integer('issue_count').notNull().default(0),
+    approvedByMemberId: uuid('approved_by_member_id'),
+    approvedAt: timestamp('approved_at', { withTimezone: true }).notNull().defaultNow(),
+    /** Set when a later correction changes the week: the approval no longer stands. */
+    supersededAt: timestamp('superseded_at', { withTimezone: true }),
+  },
+  (t) => [index('ts_appr_org_week_idx').on(t.orgId, t.weekStart), index('ts_appr_org_member_idx').on(t.orgId, t.memberId)],
 );

@@ -73,6 +73,49 @@ export type Rule = Provenance & { id: string; label: string } & (
         kind: 'overtime_flag';
         dailyHours?: number | null;
         weeklyHours?: number | null;
+        /** Premium for daily/weekly overtime hours (default 1.5). Hours bands only; never pay. */
+        multiplier?: number | null;
+        /** Hours in one workday above which time is double time (CA: 12). */
+        doubleTimeDailyHours?: number | null;
+        /** Default 2. */
+        doubleTimeMultiplier?: number | null;
+        /**
+         * CA-style seventh consecutive workday in a workweek: the first `dailyHours` at
+         * `multiplier`, anything above at double time.
+         */
+        seventhDay?: boolean | null;
+      }
+    | {
+        /** A meal period a shift owes (time clock checks; not used for coverage). */
+        kind: 'meal_break';
+        /** Owed when the shift's worked time is more than this many hours. */
+        whenOverHours: number;
+        minutes: number;
+        /** 1 = first meal, 2 = second meal (e.g. CA over 10 h). */
+        nth?: 1 | 2;
+        /** Latest start, in hours of work from the shift start (CA: by the end of hour 5). */
+        startByHours?: number | null;
+        /** Earliest start, in hours from the shift start (WA: 2). */
+        startAfterHours?: number | null;
+        /**
+         * Local window the meal must fall in, minutes after midnight (NY noonday: 660–840).
+         * Owed only when the shift spans the whole window.
+         */
+        window?: { from: number; to: number } | null;
+        /** Owed only when the shift starts before this local minute (NY 2nd meal: 660). */
+        shiftStartsBefore?: number | null;
+        /** Owed only when the shift ends after this local minute (NY 2nd meal: 1140). */
+        shiftEndsAfter?: number | null;
+      }
+    | {
+        /** Paid rest breaks owed per stretch of work (not clocked; attested at clock-out). */
+        kind: 'rest_break';
+        minutes: number;
+        perHours: number;
+        /** Count a "major fraction" (more than half) of `perHours` as a full period. */
+        majorFraction: boolean;
+        /** No rest break owed below this many hours (CA: 3.5). */
+        minShiftHours?: number | null;
       }
     | {
         kind: 'sick_accrual';
@@ -139,6 +182,9 @@ export function validateRulePack(pack: RulePack): string[] {
       if (r.maxGroupSize != null && !(r.maxGroupSize > 0)) errs.push(`${r.id}: maxGroupSize must be > 0`);
     }
     if (r.kind === 'role_present' && !(r.min >= 1)) errs.push(`${r.id}: min must be ≥ 1`);
+    if (r.kind === 'meal_break' && !(r.minutes > 0 && r.whenOverHours >= 0)) errs.push(`${r.id}: a meal break needs minutes > 0 and whenOverHours ≥ 0`);
+    if (r.kind === 'rest_break' && !(r.minutes > 0 && r.perHours > 0)) errs.push(`${r.id}: a rest break needs minutes > 0 and perHours > 0`);
+    if (r.kind === 'overtime_flag' && r.multiplier != null && !(r.multiplier >= 1)) errs.push(`${r.id}: multiplier must be ≥ 1`);
   }
   if (rulesOf(pack, 'mixed_age').length > 1) errs.push('at most one mixed_age rule');
   return errs;

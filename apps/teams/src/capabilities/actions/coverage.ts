@@ -22,6 +22,7 @@ import {
   shiftExceptions,
   shiftTemplates,
   siteRulePacks,
+  VERTICALS,
 } from '@/db/schema';
 import type { Db } from '@/db/client';
 import { coverageDays, expiryBand, gapWindows, getLocation, siteContext, assertValidPack } from '@/domain/coverage';
@@ -166,7 +167,7 @@ export const manageSchedule = defineCapability({
     'demand counts per room (counts only, never child details), and weekly shift templates or dated changes per ' +
     'member. One operation per call.',
   input: z.discriminatedUnion('op', [
-    z.object({ op: z.literal('setVertical'), vertical: z.enum(['general', 'childcare', 'clinic']), costAwareRanking: z.boolean().optional() }),
+    z.object({ op: z.literal('setVertical'), vertical: z.enum(VERTICALS), costAwareRanking: z.boolean().optional() }),
     z.object({
       op: z.literal('upsertRoom'),
       roomId: z.uuid().optional(),

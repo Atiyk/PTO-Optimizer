@@ -32,3 +32,12 @@ export function parseCsv(text: string): string[][] {
   }
   return rows.filter((r) => r.some((v) => v.trim() !== ''));
 }
+
+/** One CSV cell: quoted when needed, and a leading = + - @ neutralised so spreadsheets never run it. */
+export function csvCell(v: string | number | null | undefined): string {
+  let s = v == null ? '' : String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+export const csvRow = (cells: (string | number | null | undefined)[]) => cells.map(csvCell).join(',');

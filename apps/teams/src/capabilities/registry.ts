@@ -14,6 +14,7 @@ import { draftRulePackFromText, explainCoverInWords, parseCoverText, saveRulePac
 import { getCoverage, getCoverageSetup, getCredentials, getSickLeave, importHoursWorked, listRulePacks, manageCredentials, manageSchedule } from './actions/coverage';
 import { listMyProposals, respondToProposal, runTeamPlan, sendPlanProposals } from './actions/planner';
 import { getCoverageForecast } from './actions/forecast';
+import { clockPunch, getComplianceTasks, getMyTimeClock, getTimesheets, getWorkRules, manageTimesheets, manageWorkRules } from './actions/timeclock';
 import { decideLeaveRequest, listPendingApprovals } from './actions/approvals';
 import { explainBalance, getMyBalance } from './actions/balance';
 import { listHolidays, whoIsOut } from './actions/calendar';
@@ -77,6 +78,13 @@ export const CAPABILITIES = {
   manageStaffSignIn,
   setMyCoverPrefs,
   getMySchedule,
+  getMyTimeClock,
+  clockPunch,
+  getTimesheets,
+  manageTimesheets,
+  getComplianceTasks,
+  getWorkRules,
+  manageWorkRules,
   draftRulePackFromText,
   saveRulePack,
   explainCoverInWords,
