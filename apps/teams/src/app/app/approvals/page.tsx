@@ -1,5 +1,6 @@
 import { ActionButton } from '@/components/ActionButton';
 import { DecideButtons } from '@/components/DecideButtons';
+import { DecisionChecks } from '@/components/DecisionChecks';
 import { ProfileChangeQueue } from '@/components/ProfileChanges';
 import { Badge, Card, fmt, formatRange } from '@/components/ui';
 import { call, requireActor } from '@/server/page';
@@ -9,9 +10,38 @@ export default async function Approvals() {
   if (actor.role === 'employee') return <p className="text-sm text-muted">Approvals are for managers and admins.</p>;
   const { requests, recentAutoApprovals } = await call('listPendingApprovals', {}, actor);
   const { toDecide } = await call('getProfileChanges', {}, actor);
+  const { windows } = await call('getRequestWindows', {}, actor);
+  const clean = requests.filter((r) => r.decision.wouldAutoApprove && r.decision.route === 'needs_person');
+  const ready = windows.filter((w) => w.status === 'ready' && w.allocation.length);
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-ink">Waiting for you ({requests.length})</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-semibold text-ink">Waiting for you ({requests.length})</h1>
+        {clean.length > 0 && (
+          <ActionButton capability="approveAllClean" input={{ requestIds: clean.map((r) => r.id) }} confirm={`Approve ${clean.length} request${clean.length === 1 ? '' : 's'} that pass every check?`}>
+            Approve all clean ({clean.length})
+          </ActionButton>
+        )}
+      </div>
+      {ready.map((w) => (
+        <Card key={w.ruleId} title={`${w.name}: places to confirm`}>
+          <p className="text-sm text-muted">
+            {w.requests} asked for {formatRange(w.start, w.end)}; {w.slots} place{w.slots === 1 ? '' : 's'} a day, shared by {w.tieBreak}. Confirming approves the ones marked in and declines the rest with &ldquo;busy period&rdquo; and other dates.
+          </p>
+          <ul className="mt-2 space-y-1 text-sm">
+            {w.allocation.map((a) => (
+              <li key={a.requestId}>
+                <Badge tone={a.in ? 'ok' : 'neutral'}>{a.in ? 'In' : 'Not this time'}</Badge> {a.member.name.untrusted_text} · {formatRange(a.start, a.end)} <span className="text-muted">({a.reason})</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3">
+            <ActionButton capability="confirmRequestWindow" input={{ ruleId: w.ruleId }} confirm="Confirm this allocation?">
+              Confirm allocation
+            </ActionButton>
+          </div>
+        </Card>
+      ))}
       {requests.length === 0 && <p className="text-sm text-muted">Nothing to decide right now.</p>}
       {requests.map((r) => (
         <Card
@@ -50,15 +80,7 @@ export default async function Approvals() {
               ))}
             </ul>
           )}
-          {r.autoApproval && (
-            <p className="mt-2 text-sm">
-              {r.autoApproval.eligible ? (
-                <><Badge tone="accent">Meets auto-approval rules</Badge> Safe to approve by the org&rsquo;s rules.</>
-              ) : (
-                <><Badge>Needs a look</Badge> {r.autoApproval.blockers.join(' ')}</>
-              )}
-            </p>
-          )}
+          <DecisionChecks r={r} />
           {r.retroactive && <p className="mt-2 text-sm"><Badge tone="warn">Past dates</Badge> Starts before today.</p>}
           {r.note && (
             <p className="mt-2 text-sm text-ink">

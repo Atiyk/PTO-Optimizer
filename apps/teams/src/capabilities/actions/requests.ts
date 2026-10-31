@@ -229,6 +229,9 @@ const requestSummary = z.object({
   autoApproved: z.boolean(),
   note: z.object({ untrusted_text: z.string() }).nullable(),
   decisionNote: z.object({ untrusted_text: z.string() }).nullable(),
+  declineReason: z.enum(['coverage', 'notice', 'peak_period', 'other']).nullable(),
+  otherDates: z.array(z.object({ start: z.string(), end: z.string() })).describe('On a decline: dates the engine found that work.'),
+  canAskForReview: z.boolean(),
   createdAt: z.string(),
 });
 
@@ -236,6 +239,7 @@ type Snapshot = { amount: number; unit: 'days' | 'hours'; chargedDates: string[]
 
 export function summarize(r: typeof leaveRequests.$inferSelect, typeKey: string): z.infer<typeof requestSummary> {
   const snap = (r.engineSnapshot ?? { amount: 0, unit: 'days' }) as Snapshot;
+  const ds = (r.decisionSnapshot ?? {}) as { declineAlternatives?: { start: string; end: string }[]; review?: unknown; reversed?: boolean };
   return {
     id: r.id,
     leaveType: typeKey,
@@ -249,6 +253,9 @@ export function summarize(r: typeof leaveRequests.$inferSelect, typeKey: string)
     autoApproved: r.autoApproved,
     note: untrusted(r.note),
     decisionNote: untrusted(r.decisionNote),
+    declineReason: r.status === 'declined' ? ((r.declineReason as 'coverage' | 'notice' | 'peak_period' | 'other' | null) ?? null) : null,
+    otherDates: r.status === 'declined' ? (ds.declineAlternatives ?? []).map((a) => ({ start: a.start, end: a.end })) : [],
+    canAskForReview: r.status === 'declined' && !ds.review && !ds.reversed && !!r.decidedAt && Date.now() - r.decidedAt.getTime() <= 14 * 86_400_000,
     createdAt: r.createdAt.toISOString(),
   };
 }
@@ -466,7 +473,7 @@ export const listMyRequests = defineCapability({
   name: 'listMyRequests',
   description: "Lists the member's own leave requests, newest first, with status and the engine-computed amount deducted.",
   input: z.object({
-    status: z.array(z.enum(['pending', 'approved', 'declined', 'cancelled'])).optional().describe('Filter by status; all by default.'),
+    status: z.array(z.enum(['pending', 'approved', 'declined', 'cancelled', 'recorded'])).optional().describe('Filter by status; all by default.'),
     limit: z.number().int().min(1).max(200).default(50),
   }),
   output: z.object({ requests: z.array(requestSummary) }),
