@@ -17,6 +17,7 @@ import { coverEvents, coverOffers, coverRequests, leaveRequests, locations, memb
 import { CapabilityError } from '@/capabilities/errors';
 import { credentialFacts, getLocation, packsOn, sitePacks, type GapWindow } from './coverage';
 import { holidayMap } from './holidays';
+import { clockedShifts, siteWorkRules } from './timeclock';
 
 /*
  * Cover workflow (COVERAGE-SPEC §4): load candidates' facts org-wide, rank with the pure
@@ -98,6 +99,7 @@ export interface RankingResult {
   ranked: RankedCandidate[];
   names: Map<string, string>;
   costAware: boolean;
+  overtimePolicy: 'allow' | 'avoid' | 'exclude';
 }
 
 /** Build the need from the site's pack and rank every active member of the org. */
@@ -106,7 +108,10 @@ export async function rankForTarget(db: Db, orgId: string, t: CoverTarget, now: 
   const [room] = await db.select().from(rooms).where(and(eq(rooms.orgId, orgId), eq(rooms.id, t.roomId), eq(rooms.locationId, t.locationId)));
   if (!room) throw new CapabilityError('not_found', 'Room not found at this site.');
   if (t.endMinute <= t.startMinute) throw new CapabilityError('invalid_input', 'The cover must end after it starts.');
-  const pack = packsOn(await sitePacks(db, orgId, t.locationId), t.date) ?? { ageGroups: [], rules: [] };
+  const sitePack = packsOn(await sitePacks(db, orgId, t.locationId), t.date) ?? { ageGroups: [], rules: [] };
+  // Overtime for ranking: the site's own pack, else its timesheet rules (chosen labour pack or FLSA).
+  const work = rulesOf(sitePack, 'overtime_flag').length ? null : (await siteWorkRules(db, orgId, t.locationId, t.date)).rules.overtime;
+  const pack = work ? { ...sitePack, rules: [...sitePack.rules, work as unknown as (typeof sitePack.rules)[number]] } : sitePack;
   const interval = localInterval(t.date, t.startMinute, t.endMinute, location.timezone);
 
   const needs: CoverNeed['credentials'][number][] = [];
@@ -134,6 +139,9 @@ export async function rankForTarget(db: Db, orgId: string, t: CoverTarget, now: 
   const ids = people.map((p) => p.id);
   const ws = addDays(t.date, -mondayIndexedDow(t.date));
   const shifts = await orgShifts(db, orgId, addDays(ws, -7), addDays(ws, 13));
+  // Days already worked use the time clock's real hours instead of the schedule.
+  const clocked = await clockedShifts(db, orgId, ids, addDays(ws, -7), addDays(ws, 13), now);
+  for (const [memberId, c] of clocked) shifts.set(memberId, [...(shifts.get(memberId) ?? []).filter((s) => !c.dates.has(s.date)), ...c.shifts]);
   const prefs = ids.length ? await db.select().from(memberCoverPrefs).where(and(eq(memberCoverPrefs.orgId, orgId), inArray(memberCoverPrefs.memberId, ids))) : [];
   const creds = await credentialFacts(db, orgId, ids);
   const fair = await fairnessLedger(db, orgId, now);
@@ -174,7 +182,8 @@ export async function rankForTarget(db: Db, orgId: string, t: CoverTarget, now: 
     };
   });
   const costAware = !!org?.costAwareRanking;
-  return { need, ranked: rankCandidates(need, facts, { pack, costAware }), names: new Map(people.map((p) => [p.id, p.name])), costAware };
+  const overtimePolicy = org?.overtimePolicy ?? 'avoid';
+  return { need, ranked: rankCandidates(need, facts, { pack, costAware, overtimePolicy }), names: new Map(people.map((p) => [p.id, p.name])), costAware, overtimePolicy };
 }
 
 /** Re-check one member at accept time (fresh facts). */

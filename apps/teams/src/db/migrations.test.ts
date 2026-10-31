@@ -24,7 +24,7 @@ async function snapshot(db: Awaited<ReturnType<typeof freshDb>>) {
   return { tables: rows(tables).map((t) => t.table_name as string), orgs: rows(orgs), ledger: rows(ledger) };
 }
 
-const COVERAGE_MIGRATIONS = ['0005_regulated_coverage.sql', '0006_cover_workflow.sql'];
+const COVERAGE_MIGRATIONS = ['0005_regulated_coverage.sql', '0006_cover_workflow.sql', '0007_time_clock.sql'];
 const downStatements = (file: string) =>
   readFileSync(path.join(MIGRATIONS_DIR, 'down', file), 'utf8')
     .replace(/^--.*$/gm, '')
@@ -32,7 +32,7 @@ const downStatements = (file: string) =>
     .map((x) => x.trim())
     .filter(Boolean);
 
-describe('regulated coverage migrations (0005, 0006)', () => {
+describe('regulated coverage and time clock migrations (0005–0007)', () => {
   it.each(COVERAGE_MIGRATIONS)('%s is additive: no DROP, no type changes, every new column nullable or defaulted', (file) => {
     const up = statements(file);
     expect(up.some((s) => /\bDROP\b/i.test(s))).toBe(false);
@@ -44,11 +44,11 @@ describe('regulated coverage migrations (0005, 0006)', () => {
     const db = await freshDb();
     await seedOrg(db);
     const withCoverage = await snapshot(db);
-    expect(withCoverage.tables).toEqual(expect.arrayContaining(['rooms', 'cover_events', 'hours_worked', 'passkeys', 'login_codes', 'push_subscriptions']));
+    expect(withCoverage.tables).toEqual(expect.arrayContaining(['rooms', 'cover_events', 'hours_worked', 'passkeys', 'login_codes', 'push_subscriptions', 'time_punches', 'timesheet_approvals']));
 
     for (const file of [...COVERAGE_MIGRATIONS].reverse()) for (const s of downStatements(file)) await db.execute(sql.raw(s));
     const after = await snapshot(db);
-    expect(after.tables.filter((t) => ['rooms', 'cover_events', 'hours_worked', 'credentials', 'passkeys', 'login_codes', 'push_subscriptions'].includes(t))).toEqual([]);
+    expect(after.tables.filter((t) => ['rooms', 'cover_events', 'hours_worked', 'credentials', 'passkeys', 'login_codes', 'push_subscriptions', 'time_punches', 'timesheet_approvals'].includes(t))).toEqual([]);
     expect(after.orgs).toEqual(withCoverage.orgs.map(({ id, name }) => ({ id, name })));
     expect(after.ledger).toEqual(withCoverage.ledger);
 

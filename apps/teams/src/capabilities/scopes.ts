@@ -10,14 +10,16 @@ export const SCOPES = [
   'cover:request',
   'cover:respond',
   'rules:draft',
+  'time:clock',
+  'time:approve',
   'admin',
 ] as const;
 export type Scope = (typeof SCOPES)[number];
 
 export type Role = 'owner' | 'admin' | 'manager' | 'employee';
 
-const EMPLOYEE: Scope[] = ['leave:read', 'leave:request', 'policy:read', 'coverage:read', 'cover:respond'];
-const MANAGER: Scope[] = [...EMPLOYEE, 'leave:approve', 'planner:run', 'cover:request'];
+const EMPLOYEE: Scope[] = ['leave:read', 'leave:request', 'policy:read', 'coverage:read', 'cover:respond', 'time:clock'];
+const MANAGER: Scope[] = [...EMPLOYEE, 'leave:approve', 'planner:run', 'cover:request', 'time:approve'];
 const ADMIN: Scope[] = [...MANAGER, 'policy:draft', 'rules:draft', 'admin'];
 
 export const ROLE_SCOPES: Record<Role, readonly Scope[]> = {
@@ -39,5 +41,7 @@ export const SCOPE_DESCRIPTIONS: Record<Scope, string> = {
   'cover:request': 'Find ranked cover for a gap and send cover offers (offers from agents wait for a person to confirm).',
   'cover:respond': 'Answer cover offers and report a call-off for yourself.',
   'rules:draft': 'Draft a rule pack from pasted regulation or handbook text for an admin to confirm.',
+  'time:clock': 'See your own time clock and timesheet. Clocking in or out is for people only, never agents.',
+  'time:approve': 'See team timesheets, overtime and compliance tasks; approve timesheets and correct punches (people only).',
   admin: 'Change workspace settings, people and policies.',
 };

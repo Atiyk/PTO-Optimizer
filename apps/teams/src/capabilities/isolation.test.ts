@@ -6,7 +6,7 @@ import { callAsAgent } from '@/server/agentGateway';
 import { buildOrg, humanActor, NOW, run, snapshotOrg } from '@/test/fixtures';
 import { freshDb } from '@/test/db';
 import { eq } from 'drizzle-orm';
-import { coverOffers } from '@/db/schema';
+import { coverOffers, timePunches } from '@/db/schema';
 
 /*
  * A6 / tenant isolation: an admin of org A tries to read or change org B's objects through
@@ -28,6 +28,7 @@ let bMemberCredId: string;
 let bHoursBatch: string;
 let bCoverId: string;
 let bOfferId: string;
+let bPunchId: string;
 
 beforeAll(async () => {
   db = await freshDb();
@@ -56,6 +57,9 @@ beforeAll(async () => {
   bMemberCredId = (await run(db, bo, 'manageCredentials', { op: 'grant', memberId: B.emp.id, credentialKey: 'cpr', expiresOn: '2027-06-01' })).id;
   bCoverId = (await run(db, bo, 'requestCover', { op: 'create', locationId: B.location.id, roomId: bRoomId, date: '2026-11-09', start: '08:00', end: '12:00', idempotencyKey: 'b-cover-0001' })).requestId;
   [{ id: bOfferId }] = await db.select({ id: coverOffers.id }).from(coverOffers).where(eq(coverOffers.coverRequestId, bCoverId)).limit(1) as [{ id: string }];
+  await run(db, bo, 'manageWorkRules', { op: 'setTimeClock', enabled: true });
+  await run(db, humanActor(B.emp), 'clockPunch', { op: 'in', idempotencyKey: 'b-punch-0001' });
+  [{ id: bPunchId }] = (await db.select({ id: timePunches.id }).from(timePunches).where(eq(timePunches.orgId, B.org.id)).limit(1)) as [{ id: string }];
   bHoursBatch = (await run(db, bo, 'importHoursWorked', { stage: 'commit', rows: [{ member: B.emp.id, periodStart: '2026-10-01', periodEnd: '2026-10-07', hours: 40 }] })).batchId!;
 });
 
@@ -124,6 +128,11 @@ const attacks = (): [CapabilityName, unknown][] => [
   ['manageStaffSignIn', { op: 'listPasskeys', memberId: B.emp.id }],
   ['manageStaffSignIn', { op: 'revokePasskey', passkeyId: '00000000-0000-4000-8000-000000000000' }],
   ['setMyCoverPrefs', { allowedLocationIds: [B.location.id] }],
+  ['getTimesheets', { memberId: B.emp.id }],
+  ['manageTimesheets', { op: 'approve', week: '2026-11-02', memberIds: [B.emp.id] }],
+  ['manageTimesheets', { op: 'correct', memberId: B.emp.id, voidPunchId: bPunchId, note: 'pwned' }],
+  ['manageTimesheets', { op: 'correct', memberId: A.emp.id, voidPunchId: bPunchId, note: 'pwned' }],
+  ['manageWorkRules', { op: 'setSiteLaborPack', locationId: B.location.id, packKey: 'labor-us-ca' }],
 ];
 
 describe('tenant isolation (A6)', () => {
