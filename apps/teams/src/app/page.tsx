@@ -30,6 +30,15 @@ const REGULATED: [title: string, body: string][] = [
   ['Children stay anonymous', 'Only counts per age group, room and time block. No names, no birthdays, ever.'],
 ];
 
+const TIME: [title: string, body: string][] = [
+  ['Clock in from a phone', 'One big button, a meal-break reminder with its deadline, and a yes/no on rest breaks at clock-out. People only: agents can’t punch.'],
+  ['Hours that sync themselves', 'Every clock-out updates the timesheet and hourly sick-leave accrual. No CSV to import, no end-of-week chasing.'],
+  ['Overtime you see coming', 'Daily, weekly, double time and 7th-day rules per state. Cover goes to people at regular time first, unless you say otherwise.'],
+  ['A compliance inbox, not a binder', 'Missed clock-outs, short or late meals, overtime, timesheets to approve and expiring credentials, each with a link to fix it.'],
+];
+
+const INDUSTRIES = ['Offices', 'Childcare', 'Clinics', 'Healthcare and care homes', 'Retail', 'Restaurants and hospitality', 'Security and facilities', 'Manufacturing and warehouses'];
+
 const INTEGRATIONS: [title: string, body: string, icon: ReactNode][] = [
   ['Slack', 'Request, approve and see who is out without leaving Slack. Sign in with your work account.', <IconChat key="i" />],
   ['Phone app', 'Installs from the browser, signs in with a passkey, and works for staff who never use Slack.', <IconPhone key="i" />],
@@ -57,9 +66,9 @@ export default function Home() {
                 Early preview · free to try
               </p>
               <h1 id="hero" className="mt-5 text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-                Know who’s off, and who can cover.
+                Know who’s off, who’s on the clock, and who can cover.
               </h1>
-              <p className="mt-5 max-w-xl text-lg text-on-hero-muted">{PRODUCT_TAGLINE} Built for offices, childcare centres and clinics, where one absence can break a rule.</p>
+              <p className="mt-5 max-w-xl text-lg text-on-hero-muted">{PRODUCT_TAGLINE} One system for any team that works in shifts, with presets for regulated industries where one absence can break a rule.</p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Link href="/try" className={`${btn} bg-on-hero px-5 py-2.5 text-base text-accent-strong hover:bg-accent-soft`}>Try the demo</Link>
                 <Link href="/signin" className={`${btn} border border-on-hero-muted/60 px-5 py-2.5 text-base text-on-hero hover:bg-white/10`}>Sign in</Link>
@@ -82,10 +91,37 @@ export default function Home() {
           </div>
         </section>
 
+        <section id="time" className="scroll-mt-20 border-t border-line" aria-labelledby="time-h">
+          <div className="mx-auto max-w-6xl px-4 py-20">
+            <SectionHead id="time-h" eyebrow="Time and compliance" title="The admin work that grows with every hire, done for you">
+              Clock-ins become timesheets, timesheets become overtime and break checks against your state’s rules, and anything that needs a person lands in one inbox.
+            </SectionHead>
+            <ul className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+              {TIME.map(([title, body]) => (
+                <li key={title} className="border-l-2 border-accent pl-4">
+                  <h3 className="font-semibold text-ink">{title}</h3>
+                  <p className="mt-1 text-sm text-muted">{body}</p>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-8 text-sm text-muted">
+              Overtime and break rules for US federal, California, Washington, Colorado, New York State and New York City, each cited and dated. Configurable defaults, not legal advice. Hours only: pay stays with your payroll provider.
+            </p>
+            <div className="mt-8">
+              <h3 className="text-sm font-semibold text-ink">One system, presets for your industry</h3>
+              <ul className="mt-3 flex flex-wrap gap-2" aria-label="Industry presets">
+                {INDUSTRIES.map((i) => (
+                  <li key={i} className="rounded-full border border-line bg-page px-3 py-1 text-sm text-ink">{i}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+
         <section id="coverage" className="scroll-mt-20 border-y border-line bg-surface" aria-labelledby="coverage-h">
           <div className="mx-auto grid max-w-6xl gap-12 px-4 py-20 lg:grid-cols-[1fr_minmax(0,28rem)] lg:items-center">
             <div>
-              <SectionHead id="coverage-h" eyebrow="For childcare centres and clinics" title="Know before an absence breaks a staffing rule">
+              <SectionHead id="coverage-h" eyebrow="For regulated industries" title="Know before an absence breaks a staffing rule">
                 Where coverage is the law, one day off can leave a room out of ratio. See it per room and half hour, with the rule and its source, and find
                 cover that is legal, qualified and fair.
               </SectionHead>
@@ -104,7 +140,7 @@ export default function Home() {
                 <Link href="/try" className={btnPrimary}>Open the sample centre</Link>
                 <Link href="/demo/coverage" className={btnSecondary}>Watch a call-off, step by step</Link>
               </div>
-              <p className="mt-3 text-sm text-muted">California rule pack included. Not legal advice.</p>
+              <p className="mt-3 text-sm text-muted">California, Texas and New York childcare packs and a clinic template included. Not legal advice.</p>
             </div>
             <SampleGrid />
           </div>

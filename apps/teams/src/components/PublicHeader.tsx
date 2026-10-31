@@ -5,6 +5,7 @@ import { PRODUCT_NAME } from '@/lib/brand';
 
 const LINKS: [href: string, text: string][] = [
   ['/#product', 'Product'],
+  ['/#time', 'Time clock'],
   ['/#coverage', 'Staff cover'],
   ['/#integrations', 'Integrations'],
   ['/docs/agents', 'For AI agents'],
