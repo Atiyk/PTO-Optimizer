@@ -112,7 +112,7 @@ export function HeroCoverageGrid({ data }: { data: HeroExampleData }) {
       </p>
 
       <div className="relative mt-2">
-        <div ref={scroller} className="overflow-x-auto pb-1" tabIndex={overflowing ? 0 : -1} role={overflowing ? 'region' : undefined} aria-label={overflowing ? 'Coverage grid, scrolls sideways' : undefined}>
+        <div ref={scroller} className="relative overflow-x-auto pb-1" tabIndex={overflowing ? 0 : -1} role={overflowing ? 'region' : undefined} aria-label={overflowing ? 'Coverage grid, scrolls sideways' : undefined}>
           <table className="border-separate border-spacing-1 text-center text-sm tabular-nums">
             <caption className="sr-only">
               Example: staff counted in ratio against staff required, per room and half hour, {data.gridFrom} to {data.gridTo}.

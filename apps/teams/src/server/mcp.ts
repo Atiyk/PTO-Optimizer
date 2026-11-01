@@ -5,7 +5,7 @@ import { CapabilityError } from '@/capabilities/errors';
 import { CAPABILITIES, invokeCapability, roleAllows } from '@/capabilities/registry';
 import type { Actor, CapabilityDef } from '@/capabilities/types';
 import { describePolicy } from '@/domain/describePolicy';
-import { LEGACY_PRODUCT_NAME as PRODUCT_NAME } from '@/lib/brand';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { callAsAgent, confirmDraftAsAgent } from './agentGateway';
 import { consumeRate } from './rateLimit';
 

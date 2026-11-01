@@ -50,7 +50,7 @@ for (const width of [1440, 375]) {
   await page.keyboard.press('Enter');
   const details = page.getByRole('heading', { name: 'Who can cover, ranked' });
   check(`Enter shows the cover options @${width}`, await details.isVisible());
-  const chip = page.getByRole('button', { name: /Source:/ });
+  const chip = page.locator('figure').first().getByRole('button', { name: /Source:/ });
   await chip.focus();
   await page.keyboard.press('Enter');
   check(`source chip opens from the keyboard @${width}`, await page.getByText('Not legal advice.').first().isVisible());

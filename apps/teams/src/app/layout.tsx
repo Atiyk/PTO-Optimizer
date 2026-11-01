@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Source_Sans_3 } from 'next/font/google';
 import type { ReactNode } from 'react';
-import { LEGACY_PRODUCT_NAME as PRODUCT_NAME, LEGACY_PRODUCT_TAGLINE as PRODUCT_TAGLINE } from '@/lib/brand';
+import { PRODUCT_NAME, PRODUCT_TAGLINE } from '@/lib/brand';
 import './globals.css';
 
 /*
@@ -12,7 +12,6 @@ import './globals.css';
  */
 const sans = Source_Sans_3({ subsets: ['latin'], display: 'swap', variable: '--font-ui' });
 
-// Metadata keeps the previous name until the rename follow-up (see src/lib/brand.ts).
 export const metadata: Metadata = {
   title: PRODUCT_NAME,
   description: PRODUCT_TAGLINE,

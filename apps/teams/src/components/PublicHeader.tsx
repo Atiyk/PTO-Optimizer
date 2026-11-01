@@ -4,8 +4,8 @@ import { btnPrimary } from '@/components/ui';
 import { PRODUCT_NAME } from '@/lib/brand';
 
 const LINKS: [href: string, text: string][] = [
-  ['/#product', 'Product'],
-  ['/#coverage', 'Compliance'],
+  ['/#call-off', 'Product'],
+  ['/#compliance', 'Compliance'],
   ['/#for-staff', 'For staff'],
 ];
 

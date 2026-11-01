@@ -18,7 +18,7 @@ export default async function MyAgents() {
       <Card title="My agents">
         <p className="text-sm text-muted">
           A personal token lets an AI agent (Claude Code, Copilot Studio, your own script) act for you, never beyond what you can do yourself.
-          Anything that changes your leave comes back here for you to confirm first. See <Link className="text-accent underline" href="/docs/agents">how to connect an agent</Link>.
+          Anything that changes your leave comes back here for you to confirm first. See <Link className="text-accent underline" href="/developers">how to connect an agent</Link>.
         </p>
       </Card>
       {slack.configured && (

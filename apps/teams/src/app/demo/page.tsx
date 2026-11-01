@@ -91,7 +91,7 @@ export default async function DemoPage() {
 
         <div className="flex flex-wrap items-center gap-3">
           <Link href="/signin" className={btnPrimary}>Start with your team</Link>
-          <Link href="/docs/agents" className="text-sm text-ink underline underline-offset-4">Connect an AI agent</Link>
+          <Link href="/developers" className="text-sm text-ink underline underline-offset-4">Connect an AI agent</Link>
         </div>
       </main>
     </>

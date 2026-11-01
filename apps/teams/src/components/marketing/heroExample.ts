@@ -207,7 +207,7 @@ export interface HeroExampleData {
 }
 
 /** "Cal. Health & Safety Code (as amended …)" → "Cal. H&S Code", for the chip. */
-function shortSource(c: Citation): string {
+export function shortSource(c: Citation): string {
   const reg = c.regulation.replace(/\s*\(.*\)\s*$/, '').replace('Health & Safety Code', 'H&S Code').replace('Code Regs. tit.', 'tit.');
   return `${reg} ${c.section}`;
 }
@@ -309,4 +309,58 @@ export function buildHeroExample(): HeroExampleData {
     moreEligible: eligible.length - shown.length,
     busy: excluded.filter((c) => c.excludedBy === 'available').length,
   };
+}
+
+export interface CallOffStepCell {
+  minute: number;
+  time: string;
+  required: number;
+  /** Staff counted before the call-off, after it, and after the cover was accepted. */
+  before: number;
+  after: number;
+  filled: number;
+}
+
+export interface CallOffStepsData {
+  hero: HeroExampleData;
+  /** The same rooms as the hero, cut to the hours around the gap. */
+  rooms: { id: string; name: string; cells: CallOffStepCell[] }[];
+  accepted: { name: string; reason: string };
+}
+
+/**
+ * The call-off step-through (landing page section 2): the hero's example, plus what the engine
+ * says once the top-ranked person accepts and works the gap in the gap room. Every count is an
+ * engine output: the accepted cover is an input (one more shift), the counts are recomputed.
+ */
+export function buildCallOffSteps(): CallOffStepsData {
+  const hero = buildHeroExample();
+  const pick = hero.options[0];
+  if (!pick) throw new Error('call-off steps: the example needs at least one eligible person');
+  const memberId = Object.entries(NAMES).find(([, n]) => n === pick.name)![0];
+  const gapRoom = hero.rooms.find((r) => r.id === hero.gap.roomId)!;
+  const gapCells = gapRoom.cells.filter((c) => c.after < c.required);
+  const from = gapCells[0]!.minute;
+  const to = gapCells.at(-1)!.minute + 30;
+
+  const filledInput = exampleDayInput(true);
+  const filled = coverageForDay({
+    ...filledInput,
+    shifts: [...filledInput.shifts, { memberId, roomId: hero.gap.roomId, interval: localInterval(EXAMPLE.date, from, to, EXAMPLE.timezone) }],
+  });
+
+  // One hour either side of the gap, so the before/after edges are visible.
+  const lo = from - 60;
+  const hi = to + 60;
+  const rooms = hero.rooms.map((room) => ({
+    id: room.id,
+    name: room.name,
+    cells: room.cells
+      .filter((c) => c.minute >= lo && c.minute < hi)
+      .map((c) => {
+        const f = filled.rooms.find((rb) => rb.roomId === room.id && rb.block.fold === 0 && rb.block.startMinute === c.minute)!;
+        return { ...c, filled: f.present };
+      }),
+  }));
+  return { hero, rooms, accepted: { name: pick.name, reason: pick.reason } };
 }

@@ -116,6 +116,7 @@ const attacks = (): [CapabilityName, unknown][] => [
   ['manageWebhooks', { op: 'retry', deliveryId: bDeliveryId }],
   ['eraseMember', { memberId: B.emp.id }],
   ['getCoverage', { locationId: B.location.id, date: '2026-11-02' }],
+  ['getInspectorReport', { locationId: B.location.id, from: '2026-11-02', to: '2026-11-06' }],
   ['manageSchedule', { op: 'upsertRoom', locationId: B.location.id, name: 'pwned', kind: 'room', groupKey: 'infant' }],
   ['manageSchedule', { op: 'upsertRoom', roomId: bRoomId, locationId: A.location.id, name: 'pwned', kind: 'room', groupKey: 'infant' }],
   ['manageSchedule', { op: 'archiveRoom', roomId: bRoomId }],

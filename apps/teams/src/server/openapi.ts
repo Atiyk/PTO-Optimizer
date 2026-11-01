@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { CAPABILITIES } from '@/capabilities/registry';
 import type { CapabilityDef } from '@/capabilities/types';
 import { SCOPES } from '@/capabilities/scopes';
-import { LEGACY_PRODUCT_NAME as PRODUCT_NAME } from '@/lib/brand';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { WEBHOOK_DATA } from './webhookSchemas';
 
 /** OpenAPI 3.1 generated from the capability registry (R9). One POST operation per REST capability. */

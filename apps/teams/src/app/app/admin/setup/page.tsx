@@ -173,6 +173,18 @@ export default async function Setup() {
             submitLabel="Save settings"
           />
         </Card>
+        <Card title="AI features">
+          <p className="mb-3 text-sm text-muted">
+            Handbook import, requests in plain words, explanations, rule drafting and report summaries. When off, none of them call an AI model and
+            every form still works. Numbers never come from AI either way. Changes are recorded in the audit log.
+          </p>
+          <CapabilityForm
+            capability="manageOrgSetup"
+            fixed={{ op: 'updateSettings' }}
+            fields={[{ name: 'aiFeaturesEnabled', label: 'Use AI features in this workspace', type: 'checkbox', defaultValue: s.org.aiFeaturesEnabled }]}
+            submitLabel="Save AI setting"
+          />
+        </Card>
       </div>
     </div>
   );

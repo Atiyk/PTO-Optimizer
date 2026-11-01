@@ -17,7 +17,7 @@ export function GET() {
       scopes_supported: SCOPES,
       bearer_methods_supported: ['header'],
       resource_name: 'Days Off for Teams MCP server',
-      resource_documentation: `${appUrl()}/docs/agents`,
+      resource_documentation: `${appUrl()}/developers`,
     },
     { headers: { 'Cache-Control': 'public, max-age=3600' } },
   );

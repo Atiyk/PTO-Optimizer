@@ -53,7 +53,7 @@ function noticeTiers(i: { noticeDays?: number; longRequestDays?: number; longNot
 }
 
 const setupOp = z.discriminatedUnion('op', [
-  z.object({ op: z.literal('updateSettings'), name: z.string().min(1).max(120).optional(), visibility: z.enum(['org', 'team', 'custom']).optional(), showLeaveType: z.boolean().optional(), sickNotesEnabled: z.boolean().optional(), weekStart: z.union([z.literal(0), z.literal(1)]).optional() }),
+  z.object({ op: z.literal('updateSettings'), name: z.string().min(1).max(120).optional(), visibility: z.enum(['org', 'team', 'custom']).optional(), showLeaveType: z.boolean().optional(), sickNotesEnabled: z.boolean().optional(), aiFeaturesEnabled: z.boolean().optional().describe('The org-wide switch for in-app AI features. Signed-in owners and admins only; forms keep working when off.'), weekStart: z.union([z.literal(0), z.literal(1)]).optional() }),
   z.object({ op: z.literal('addLocation'), name: z.string().min(1).max(120), countryCode: z.string().regex(/^[A-Z]{2}$/), subdivisionCode: z.string().max(10).nullable().optional(), timezone: z.string().max(64).optional() }),
   z.object({ op: z.literal('addTeam'), name: z.string().min(1).max(120) }),
   z.object({ op: z.literal('renameTeam'), teamId: z.uuid(), name: z.string().min(1).max(120) }),
@@ -170,7 +170,8 @@ export const manageOrgSetup = defineCapability({
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
   rateLimit: 'write',
   surfaces: ['ui', 'rest'],
-  audit: (i) => `Org setup: ${i.op}${'name' in i && i.name ? ` "${i.name}"` : ''}`,
+  audit: (i) =>
+    `Org setup: ${i.op}${'name' in i && i.name ? ` "${i.name}"` : ''}${i.op === 'updateSettings' && i.aiFeaturesEnabled !== undefined ? (i.aiFeaturesEnabled ? ' (AI features on)' : ' (AI features OFF)') : ''}`,
   async handler({ db, actor }, input) {
     const orgId = actor.orgId;
     const ensureTeam = async (teamId: string) => {
@@ -205,6 +206,7 @@ export const manageOrgSetup = defineCapability({
     switch (input.op) {
       case 'updateSettings': {
         const { op: _op, ...rest } = input;
+        if (rest.aiFeaturesEnabled !== undefined && actor.type !== 'human') throw new CapabilityError('forbidden', 'Only a signed-in owner or admin can turn AI features on or off.');
         if (Object.keys(rest).length) await db.update(organizations).set(rest).where(eq(organizations.id, orgId));
         return { ok: true as const, id: orgId };
       }
@@ -418,7 +420,7 @@ export const getOrgSetup = defineCapability({
   description: 'Reads the org configuration (settings, locations, teams, leave types, policies, coverage rules, blackouts) for the admin screens.',
   input: z.object({}),
   output: z.object({
-    org: z.object({ id: z.uuid(), name: z.string(), visibility: z.string(), showLeaveType: z.boolean(), sickNotesEnabled: z.boolean(), agentAccessEnabled: z.boolean(), plan: z.enum(['starter', 'complete']) }),
+    org: z.object({ id: z.uuid(), name: z.string(), visibility: z.string(), showLeaveType: z.boolean(), sickNotesEnabled: z.boolean(), agentAccessEnabled: z.boolean(), aiFeaturesEnabled: z.boolean(), plan: z.enum(['starter', 'complete']) }),
     locations: z.array(z.object({ id: z.uuid(), name: z.string(), countryCode: z.string(), subdivisionCode: z.string().nullable() })),
     teams: z.array(z.object({ id: z.uuid(), name: z.string(), approverMemberId: z.uuid().nullable(), backupApproverMemberId: z.uuid().nullable() })),
     groups: z.array(z.object({ id: z.uuid(), name: z.string(), memberIds: z.array(z.uuid()) })),
@@ -476,7 +478,7 @@ export const getOrgSetup = defineCapability({
     const lt = await db.select().from(leaveTypes).where(eq(leaveTypes.orgId, orgId)).orderBy(asc(leaveTypes.createdAt));
     const key = new Map(lt.map((t) => [t.id, t.key]));
     return {
-      org: { id: org!.id, name: org!.name, visibility: org!.visibility, showLeaveType: org!.showLeaveType, sickNotesEnabled: org!.sickNotesEnabled, agentAccessEnabled: org!.agentAccessEnabled, plan: org!.plan },
+      org: { id: org!.id, name: org!.name, visibility: org!.visibility, showLeaveType: org!.showLeaveType, sickNotesEnabled: org!.sickNotesEnabled, agentAccessEnabled: org!.agentAccessEnabled, aiFeaturesEnabled: org!.aiFeaturesEnabled, plan: org!.plan },
       locations: (await db.select().from(locations).where(eq(locations.orgId, orgId)).orderBy(asc(locations.createdAt))).map((l) => ({ id: l.id, name: l.name, countryCode: l.countryCode, subdivisionCode: l.subdivisionCode })),
       teams: (await db.select().from(teams).where(eq(teams.orgId, orgId)).orderBy(asc(teams.name))).map((t) => ({ id: t.id, name: t.name, approverMemberId: t.approverMemberId, backupApproverMemberId: t.backupApproverMemberId })),
       groups: await (async () => {

@@ -2,7 +2,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { and, eq, gte, sql } from 'drizzle-orm';
 import type { Db } from '@/db/client';
-import { aiCache, aiUsage } from '@/db/schema';
+import { aiCache, aiUsage, organizations } from '@/db/schema';
 import { monthlyTokenBudget, orgDailyTokenBudget, taskConfig } from './config';
 import { AiProviderError, currentProvider, mockProvider } from './provider';
 import type { AiTask } from './task';
@@ -60,6 +60,12 @@ export async function budgetStatus(db: Db, orgId: string, now: Date) {
  * The single entry point for model calls: mode check → input size → budgets → cache →
  * provider → schema validation (one retry) → usage row. Nothing else imports the SDK.
  */
+/** The org's own "AI features" switch (admin setting). A missing org reads as off. */
+export async function orgAiEnabled(db: Db, orgId: string): Promise<boolean> {
+  const [org] = await db.select({ on: organizations.aiFeaturesEnabled }).from(organizations).where(eq(organizations.id, orgId)).limit(1);
+  return org?.on === true;
+}
+
 export async function runAiTask<I, O>(
   db: Db,
   orgId: string,
@@ -71,6 +77,8 @@ export async function runAiTask<I, O>(
   const base = currentProvider();
   const provider = base?.name === 'anthropic' && (await demoKind(db, orgId)) === 'sandbox' ? mockProvider : base;
   if (!provider) throw new AiUnavailableError('disabled', 'AI features are turned off.');
+  // Checked before the cache too: an org that turned AI off gets no AI output at all.
+  if (!(await orgAiEnabled(db, orgId))) throw new AiUnavailableError('disabled', 'An admin turned AI features off for this workspace. Forms still work.');
   const cfg = taskConfig(task.name);
 
   const rendered = task.render(input);

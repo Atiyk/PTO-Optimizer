@@ -12,7 +12,7 @@ export function GET() {
       grant_types_supported: ['client_credentials'],
       token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post'],
       scopes_supported: SCOPES,
-      service_documentation: `${base}/docs/agents`,
+      service_documentation: `${base}/developers`,
     },
     { headers: { 'Cache-Control': 'public, max-age=3600' } },
   );

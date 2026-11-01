@@ -14,6 +14,7 @@ import { draftRulePackFromText, explainCoverInWords, parseCoverText, saveRulePac
 import { getCoverage, getCoverageSetup, getCredentials, getSickLeave, importHoursWorked, listRulePacks, manageCredentials, manageSchedule } from './actions/coverage';
 import { listMyProposals, respondToProposal, runTeamPlan, sendPlanProposals } from './actions/planner';
 import { getCoverageForecast } from './actions/forecast';
+import { getInspectorReport } from './actions/inspector';
 import { clockPunch, getComplianceTasks, getMyTimeClock, getTimesheets, getWorkRules, manageTimesheets, manageWorkRules } from './actions/timeclock';
 import { approveAllClean, decideLeaveRequest, listPendingApprovals, requestReview } from './actions/approvals';
 import { completeHrTask, confirmRequestWindow, getRequestWindows, getShadowReplay, listHrTasks } from './actions/decisions';
@@ -109,6 +110,7 @@ export const CAPABILITIES = {
   explainCoverInWords,
   parseCoverText,
   getCoverageForecast,
+  getInspectorReport,
 } as const satisfies Record<string, CapabilityDef>;
 
 export type CapabilityName = keyof typeof CAPABILITIES;

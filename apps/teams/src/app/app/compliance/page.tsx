@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { Badge, Card, StatusBanner } from '@/components/ui';
+import { addDays } from '@daysoff/engine/solver/dateUtils';
+import { Badge, btnSecondary, Card, input, label, StatusBanner } from '@/components/ui';
 import { call, requireActor } from '@/server/page';
 
 const GROUPS: { severity: 'action' | 'warning' | 'info'; title: string; blurb: string }[] = [
@@ -59,7 +60,48 @@ export default async function CompliancePage() {
           </Card>
         );
       })}
+      {(actor.role === 'owner' || actor.role === 'admin') && <InspectorExport />}
       <p className="text-xs text-muted">{out.notice}</p>
     </div>
+  );
+}
+
+/**
+ * The inspector export (getInspectorReport): ratio checks per room and day with their citations,
+ * gap windows and the audit entries, as CSV. A plain GET form; the download is audited.
+ */
+async function InspectorExport() {
+  const setup = await call('getOrgSetup', {}, await requireActor());
+  if (!setup.locations.length) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  return (
+    <Card title="Inspector export">
+      <p className="-mt-2 mb-3 text-sm text-muted">
+        For a licensing visit: each room&rsquo;s ratio checks per day, the rule behind each one with its source, every gap, and the audit log for those days. Up to 31 days. Not legal advice.
+      </p>
+      <form method="get" action="/api/reports/inspector" className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+        <div>
+          <label htmlFor="ie-site" className={label}>Site</label>
+          <select id="ie-site" name="location" className={`${input} mt-1`} defaultValue={setup.locations[0]!.id}>
+            {setup.locations.map((l) => (
+              <option key={l.id} value={l.id}>{l.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="ie-from" className={label}>From</label>
+          <input id="ie-from" name="from" type="date" required defaultValue={addDays(today, -6)} className={`${input} mt-1`} />
+        </div>
+        <div>
+          <label htmlFor="ie-to" className={label}>To</label>
+          <input id="ie-to" name="to" type="date" required defaultValue={today} className={`${input} mt-1`} />
+        </div>
+        <div className="flex flex-wrap gap-2 sm:col-span-3">
+          <button type="submit" name="file" value="ratio-checks" className={btnSecondary}>Ratio checks (CSV)</button>
+          <button type="submit" name="file" value="gaps" className={btnSecondary}>Gaps (CSV)</button>
+          <button type="submit" name="file" value="audit" className={btnSecondary}>Audit entries (CSV)</button>
+        </div>
+      </form>
+    </Card>
   );
 }

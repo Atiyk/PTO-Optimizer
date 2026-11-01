@@ -9,7 +9,7 @@ afterEach(() => vi.unstubAllEnvs());
 describe('discovery (5E)', () => {
   it('llms.txt follows the llmstxt.org shape and lists every MCP tool', async () => {
     const text = await (await llms(new Request('https://teams.example.com/llms.txt'))).text();
-    expect(text.split('\n')[0]).toBe('# Days Off for Teams');
+    expect(text.split('\n')[0]).toBe('# Gapless');
     expect(text).toMatch(/^> /m);
     expect(text).toContain('## Tools');
     for (const t of agentTools()) expect(text).toContain(`\`${t.name}\``);
@@ -22,7 +22,7 @@ describe('discovery (5E)', () => {
     expect((await a2a(new Request('https://teams.example.com/api/a2a', { method: 'POST', body: '{}' }))).status).toBe(404);
     vi.stubEnv('A2A_ENABLED', '1');
     const c = await (await card(new Request('https://teams.example.com/.well-known/agent-card.json'))).json();
-    expect(c).toMatchObject({ name: 'Days Off for Teams', supportedInterfaces: [{ protocolBinding: 'JSONRPC', protocolVersion: '1.0' }] });
+    expect(c).toMatchObject({ name: 'Gapless', supportedInterfaces: [{ protocolBinding: 'JSONRPC', protocolVersion: '1.0' }] });
     expect(c.skills.length).toBeGreaterThan(0);
     expect(c).not.toHaveProperty('protocolVersion'); // 0.3-era top-level field
     const r = await (await a2a(new Request('https://teams.example.com/api/a2a', { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'SendMessage' }) }))).json();
