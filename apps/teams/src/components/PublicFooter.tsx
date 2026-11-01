@@ -4,8 +4,8 @@ import { PRODUCT_NAME, PRODUCT_TAGLINE } from '@/lib/brand';
 
 const COLUMNS: [title: string, links: [href: string, text: string][]][] = [
   ['Try it', [['/try', 'Try the demo'], ['/demo/coverage', 'Coverage walkthrough'], ['/demo', 'Leave planner walkthrough']]],
-  ['Product', [['/#product', 'For managers and staff'], ['/#coverage', 'Staff cover and ratios'], ['/#integrations', 'Integrations']]],
-  ['Developers', [['/docs/agents', 'MCP and REST for AI agents'], ['/llms.txt', 'llms.txt'], ['/status', 'Service status']]],
+  ['Product', [['/#call-off', 'Call-offs and cover'], ['/#compliance', 'Compliance'], ['/#for-staff', 'For staff'], ['/childcare', 'Childcare centres']]],
+  ['Developers', [['/developers', 'MCP, REST and webhooks'], ['/llms.txt', 'llms.txt'], ['/status', 'Service status']]],
 ];
 
 export function PublicFooter() {

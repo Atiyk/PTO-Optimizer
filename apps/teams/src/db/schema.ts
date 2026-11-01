@@ -58,6 +58,12 @@ export const organizations = pgTable('organizations', {
   showLeaveType: boolean('show_leave_type').notNull().default(false),
   /** Admin kill switch for every agent token in the org (A12). */
   agentAccessEnabled: boolean('agent_access_enabled').notNull().default(true),
+  /**
+   * Admin switch for the in-app AI features (handbook import, plain-words requests, explanations,
+   * rule drafting, reports). Off → every AI call reports unavailable and every form still works.
+   * Checked in src/ai/run.ts, the single entry point for model calls.
+   */
+  aiFeaturesEnabled: boolean('ai_features_enabled').notNull().default(true),
   /** The shared, read-only sample org behind the public demo (/demo). */
   isDemo: boolean('is_demo').notNull().default(false),
   /** Minutes an auto-approval stays reversible by the manager. */

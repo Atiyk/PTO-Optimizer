@@ -7,6 +7,10 @@ import { useEffect, useId, useRef, useState } from 'react';
  * source (a regulation section or a handbook sentence). Activating it opens a small panel
  * with the quoted text, who published it, the date it was read and a link, plus "Not legal
  * advice". A real button (keyboard-reachable); Escape or a click elsewhere closes it.
+ *
+ * The panel opens in the flow of the text, on its own line below the chip, and pushes what
+ * follows down instead of floating over it: a floating panel covered the cover-option reasons
+ * under the hero's rule at 1440px.
  */
 
 export interface SourceChipSource {
@@ -60,7 +64,7 @@ export function SourceChip({ source }: { source: SourceChipSource }) {
   }, [open]);
 
   return (
-    <span ref={wrap} className="relative inline-block align-baseline">
+    <span ref={wrap} className="inline">
       <button
         ref={button}
         type="button"
@@ -80,7 +84,7 @@ export function SourceChip({ source }: { source: SourceChipSource }) {
           id={id}
           role="group"
           aria-label={`Source: ${source.label}`}
-          className="absolute top-full left-0 z-30 mt-2 block w-80 max-w-[calc(100vw-2.5rem)] rounded-lg border border-line bg-card p-3 text-left text-sm text-ink shadow-lg"
+          className="my-2 block w-full max-w-md rounded-lg border border-line bg-card p-3 text-left text-sm text-ink shadow-sm"
         >
           <span className="block font-semibold">
             {source.regulation}

@@ -213,7 +213,7 @@ export const reportCallOff = defineCapability({
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
   rateLimit: 'write',
   surfaces: ['ui', 'rest', 'mcp', 'slack', 'assistant'],
-  audit: (_i, o) => `Call-off for ${o.date}: ${o.coverRequests.length} cover requests`,
+  audit: (_i, o) => `Call-off for ${o.date}: ${o.coverRequests.length} cover request${o.coverRequests.length === 1 ? '' : 's'}`,
   async handler({ db, actor, now }, input) {
     const member = await subjectMember(db, actor);
     const today = await memberToday(db, actor.orgId, member.id, now);

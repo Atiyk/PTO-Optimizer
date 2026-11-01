@@ -59,7 +59,7 @@ export default async function AgentsAndApi() {
           {a.agentAccessEnabled
             ? 'Agents can connect with the tokens and clients below.'
             : 'Agent access is off. Every token and client is refused until you turn it back on.'}{' '}
-          Setup steps for Claude, ChatGPT, Copilot Studio and Agentforce are in the <Link className="text-accent underline" href="/docs/agents">agent guide</Link>.
+          Setup steps for Claude, ChatGPT, Copilot Studio and Agentforce are in the <Link className="text-accent underline" href="/developers">agent guide</Link>.
         </p>
       </Card>
 

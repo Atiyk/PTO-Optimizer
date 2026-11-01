@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { coverageForDay, rankCandidates, rulesOf } from '@daysoff/engine/coverage/index';
 import { CHILDCARE_US_CA } from '@daysoff/engine/rulepacks';
-import { EXAMPLE_PACK, buildHeroExample, exampleCandidates, exampleDayInput } from './heroExample';
+import { EXAMPLE_PACK, buildCallOffSteps, buildHeroExample, exampleCandidates, exampleDayInput } from './heroExample';
+import { childcarePacks } from './rulesExample';
 
 /*
  * The landing-page hero must show the engine's numbers, not hand-written ones: every count
@@ -85,5 +86,50 @@ describe('hero coverage example', () => {
   it('the client grid writes no ratio or count of its own', () => {
     const src = readFileSync(new URL('./HeroCoverageGrid.tsx', import.meta.url), 'utf8');
     expect(src).not.toMatch(/per \d|1:\d|\d+ (?:toddlers|children|teachers)/i);
+  });
+});
+
+describe('call-off step-through (section 2)', () => {
+  const steps = buildCallOffSteps();
+
+  it('shows the hero’s own cells around the gap, and the accepted cover is the top-ranked person', () => {
+    expect(steps.accepted.name).toBe(hero.options[0]!.name);
+    for (const room of steps.rooms) {
+      const heroRoom = hero.rooms.find((r) => r.id === room.id)!;
+      for (const c of room.cells) {
+        const h = heroRoom.cells.find((x) => x.minute === c.minute)!;
+        expect([c.required, c.before, c.after]).toEqual([h.required, h.before, h.after]);
+      }
+    }
+    // The gap's blocks are all inside the window, with an hour either side.
+    const gapRoom = steps.rooms.find((r) => r.id === hero.gap.roomId)!;
+    expect(gapRoom.cells.filter((c) => c.after < c.required)).toHaveLength(5);
+    expect(gapRoom.cells[0]!.time).toBe('08:00');
+  });
+
+  it('after the cover is accepted the engine puts every block back in ratio, changing only the gap room', () => {
+    for (const room of steps.rooms) {
+      for (const c of room.cells) {
+        expect(c.filled).toBeGreaterThanOrEqual(c.required);
+        if (room.id !== hero.gap.roomId) expect(c.filled).toBe(c.after);
+      }
+    }
+    const gapRoom = steps.rooms.find((r) => r.id === hero.gap.roomId)!;
+    for (const c of gapRoom.cells.filter((x) => x.after < x.required)) expect(c.filled).toBe(c.after + 1);
+  });
+});
+
+describe('marketing rules (compliance section, /childcare)', () => {
+  it('are the CA, TX and NY packs’ own ratio rules and citations', () => {
+    const packs = childcarePacks();
+    expect(packs.map((p) => p.state)).toEqual(['California', 'Texas', 'New York']);
+    const ca = packs[0]!;
+    const caRatios = rulesOf(CHILDCARE_US_CA, 'ratio');
+    expect(ca.ratios.map((r) => r.label)).toEqual(caRatios.map((r) => r.label));
+    for (const [i, r] of ca.ratios.entries()) {
+      expect(r.source?.url).toBe(caRatios[i]!.citation?.url);
+      expect(r.source?.retrievedOn).toBe(caRatios[i]!.citation?.retrievedOn);
+    }
+    for (const p of packs) for (const r of p.ratios) expect(r.source || r.needsVerification).toBeTruthy();
   });
 });

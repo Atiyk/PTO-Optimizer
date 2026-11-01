@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@/lib/brand';
 import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import {
@@ -58,7 +59,7 @@ export async function redeemLoginCode(db: Db, code: string, now: Date) {
 
 function rp() {
   const url = new URL(appUrl());
-  return { rpID: url.hostname, origin: url.origin, rpName: 'Days Off for Teams' };
+  return { rpID: url.hostname, origin: url.origin, rpName: PRODUCT_NAME };
 }
 
 function secret(): string {
