@@ -1,42 +1,53 @@
 @import 'tailwindcss';
 
 /*
- * Same visual language as Days Off (src/index.css at the repo root): two neutrals plus one
- * deep-blue accent, light theme only, every text/background pair at WCAG AA 4.5:1 or
- * better. Data viz must stay legible in greyscale, so state is never carried by hue alone.
+ * Gapless: warm neutrals, one calm accent (deep green) and one alert colour (brick red)
+ * used ONLY for rule breaches and gaps. Light theme only. Every text/background pair below
+ * is at WCAG AA 4.5:1 or better (checked with a contrast script and axe; see the PR). Data
+ * viz stays legible in greyscale: state is never carried by hue alone (patterns, borders
+ * and text carry it too). Token names are unchanged so the app keeps working.
  */
 :root {
-  --bg-page: #ffffff;
-  --bg-surface: #f8fafc;
-  --bg-surface-alt: #f1f5f9;
-  --border-default: #e2e8f0;
-  --text-primary: #0f172a;
-  --text-muted: #5a687c; /* #64748b failed 4.5:1 on surface-alt (axe, Phase 6) */
-  --focus-ring: #1e3a8a;
-  --accent: #1e3a8a;
-  --accent-strong: #172554;
+  /* Neutrals: stone/off-white page, white cards, warm near-black ink. */
+  --bg-page: #faf8f5;
+  --bg-card: #ffffff;
+  --bg-surface: #f4f1ec;
+  --bg-surface-alt: #ebe6df;
+  --border-default: #ddd6cc;
+  --text-primary: #1c1a17; /* 16.4:1 on page */
+  --text-muted: #5b544b; /* 6.0:1 on surface-alt, the darkest neutral it sits on */
+  /* Accent: deep green. White on it 7.9:1; it on page 7.5:1. */
+  --focus-ring: #0f5c4d;
+  --accent: #0f5c4d;
+  --accent-strong: #0a4238;
   --accent-text: #ffffff;
+  --accent-soft: #e4f0ea;
   --band-bg: #fef3c7;
-  --band-text: #1e293b;
-  /* Marketing and app chrome: a soft accent wash, and text on the deep-blue hero (9:1 or better). */
-  --accent-soft: #eef2ff;
-  --hero-bg: #0f1b3d;
+  --band-text: #1c1a17;
+  /* The dark navy hero is retired; bands that still use these tokens are deep green. */
+  --hero-bg: #0a4238;
   --on-hero: #ffffff;
-  --on-hero-muted: #c7d2fe;
+  --on-hero-muted: #cfe5da; /* 8.6:1 on hero-bg */
   /* Coverage states. Each pairs with a pattern or border too, so none relies on hue alone. */
-  --ok-bg: #ecfdf5;
-  --ok-fill: #d1fae5;
-  --ok-line: #6ee7b7;
-  --ok-text: #065f46;
-  --gap-bg: #fef2f2;
-  --gap-fill: #fee2e2;
-  --gap-line: #b91c1c;
-  --gap-text: #991b1b;
+  --ok-bg: #eef5f0;
+  --ok-fill: #dcebe2;
+  --ok-line: #7fb293;
+  --ok-text: #1d5a3c; /* 6.6:1 on ok-fill */
+  /* Alert: rule breaches and gaps only. */
+  --gap-bg: #fdf0ed;
+  --gap-fill: #fbdcd5;
+  --gap-line: #b42318; /* 5.1:1 on gap-fill (non-text 3:1 needed) */
+  --gap-text: #8f1d14; /* 6.9:1 on gap-fill */
+  /* The brief's names, as aliases of the tokens above. */
+  --alert: var(--gap-line);
+  --alert-soft: var(--gap-bg);
+  --ok: var(--ok-text);
   color-scheme: light;
 }
 
 @theme inline {
   --color-page: var(--bg-page);
+  --color-card: var(--bg-card);
   --color-surface: var(--bg-surface);
   --color-surface-alt: var(--bg-surface-alt);
   --color-line: var(--border-default);
@@ -57,6 +68,11 @@
   --color-gap-fill: var(--gap-fill);
   --color-gap-line: var(--gap-line);
   --color-gap-text: var(--gap-text);
+  --color-alert: var(--alert);
+  --color-alert-soft: var(--alert-soft);
+  --color-ok: var(--ok);
+  --font-sans: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-display), ui-serif, Georgia, serif;
 }
 
 body {
@@ -77,6 +93,14 @@ body {
 
 html {
   scroll-behavior: smooth;
+}
+
+/* A gap cell: alert fill plus a hatch, so it reads as "gap" in greyscale too (border and
+   bold text carry it as well). */
+.hero-gap-cell {
+  background-color: var(--gap-fill);
+  background-image: repeating-linear-gradient(135deg, transparent 0 5px, rgb(180 35 24 / 0.14) 5px 7px);
+  transition: background-color 300ms ease;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,4 +1,4 @@
-import { PRODUCT_NAME } from '@/lib/brand';
+import { LEGACY_PRODUCT_NAME as PRODUCT_NAME } from '@/lib/brand';
 
 /** Web app manifest for the staff app (installable from the browser on phones). */
 export function GET() {

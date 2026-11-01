@@ -1,7 +1,7 @@
 import { CAPABILITIES } from '@/capabilities/registry';
 import { SCOPE_DESCRIPTIONS, type Scope } from '@/capabilities/scopes';
 import { appUrl } from '@/lib/appUrl';
-import { PRODUCT_NAME, PRODUCT_TAGLINE } from '@/lib/brand';
+import { LEGACY_PRODUCT_NAME as PRODUCT_NAME, LEGACY_PRODUCT_TAGLINE as PRODUCT_TAGLINE } from '@/lib/brand';
 
 /*
  * One source for what agents read about us: /llms.txt, /docs/agents and the A2A card.

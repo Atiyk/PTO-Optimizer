@@ -1,9 +1,11 @@
+import { Source_Serif_4 } from 'next/font/google';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
 import { btn, btnPrimary, btnSecondary } from '@/components/ui';
-import { PRODUCT_TAGLINE } from '@/lib/brand';
+import { HeroCoverageGrid } from '@/components/marketing/HeroCoverageGrid';
+import { buildHeroExample } from '@/components/marketing/heroExample';
 
 /*
  * The marketing page. Every picture on it is the product's own UI pattern drawn with fixed,
@@ -37,12 +39,10 @@ const TIME: [title: string, body: string][] = [
   ['A compliance inbox, not a binder', 'Missed clock-outs, short or late meals, overtime, timesheets to approve and expiring credentials, each with a link to fix it.'],
 ];
 
-const INDUSTRIES = ['Offices', 'Childcare', 'Clinics', 'Healthcare and care homes', 'Retail', 'Restaurants and hospitality', 'Security and facilities', 'Manufacturing and warehouses'];
-
 const INTEGRATIONS: [title: string, body: string, icon: ReactNode][] = [
   ['Slack', 'Request, approve and see who is out without leaving Slack. Sign in with your work account.', <IconChat key="i" />],
   ['Phone app', 'Installs from the browser, signs in with a passkey, and works for staff who never use Slack.', <IconPhone key="i" />],
-  ['AI agents over MCP', 'Claude and other agents read and draft through the same rules as people, with scoped keys you control.', <IconSpark key="i" />],
+  ['AI agents over MCP', 'Claude and other agents read and draft through the same rules as people, with scoped keys you control.', <IconPlug key="i" />],
   ['REST API and webhooks', 'Every action the app can take, as an API, plus signed events when leave or cover changes.', <IconCode key="i" />],
   ['Spreadsheet import', 'Bring people, balances and hours worked from a CSV. Each row is checked before anything is saved.', <IconTable key="i" />],
 ];
@@ -54,28 +54,37 @@ const TRUST: [title: string, body: string][] = [
   ['One switch for agents', 'Turn off all agent access at once, and choose what agents may do without asking.'],
 ];
 
+/** Serif for marketing headings only; loaded (and preloaded) by this page alone. */
+const serif = Source_Serif_4({ subsets: ['latin'], weight: ['600'], display: 'swap', variable: '--font-display' });
+
 export default function Home() {
   return (
-    <>
+    <div className={serif.variable}>
       <PublicHeader />
       <main>
-        <section className="on-hero bg-hero text-on-hero" aria-labelledby="hero">
-          <div className="mx-auto grid max-w-6xl gap-12 px-4 pt-16 pb-20 lg:grid-cols-[1fr_minmax(0,32rem)] lg:items-center lg:pt-24 lg:pb-28">
-            <div>
-              <p className="inline-flex rounded-full border border-on-hero-muted/40 px-3 py-1 text-xs font-medium tracking-wide text-on-hero-muted uppercase">
-                Early preview · free to try
-              </p>
-              <h1 id="hero" className="mt-5 text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-                Know who’s off, who’s on the clock, and who can cover.
+        <section className="bg-page" aria-labelledby="hero">
+          <div className="mx-auto grid max-w-7xl gap-10 px-4 pt-12 pb-20 sm:pt-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,44rem)] lg:items-start lg:gap-12 lg:pt-20 lg:pb-24">
+            <div className="lg:pt-8">
+              <p className="text-sm font-semibold text-accent">For childcare centres, clinics and care homes</p>
+              <h1 id="hero" className="mt-4 font-serif text-[2.5rem] leading-[1.1] font-semibold tracking-tight text-balance text-ink sm:text-5xl lg:text-[3.5rem]">
+                Know before an absence breaks a staffing rule.
               </h1>
-              <p className="mt-5 max-w-xl text-lg text-on-hero-muted">{PRODUCT_TAGLINE} One system for any team that works in shifts, with presets for regulated industries where one absence can break a rule.</p>
+              <p className="mt-5 max-w-xl text-lg text-muted">
+                See each room against its staffing rule and, when someone calls in sick, the gap, the rule behind it and who can cover.
+              </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
-                <Link href="/try" className={`${btn} bg-on-hero px-5 py-2.5 text-base text-accent-strong hover:bg-accent-soft`}>Try the demo</Link>
-                <Link href="/signin" className={`${btn} border border-on-hero-muted/60 px-5 py-2.5 text-base text-on-hero hover:bg-white/10`}>Sign in</Link>
+                <Link href="/try" className={`${btnPrimary} px-5 py-2.5 text-base`}>Try the demo</Link>
+                <Link href="#coverage" className={`${btnSecondary} px-5 py-2.5 text-base`}>See how call-offs work</Link>
               </div>
-              <p className="mt-4 text-sm text-on-hero-muted">No sign-up. You get your own copy of a made-up team.</p>
+              <p className="mt-8 flex max-w-xl gap-2 text-base text-ink">
+                <Check />
+                <span>
+                  <strong className="font-semibold">AI that shows its work:</strong> every number comes from a tested engine, every rule links to its source.
+                </span>
+              </p>
+              <p className="mt-3 text-sm text-muted">Early preview · free to try. No sign-up: you get your own copy of a made-up team.</p>
             </div>
-            <HeroVisual />
+            <HeroCoverageGrid data={buildHeroExample()} />
           </div>
         </section>
 
@@ -86,7 +95,7 @@ export default function Home() {
             </SectionHead>
             <div className="mt-12 grid gap-8 lg:grid-cols-2">
               <Side title="For managers and owners" items={MANAGERS} visual={<ApprovalVisual />} />
-              <Side title="For your team" items={STAFF} visual={<BalanceVisual />} />
+              <Side id="for-staff" title="For your team" items={STAFF} visual={<BalanceVisual />} />
             </div>
           </div>
         </section>
@@ -107,14 +116,6 @@ export default function Home() {
             <p className="mt-8 text-sm text-muted">
               Overtime and break rules for US federal, California, Washington, Colorado, New York State and New York City, each cited and dated. Configurable defaults, not legal advice. Hours only: pay stays with your payroll provider.
             </p>
-            <div className="mt-8">
-              <h3 className="text-sm font-semibold text-ink">One system, presets for your industry</h3>
-              <ul className="mt-3 flex flex-wrap gap-2" aria-label="Industry presets">
-                {INDUSTRIES.map((i) => (
-                  <li key={i} className="rounded-full border border-line bg-page px-3 py-1 text-sm text-ink">{i}</li>
-                ))}
-              </ul>
-            </div>
           </div>
         </section>
 
@@ -193,7 +194,7 @@ export default function Home() {
         </section>
       </main>
       <PublicFooter />
-    </>
+    </div>
   );
 }
 
@@ -207,9 +208,9 @@ function SectionHead({ id, eyebrow, title, children }: { id: string; eyebrow: st
   );
 }
 
-function Side({ title, items, visual }: { title: string; items: [string, string][]; visual: ReactNode }) {
+function Side({ id, title, items, visual }: { id?: string; title: string; items: [string, string][]; visual: ReactNode }) {
   return (
-    <div className="flex flex-col rounded-2xl border border-line bg-surface p-6 sm:p-8">
+    <div id={id} className="flex scroll-mt-20 flex-col rounded-2xl border border-line bg-surface p-6 sm:p-8">
       <h3 className="text-xl font-semibold text-ink">{title}</h3>
       <div className="mt-6">{visual}</div>
       <ul className="mt-8 space-y-5">
@@ -348,42 +349,6 @@ function SampleGrid({ compact = false }: { compact?: boolean }) {
   );
 }
 
-/** The hero: the manager's coverage view in a window, with the staff phone app beside it. */
-function HeroVisual() {
-  return (
-    <div className="relative pb-16 sm:pr-36 lg:pr-28">
-      <div className="overflow-hidden rounded-2xl border border-white/15 bg-surface shadow-2xl">
-        <div className="flex items-center gap-1.5 border-b border-line bg-page px-4 py-2.5" aria-hidden="true">
-          <span className="h-2.5 w-2.5 rounded-full bg-line" />
-          <span className="h-2.5 w-2.5 rounded-full bg-line" />
-          <span className="h-2.5 w-2.5 rounded-full bg-line" />
-          <span className="ml-3 text-xs text-muted">Coverage · Sunbeam Early Learning</span>
-        </div>
-        <div className="space-y-3 p-4 text-ink">
-          <div className="rounded-lg border-l-8 border-gap-line bg-gap-bg p-3">
-            <p className="font-semibold text-gap-text">1 gap this week</p>
-            <p className="text-sm">Monday 15:30, Toddlers, 1 staff short</p>
-          </div>
-          <SampleGrid compact />
-        </div>
-      </div>
-      <figure className="absolute right-0 bottom-0 hidden w-44 rounded-[1.75rem] border-4 border-ink bg-page p-3 text-ink shadow-2xl sm:block" aria-label="Example: the staff phone app">
-        <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-line" aria-hidden="true" />
-        <p className="text-[11px] font-medium text-muted uppercase">Tomorrow</p>
-        <p className="text-sm font-semibold">7:00 – 15:00</p>
-        <p className="text-xs text-muted">Toddlers</p>
-        <span className="mt-3 block rounded-lg border-2 border-gap-line bg-gap-bg py-2 text-center text-xs font-semibold text-gap-text" aria-hidden="true">
-          I can’t come in
-        </span>
-        <span className="mt-2 block rounded-lg bg-accent py-2 text-center text-xs font-semibold text-white" aria-hidden="true">
-          1 cover offer
-        </span>
-        <figcaption className="sr-only">Tomorrow 7:00 to 15:00 in Toddlers, with an “I can’t come in” button and one cover offer.</figcaption>
-      </figure>
-    </div>
-  );
-}
-
 function Check() {
   return (
     <svg viewBox="0 0 20 20" className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden="true" focusable="false">
@@ -400,8 +365,8 @@ function IconChat() {
 function IconPhone() {
   return <svg {...iconProps}><rect x="7" y="2.5" width="10" height="19" rx="2.5" /><path d="M11 18h2" /></svg>;
 }
-function IconSpark() {
-  return <svg {...iconProps}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6" /></svg>;
+function IconPlug() {
+  return <svg {...iconProps}><path d="M9 3v5M15 3v5M6.5 8h11v3a5.5 5.5 0 0 1-11 0zM12 16.5V21" /></svg>;
 }
 function IconCode() {
   return <svg {...iconProps}><path d="M8 7l-5 5 5 5M16 7l5 5-5 5" /></svg>;
