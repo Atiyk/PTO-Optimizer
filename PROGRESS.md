@@ -2856,3 +2856,90 @@ of the spec).
    words when you next edit the file?
 2. The internal tool names "PTO Optimizer" / "Sabbatical Planning" stay as page headings
    until Phase 1 switches the nav to the D2 labels.
+
+## Phase 1: visual system (`claude/redesign-1-visual-system`)
+
+### What changed
+- **Tokens** (`src/index.css`): warm page `#FBF8F3`, white surfaces, burnt-orange accent
+  `#C2410C` (suggested PTO, primary action, focus ring), orange-100 band wash, weekend
+  `#F5F0E8`, holiday dot `#57534E`, plus `--border-strong` (`#8C8279`) for control
+  boundaries. A Tailwind v4 `@theme inline` block exposes them as `bg-page`, `bg-surface`,
+  `text-ink`, `text-muted`, `border-line`, `bg-accent`, `bg-accent-soft`, `bg-band`,
+  `bg-holiday`, `bg-weekend` and friends, plus the type scale (`text-display` 56/64,
+  `text-display-sm` 44/48, `text-h1` 40/48, `text-h2` 28/32, body 16/24, small 14/20).
+  Light theme only, with dark-ready structure.
+- **The slate ramp is remapped to warm neutrals** in `@theme`. Every existing page used
+  Tailwind's cool slate greys directly, so this warms all of them without touching their
+  markup, which Phase 3 restyles. Shades 400 and darker now reach 4.5:1 on every
+  background. That fixes the light-grey footnote text that used to fail contrast.
+- **Score bars**: the accent and two darker shades instead of indigo, so the site has one
+  accent hue. Canvas share images and the policy chart use the new hexes.
+- **Font**: Figtree variable, Latin subset only. One 20 KB woff2 at a stable
+  `/fonts/` URL, preloaded by every HTML shell, with `font-display: swap` and a
+  metric-matched Arial fallback (`size-adjust`, `ascent-override`), so the swap causes no
+  layout shift (CLS 0 on all three measured routes). `tabular-nums` is set on `body`. I
+  checked that Figtree has tabular figures: "1111" and "0000" render at the same width.
+- **Components** in `src/ui/`: `Button` (primary/secondary/quiet, sm/md; it renders an
+  `<a>` when given `href`), `Chip` (a static fact, or a toggle whose state shows in
+  `aria-pressed` plus a check mark), `Card`, `StatNumber` (eases in for 150 ms only when its
+  value changes, never on load), `Callout` (left border plus an optional "Why:" line),
+  `Countdown`, and `Logo`/`LogoMark`.
+- **Logo**: a calendar page with one solid accent run across the week. A single source
+  (`src/ui/logoMark.ts`) feeds the inline mark and `scripts/build-icons.ts`, which
+  writes `favicon.svg`, a 16/32/48 `favicon.ico`, the 180 px `apple-touch-icon.png`, and
+  `icons/icon-192.png`, `icon-512.png` and `icon-maskable-512.png` (safe zone).
+- **Header**: logo plus wordmark (`PRODUCT_NAME`, or `PRODUCT_SHORT_NAME` below 400 px,
+  switched in CSS so nothing shifts); the "Plan" (Plan PTO, Sabbatical) and "Understand"
+  (Your policy, Glossary) groups per D2; the "Plan my time off" primary link; a reserved
+  76 px sign-in slot. Below 1024 px the groups collapse into a disclosure (Menu button with
+  `aria-expanded`/`aria-controls`, Escape closes it and returns focus). I moved the
+  breakpoint from the spec's "at 375px" up to 1024 px, because at 768 px the full wordmark,
+  four links and the button wrapped onto two lines (screenshots). The CTA moves into the
+  panel below 640 px.
+- **Footer**: a brand column (mark, name, tagline) plus Product / Resources / About, and a
+  closing "formerly Days Off. Your old links still work." line. No external product links.
+- D2 labels are also used in the FAQ page, the sabbatical page's cross-link and 404.html.
+- The two inner page `<header>`s (on /pto and /sabbatical) became `<div>`s, so each page has
+  one banner landmark.
+- **`/_dev/ui/`**: a gallery of every component in every state. It shows the gallery three
+  times in iframes at 375/768/1440, and `?bare` shows one copy. It is served only by
+  `npm run dev`, because it isn't a Vite build input or a route in `scripts/routes.ts`.
+  Verified: `find dist -name '*_dev*'` is empty and the sitemap has no `_dev`.
+
+### Tests
+- `tokens.test.ts` parses the real `src/index.css`. `colorScheme.test.ts` now does too,
+  instead of keeping hand-copied RGB triples. They check ink and muted text on
+  page/surface/surface-alt, accent text, text on the accent (including hover), band and
+  weekend text, 3:1 UI boundaries (focus ring, control border, holiday dot, PTO cell), every
+  remapped slate shade from 400 up, the score ramp matching the accent, and the greyscale
+  separation between suggested PTO, the band and a plain cell. Vitest blanks CSS imports by
+  default, so `vite.config.ts` includes `index.css` for tests.
+- `SiteHeader.test.tsx` covers the labels, routes, the CTA being a link, `aria-current`,
+  the sign-in slot, and the disclosure open, Escape and focus behaviour; it also checks the
+  footer columns and external links. `components.test.tsx` covers the rest.
+
+### Gates
+- Tests 675: 671 pass, plus the same 4 baseline engine timing failures. `tsc --noEmit`
+  clean, `npm run build` clean, submit-verb grep clean (the only new button labels are
+  "Menu" and the gallery's demo labels).
+- Lighthouse (mobile): `/` 72 / 100 / 100 (was 62/96/100), `/pto` 88 / 91 / 100 (was
+  71/91), `/sabbatical` 95 / 100 / 100 (was 98/96). The first run without the preload and
+  fallback scored `/sabbatical` 79 with CLS 0.155 from the font swap; the preload and
+  fallback fixed it.
+- `verify:dist` baseline rewritten (`--write`), since this phase changes the build on
+  purpose.
+- Screenshots: `docs/screenshots/redesign/1-visual-system/` (6 routes × 3 widths, plus
+  `ui-gallery-{1440,768,375}.png`).
+
+### Skipped
+- `docs/redesign/references/` (screenshots of Google Flights, Apple Weather, Flighty and
+  others): not captured. Those are other companies' app screens, and this sandbox can't
+  reach most of them. The patterns are described in the spec and were followed.
+
+### Questions for Atiyk (Phase 1)
+3. Remapping Tailwind's slate ramp to warm neutrals is a deliberate shortcut, so every
+   page warms up before Phase 3 restyles it. Once Phase 3 has moved every page onto the
+   semantic names, the remap can be dropped. Keep it as the permanent neutral ramp instead?
+4. The mark is a calendar page with one solid run. If you want a wordmark-only logo or a
+   different mark, `src/ui/logoMark.ts` plus `scripts/build-icons.ts` regenerate every
+   icon.

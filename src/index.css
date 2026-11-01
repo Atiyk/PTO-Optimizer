@@ -8,59 +8,165 @@
 @source not '../*.md';
 
 /*
- * Light theme only - no dark mode, no toggle. Colours used by more than one component (the
- * calendar's PTO/band scheme, the holiday dot, the score intensity ramp, and the shared
- * text/surface tokens) are defined here as CSS custom properties on :root, so
- * colorScheme.ts and scoreFormat.ts stay the single source of truth for those colours
- * without a component ever forking or duplicating a value.
+ * Redesign Phase 1: the Gapless visual system. Warm, calm, light theme only.
  *
- * The whole palette is two neutrals (a near-white page, a subtle off-white for raised
- * surfaces, and a slate border/text ramp between them) plus ONE accent (the deep blue used
- * for suggested PTO, the primary action, and focus rings - never anything else). Every
- * text/background pair below is verified against WCAG 4.5:1 - see NOTES.md for the full
- * table and src/ui/colorScheme.test.ts / src/ui/scoreFormat.test.ts for the assertions.
+ * Self-hosted Figtree (variable weight, Latin subset only: ~20 KB, the whole font payload).
+ * The file is public/fonts/figtree-latin-wght-normal.woff2, copied unchanged from the
+ * @fontsource-variable/figtree package (OFL, licence alongside it) so it has a stable URL
+ * every HTML shell can preload - a hashed asset URL can't be preloaded from a static shell.
+ * Declared here rather than via the package's own CSS, which would also ship latin-ext.
+ *
+ * 'Figtree Fallback' is Arial resized to Figtree's metrics, so the swap moves nothing
+ * (Figtree's advance widths are within 0.2% of Arial's; the overrides match its vertical
+ * metrics, 950/250 per 1000 em).
+ */
+@font-face {
+  font-family: 'Figtree Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 900;
+  src: url('/fonts/figtree-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2190-2199, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Figtree Fallback';
+  src: local('Arial'), local('Liberation Sans'), local('Helvetica Neue'), local('Helvetica');
+  size-adjust: 99.8%;
+  ascent-override: 95.2%;
+  descent-override: 25.05%;
+  line-gap-override: 0%;
+}
+
+/*
+ * Tokens. Every colour used by more than one component is a custom property on :root, so
+ * colorScheme.ts and scoreFormat.ts stay the single source of truth without a component
+ * forking a value. tokens.test.ts parses THIS block and checks every text/background pair
+ * (4.5:1, or 3:1 for UI boundaries), so the numbers below can't drift from the tests.
+ *
+ * One accent hue only (burnt orange): suggested PTO, the primary action, focus rings, and
+ * the score bars as darker shades of the same hue. The day-off band is a quiet wash behind
+ * it. Structured so a dark theme could later redefine these under a media query or a
+ * data-theme attribute; none is defined yet.
  */
 :root {
-  --bg-page: #ffffff;
-  --bg-surface: #f8fafc; /* slate-50 - the one subtle off-white raised surfaces sit on */
-  --bg-surface-alt: #f1f5f9; /* slate-100 - secondary chrome: hover fills, muted pills */
-  --border-default: #e2e8f0; /* slate-200 */
-  --text-primary: #0f172a; /* slate-900 */
-  --text-muted: #64748b; /* slate-500 */
-  --focus-ring: #1e3a8a; /* blue-900 - the one accent, reused for the ring */
+  --bg-page: #fbf8f3; /* warm off-white page */
+  --bg-surface: #ffffff; /* cards */
+  --bg-surface-alt: #f5f0e8; /* hover fills, chips */
+  --border-default: #e7e0d5;
+  --border-strong: #8c8279; /* input and control boundaries: 3:1 on surface and page */
+  --text-primary: #1c1917; /* ink */
+  --text-muted: #57534e; /* secondary text */
+  --focus-ring: #c2410c;
 
-  --pto-bg: #1e3a8a; /* blue-900 - the one accent */
-  --pto-border: #172554; /* blue-950 */
+  --accent: #c2410c;
+  --accent-hover: #9a3412;
+  --accent-soft: #ffedd5;
+  --accent-ink: #9a3412; /* accent-coloured text (links, labels) on light backgrounds */
+
+  --pto-bg: #c2410c; /* suggested PTO: the strongest thing on the page */
+  --pto-border: #9a3412;
   --pto-text: #ffffff;
-  /* amber-100, not amber-200: suggested-PTO (the accent) is the day the user acts on and
-     must read as the strongest thing on the page; "days off" is the outcome and should sit
-     behind it as a quiet tint, not a saturated fill competing for attention across a run
-     that often spans most of a month. At this lightness the band is nearly invisible
-     against the white card on its own (1.11:1), by design: it reads as a wash the band
-     text/holiday dot are visible on, not as a block that competes with the solid pto-bg
-     fill. */
-  --band-bg: #fef3c7; /* amber-100 */
-  --band-text: #1e293b; /* slate-800 */
-  --holiday-dot: #475569; /* slate-600 */
-  --alt-border: #1e3a8a; /* blue-900, matching pto-bg - never a second hue */
+  /* The day-off run: a quiet wash behind the accent, never competing with it. */
+  --band-bg: #ffedd5;
+  --band-text: #292524;
+  --holiday-dot: #57534e; /* a dot, never colour alone */
+  --weekend-bg: #f5f0e8;
+  --alt-border: #c2410c; /* alternative placement outline: same hue, dashed */
 
-  --score-track: #e2e8f0; /* slate-200 */
-  --score-1: #4f46e5; /* indigo-600 */
-  --score-2: #4338ca; /* indigo-700 */
-  --score-3: #3730a3; /* indigo-800 */
+  --score-track: #e7e0d5;
+  --score-1: #c2410c;
+  --score-2: #9a3412;
+  --score-3: #7c2d12;
 
   color-scheme: light;
 }
 
-body {
-  margin: 0;
+/*
+ * Semantic utility names (bg-page, text-ink, border-line, bg-accent, ...) over the tokens
+ * above, plus the type scale and the font.
+ *
+ * The slate ramp is remapped to a warm neutral ramp: every existing component was written
+ * against Tailwind's cool slate greys, and this turns all of them warm in one place without
+ * touching their markup (Phase 3 restyles those pages properly). 400 and up all reach 4.5:1
+ * on the page, surface, surface-alt and band backgrounds (tokens.test.ts), which also fixes
+ * the light-grey footnote text that used to fail contrast.
+ */
+@theme inline {
+  --color-page: var(--bg-page);
+  --color-surface: var(--bg-surface);
+  --color-surface-alt: var(--bg-surface-alt);
+  --color-ink: var(--text-primary);
+  --color-muted: var(--text-muted);
+  --color-line: var(--border-default);
+  --color-line-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-band: var(--band-bg);
+  --color-holiday: var(--holiday-dot);
+  --color-weekend: var(--weekend-bg);
+
+  --font-sans: 'Figtree Variable', 'Figtree Fallback', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --text-display: 3.5rem;
+  --text-display--line-height: 4rem;
+  --text-display-sm: 2.75rem;
+  --text-display-sm--line-height: 3rem;
+  --text-h1: 2.5rem;
+  --text-h1--line-height: 3rem;
+  --text-h2: 1.75rem;
+  --text-h2--line-height: 2rem;
+  --text-body: 1rem;
+  --text-body--line-height: 1.5rem;
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.25rem;
 }
 
-/* Motion is for comprehension here (showing what changed when a slider moves or a day's
-   state flips), never decoration - every transition in this app is already under 200ms and
-   none run on page load, so this rule doesn't change how anything looks for most visitors.
-   For prefers-reduced-motion it turns all of it off instantly rather than just shortening
-   it, per spec. */
+@theme {
+  --color-slate-50: #faf7f2;
+  --color-slate-100: #f5f0e8;
+  --color-slate-200: #e7e0d5;
+  --color-slate-300: #d6ccbe;
+  --color-slate-400: #736c66;
+  --color-slate-500: #6b645e;
+  --color-slate-600: #57534e;
+  --color-slate-700: #44403c;
+  --color-slate-800: #292524;
+  --color-slate-900: #1c1917;
+  --color-slate-950: #0c0a09;
+}
+
+/* In the base layer so any component's own utility classes (focus-visible:outline-none
+   with a ring, say) still win over these defaults. */
+@layer base {
+  html {
+    background: var(--bg-page);
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    /* Every number in this app is data that changes as inputs change; tabular figures stop
+       a counter or a column from jittering sideways while it does. */
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Visible keyboard focus everywhere, in the accent, without a ring on mouse clicks. */
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Motion is for comprehension here (a value changed, a day flipped), never decoration:
+   at most 200ms and none on page load. For prefers-reduced-motion it turns all of it off
+   instantly rather than just shortening it. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -69,5 +175,17 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* StatNumber's change cue (redesign Phase 1): runs only when a value changes, never on load. */
+@keyframes stat-in {
+  from {
+    opacity: 0.35;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }

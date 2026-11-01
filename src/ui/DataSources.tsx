@@ -24,8 +24,8 @@ interface Source {
 export function DataSources() {
   const sources = dataSources.sources as Source[];
   return (
-    <div className="min-h-screen bg-white">
-      <SiteHeader active="landing" />
+    <div className="min-h-screen bg-page">
+      <SiteHeader active="other" />
       <main>
         <Container className="flex flex-col gap-8 px-4 py-10">
           <section>
