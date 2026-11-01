@@ -242,8 +242,11 @@ export const manageSchedule = defineCapability({
           .update(organizations)
           .set({ vertical: input.vertical, ...(input.costAwareRanking != null ? { costAwareRanking: input.costAwareRanking } : {}) })
           .where(eq(organizations.id, orgId));
-        // Pay rates exist only while cost-aware ranking is on: turning it off deletes them.
-        if (input.costAwareRanking === false) await db.delete(memberPayRates).where(eq(memberPayRates.orgId, orgId));
+        // Pay rates exist only while cost-aware ranking or payout money estimates are on: turning the last one off deletes them.
+        if (input.costAwareRanking === false) {
+          const [o] = await db.select({ payout: organizations.payoutMoneyEstimates }).from(organizations).where(eq(organizations.id, orgId));
+          if (!o?.payout) await db.delete(memberPayRates).where(eq(memberPayRates.orgId, orgId));
+        }
         return { ok: true as const, op: input.op, id: null };
       }
       case 'upsertRoom': {

@@ -727,7 +727,7 @@ export const exportData = defineCapability({
       hours_worked: byMember(await db.select().from(hoursWorked).where(eq(hoursWorked.orgId, orgId))).map((h) => ({ member_id: h.memberId, period_start: h.periodStart, period_end: h.periodEnd, hours: h.hours })),
       cover_preferences: byMember(await db.select().from(memberCoverPrefs).where(eq(memberCoverPrefs.orgId, orgId))).map(({ orgId: _o, ...p }) => plain(p)),
       cover_offers: byMember(await db.select().from(coverOffers).where(eq(coverOffers.orgId, orgId))).map((o) => ({ member_id: o.memberId, cover_request_id: o.coverRequestId, wave: o.wave, rank: o.rank, channel: o.channel, sent_at: o.sentAt.toISOString(), response: o.response, responded_at: o.respondedAt?.toISOString() ?? null })),
-      // Pay rates exist only while cost-aware ranking is on; exports are admin-only.
+      // Pay rates exist only while cost-aware ranking or payout money estimates are on; exports are admin-only.
       pay_rates: byMember(await db.select().from(memberPayRates).where(eq(memberPayRates.orgId, orgId))).map((r) => ({ member_id: r.memberId, hourly_rate: r.hourlyRate, effective_from: r.effectiveFrom })),
       audit_log: input.memberId
         ? []

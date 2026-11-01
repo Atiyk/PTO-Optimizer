@@ -50,9 +50,20 @@ Read `docs/teams/COVERAGE-ARCHITECTURE.md` and `docs/teams/COVERAGE-SPEC.md` fir
 - **No child data.** Demand is counts per age group per room per time block. Never store
   or accept child names, birthdays, addresses or any child identifier. A schema/API test
   enforces this.
-- **Pay rates.** Stored only while the org has cost-aware ranking on; visible to
-  owner/admin only (`payrates:read`, never grantable to tokens); never sent to the LLM,
-  webhooks, logs or exports to non-admins. Ranking outputs a cost band, not a rate.
+- **Pay rates.** Stored only while the org has cost-aware ranking or payout money
+  estimates on (deleted when both are off). Set only by a signed-in owner/admin (never by
+  a token or agent). The only place a rate is read back is the owner/admin data export;
+  every other capability returns at most "N people have a rate on file". Never sent to the
+  LLM, webhooks, logs, audit text or exports to non-admins. Ranking outputs a cost band,
+  not a rate.
+- **Payout money estimates (decided by Atiyk 2026-11-01: admin opt-in).** Amounts derived
+  from a rate (`getPayoutEstimate`, `getPayoutLiability`) follow these rules: off by default;
+  when an admin turns on "payout estimates in money", owners/admins see amounts for everyone
+  and managers for the people they manage. An employee sees their **own** amount only when
+  an admin also turns on "show employees their payout estimate"; never anyone else's.
+  Both switches are audited. Agents and tokens never get amounts (null) or rates; the
+  payout CSV is owners/admins only. Everyone (within their scope) sees hours/days payable.
+  Every payout view says "Estimate. Your payroll provider pays; not legal advice."
 - **Call-off reasons** are not stored by default (health-data minimisation).
 - **Messaging.** Business logic lives in capabilities; adapters (mock, Slack, Web Push,
   Twilio-off) only deliver. Tests use the mock. Never send a real SMS or push.

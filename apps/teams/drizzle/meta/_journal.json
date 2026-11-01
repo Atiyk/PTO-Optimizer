@@ -78,6 +78,13 @@
       "when": 1793560703718,
       "tag": "0010_ai_features_switch",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793562527982,
+      "tag": "0011_pto_payout",
+      "breakpoints": true
     }
   ]
 }

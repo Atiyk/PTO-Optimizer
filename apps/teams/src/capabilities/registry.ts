@@ -15,6 +15,7 @@ import { getCoverage, getCoverageSetup, getCredentials, getSickLeave, importHour
 import { listMyProposals, respondToProposal, runTeamPlan, sendPlanProposals } from './actions/planner';
 import { getCoverageForecast } from './actions/forecast';
 import { getInspectorReport } from './actions/inspector';
+import { getPayoutEstimate, getPayoutLiability, managePayout } from './actions/payout';
 import { clockPunch, getComplianceTasks, getMyTimeClock, getTimesheets, getWorkRules, manageTimesheets, manageWorkRules } from './actions/timeclock';
 import { approveAllClean, decideLeaveRequest, listPendingApprovals, requestReview } from './actions/approvals';
 import { completeHrTask, confirmRequestWindow, getRequestWindows, getShadowReplay, listHrTasks } from './actions/decisions';
@@ -111,6 +112,9 @@ export const CAPABILITIES = {
   parseCoverText,
   getCoverageForecast,
   getInspectorReport,
+  getPayoutEstimate,
+  getPayoutLiability,
+  managePayout,
 } as const satisfies Record<string, CapabilityDef>;
 
 export type CapabilityName = keyof typeof CAPABILITIES;

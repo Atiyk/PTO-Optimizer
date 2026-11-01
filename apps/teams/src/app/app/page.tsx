@@ -1,6 +1,7 @@
 import { ActionButton } from '@/components/ActionButton';
 import { RequestForm } from '@/components/RequestForm';
 import { ExplainBalance } from '@/components/ExplainBalance';
+import { PayoutLines } from '@/components/PayoutLines';
 import { AskPolicy } from '@/components/AskPolicy';
 import { UpdateMyDetails } from '@/components/ProfileChanges';
 import { Badge, btnPrimary, btnSecondary, Card, fmt, formatRange, Stat } from '@/components/ui';
@@ -13,7 +14,9 @@ export default async function MyLeave({ searchParams }: { searchParams: Promise<
   const setup = await call('getOrgSetup', {}, actor);
   const types = setup.leaveTypes.filter((t) => !t.key.startsWith('archived'));
   const balances = await Promise.all(
-    types.filter((t) => t.countsAgainstBalance).map(async (t) => ({ type: t, b: await call('getMyBalance', { leaveType: t.key }, actor) })),
+    types
+      .filter((t) => t.countsAgainstBalance)
+      .map(async (t) => ({ type: t, b: await call('getMyBalance', { leaveType: t.key }, actor), payout: await call('getPayoutEstimate', { leaveType: t.key }, actor).catch(() => null) })),
   );
   const { requests } = await call('listMyRequests', { limit: 30 }, actor);
   const { proposals } = await call('listMyProposals', {}, actor);
@@ -24,7 +27,7 @@ export default async function MyLeave({ searchParams }: { searchParams: Promise<
   return (
     <div className="grid gap-4 lg:grid-cols-5">
       <div className="space-y-4 lg:col-span-2">
-        {balances.map(({ type, b }) => (
+        {balances.map(({ type, b, payout }) => (
           <Card key={type.key} title={type.name}>
             {b.unlimited ? (
               <Stat label="Taken this year" value={fmt(b.usedThisPlanYear, b.unit)} hint="Unlimited policy" />
@@ -48,6 +51,7 @@ export default async function MyLeave({ searchParams }: { searchParams: Promise<
                     )}
                   </p>
                 )}
+                {payout && !(payout.separation.rule.id === 'sick-excluded') && <PayoutLines e={payout} />}
                 <ExplainBalance leaveType={type.key} />
               </div>
             )}

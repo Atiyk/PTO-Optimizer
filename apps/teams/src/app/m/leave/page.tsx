@@ -1,5 +1,6 @@
 import { RequestForm } from '@/components/RequestForm';
 import { Shell } from '@/components/mobile/Shell';
+import { PayoutLines } from '@/components/PayoutLines';
 import { Badge, fmt, formatRange } from '@/components/ui';
 import { getOrg } from '@/domain/leave';
 import { getDb } from '@/db/client';
@@ -14,6 +15,9 @@ export default async function StaffLeave() {
   const types = setup.leaveTypes.filter((t) => !t.key.startsWith('archived'));
   const balances = await Promise.all(types.filter((t) => t.countsAgainstBalance).map(async (t) => ({ type: t, b: await call('getMyBalance', { leaveType: t.key }, actor) })));
   const sick = await call('getSickLeave', {}, actor).catch(() => null);
+  const payouts = (await Promise.all(balances.filter(({ b }) => !b.unlimited).map(({ type }) => call('getPayoutEstimate', { leaveType: type.key }, actor).catch(() => null)))).filter(
+    (e): e is NonNullable<typeof e> => !!e && e.separation.rule.id !== 'sick-excluded',
+  );
   const { requests } = await call('listMyRequests', { limit: 5 }, actor);
   const typeName = new Map(types.map((t) => [t.key, t.name]));
 
@@ -34,6 +38,11 @@ export default async function StaffLeave() {
           </li>
         )}
       </ul>
+ {payouts.map((e) => (
+        <section key={e.leaveType} aria-label={`${e.leaveTypeName} payout`}>
+          <PayoutLines e={e} compact />
+        </section>
+      ))}
       <section aria-labelledby="ask" className="rounded-lg border border-line bg-page p-4">
         <h2 id="ask" className="mb-2 text-base font-semibold text-ink">
           Ask for time off
