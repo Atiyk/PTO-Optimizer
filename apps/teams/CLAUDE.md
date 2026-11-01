@@ -68,3 +68,14 @@ Read `docs/teams/COVERAGE-ARCHITECTURE.md` and `docs/teams/COVERAGE-SPEC.md` fir
 - **Messaging.** Business logic lives in capabilities; adapters (mock, Slack, Web Push,
   Twilio-off) only deliver. Tests use the mock. Never send a real SMS or push.
 - **MCP tool budget ≤ 25.** Count before adding a tool; prefer extending a capability.
+
+## Personal accounts (shared infrastructure)
+The consumer product at the repo root (Gapless PTO Optimizer, formerly Days Off) may reuse
+this app's backend infrastructure for optional personal accounts (see
+`docs/REDESIGN-SPEC.md`, Phase 5 onwards). It is a separate product: no UI, link, copy or
+data flow between the two.
+- `personal_*` tables are owned by `account_id`, never `org_id`.
+- No org-scoped route, capability, MCP tool, webhook or export may read a `personal_*`
+  table, and personal routes (`/api/me/*`, `/auth/*`) never read org tables. A test per
+  route proves both directions.
+- Personal data gets no MCP tools; the MCP tool budget (≤ 25) is unchanged.

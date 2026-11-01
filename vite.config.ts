@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { configDefaults, defineConfig, type Plugin } from 'vitest/config'
 import { getSiteUrl } from './scripts/siteUrl.ts'
 import { GLOSSARY_TERMS } from './src/content/glossary/terms.ts'
+import { PRODUCT_NAME } from './src/brand.ts'
 
 // Country landing pages (Phase 2B): each is a real static HTML file at the project root
 // (uk/index.html, canada/index.html, ...), loading the same app bundle as / but with its
@@ -33,7 +34,11 @@ function siteUrlHtmlPlugin(): Plugin {
   return {
     name: 'site-url-html-interpolation',
     transformIndexHtml(html) {
-      return html.replaceAll('%SITE_URL%', siteUrl).replaceAll('%SITE_HOST%', siteHost)
+      // Redesign Phase 0: %PRODUCT_NAME% too, from src/brand.ts - the one place the name lives.
+      return html
+        .replaceAll('%SITE_URL%', siteUrl)
+        .replaceAll('%SITE_HOST%', siteHost)
+        .replaceAll('%PRODUCT_NAME%', PRODUCT_NAME)
     },
   }
 }
@@ -65,6 +70,9 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // Redesign Phase 1: tokens.test.ts / colorScheme.test.ts read src/index.css?raw to check
+    // contrast against the real stylesheet; vitest blanks CSS unless it's included here.
+    css: { include: [/index\.css/] },
     globals: false,
     // apps/* run their own test suites (npm run test:all); the root run is Days Off + engine.
     exclude: [...configDefaults.exclude, 'apps/**'],

@@ -192,7 +192,7 @@ export function Landing() {
     if (!ctx) return;
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT);
-    ctx.fillStyle = '#0f172a';
+    ctx.fillStyle = '#1c1917';
     ctx.font = '700 44px system-ui, sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText(
@@ -201,20 +201,20 @@ export function Landing() {
       110,
     );
     ctx.font = '400 24px system-ui, sans-serif';
-    ctx.fillStyle = '#64748b';
+    ctx.fillStyle = '#57534e';
     if (nextHol) {
       ctx.fillText(`${weekdayName(nextHol.holiday.date)}, ${formatLong(nextHol.holiday.date)}`, 48, 150);
     }
     ctx.font = '400 15px system-ui, sans-serif';
-    ctx.fillStyle = '#94a3b8';
+    ctx.fillStyle = '#6b645e';
     ctx.fillText(window.location.host, 48, SHARE_IMAGE_HEIGHT - 32);
-    await copyCanvasImage(canvas, 'days-off.png');
+    await copyCanvasImage(canvas, 'gapless-pto.png');
   };
 
   const [linkMessage, setLinkMessage] = useState<string | null>(null);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-page">
       <SiteHeader active="landing" />
       <main>
         <Container className="flex flex-col gap-10 px-4 py-10">
@@ -271,7 +271,7 @@ export function Landing() {
 
             <a
               href={ptoHref()}
-              className="w-fit rounded-md bg-[var(--pto-bg,#1e3a8a)] px-5 py-2.5 text-sm font-medium text-white hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring,#1e3a8a)]"
+              className="w-fit rounded-md bg-[var(--pto-bg)] px-5 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring,#1e3a8a)]"
             >
               Plan my time off &rarr;
             </a>
@@ -310,7 +310,7 @@ export function Landing() {
             ) : (
               <p className="mt-3 text-sm text-slate-500">Loading&hellip;</p>
             )}
-            <a href={ptoHref()} className="mt-3 inline-block text-sm font-medium text-[var(--pto-bg,#1e3a8a)] underline">
+            <a href={ptoHref()} className="mt-3 inline-block text-sm font-medium text-[var(--pto-bg)] underline">
               PTO Optimizer &rarr;
             </a>
           </section>
@@ -350,7 +350,7 @@ export function Landing() {
             ) : (
               <p className="mt-3 text-sm text-slate-500">No placement found in the next 12 months.</p>
             )}
-            <a href="/sabbatical" className="mt-3 inline-block text-sm font-medium text-[var(--pto-bg,#1e3a8a)] underline">
+            <a href="/sabbatical" className="mt-3 inline-block text-sm font-medium text-[var(--pto-bg)] underline">
               Sabbatical Planning &rarr;
             </a>
           </section>
@@ -423,7 +423,7 @@ export function Landing() {
                         (() => {
                           const bridge = bridges.find((b) => b.combined.start === r.run.start || b.combined.end === r.run.end);
                           return bridge ? (
-                            <a href={ptoHref(bridge.bridgeDate)} className="font-medium text-[var(--pto-bg,#1e3a8a)] underline">
+                            <a href={ptoHref(bridge.bridgeDate)} className="font-medium text-[var(--pto-bg)] underline">
                               Take {weekdayName(bridge.bridgeDate)} for a {runLength(bridge.combined)}-day weekend &middot; 1 PTO day
                             </a>
                           ) : null;
@@ -444,7 +444,7 @@ export function Landing() {
                   <span key={w.budget}>
                     {i > 0 ? ' ' : ''}
                     With {w.budget} PTO day{w.budget === 1 ? '' : 's'} you&rsquo;d get{' '}
-                    <a href={`${ptoHref()}&b=${w.budget}`} className="font-medium text-[var(--pto-bg,#1e3a8a)] underline">
+                    <a href={`${ptoHref()}&b=${w.budget}`} className="font-medium text-[var(--pto-bg)] underline">
                       {w.totalDaysOff} days off
                     </a>
                     .
@@ -462,7 +462,7 @@ export function Landing() {
             <h2 className="text-xl font-semibold text-slate-900">Ready to see your own plan?</h2>
             <a
               href={ptoHref()}
-              className="w-fit rounded-md bg-[var(--pto-bg,#1e3a8a)] px-5 py-2.5 text-sm font-medium text-white hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring,#1e3a8a)]"
+              className="w-fit rounded-md bg-[var(--pto-bg)] px-5 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring,#1e3a8a)]"
             >
               Plan my time off &rarr;
             </a>

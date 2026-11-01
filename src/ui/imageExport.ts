@@ -8,15 +8,15 @@ export const SHARE_IMAGE_HEIGHT = 630;
 // canvas can't read Tailwind classes, so these are kept in lockstep by hand. Same two
 // colours as the live calendar (PTO role + band role) plus the one neutral holiday dot.
 const COLOR = {
-  bg: '#ffffff',
-  textPrimary: '#1e293b', // slate-800
-  textMuted: '#64748b', // slate-500
-  gridLine: '#e2e8f0', // slate-200
-  ptoFill: '#1e3a8a', // blue-900
+  bg: '#fbf8f3', // --bg-page (redesign Phase 1 tokens, src/index.css)
+  textPrimary: '#1c1917', // --text-primary
+  textMuted: '#57534e', // --text-muted
+  gridLine: '#e7e0d5', // --border-default
+  ptoFill: '#c2410c', // --pto-bg
   ptoText: '#ffffff',
-  bandFill: '#fde68a', // amber-200
-  holidayDot: '#475569', // slate-600
-  cellPlain: '#f8fafc', // slate-50
+  bandFill: '#ffedd5', // --band-bg
+  holidayDot: '#57534e', // --holiday-dot
+  cellPlain: '#ffffff', // --bg-surface
 };
 
 export interface ShareImageMonth {

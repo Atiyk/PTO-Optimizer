@@ -1,17 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import { contrastRatio, relativeLuminance } from './scoreFormat';
 
-// Raw RGB behind the tokens under test, kept in sync with colorScheme.ts / index.css by
-// hand - Tailwind classes and CSS custom properties aren't introspectable at test time.
-type RGB = [number, number, number];
-const PTO_BG: RGB = [30, 58, 138]; // blue-900, the one accent
-const PTO_TEXT: RGB = [255, 255, 255];
-const BAND_BG: RGB = [254, 243, 199]; // amber-100
-const BAND_TEXT: RGB = [30, 41, 59]; // slate-800
-const HOLIDAY_DOT: RGB = [71, 85, 105]; // slate-600
-const WHITE: RGB = [255, 255, 255];
-const TEXT_PRIMARY_RGB: RGB = [15, 23, 42]; // slate-900
-const TEXT_MUTED_RGB: RGB = [100, 116, 139]; // slate-500
+import css from '../index.css?raw';
+import { parseHexTokens, type RGB } from './cssTokens';
+
+// The real values behind the tokens under test, parsed from index.css (redesign Phase 1;
+// these used to be hand-copied triples that could drift from the stylesheet).
+const TOKENS = parseHexTokens(css);
+const PTO_BG: RGB = TOKENS['pto-bg']; // the one accent
+const PTO_TEXT: RGB = TOKENS['pto-text'];
+const BAND_BG: RGB = TOKENS['band-bg'];
+const BAND_TEXT: RGB = TOKENS['band-text'];
+const HOLIDAY_DOT: RGB = TOKENS['holiday-dot'];
+const WHITE: RGB = TOKENS['bg-surface']; // calendar cells sit on the white card surface
+const PAGE: RGB = TOKENS['bg-page'];
+const TEXT_PRIMARY_RGB: RGB = TOKENS['text-primary'];
+const TEXT_MUTED_RGB: RGB = TOKENS['text-muted'];
 
 describe('every numeral/background pair reaches 4.5:1', () => {
   it('ptoText on ptoBg (suggested-pto and pinned both use this pair)', () => {
@@ -25,6 +29,7 @@ describe('every numeral/background pair reaches 4.5:1', () => {
 
   it('TEXT_MUTED (weekend numeral, not in a band) reaches 4.5:1 on white - the only background it ever sits on, since inBand switches to TEXT_PRIMARY', () => {
     expect(contrastRatio(TEXT_MUTED_RGB, WHITE)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(TEXT_MUTED_RGB, PAGE)).toBeGreaterThanOrEqual(4.5);
   });
 
   it('bandText on bandBg', () => {
@@ -55,8 +60,8 @@ describe("the calendar's two colours plus the holiday dot stay distinguishable, 
 });
 
 describe('regression: a weekend/holiday numeral sitting on the band fill must use BAND_TEXT, not TEXT_PRIMARY', () => {
-  it('BAND_TEXT is pinned to slate-800 regardless of TEXT_PRIMARY - bandBg never changes, so neither does the text that sits on it', () => {
-    expect(BAND_TEXT).toEqual([30, 41, 59]);
+  it('BAND_TEXT is its own token, pinned regardless of TEXT_PRIMARY - bandBg never changes, so neither does the text that sits on it', () => {
+    expect(BAND_TEXT).toEqual([41, 37, 36]); // #292524
   });
 
   it('BAND_TEXT on the band fill passes 4.5:1', () => {

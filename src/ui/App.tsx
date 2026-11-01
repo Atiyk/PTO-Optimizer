@@ -53,14 +53,14 @@ export function App() {
   });
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-page">
       <SiteHeader active="pto" />
       {/* Semantic HTML pass (Phase 5): everything above the workspace - headline, pinned
           plans, controls, banners - is genuinely page-header content, not part of <main>.
           Site restructure: the old per-route tagline paragraph is gone - "no page has a
           subtitle under its h1 except the landing page," and this one only ever restated
           what the headline below it already says. */}
-      <header>
+      <div>
 
       {/* The answer first: large, sticky, directly under the site header - the most prominent
           thing on the page, visible on load with nothing to configure first. Break count
@@ -225,7 +225,7 @@ export function App() {
           </Container>
         </div>
       )}
-      </header>
+      </div>
 
       <main>
         <Container className="p-4">

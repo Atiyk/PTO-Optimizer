@@ -36,10 +36,12 @@ import { renderToString } from 'react-dom/server';
 import React from 'react';
 import { ITEMS as FAQ_ITEMS } from '../src/ui/FAQ.tsx';
 import { SABBATICAL_FAQ_ITEMS } from '../src/ui/sabbaticalFaqItems.ts';
+import { ABOUT_FAQ_ITEMS } from '../src/ui/aboutFaqItems.ts';
 import { GLOSSARY_TERMS } from '../src/content/glossary/terms.ts';
 import { rawHolidaysToHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { getSiteUrl } from './siteUrl.ts';
 import { ENTRIES, type Entry, type ComponentKind } from './routes.ts';
+import { PRODUCT_NAME, PRODUCT_SHORT_NAME, FORMER_NAME } from '../src/brand.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '..');
@@ -90,7 +92,7 @@ function decodeEntities(s: string): string {
 }
 
 function extractMeta(html: string, fallbackUrl: string): { title: string; description: string; canonical: string } {
-  const title = decodeEntities(/<title>(.*?)<\/title>/s.exec(html)?.[1] ?? 'Days Off');
+  const title = decodeEntities(/<title>(.*?)<\/title>/s.exec(html)?.[1] ?? PRODUCT_NAME);
   const description = decodeEntities(/<meta\s+name="description"\s+content="([^"]*)"/s.exec(html)?.[1] ?? '');
   const canonical = /<link rel="canonical" href="([^"]*)"/.exec(html)?.[1] ?? fallbackUrl;
   return { title, description, canonical };
@@ -113,9 +115,10 @@ function buildJsonLd(entry: Entry, meta: { title: string; description: string; c
     operatingSystem: 'Any (web browser)',
     isAccessibleForFree: true,
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    publisher: { '@type': 'Organization', name: PRODUCT_NAME, url: `${SITE_URL}/` },
   };
 
-  const breadcrumbItems = [{ '@type': 'ListItem', position: 1, name: 'Days Off', item: `${SITE_URL}/` }];
+  const breadcrumbItems = [{ '@type': 'ListItem', position: 1, name: PRODUCT_NAME, item: `${SITE_URL}/` }];
   if (entry.countryName) {
     breadcrumbItems.push({ '@type': 'ListItem', position: 2, name: entry.countryName, item: meta.canonical });
   }
@@ -127,6 +130,19 @@ function buildJsonLd(entry: Entry, meta: { title: string; description: string; c
 
   const result: object[] = [webApplication, breadcrumbList];
 
+  // Redesign Phase 0: the site's own identity, once, on the home page - the product name,
+  // its short form, and the name it used to ship under (so a search for the old name still
+  // resolves to this site).
+  if (entry.component === 'landing') {
+    result.push({
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      name: PRODUCT_NAME,
+      alternateName: [PRODUCT_SHORT_NAME, FORMER_NAME],
+      url: `${SITE_URL}/`,
+    });
+  }
+
   // FAQPage for whichever FAQ array(s) that route actually renders - /faq shows both
   // tools' questions, so its own structured data combines both arrays rather than
   // picking one. The landing page and /data-sources have no FAQ section, so neither
@@ -137,7 +153,7 @@ function buildJsonLd(entry: Entry, meta: { title: string; description: string; c
       : entry.component === 'sabbatical'
         ? SABBATICAL_FAQ_ITEMS
         : entry.component === 'faq'
-          ? [...FAQ_ITEMS, ...SABBATICAL_FAQ_ITEMS]
+          ? [...FAQ_ITEMS, ...SABBATICAL_FAQ_ITEMS, ...ABOUT_FAQ_ITEMS]
           : null;
   if (faqItems) {
     result.push({
@@ -157,7 +173,7 @@ function buildJsonLd(entry: Entry, meta: { title: string; description: string; c
     result.push({
       '@context': 'https://schema.org',
       '@type': 'DefinedTermSet',
-      name: 'Days Off Glossary',
+      name: `${PRODUCT_NAME} Glossary`,
       url: meta.canonical,
       hasDefinedTerm: GLOSSARY_TERMS.map((t) => ({
         '@type': 'DefinedTerm',

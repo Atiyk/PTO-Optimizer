@@ -21,6 +21,7 @@ import { rawHolidaysToHolidays } from '@daysoff/engine/data/holidays';
 import { solve } from '@daysoff/engine/solver/solve';
 import { bestPlacements, placementNote } from '../src/ui/sabbaticalData.ts';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import { PRODUCT_NAME } from '../src/brand.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '..');
@@ -58,7 +59,7 @@ function template(title: string, subtitle: string, detail: string): string {
     p { color: #475569; font-size: 28px; line-height: 1.4; margin: 0; }
     .detail { margin-top: 28px; color: #1e3a8a; font-size: 24px; font-weight: 600; }
   </style></head><body>
-    <div class="brand">Days Off</div>
+    <div class="brand">${PRODUCT_NAME}</div>
     <h1>${title}</h1>
     <p>${subtitle}</p>
     ${detail ? `<div class="detail">${detail}</div>` : ''}
@@ -78,7 +79,9 @@ async function main(): Promise<void> {
   const holidays = loadUSHolidays();
   const stripEnd = addDays(today, 364);
 
-  const browser = await chromium.launch();
+  // PW_CHROMIUM_PATH lets a sandbox with a preinstalled browser skip `playwright install`
+  // (same switch as scripts/screenshot.mjs).
+  const browser = await chromium.launch(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {});
 
   // Landing (/): the real next US holiday, same function the hero itself uses.
   const nextHol = nextHoliday(today, stripEnd, holidays);
@@ -98,7 +101,7 @@ async function main(): Promise<void> {
   await renderOgImage(
     browser,
     'pto',
-    template('PTO Optimizer', 'Turn your PTO into more days off.', `15 PTO days → ${totalDaysOff} days off`),
+    template('Plan your PTO', 'Turn your PTO into more days off.', `15 PTO days → ${totalDaysOff} days off`),
   );
 
   // /sabbatical: a real bestPlacements() result.

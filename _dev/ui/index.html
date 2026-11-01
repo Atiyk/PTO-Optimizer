@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>UI gallery (dev only)</title>
+  </head>
+  <body>
+    <!-- Redesign Phase 1: component gallery. Served by `npm run dev` at /_dev/ui/ only - it
+         is not a build input in vite.config.ts and not in scripts/routes.ts, so it never
+         reaches dist/ or the sitemap. -->
+    <div id="root"></div>
+    <script type="module" src="/src/dev/ui-gallery-main.tsx"></script>
+  </body>
+</html>

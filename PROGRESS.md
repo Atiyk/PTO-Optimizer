@@ -2776,3 +2776,170 @@ h1. Screenshots: `gapless-redesign/` in the project files.
   replaces that section.
 - **Q36: Failing test on `main`.** The escalation test above fails on unmodified `main` today; it
   probably mixes the fixed test clock with real `created_at` times. Fix in its own PR?
+
+---
+
+# Redesign: Gapless PTO Optimizer (docs/REDESIGN-SPEC.md)
+
+Run of 2026-11-01, Phases 0-2, each merged after its gates (run overrides from Atiyk at the top
+of the spec).
+
+## Baseline (main @ a142c11, before any redesign change)
+
+- **Tests:** `npm test` = 644 tests, 640 pass, **4 fail on main already** - all in
+  `packages/engine/src/solver/solve.test.ts` (3 hit the 5 s vitest timeout, 1 asserts a solve
+  takes < 1000 ms and measured ~1100-1700 ms). They fail identically when that file runs alone,
+  so it is this sandbox's CPU speed, not a regression; the redesign does not touch the engine.
+  Every phase below reports the same 4 and nothing else.
+- **`npm run verify:dist`** already fails on main (data-sources/index.html and the canada page
+  differ from the committed hash list: date-relative prerendered content). It proves "the
+  build didn't change", so it doesn't apply to phases that change the build on purpose; each
+  phase rewrites the baseline with `--write` at the end so it stays useful for engine-only work.
+- **Lighthouse (mobile, local static server, this sandbox):**
+
+  | Route | Performance | Accessibility | SEO | LCP | TBT |
+  |---|---|---|---|---|---|
+  | `/` | 62 | 96 | 100 | 3.6 s | 2,130 ms |
+  | `/pto` | 71 | 91 | 100 | 3.9 s | 640 ms |
+  | `/sabbatical` | 98 | 96 | 100 | 1.5 s | 130 ms |
+
+  Lighthouse 13.6 via `npx lighthouse` with the preinstalled Chromium
+  (`/opt/pw-browsers/chromium-1243/chrome-linux64/chrome`, `--headless --no-sandbox`). Absolute
+  numbers are pessimistic (slow sandbox CPU, no compression on the local server); compare
+  phases against each other, not against production.
+- **Screenshots:** every route at 1440/768/375 in `docs/screenshots/redesign/before/`
+  (one country page, `/uk`, and one glossary term, `/glossary/carryover`), taken before the rename.
+
+## Phase 0: rules, rename, brand constants (`claude/redesign-0-foundations`)
+
+### What changed
+- `CLAUDE.md`: product renamed in the scope section; the "no backend, no accounts" rule
+  replaced with the spec's optional-accounts wording. Every other rule untouched.
+- `apps/teams/CLAUDE.md`: new "Personal accounts (shared infrastructure)" section. Nothing
+  else in `apps/teams` changed.
+- `src/brand.ts`: `PRODUCT_NAME`, `PRODUCT_SHORT_NAME`, `TAGLINE`, `FORMER_NAME`.
+- The HTML shells (`index.html`, every route folder, all 29 glossary term pages via
+  `scripts/generate-glossary-html.ts`) use a `%PRODUCT_NAME%` placeholder, filled in by the
+  same Vite HTML plugin that already fills `%SITE_URL%`, from `src/brand.ts`. `/pto`'s title
+  is now "Plan your PTO - Gapless PTO Optimizer" (not "PTO Optimizer - Gapless PTO
+  Optimizer").
+- Header wordmark, footer heading, JSON-LD (breadcrumb root, glossary set name, a
+  `publisher` on WebApplication, a new `WebSite` block on `/` with
+  `alternateName: ["Gapless PTO", "Days Off"]`), ICS `PRODID` plus a new `X-WR-CALNAME`
+  per export, OG images (regenerated), landing share-image filename, `404.html`,
+  `privacy.html`, `public/docs`, `llms.txt`.
+- `/faq` gets an "About this site" section with the rename question ("Days Off is now
+  Gapless PTO Optimizer. Your old links still work."), also in its FAQPage JSON-LD.
+- `src/brand.test.ts`: scans every user-facing source (HTML shells, `public/`, `src/`, the
+  build scripts) for a bare "Days Off" or any mention of the teams product. Mutation-checked:
+  adding "Days Off" to `404.html` fails it.
+- No teams cross-reference existed in the root app's footer/about copy (confirmed by grep).
+
+### Gates
+- Tests 648 (644 pass; the same 4 baseline engine timing failures). `tsc --noEmit` clean.
+  `npm run build` clean.
+- `dist/` grep for `Days Off`: only the FAQ rename entry (HTML + JSON-LD), the `WebSite`
+  `alternateName`, the bundled `FORMER_NAME` constant that FAQ entry reads, and the two
+  "formerly Days Off" mentions (`404.html`, `llms.txt`).
+- Layout unchanged: `docs/screenshots/redesign/0-foundations/` (/, /faq, /pto).
+
+### Surprises
+- `tsc -b` (the build) type-checks test files with the browser tsconfig, so a test can't
+  use `node:fs`; the brand test reads sources with `import.meta.glob(..., { query: '?raw' })`.
+- `playwright` in node_modules (1.64) expects a browser build this sandbox doesn't have;
+  `scripts/build-og-images.ts` now honours `PW_CHROMIUM_PATH` like `scripts/screenshot.mjs`.
+
+### Questions for Atiyk (Phase 0)
+1. The root `CLAUDE.md` "Unattended runs" paragraph still lists "no backend/accounts/stored
+   data" among the rules that always apply. The spec said to keep every other rule
+   word-for-word, so I left it, but it now contradicts the new accounts rule. Delete those
+   words when you next edit the file?
+2. The internal tool names "PTO Optimizer" / "Sabbatical Planning" stay as page headings
+   until Phase 1 switches the nav to the D2 labels.
+
+## Phase 1: visual system (`claude/redesign-1-visual-system`)
+
+### What changed
+- **Tokens** (`src/index.css`): warm page `#FBF8F3`, white surfaces, burnt-orange accent
+  `#C2410C` (suggested PTO, primary action, focus ring), orange-100 band wash, weekend
+  `#F5F0E8`, holiday dot `#57534E`, plus `--border-strong` (`#8C8279`) for control
+  boundaries. A Tailwind v4 `@theme inline` block exposes them as `bg-page`, `bg-surface`,
+  `text-ink`, `text-muted`, `border-line`, `bg-accent`, `bg-accent-soft`, `bg-band`,
+  `bg-holiday`, `bg-weekend` and friends, plus the type scale (`text-display` 56/64,
+  `text-display-sm` 44/48, `text-h1` 40/48, `text-h2` 28/32, body 16/24, small 14/20).
+  Light theme only, with dark-ready structure.
+- **The slate ramp is remapped to warm neutrals** in `@theme`. Every existing page used
+  Tailwind's cool slate greys directly, so this warms all of them without touching their
+  markup, which Phase 3 restyles. Shades 400 and darker now reach 4.5:1 on every
+  background. That fixes the light-grey footnote text that used to fail contrast.
+- **Score bars**: the accent and two darker shades instead of indigo, so the site has one
+  accent hue. Canvas share images and the policy chart use the new hexes.
+- **Font**: Figtree variable, Latin subset only. One 20 KB woff2 at a stable
+  `/fonts/` URL, preloaded by every HTML shell, with `font-display: swap` and a
+  metric-matched Arial fallback (`size-adjust`, `ascent-override`), so the swap causes no
+  layout shift (CLS 0 on all three measured routes). `tabular-nums` is set on `body`. I
+  checked that Figtree has tabular figures: "1111" and "0000" render at the same width.
+- **Components** in `src/ui/`: `Button` (primary/secondary/quiet, sm/md; it renders an
+  `<a>` when given `href`), `Chip` (a static fact, or a toggle whose state shows in
+  `aria-pressed` plus a check mark), `Card`, `StatNumber` (eases in for 150 ms only when its
+  value changes, never on load), `Callout` (left border plus an optional "Why:" line),
+  `Countdown`, and `Logo`/`LogoMark`.
+- **Logo**: a calendar page with one solid accent run across the week. A single source
+  (`src/ui/logoMark.ts`) feeds the inline mark and `scripts/build-icons.ts`, which
+  writes `favicon.svg`, a 16/32/48 `favicon.ico`, the 180 px `apple-touch-icon.png`, and
+  `icons/icon-192.png`, `icon-512.png` and `icon-maskable-512.png` (safe zone).
+- **Header**: logo plus wordmark (`PRODUCT_NAME`, or `PRODUCT_SHORT_NAME` below 400 px,
+  switched in CSS so nothing shifts); the "Plan" (Plan PTO, Sabbatical) and "Understand"
+  (Your policy, Glossary) groups per D2; the "Plan my time off" primary link; a reserved
+  76 px sign-in slot. Below 1024 px the groups collapse into a disclosure (Menu button with
+  `aria-expanded`/`aria-controls`, Escape closes it and returns focus). I moved the
+  breakpoint from the spec's "at 375px" up to 1024 px, because at 768 px the full wordmark,
+  four links and the button wrapped onto two lines (screenshots). The CTA moves into the
+  panel below 640 px.
+- **Footer**: a brand column (mark, name, tagline) plus Product / Resources / About, and a
+  closing "formerly Days Off. Your old links still work." line. No external product links.
+- D2 labels are also used in the FAQ page, the sabbatical page's cross-link and 404.html.
+- The two inner page `<header>`s (on /pto and /sabbatical) became `<div>`s, so each page has
+  one banner landmark.
+- **`/_dev/ui/`**: a gallery of every component in every state. It shows the gallery three
+  times in iframes at 375/768/1440, and `?bare` shows one copy. It is served only by
+  `npm run dev`, because it isn't a Vite build input or a route in `scripts/routes.ts`.
+  Verified: `find dist -name '*_dev*'` is empty and the sitemap has no `_dev`.
+
+### Tests
+- `tokens.test.ts` parses the real `src/index.css`. `colorScheme.test.ts` now does too,
+  instead of keeping hand-copied RGB triples. They check ink and muted text on
+  page/surface/surface-alt, accent text, text on the accent (including hover), band and
+  weekend text, 3:1 UI boundaries (focus ring, control border, holiday dot, PTO cell), every
+  remapped slate shade from 400 up, the score ramp matching the accent, and the greyscale
+  separation between suggested PTO, the band and a plain cell. Vitest blanks CSS imports by
+  default, so `vite.config.ts` includes `index.css` for tests.
+- `SiteHeader.test.tsx` covers the labels, routes, the CTA being a link, `aria-current`,
+  the sign-in slot, and the disclosure open, Escape and focus behaviour; it also checks the
+  footer columns and external links. `components.test.tsx` covers the rest.
+
+### Gates
+- Tests 675: 671 pass, plus the same 4 baseline engine timing failures. `tsc --noEmit`
+  clean, `npm run build` clean, submit-verb grep clean (the only new button labels are
+  "Menu" and the gallery's demo labels).
+- Lighthouse (mobile): `/` 72 / 100 / 100 (was 62/96/100), `/pto` 88 / 91 / 100 (was
+  71/91), `/sabbatical` 95 / 100 / 100 (was 98/96). The first run without the preload and
+  fallback scored `/sabbatical` 79 with CLS 0.155 from the font swap; the preload and
+  fallback fixed it.
+- `verify:dist` baseline rewritten (`--write`), since this phase changes the build on
+  purpose.
+- Screenshots: `docs/screenshots/redesign/1-visual-system/` (6 routes × 3 widths, plus
+  `ui-gallery-{1440,768,375}.png`).
+
+### Skipped
+- `docs/redesign/references/` (screenshots of Google Flights, Apple Weather, Flighty and
+  others): not captured. Those are other companies' app screens, and this sandbox can't
+  reach most of them. The patterns are described in the spec and were followed.
+
+### Questions for Atiyk (Phase 1)
+3. Remapping Tailwind's slate ramp to warm neutrals is a deliberate shortcut, so every
+   page warms up before Phase 3 restyles it. Once Phase 3 has moved every page onto the
+   semantic names, the remap can be dropped. Keep it as the permanent neutral ramp instead?
+4. The mark is a calendar page with one solid run. If you want a wordmark-only logo or a
+   different mark, `src/ui/logoMark.ts` plus `scripts/build-icons.ts` regenerate every
+   icon.

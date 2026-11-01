@@ -77,16 +77,16 @@ function BalanceChart({ series, cap }: { series: { date: string; balance: number
 
   return (
     <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full" role="img" aria-label="Your PTO balance over the next year and a half">
-      <line x1={PAD} y1={y(0)} x2={WIDTH - PAD} y2={y(0)} stroke="#e2e8f0" strokeWidth={1} />
+      <line x1={PAD} y1={y(0)} x2={WIDTH - PAD} y2={y(0)} stroke="#e7e0d5" strokeWidth={1} />
       {cap !== undefined && (
         <>
-          <line x1={PAD} y1={y(cap)} x2={WIDTH - PAD} y2={y(cap)} stroke="#94a3b8" strokeWidth={1} strokeDasharray="4 3" />
+          <line x1={PAD} y1={y(cap)} x2={WIDTH - PAD} y2={y(cap)} stroke="#8c8279" strokeWidth={1} strokeDasharray="4 3" />
           <text x={WIDTH - PAD} y={y(cap) - 4} textAnchor="end" className="fill-slate-400 text-[10px]">
             cap
           </text>
         </>
       )}
-      <path d={linePath} fill="none" stroke="#1e293b" strokeWidth={2} />
+      <path d={linePath} fill="none" stroke="#292524" strokeWidth={2} />
     </svg>
   );
 }
@@ -221,7 +221,7 @@ export function Policy() {
   const decodedTerms = useMemo(() => uniqueMatchedTerms(decoded), [decoded]);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-page">
       <SiteHeader active="policy" />
       <main>
         <Container className="px-4 py-10">

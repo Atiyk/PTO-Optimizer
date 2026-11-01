@@ -139,9 +139,9 @@ export function Sabbatical() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-page">
       <SiteHeader active="sabbatical" />
-      <header>
+      <div>
         <div className="border-b border-slate-200 bg-slate-50">
           <Container className="flex flex-wrap items-end gap-4 px-4 py-4">
             {/* 4B/K3f: CountrySelect renders its own "Country" label already - a second
@@ -275,7 +275,7 @@ export function Sabbatical() {
             <p className="text-sm text-slate-500">Loading placements&hellip;</p>
           </Container>
         )}
-      </header>
+      </div>
 
       <main>
         <Container className="flex flex-col gap-8 p-4">
@@ -358,7 +358,7 @@ export function Sabbatical() {
 
           {/* 6. Back to /pto. */}
           <p className="border-t border-slate-200 pt-6 text-sm text-slate-500">
-            Planning ordinary time off too? <a href="/pto" className="underline hover:text-slate-700">PTO Optimizer &rarr;</a>
+            Planning ordinary time off too? <a href="/pto" className="underline hover:text-slate-700">Plan PTO &rarr;</a>
           </p>
 
           <SabbaticalFAQ />
@@ -486,15 +486,15 @@ function SabbaticalExportRow({
     if (!ctx) return;
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT);
-    ctx.fillStyle = '#0f172a';
+    ctx.fillStyle = '#1c1917';
     ctx.font = '700 44px system-ui, sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText(`Away for ${placement.totalAwayDays} consecutive days`, 48, 110);
     ctx.font = '400 24px system-ui, sans-serif';
-    ctx.fillStyle = '#64748b';
+    ctx.fillStyle = '#57534e';
     ctx.fillText(`${formatLong(placement.extendedStart)} – ${formatLong(placement.extendedEnd)}`, 48, 150);
     ctx.font = '400 15px system-ui, sans-serif';
-    ctx.fillStyle = '#94a3b8';
+    ctx.fillStyle = '#6b645e';
     ctx.fillText(window.location.host, 48, SHARE_IMAGE_HEIGHT - 32);
     const result = await copyCanvasImage(canvas, 'sabbatical.png');
     flash(result.method === 'clipboard' ? 'Copied!' : result.method === 'download' ? 'Downloaded instead' : 'Could not copy');

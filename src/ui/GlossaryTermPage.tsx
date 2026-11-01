@@ -46,7 +46,7 @@ export function GlossaryTermPage({ termId }: { termId: string }) {
 
   if (!term) {
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-page">
         <SiteHeader active="glossary" />
         <main>
           <Container className="px-4 py-10">
@@ -66,7 +66,7 @@ export function GlossaryTermPage({ termId }: { termId: string }) {
   const relatedTerms = term.related.map((id) => findTerm(id)).filter((t): t is NonNullable<typeof t> => !!t);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-page">
       <SiteHeader active="glossary" />
       <main>
         <Container className="max-w-2xl px-4 py-10">
