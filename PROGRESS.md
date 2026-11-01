@@ -2741,3 +2741,38 @@ committed baseline on both `main` and this branch (date-dependent holiday data, 
   (cron-job.org); daily only otherwise.
 - **Q29: Legal review.** Protected-leave handling is US-focused (FMLA, CA §246.5). Not legal
   advice; worth a counsel check before EU customers.
+
+## Gapless, Phase 1: brand tokens and interactive coverage hero (`claude/gapless-hero`)
+
+Draft PR, hero only (Phases 2–4 of `prompts/gapless-marketing-redesign-prompt.md` not started).
+`PRODUCT_NAME` is now Gapless (app chrome too). Warm-neutral tokens with a deep-green accent and
+one alert colour for gaps only; the navy hero is gone. New header (Product, Compliance, For staff,
+Try the demo, Sign in; no blur). The hero grid is a real table whose numbers come from
+`coverageForDay` and `rankCandidates` on a made-up CA example, computed on the server at build
+time (`/` is static); the client chunk is about 7 kB gzipped. The rule shown is the CA pack's
+toddler ratio with its real citation (Cal. H&S Code § 1596.955(a)(3)–(4)) in a `SourceChip`.
+
+### Gate
+Teams tests: all pass except `decisionFlow.test.ts` "a request starting within 2 working days
+escalates at once", which fails on unmodified `main` too (probably clock-dependent, see Q36).
+Typecheck, lint (no new warnings), Teams build and root build pass; Days Off `dist/` is identical
+to a build of `main` (690 files, build stamp normalised). `e2e/gapless-hero.mjs`: 24 checks, axe
+clean at 1440 and 375 (before and after selecting the gap). Lighthouse mobile: LCP element is the
+h1. Screenshots: `gapless-redesign/` in the project files.
+
+### Questions for Atiyk
+- **Q30: Rename reach.** Still "Days Off for Teams": page metadata, llms.txt and agent card, MCP
+  and OpenAPI titles, the staff PWA name, passkey `rpName`, OAuth resource name, Teams manifest and
+  Slack app. Recommend switching them together in one follow-up PR once the hero is approved.
+- **Q31: Logo.** The mark is the old calendar, recoloured. Commission a Gapless mark?
+- **Q32: Fonts and colours.** Source Sans 3 (UI, app-wide) and Source Serif 4 (marketing h1),
+  self-hosted via `next/font`; accent `#0f5c4d`, alert `#b42318`. Keep?
+- **Q33: Citation URL.** The CA toddler citation points at the enacted AB 762 (2015) text on the
+  leginfo archive. Recommend refreshing the rule pack to the current codified section (engine
+  change, separate PR).
+- **Q34: "See how call-offs work"** anchors to the existing staff-cover section until Phase 2
+  builds section 2.
+- **Q35: Duplicate heading.** The old staff-cover section's h2 repeats the new h1; Phase 2
+  replaces that section.
+- **Q36: Failing test on `main`.** The escalation test above fails on unmodified `main` today; it
+  probably mixes the fixed test clock with real `created_at` times. Fix in its own PR?

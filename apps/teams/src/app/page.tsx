@@ -2,174 +2,299 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
-import { btn, btnPrimary, btnSecondary } from '@/components/ui';
-import { PRODUCT_TAGLINE } from '@/lib/brand';
+import { SourceChip } from '@/components/SourceChip';
+import { btnPrimary, btnSecondary } from '@/components/ui';
+import { CallOffSteps } from '@/components/marketing/CallOffSteps';
+import { HeroCoverageGrid } from '@/components/marketing/HeroCoverageGrid';
+import { serif } from '@/components/marketing/fonts';
+import { buildCallOffSteps, buildHeroExample, EXAMPLE } from '@/components/marketing/heroExample';
+import { Check, Example, PhoneFrame, SectionHead } from '@/components/marketing/parts';
+import { childcarePacks } from '@/components/marketing/rulesExample';
+import { INDUSTRIES } from '@/domain/industries';
 
 /*
  * The marketing page. Every picture on it is the product's own UI pattern drawn with fixed,
  * made-up example values (each labelled "Example"), never a stock photo or a screenshot of
- * real data. No prices and no customer claims: there are none yet.
+ * real data. Counts, rules and rankings come from the engine (heroExample.ts, rulesExample.ts).
+ * No prices and no customer claims: there are none yet.
  */
 
-const MANAGERS: [title: string, body: string][] = [
-  ['Approve with the full picture', 'Each request shows the balance after it, who else is out, and whether cover still holds. One tap in the app or in Slack.'],
-  ['Clear leave before it expires', 'The planner spreads the days people would lose across the year without anyone dropping below the cover you need.'],
-  ['Set up from your handbook', 'Paste your leave policy. Each value comes back with the sentence it came from, and anything unclear comes back as a question.'],
-];
-
-const STAFF: [title: string, body: string][] = [
-  ['A balance you can check', 'Every number comes from a deterministic engine, with a line-by-line "why this number". AI never makes one up.'],
-  ['Ask in your own words', '"Next Friday and Monday off" becomes a request, with public holidays left out of the count.'],
-  ['Call in sick in two taps', 'From the phone app, with no reason asked. Cover offers arrive there too, with Accept and Decline.'],
-];
-
-const REGULATED: [title: string, body: string][] = [
-  ['Rules with sources', 'Staff-to-child ratios, group sizes and required roles for your state, each with its regulation and section, or marked "needs verification".'],
-  ['Gaps before they happen', 'Approved and requested leave, call-offs and expiring credentials, checked per room and half hour, up to 12 weeks ahead.'],
-  ['Cover that is legal and fair', 'Ranked by who may legally take the shift, then by fairness, with the reason for every yes and no.'],
-  ['Children stay anonymous', 'Only counts per age group, room and time block. No names, no birthdays, ever.'],
-];
-
-const TIME: [title: string, body: string][] = [
-  ['Clock in from a phone', 'One big button, a meal-break reminder with its deadline, and a yes/no on rest breaks at clock-out. People only: agents can’t punch.'],
-  ['Hours that sync themselves', 'Every clock-out updates the timesheet and hourly sick-leave accrual. No CSV to import, no end-of-week chasing.'],
-  ['Overtime you see coming', 'Daily, weekly, double time and 7th-day rules per state. Cover goes to people at regular time first, unless you say otherwise.'],
-  ['A compliance inbox, not a binder', 'Missed clock-outs, short or late meals, overtime, timesheets to approve and expiring credentials, each with a link to fix it.'],
-];
-
-const INDUSTRIES = ['Offices', 'Childcare', 'Clinics', 'Healthcare and care homes', 'Retail', 'Restaurants and hospitality', 'Security and facilities', 'Manufacturing and warehouses'];
-
-const INTEGRATIONS: [title: string, body: string, icon: ReactNode][] = [
-  ['Slack', 'Request, approve and see who is out without leaving Slack. Sign in with your work account.', <IconChat key="i" />],
-  ['Phone app', 'Installs from the browser, signs in with a passkey, and works for staff who never use Slack.', <IconPhone key="i" />],
-  ['AI agents over MCP', 'Claude and other agents read and draft through the same rules as people, with scoped keys you control.', <IconSpark key="i" />],
-  ['REST API and webhooks', 'Every action the app can take, as an API, plus signed events when leave or cover changes.', <IconCode key="i" />],
-  ['Spreadsheet import', 'Bring people, balances and hours worked from a CSV. Each row is checked before anything is saved.', <IconTable key="i" />],
+const LEAVE_TIME: [title: string, body: string][] = [
+  ['Leave requests and approvals', 'Each request shows the balance after it, who else is out and whether cover still holds. Approve in the app, Slack or Teams.'],
+  ['Leave that doesn’t expire unused', 'The planner spreads days people would lose across the year without dropping below the cover you need.'],
+  ['Clock in from a phone', 'Every clock-out updates the timesheet and hourly sick-leave accrual, with meal and rest reminders.'],
+  ['Overtime and breaks by state', 'Federal, California, Washington, Colorado, New York State and New York City rules, each cited. Hours only: payroll stays with your provider.'],
 ];
 
 const TRUST: [title: string, body: string][] = [
-  ['Exact numbers', 'Balances, ratios and gaps come from a tested engine. AI only reads and writes words.'],
-  ['An audit log of everything', 'Every action, by a person or an agent, with who did it and when.'],
-  ['Your data, exportable', 'Export everything at any time. Delete a person or the whole workspace in one step.'],
-  ['One switch for agents', 'Turn off all agent access at once, and choose what agents may do without asking.'],
+  ['A tested engine for every number', 'Ratios, gaps, balances and rankings come from deterministic code with tests per rule. AI only reads and writes words.'],
+  ['AI you can switch off', 'One setting turns off every AI feature for your workspace; forms keep working. A separate switch stops all agent access.'],
+  ['An audit log of everything', 'Every change, by a person or an agent, with who, when and what. Turning AI off is recorded too.'],
+  ['Your data, exportable', 'Export everything as CSV or JSON at any time. Delete a person or the whole workspace in one step.'],
 ];
 
 export default function Home() {
+  const hero = buildHeroExample();
+  const steps = buildCallOffSteps();
+  const packs = childcarePacks();
   return (
-    <>
+    <div className={serif.variable}>
       <PublicHeader />
       <main>
-        <section className="on-hero bg-hero text-on-hero" aria-labelledby="hero">
-          <div className="mx-auto grid max-w-6xl gap-12 px-4 pt-16 pb-20 lg:grid-cols-[1fr_minmax(0,32rem)] lg:items-center lg:pt-24 lg:pb-28">
-            <div>
-              <p className="inline-flex rounded-full border border-on-hero-muted/40 px-3 py-1 text-xs font-medium tracking-wide text-on-hero-muted uppercase">
-                Early preview · free to try
-              </p>
-              <h1 id="hero" className="mt-5 text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-                Know who’s off, who’s on the clock, and who can cover.
+        <section className="bg-page" aria-labelledby="hero">
+          <div className="mx-auto grid max-w-7xl gap-10 px-4 pt-12 pb-20 sm:pt-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,44rem)] lg:items-start lg:gap-12 lg:pt-20 lg:pb-24">
+            <div className="lg:pt-8">
+              <p className="text-sm font-semibold text-accent">For childcare centres, clinics and care homes</p>
+              <h1 id="hero" className="mt-4 font-serif text-[2.5rem] leading-[1.1] font-semibold tracking-tight text-balance text-ink sm:text-5xl lg:text-[3.5rem]">
+                Know before an absence breaks a staffing rule.
               </h1>
-              <p className="mt-5 max-w-xl text-lg text-on-hero-muted">{PRODUCT_TAGLINE} One system for any team that works in shifts, with presets for regulated industries where one absence can break a rule.</p>
+              <p className="mt-5 max-w-xl text-lg text-muted">
+                See each room against its staffing rule and, when someone calls in sick, the gap, the rule behind it and who can cover.
+              </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
-                <Link href="/try" className={`${btn} bg-on-hero px-5 py-2.5 text-base text-accent-strong hover:bg-accent-soft`}>Try the demo</Link>
-                <Link href="/signin" className={`${btn} border border-on-hero-muted/60 px-5 py-2.5 text-base text-on-hero hover:bg-white/10`}>Sign in</Link>
+                <Link href="/try" className={`${btnPrimary} px-5 py-2.5 text-base`}>Try the demo</Link>
+                <Link href="#call-off" className={`${btnSecondary} px-5 py-2.5 text-base`}>See how call-offs work</Link>
               </div>
-              <p className="mt-4 text-sm text-on-hero-muted">No sign-up. You get your own copy of a made-up team.</p>
+              <p className="mt-8 flex max-w-xl gap-2 text-base text-ink">
+                <Check />
+                <span>
+                  <strong className="font-semibold">AI that shows its work:</strong> every number comes from a tested engine, every rule links to its source.
+                </span>
+              </p>
+              <p className="mt-3 text-sm text-muted">Early preview · free to try. No sign-up: you get your own copy of a made-up team.</p>
             </div>
-            <HeroVisual />
+            <HeroCoverageGrid data={hero} />
           </div>
         </section>
 
-        <section id="product" className="scroll-mt-20" aria-labelledby="product-h">
+        {/* 2. Call-off, step by step */}
+        <section id="call-off" className="scroll-mt-20 border-t border-line bg-surface" aria-labelledby="call-off-h">
           <div className="mx-auto max-w-6xl px-4 py-20">
-            <SectionHead id="product-h" eyebrow="One app, two sides" title="Built for the people who approve, and the people who ask">
-              Managers get the context to say yes quickly. Everyone else gets a balance they can trust and a request that takes seconds.
+            <SectionHead id="call-off-h" eyebrow="Call-offs" title="From a sick call to a covered room">
+              The same example centre, one step at a time: the call, the gap and its rule, the offers, the accepted cover.
             </SectionHead>
-            <div className="mt-12 grid gap-8 lg:grid-cols-2">
-              <Side title="For managers and owners" items={MANAGERS} visual={<ApprovalVisual />} />
-              <Side title="For your team" items={STAFF} visual={<BalanceVisual />} />
+            <div className="mt-12">
+              <CallOffSteps data={steps} />
             </div>
+            <p className="mt-8 text-sm">
+              <Link href="/demo/coverage" className="font-medium text-accent underline underline-offset-4">Watch it run on the sample centre →</Link>
+            </p>
           </div>
         </section>
 
-        <section id="time" className="scroll-mt-20 border-t border-line" aria-labelledby="time-h">
+        {/* 3. Compliance */}
+        <section id="compliance" className="scroll-mt-20 border-t border-line" aria-labelledby="compliance-h">
           <div className="mx-auto max-w-6xl px-4 py-20">
-            <SectionHead id="time-h" eyebrow="Time and compliance" title="The admin work that grows with every hire, done for you">
-              Clock-ins become timesheets, timesheets become overtime and break checks against your state’s rules, and anything that needs a person lands in one inbox.
+            <SectionHead id="compliance-h" eyebrow="Compliance" title="Every rule shows where it comes from">
+              Childcare ratios for three states, read from the regulation and dated. Select a source to see the text it came from.
             </SectionHead>
-            <ul className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-              {TIME.map(([title, body]) => (
+            <ul className="mt-12 grid gap-6 lg:grid-cols-3">
+              {packs.map((p) => (
+                <li key={p.state} className="rounded-2xl border border-line bg-card p-5">
+                  <h3 className="text-lg font-semibold text-ink">{p.state}</h3>
+                  <p className="mt-0.5 text-sm text-muted">{p.name}</p>
+                  <ul className="mt-4 space-y-3 text-sm">
+                    {p.ratios.slice(0, 3).map((r) => (
+                      <li key={r.id} className="text-ink">
+                        {r.label} {r.source ? <SourceChip source={r.source} /> : <span className="text-muted">(needs verification)</span>}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-3 text-sm text-muted">
+                    {p.ratios.length > 3 ? `and ${p.ratios.length - 3} more age group${p.ratios.length - 3 === 1 ? '' : 's'}, ` : ''}
+                    {p.mixed ? `plus mixed-age rooms: ${p.mixed.label.replace(/^Mixed ages[^:]*: /, '').toLowerCase()}.` : ''}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-6 max-w-3xl text-sm text-muted">
+              Clinics and care homes: set your own staffing per service or unit, with your handbook as the source. Those rules show as “your policy”, never as law. Not legal advice:
+              confirm the rules that apply to you with your licensing agency.
+            </p>
+
+            <div className="mt-14 grid gap-8 lg:grid-cols-2">
+              <figure className="min-w-0 rounded-2xl border border-line bg-card p-5">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-semibold text-ink">Audit log</h3>
+                  <Example />
+                </div>
+                <p className="mt-1 text-sm text-muted">Every change, by a person or an agent. This morning’s call-off, as the log records it:</p>
+                <div className="relative mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="Example audit log">
+                  <table className="w-full min-w-[26rem] text-left text-sm">
+                    <caption className="sr-only">Example audit log entries for the call-off</caption>
+                    <thead className="text-muted">
+                      <tr>
+                        <th scope="col" className="py-1.5 pr-3 font-medium">Time</th>
+                        <th scope="col" className="py-1.5 pr-3 font-medium">Who</th>
+                        <th scope="col" className="py-1.5 font-medium">What</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-ink tabular-nums">
+                      <AuditRow t={hero.event.time} who={`${hero.event.name} · staff app`} what={`Call-off for ${EXAMPLE.date}: 1 cover request`} />
+                      <AuditRow t="07:41" who="Director" what={`Requested cover ${EXAMPLE.date} ${hero.gap.from}–${hero.gap.to}: ${hero.options.length} offers sent`} />
+                      <AuditRow t="07:52" who={`${steps.accepted.name} · staff app`} what="Accepted a cover offer: filled" />
+                      <AuditRow t="16:05" who="Owner" what="Inspector export 2026-11-09 to 2026-11-13" />
+                    </tbody>
+                  </table>
+                </div>
+              </figure>
+
+              <figure className="min-w-0 rounded-2xl border border-line bg-card p-5">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-semibold text-ink">Inspector export</h3>
+                  <Example />
+                </div>
+                <p className="mt-1 text-sm text-muted">
+                  For a licensing visit: each room’s ratio checks per day, the rule and its source, every gap and the audit entries, as CSV. Here, {hero.gridFrom}–{hero.gridTo} on
+                  the example morning, before cover was found:
+                </p>
+                <div className="relative mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="Example inspector export">
+                  <table className="w-full min-w-[26rem] text-left text-sm">
+                    <caption className="sr-only">Example ratio checks per room, from the inspector export</caption>
+                    <thead className="text-muted">
+                      <tr>
+                        <th scope="col" className="py-1.5 pr-3 font-medium">Room</th>
+                        <th scope="col" className="py-1.5 pr-3 font-medium">Half hours checked</th>
+                        <th scope="col" className="py-1.5 pr-3 font-medium">In ratio</th>
+                        <th scope="col" className="py-1.5 font-medium">Short</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-ink tabular-nums">
+                      {hero.rooms.map((r) => {
+                        const checked = r.cells.filter((c) => c.required > 0);
+                        const short = checked.filter((c) => c.after < c.required).length;
+                        return (
+                          <tr key={r.id} className="border-t border-line">
+                            <th scope="row" className="py-2 pr-3 font-medium">{r.name}</th>
+                            <td className="py-2 pr-3">{checked.length}</td>
+                            <td className="py-2 pr-3">{checked.length - short}</td>
+                            <td className={`py-2 ${short ? 'font-semibold text-gap-text' : ''}`}>{short}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-3 text-sm text-muted">Each row also lists the rules applied with their sources and read dates. Not legal advice.</p>
+              </figure>
+            </div>
+            <p className="mt-8 flex max-w-3xl gap-2 text-base text-ink">
+              <Check />
+              <span>
+                <strong className="font-semibold">Children stay anonymous.</strong> Only counts per age group, room and half hour. No names, no birthdays, ever.
+              </span>
+            </p>
+          </div>
+        </section>
+
+        {/* 4. For staff */}
+        <section id="for-staff" className="scroll-mt-20 border-t border-line bg-surface" aria-labelledby="staff-h">
+          <div className="mx-auto max-w-6xl px-4 py-20">
+            <SectionHead id="staff-h" eyebrow="For staff" title="Made for the people on the floor">
+              A phone app that installs from the browser and signs in with a passkey. Staff who never open Slack get everything here.
+            </SectionHead>
+            <div className="mt-12 grid gap-10 md:grid-cols-3">
+              <PhoneFrame label="A balance with “why this number”">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-ink">Sick leave</p>
+                  <Example />
+                </div>
+                <p className="text-3xl font-semibold text-ink tabular-nums">16 h</p>
+                <div className="rounded-lg border border-line bg-surface p-3 text-sm">
+                  <p className="font-semibold text-ink">Why this number</p>
+                  <ul className="mt-1 space-y-0.5 text-ink tabular-nums">
+                    <li className="flex justify-between"><span>480 h worked ÷ 30</span><span>+16 h</span></li>
+                    <li className="flex justify-between"><span>Used</span><span>0 h</span></li>
+                  </ul>
+                  <p className="mt-1 text-muted">1 hour per 30 worked · Cal. Lab. Code § 246</p>
+                </div>
+              </PhoneFrame>
+              <PhoneFrame label="Ask in your own words">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-ink">Ask for time off</p>
+                  <Example />
+                </div>
+                <p className="rounded-lg border border-line bg-card p-3 text-sm text-muted">“next Friday and Monday off”</p>
+                <div className="rounded-lg border border-line bg-surface p-3 text-sm">
+                  <p className="font-semibold text-ink">Fri 13 – Mon 16 Nov</p>
+                  <p className="text-ink">2 days of vacation · weekend not counted</p>
+                  <p className="mt-1 text-muted">Left after: 12.5 days</p>
+                </div>
+                <span className="block rounded-md bg-accent py-2 text-center text-sm font-semibold text-white" aria-hidden="true">Send to my manager</span>
+              </PhoneFrame>
+              <PhoneFrame label="Call in sick in two taps; answer cover offers">
+                <span className="block rounded-lg border-2 border-gap-line bg-gap-bg py-3 text-center font-semibold text-gap-text" aria-hidden="true">I can’t come in</span>
+                <p className="text-sm text-muted">No reason asked. Your manager sees “out”.</p>
+                <div className="rounded-xl border border-line bg-card p-3 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-ink">Cover: {hero.gap.roomName}</p>
+                    <Example />
+                  </div>
+                  <p className="text-sm text-ink">Thu, {hero.gap.from}–{hero.gap.to}</p>
+                  <div className="mt-2 grid grid-cols-2 gap-1.5 text-sm" aria-hidden="true">
+                    <span className="rounded-lg bg-accent py-2 text-center font-semibold text-white">Take it</span>
+                    <span className="rounded-lg border border-line py-2 text-center text-ink">Can’t</span>
+                  </div>
+                </div>
+              </PhoneFrame>
+            </div>
+            <p className="mt-8 max-w-3xl text-sm text-muted">Explanations in words are written by AI from the engine’s figures only, and every figure in them must match. The figures above are an example.</p>
+          </div>
+        </section>
+
+        {/* 5. Leave and time clock, briefly */}
+        <section id="leave-time" className="scroll-mt-20 border-t border-line" aria-labelledby="leave-time-h">
+          <div className="mx-auto max-w-6xl px-4 py-20">
+            <SectionHead id="leave-time-h" eyebrow="Also included" title="Leave and time clock, in the same place" />
+            <ul className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+              {LEAVE_TIME.map(([title, body]) => (
                 <li key={title} className="border-l-2 border-accent pl-4">
                   <h3 className="font-semibold text-ink">{title}</h3>
                   <p className="mt-1 text-sm text-muted">{body}</p>
                 </li>
               ))}
             </ul>
-            <p className="mt-8 text-sm text-muted">
-              Overtime and break rules for US federal, California, Washington, Colorado, New York State and New York City, each cited and dated. Configurable defaults, not legal advice. Hours only: pay stays with your payroll provider.
+            <p className="mt-8 text-sm">
+              <Link href="/demo" className="font-medium text-accent underline underline-offset-4">See leave and planning in the walkthrough →</Link>
             </p>
-            <div className="mt-8">
-              <h3 className="text-sm font-semibold text-ink">One system, presets for your industry</h3>
-              <ul className="mt-3 flex flex-wrap gap-2" aria-label="Industry presets">
-                {INDUSTRIES.map((i) => (
-                  <li key={i} className="rounded-full border border-line bg-page px-3 py-1 text-sm text-ink">{i}</li>
-                ))}
-              </ul>
-            </div>
           </div>
         </section>
 
-        <section id="coverage" className="scroll-mt-20 border-y border-line bg-surface" aria-labelledby="coverage-h">
-          <div className="mx-auto grid max-w-6xl gap-12 px-4 py-20 lg:grid-cols-[1fr_minmax(0,28rem)] lg:items-center">
-            <div>
-              <SectionHead id="coverage-h" eyebrow="For regulated industries" title="Know before an absence breaks a staffing rule">
-                Where coverage is the law, one day off can leave a room out of ratio. See it per room and half hour, with the rule and its source, and find
-                cover that is legal, qualified and fair.
-              </SectionHead>
-              <ul className="mt-8 grid gap-5 sm:grid-cols-2">
-                {REGULATED.map(([title, body]) => (
-                  <li key={title}>
-                    <h3 className="flex items-center gap-2 font-semibold text-ink">
-                      <Check />
-                      {title}
-                    </h3>
-                    <p className="mt-1 text-sm text-muted">{body}</p>
+        {/* 6. Industry presets */}
+        <section id="presets" className="scroll-mt-20 border-t border-line bg-surface" aria-labelledby="presets-h">
+          <div className="mx-auto max-w-6xl px-4 py-20">
+            <SectionHead id="presets-h" eyebrow="Presets" title="Start from your kind of team">
+              A preset sets the words (room, chair, unit) and suggests rules. You can change everything afterwards.
+            </SectionHead>
+            <ul className="mt-12 grid gap-6 md:grid-cols-3">
+              <PresetCard title="Childcare centres" href="/childcare" tag="Cited rules for CA, TX and NY">
+                Staff-to-child ratios and group sizes per age group, mixed-age rooms, qualified staff and hourly sick leave.
+              </PresetCard>
+              <PresetCard title="Clinics" tag="Your policy, not law">
+                Bookings per service and a licensed role on the floor. You set the staffing; your handbook is the source.
+              </PresetCard>
+              <PresetCard title="Care homes" tag="Your policy, not law">
+                Units, licensed roles, rest between shifts and credentials that expire. You set the staffing; your handbook is the source.
+              </PresetCard>
+            </ul>
+            <details className="mt-8 max-w-3xl rounded-xl border border-line bg-card p-4">
+              <summary className="cursor-pointer font-medium text-ink">See all presets</summary>
+              <ul className="mt-3 space-y-2 text-sm">
+                {INDUSTRIES.map((i) => (
+                  <li key={i.key}>
+                    <span className="font-semibold text-ink">{i.label}</span> <span className="text-muted">· {i.blurb}</span>
                   </li>
                 ))}
               </ul>
-              <div className="mt-8 flex flex-wrap items-center gap-3">
-                <Link href="/try" className={btnPrimary}>Open the sample centre</Link>
-                <Link href="/demo/coverage" className={btnSecondary}>Watch a call-off, step by step</Link>
-              </div>
-              <p className="mt-3 text-sm text-muted">California, Texas and New York childcare packs and a clinic template included. Not legal advice.</p>
-            </div>
-            <SampleGrid />
+            </details>
           </div>
         </section>
 
-        <section id="integrations" className="scroll-mt-20" aria-labelledby="integrations-h">
+        {/* 7. Trust */}
+        <section id="trust" className="scroll-mt-20 border-t border-line" aria-labelledby="trust-h">
           <div className="mx-auto max-w-6xl px-4 py-20">
-            <SectionHead id="integrations-h" eyebrow="Works where your team already is" title="Slack, a phone app, and an API for your AI agents">
-              No new habit to build. People ask from Slack or their phone; your agents use the same rules through MCP or REST.
-            </SectionHead>
-            <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-              {INTEGRATIONS.map(([title, body, icon]) => (
-                <li key={title} className="rounded-xl border border-line bg-page p-5">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent-soft text-accent">{icon}</span>
-                  <h3 className="mt-4 font-semibold text-ink">{title}</h3>
-                  <p className="mt-1 text-sm text-muted">{body}</p>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-6 text-sm">
-              <Link href="/docs/agents" className="font-medium text-accent underline-offset-4 hover:underline">Read the agent and API docs →</Link>
-            </p>
-          </div>
-        </section>
-
-        <section className="border-t border-line bg-surface" aria-labelledby="trust-h">
-          <div className="mx-auto max-w-6xl px-4 py-20">
-            <SectionHead id="trust-h" eyebrow="Built to be checked" title="Numbers you can show an auditor">
-              Leave and staffing are where small mistakes cost the most. Everything here is designed to be explained and traced.
+            <SectionHead id="trust-h" eyebrow="Built to be checked" title="Numbers you can show an inspector">
+              Staffing and leave are where small mistakes cost the most, so everything is built to be traced.
             </SectionHead>
             <ul className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
               {TRUST.map(([title, body]) => (
@@ -179,233 +304,49 @@ export default function Home() {
                 </li>
               ))}
             </ul>
+            <p className="mt-8 text-sm text-muted">
+              Building on it? MCP, REST and webhooks are on the{' '}
+              <Link href="/developers" className="font-medium text-accent underline underline-offset-4">developers page</Link>.
+            </p>
           </div>
         </section>
 
-        <section className="on-hero bg-hero text-on-hero" aria-labelledby="cta-h">
+        <section className="border-t border-line bg-accent-soft" aria-labelledby="cta-h">
           <div className="mx-auto flex max-w-6xl flex-col items-start gap-6 px-4 py-16 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 id="cta-h" className="text-2xl font-semibold tracking-tight sm:text-3xl">See it with a made-up team</h2>
-              <p className="mt-2 max-w-xl text-on-hero-muted">Your own private copy of a sample centre or office, deleted after a day. Nothing you do there reaches a real person.</p>
+              <h2 id="cta-h" className="font-serif text-2xl font-semibold tracking-tight text-ink sm:text-3xl">See it with a made-up centre</h2>
+              <p className="mt-2 max-w-xl text-ink">Your own private copy of a sample centre or office, deleted after a day. Nothing you do there reaches a real person.</p>
             </div>
-            <Link href="/try" className={`${btn} shrink-0 bg-on-hero px-5 py-2.5 text-base text-accent-strong hover:bg-accent-soft`}>Try the demo</Link>
+            <Link href="/try" className={`${btnPrimary} shrink-0 px-5 py-2.5 text-base`}>Try the demo</Link>
           </div>
         </section>
       </main>
       <PublicFooter />
-    </>
-  );
-}
-
-function SectionHead({ id, eyebrow, title, children }: { id: string; eyebrow: string; title: string; children: ReactNode }) {
-  return (
-    <div className="max-w-2xl">
-      <p className="text-sm font-semibold tracking-wide text-accent uppercase">{eyebrow}</p>
-      <h2 id={id} className="mt-2 text-3xl font-semibold tracking-tight text-balance text-ink sm:text-4xl">{title}</h2>
-      <p className="mt-4 text-lg text-muted">{children}</p>
     </div>
   );
 }
 
-function Side({ title, items, visual }: { title: string; items: [string, string][]; visual: ReactNode }) {
+function AuditRow({ t, who, what }: { t: string; who: string; what: string }) {
   return (
-    <div className="flex flex-col rounded-2xl border border-line bg-surface p-6 sm:p-8">
-      <h3 className="text-xl font-semibold text-ink">{title}</h3>
-      <div className="mt-6">{visual}</div>
-      <ul className="mt-8 space-y-5">
-        {items.map(([t, b]) => (
-          <li key={t} className="flex gap-3">
-            <Check />
-            <div>
-              <h4 className="font-semibold text-ink">{t}</h4>
-              <p className="mt-0.5 text-sm text-muted">{b}</p>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <tr className="border-t border-line align-top">
+      <td className="py-2 pr-3 whitespace-nowrap">{t}</td>
+      <td className="py-2 pr-3">{who}</td>
+      <td className="py-2">{what}</td>
+    </tr>
   );
 }
 
-function Example() {
-  return <span className="rounded border border-line bg-surface-alt px-1.5 py-0.5 text-xs text-muted">Example</span>;
-}
-
-/** The manager's approval card, drawn with fixed example values. */
-function ApprovalVisual() {
+function PresetCard({ title, tag, href, children }: { title: string; tag: string; href?: string; children: ReactNode }) {
   return (
-    <figure className="rounded-xl border border-line bg-page p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-ink">Waiting for you</p>
-        <Example />
-      </div>
-      <div className="mt-3 rounded-lg border border-line p-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-          <p className="font-medium text-ink">Sam Rivera · Vacation</p>
-          <p className="text-sm text-muted">Mon 7 – Fri 11 Dec · 5 days</p>
-        </div>
-        <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
-          <Fact k="Left after" v="9 days" />
-          <Fact k="Also out" v="1 of 6" />
-          <Fact k="Cover" v="Holds" ok />
-        </dl>
-        <div className="mt-3 flex gap-2" aria-hidden="true">
-          <span className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white">Approve</span>
-          <span className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-ink">Decline</span>
-        </div>
-      </div>
-      <figcaption className="sr-only">Example approval: Sam Rivera asks for 5 days of vacation; 9 days left after, 1 of 6 teammates also out, cover holds.</figcaption>
-    </figure>
+    <li className="flex flex-col rounded-2xl border border-line bg-card p-5">
+      <p className="text-sm font-medium text-accent">{tag}</p>
+      <h3 className="mt-1 text-lg font-semibold text-ink">{title}</h3>
+      <p className="mt-2 flex-1 text-sm text-muted">{children}</p>
+      {href && (
+        <Link href={href} className="mt-4 text-sm font-medium text-accent underline underline-offset-4">
+          Childcare in detail<span className="sr-only">: {title}</span> →
+        </Link>
+      )}
+    </li>
   );
-}
-
-function Fact({ k, v, ok }: { k: string; v: string; ok?: boolean }) {
-  return (
-    <div className={`rounded-md px-2 py-1.5 ${ok ? 'bg-ok-bg' : 'bg-surface-alt'}`}>
-      <dt className="text-muted">{k}</dt>
-      <dd className={`font-semibold ${ok ? 'text-ok-text' : 'text-ink'}`}>{v}</dd>
-    </div>
-  );
-}
-
-/** The employee's balance card and plain-words request, drawn with fixed example values. */
-function BalanceVisual() {
-  return (
-    <figure className="rounded-xl border border-line bg-page p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-ink">Vacation</p>
-        <Example />
-      </div>
-      <p className="mt-2 text-3xl font-semibold text-ink tabular-nums">14.5 days</p>
-      <p className="text-sm text-muted">available now · 3 would expire on 31 Dec</p>
-      <div className="mt-3 rounded-lg border border-line bg-surface p-3 text-sm">
-        <p className="text-muted">“next Friday and Monday off”</p>
-        <p className="mt-1 font-medium text-ink">Fri 13 – Mon 16 Nov · 2 days, weekend not counted</p>
-      </div>
-      <figcaption className="sr-only">Example: 14.5 vacation days available; the words “next Friday and Monday off” become a 2-day request.</figcaption>
-    </figure>
-  );
-}
-
-/** An illustration of the coverage heatmap (fixed example values, labelled as such), not live data. */
-const SAMPLE: [room: string, cells: (number | null)[]][] = [
-  ['Infants', [0, 0, 0, 0, 0, 0, 0, 0]],
-  ['Toddlers', [0, 0, 0, 0, 0, 1, 1, 0]],
-  ['Preschool', [0, 0, 0, 0, 0, 0, 0, 0]],
-];
-const SAMPLE_TIMES = ['13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'];
-
-function SampleGrid({ compact = false }: { compact?: boolean }) {
-  return (
-    <figure className={`rounded-xl border border-line bg-page shadow-sm ${compact ? 'p-3' : 'p-4'}`}>
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-ink">Monday, by room</p>
-        <Example />
-      </div>
-      <table className="mt-3 w-full table-fixed border-separate border-spacing-0.5 text-center text-[11px] tabular-nums">
-        <colgroup>
-          <col className="w-20" />
-          {SAMPLE_TIMES.map((t) => (
-            <col key={t} />
-          ))}
-        </colgroup>
-        <caption className="sr-only">Example: Toddlers is one staff member short from 15:30 to 16:30; every other room is in ratio.</caption>
-        <thead>
-          <tr>
-            <th scope="col" className="pr-2 text-left font-medium text-muted">Room</th>
-            {SAMPLE_TIMES.map((t) => (
-              <th key={t} scope="col" className="text-left font-medium text-muted">{t.endsWith(':00') ? t.slice(0, 2) : ''}<span className="sr-only">{t}</span></th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {SAMPLE.map(([room, cells]) => (
-            <tr key={room}>
-              <th scope="row" className="pr-2 text-left font-medium text-ink">{room}</th>
-              {cells.map((n, i) =>
-                n ? (
-                  <td
-                    key={i}
-                    className="h-7 rounded-sm border-2 border-gap-line bg-gap-fill font-semibold text-gap-text"
-                    style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent 0 4px, rgba(185,28,28,.28) 4px 6px)' }}
-                  >
-                    −{n}
-                  </td>
-                ) : (
-                  <td key={i} className="h-7 rounded-sm border border-ok-line bg-ok-fill" />
-                ),
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <figcaption className="mt-3 rounded-md border-l-4 border-gap-line bg-gap-bg p-2 text-sm">
-        <span className="font-semibold text-gap-text">Toddlers, 15:30–16:30: 1 staff short</span>
-        <span className="block text-muted">1 teacher per 6 children · Cal. Health &amp; Safety Code § 1596.955</span>
-        {!compact && <span className="mt-1 block text-ink">3 people can legally cover it. Ask the top 3 →</span>}
-      </figcaption>
-    </figure>
-  );
-}
-
-/** The hero: the manager's coverage view in a window, with the staff phone app beside it. */
-function HeroVisual() {
-  return (
-    <div className="relative pb-16 sm:pr-36 lg:pr-28">
-      <div className="overflow-hidden rounded-2xl border border-white/15 bg-surface shadow-2xl">
-        <div className="flex items-center gap-1.5 border-b border-line bg-page px-4 py-2.5" aria-hidden="true">
-          <span className="h-2.5 w-2.5 rounded-full bg-line" />
-          <span className="h-2.5 w-2.5 rounded-full bg-line" />
-          <span className="h-2.5 w-2.5 rounded-full bg-line" />
-          <span className="ml-3 text-xs text-muted">Coverage · Sunbeam Early Learning</span>
-        </div>
-        <div className="space-y-3 p-4 text-ink">
-          <div className="rounded-lg border-l-8 border-gap-line bg-gap-bg p-3">
-            <p className="font-semibold text-gap-text">1 gap this week</p>
-            <p className="text-sm">Monday 15:30, Toddlers, 1 staff short</p>
-          </div>
-          <SampleGrid compact />
-        </div>
-      </div>
-      <figure className="absolute right-0 bottom-0 hidden w-44 rounded-[1.75rem] border-4 border-ink bg-page p-3 text-ink shadow-2xl sm:block" aria-label="Example: the staff phone app">
-        <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-line" aria-hidden="true" />
-        <p className="text-[11px] font-medium text-muted uppercase">Tomorrow</p>
-        <p className="text-sm font-semibold">7:00 – 15:00</p>
-        <p className="text-xs text-muted">Toddlers</p>
-        <span className="mt-3 block rounded-lg border-2 border-gap-line bg-gap-bg py-2 text-center text-xs font-semibold text-gap-text" aria-hidden="true">
-          I can’t come in
-        </span>
-        <span className="mt-2 block rounded-lg bg-accent py-2 text-center text-xs font-semibold text-white" aria-hidden="true">
-          1 cover offer
-        </span>
-        <figcaption className="sr-only">Tomorrow 7:00 to 15:00 in Toddlers, with an “I can’t come in” button and one cover offer.</figcaption>
-      </figure>
-    </div>
-  );
-}
-
-function Check() {
-  return (
-    <svg viewBox="0 0 20 20" className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden="true" focusable="false">
-      <circle cx="10" cy="10" r="9" fill="var(--accent-soft)" />
-      <path d="M6 10.5l2.5 2.5L14 7.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-const iconProps = { viewBox: '0 0 24 24', className: 'h-5 w-5', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, focusable: false } as const;
-function IconChat() {
-  return <svg {...iconProps}><path d="M4 5h16v11H9l-5 4z" /></svg>;
-}
-function IconPhone() {
-  return <svg {...iconProps}><rect x="7" y="2.5" width="10" height="19" rx="2.5" /><path d="M11 18h2" /></svg>;
-}
-function IconSpark() {
-  return <svg {...iconProps}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6" /></svg>;
-}
-function IconCode() {
-  return <svg {...iconProps}><path d="M8 7l-5 5 5 5M16 7l5 5-5 5" /></svg>;
-}
-function IconTable() {
-  return <svg {...iconProps}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18M9 4v16" /></svg>;
 }

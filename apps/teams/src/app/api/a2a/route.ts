@@ -10,6 +10,6 @@ export async function POST(req: Request) {
   return Response.json({
     jsonrpc: '2.0',
     id: body?.id ?? null,
-    error: { code: -32601, message: 'A2A tasks are not available yet. Use the MCP endpoint at /api/mcp; see /docs/agents.' },
+    error: { code: -32601, message: 'A2A tasks are not available yet. Use the MCP endpoint at /api/mcp; see /developers.' },
   });
 }

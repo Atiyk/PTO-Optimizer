@@ -24,7 +24,7 @@ async function snapshot(db: Awaited<ReturnType<typeof freshDb>>) {
   return { tables: rows(tables).map((t) => t.table_name as string), orgs: rows(orgs), ledger: rows(ledger) };
 }
 
-const COVERAGE_MIGRATIONS = ['0005_regulated_coverage.sql', '0006_cover_workflow.sql', '0007_time_clock.sql', '0008_approvals_automations.sql', '0009_decision_flow.sql'];
+const COVERAGE_MIGRATIONS = ['0005_regulated_coverage.sql', '0006_cover_workflow.sql', '0007_time_clock.sql', '0008_approvals_automations.sql', '0009_decision_flow.sql', '0010_ai_features_switch.sql'];
 const downStatements = (file: string) =>
   readFileSync(path.join(MIGRATIONS_DIR, 'down', file), 'utf8')
     .replace(/^--.*$/gm, '')
@@ -32,7 +32,7 @@ const downStatements = (file: string) =>
     .map((x) => x.trim())
     .filter(Boolean);
 
-describe('regulated coverage and time clock migrations (0005–0009)', () => {
+describe('regulated coverage and time clock migrations (0005–0010)', () => {
   it.each(COVERAGE_MIGRATIONS)('%s is additive: no DROP, no type changes, every new column nullable or defaulted', (file) => {
     const up = statements(file);
     expect(up.some((s) => /\bDROP\b/i.test(s))).toBe(false);

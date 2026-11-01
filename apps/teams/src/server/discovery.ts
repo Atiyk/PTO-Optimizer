@@ -4,7 +4,7 @@ import { appUrl } from '@/lib/appUrl';
 import { PRODUCT_NAME, PRODUCT_TAGLINE } from '@/lib/brand';
 
 /*
- * One source for what agents read about us: /llms.txt, /docs/agents and the A2A card.
+ * One source for what agents read about us: /llms.txt, /developers and the A2A card.
  * Built from the capability registry (R1), so a new tool shows up everywhere at once.
  */
 
@@ -33,7 +33,7 @@ export function agentEndpoints(base = appUrl()) {
     token: `${base}/api/oauth/token`,
     resourceMetadata: `${base}/.well-known/oauth-protected-resource/api/mcp`,
     authServerMetadata: `${base}/.well-known/oauth-authorization-server`,
-    docs: `${base}/docs/agents`,
+    docs: `${base}/developers`,
   };
 }
 
@@ -45,7 +45,7 @@ export function llmsTxt(base = appUrl()): string {
   return [
     `# ${PRODUCT_NAME}`,
     '',
-    `> ${PRODUCT_TAGLINE} Leave requests, balances, approvals, who's out and team leave planning for small companies. Every number comes from a deterministic engine; agents read and draft through the same rules as people.`,
+    `> ${PRODUCT_TAGLINE} Staffing checks per room and half hour, ranked cover for call-offs, leave requests, balances, approvals, who's out and a time clock. Every number comes from a deterministic engine; agents read and draft through the same rules as people.`,
     '',
     'Agents connect over MCP (Streamable HTTP) or REST with a bearer token. Actions that change something',
     'return `status: "confirmation_required"` with a draft unless an admin raised that action to "act within',
@@ -80,7 +80,7 @@ export function agentCard(base = appUrl()) {
   const e = agentEndpoints(base);
   return {
     name: PRODUCT_NAME,
-    description: `${PRODUCT_TAGLINE} Answers questions about leave balances, who is out and holidays, and drafts leave requests for a person to confirm.`,
+    description: `${PRODUCT_TAGLINE} Answers questions about staffing coverage, leave balances, who is out and holidays, and drafts leave requests for a person to confirm.`,
     version: '0.1.0',
     provider: { organization: PRODUCT_NAME, url: base },
     documentationUrl: e.docs,
