@@ -75,30 +75,27 @@ export type IntensityBand = 0 | 1 | 2;
  * Even thirds (33/66), not 40/60: an uneven split would flag two-fifths of outcomes as
  * the worst band, training users to ignore it.
  *
- * Single hue (indigo) at three intensities, not red/yellow/green: that palette is the
- * worst case for colourblindness (red/green is the classic confusion pair, and the
- * yellow between them doesn't separate from either in greyscale), it clashes with the
- * calendar's own coral/teal (or blue/amber) and violet, and "red" reads as "broken" when
- * a 30th-percentile plan is merely below average, not wrong. Indigo is used nowhere else
- * in the calendar or the day-cell legend.
+ * Single hue at three intensities, not red/yellow/green: that palette is the worst case for
+ * colourblindness (red/green is the classic confusion pair, and the yellow between them
+ * doesn't separate from either in greyscale), and "red" reads as "broken" when a
+ * 30th-percentile plan is merely below average, not wrong.
  *
- * The three shades are deliberately NOT a light-to-dark pastel ramp: a true light indigo
- * (indigo-300/400) fails 4.5:1 against the strip's background outright, and contrast is
- * the harder constraint to satisfy than "looks pastel." All three bars/text classes below
- * clear 4.5:1 against both backgrounds the strip can sit on - see scoreFormat.test.ts for
- * the actual assertions and NOTES.md for the full contrast table and this trade-off.
+ * Redesign Phase 1: the hue is the site's one accent (burnt orange) and its two darker
+ * shades - "one accent hue only" - instead of a separate indigo. The bars always sit next to
+ * their percentile and gloss text, so sharing the accent never makes a bar read as a PTO
+ * day. All three clear 4.5:1 on every background the strip can sit on (tokens.test.ts).
  *
- * `barClasses` are Tailwind classes referencing index.css's `--score-N` custom properties
- * (indigo-600/700/800) so there is exactly one place these values live. `rgb` is the same
- * three values as plain triples, for the contrast tests below.
+ * `barClasses` are Tailwind classes referencing index.css's `--score-N` custom properties so
+ * there is exactly one place these values live. `rgb` is the same three values as plain
+ * triples for the contrast tests; tokens.test.ts checks they match the stylesheet.
  */
 export const SCORE_INTENSITY = {
   thresholds: [33, 66] as const,
   barClasses: ['bg-[var(--score-1)]', 'bg-[var(--score-2)]', 'bg-[var(--score-3)]'] as const,
   rgb: [
-    [79, 70, 229],
-    [67, 56, 202],
-    [55, 48, 163],
+    [194, 65, 12], // #c2410c
+    [154, 52, 18], // #9a3412
+    [124, 45, 18], // #7c2d12
   ] as [number, number, number][],
 } as const;
 

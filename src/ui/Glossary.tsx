@@ -37,7 +37,7 @@ export function Glossary() {
   const groups = useMemo(() => groupAlphabetically(filtered), [filtered]);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-page">
       <SiteHeader active="glossary" />
       <main>
         <Container className="px-4 py-10">

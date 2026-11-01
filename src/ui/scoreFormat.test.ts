@@ -122,10 +122,14 @@ describe('barFillWidthPercent', () => {
 });
 
 describe('score intensity contrast', () => {
-  const SLATE_50: [number, number, number] = [248, 250, 252];
+  // The strip's possible backgrounds after the Phase 1 tokens: the warm page, the white
+  // surface, and the remapped slate-50 some cards still use.
+  const PAGE: [number, number, number] = [251, 248, 243];
+  const SLATE_50: [number, number, number] = [250, 247, 242];
   const WHITE: [number, number, number] = [255, 255, 255];
 
   it.each(SCORE_INTENSITY.rgb)('intensity [%i, %i, %i] reaches 4.5:1 against the summary strip background', (r, g, b) => {
+    expect(contrastRatio([r, g, b], PAGE)).toBeGreaterThanOrEqual(4.5);
     expect(contrastRatio([r, g, b], SLATE_50)).toBeGreaterThanOrEqual(4.5);
     expect(contrastRatio([r, g, b], WHITE)).toBeGreaterThanOrEqual(4.5);
   });

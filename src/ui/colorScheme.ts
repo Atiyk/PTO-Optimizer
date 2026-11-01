@@ -14,15 +14,15 @@ export interface ColorTokens {
   focusRing: string;
 }
 
-// Contrast ratios: ptoBg/ptoText (blue-900/white) = 10.36:1, bandBg/bandText
-// (amber-100/slate-800) = 11.75:1. Verified in colorScheme.test.ts.
+// Values live in index.css (redesign Phase 1: burnt-orange accent, orange-100 band wash).
+// Every pair is verified against the real stylesheet in tokens.test.ts / colorScheme.test.ts.
 /**
  * THE primary-action treatment - the accent's second of its three reserved uses (suggested
  * PTO, this, and focus rings). One button on the page gets this at a time; everything else
  * is a neutral, bordered secondary button.
  */
 export const ACCENT_BUTTON =
-  'bg-[var(--pto-bg)] text-white hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]';
+  'bg-[var(--pto-bg)] text-white hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]';
 
 export const COLORS: ColorTokens = {
   ptoBg: 'bg-[var(--pto-bg)]',
@@ -34,16 +34,16 @@ export const COLORS: ColorTokens = {
   focusRing: 'ring-[var(--focus-ring)]',
 };
 
-// Shared text tokens, independent of the PTO/band scheme above. One token, one value: slate-900
-// on white = 17.85:1 (headings, primary numerals), slate-500 on white = 4.76:1 (secondary text).
+// Shared text tokens, independent of the PTO/band scheme above. One token, one value: ink
+// (headings, primary numerals) and muted (secondary text), both >= 4.5:1 on every surface.
 export const TEXT_PRIMARY = 'text-[var(--text-primary)]';
 export const TEXT_MUTED = 'text-[var(--text-muted)]';
 
 /**
  * Text for a numeral sitting inside the days-off BAND specifically (a weekend day whose
  * cell is drawn over the band fill) - deliberately NOT TEXT_PRIMARY, which is slate-900 and
- * reserved for the page background, not the amber band fill. BAND_TEXT is pinned to
- * slate-800 against bandBg's amber-100, matching the band's own always-light background.
+ * reserved for the page background, not the band fill. BAND_TEXT is its own token, pinned
+ * against bandBg, matching the band's own always-light background.
  */
 export const BAND_TEXT = 'text-[var(--band-text)]';
 
@@ -51,8 +51,7 @@ export const BAND_TEXT = 'text-[var(--band-text)]';
  * Public holiday marker: a small dot, not a fill - a holiday is a fact about the
  * calendar, not something to act on. Deliberately the app's existing neutral (slate)
  * family, not a new hue: the calendar's only two "colours" are the PTO role (the accent)
- * and the band role (the amber tint); a third saturated hue for holidays was the actual bug
+ * and the band role (the warm tint); a third saturated hue for holidays was the actual bug
  * ("too busy" from each feature claiming its own colour) this token set replaces.
- * Slate-600 on white = 7.58:1.
  */
 export const HOLIDAY_DOT = 'bg-[var(--holiday-dot)]';

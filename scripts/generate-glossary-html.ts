@@ -36,7 +36,8 @@ function page(termTitle: string, description: string, canonicalPath: string): st
     <link rel="alternate icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#1e3a8a" />
+    <meta name="theme-color" content="#fbf8f3" />
+    <link rel="preload" href="/fonts/figtree-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
 
     <title>${title}</title>
     <meta name="description" content="${desc}" />
