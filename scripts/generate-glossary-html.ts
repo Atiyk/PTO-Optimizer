@@ -26,7 +26,7 @@ function escapeAttr(s: string): string {
 }
 
 function page(termTitle: string, description: string, canonicalPath: string): string {
-  const title = `${escapeAttr(termTitle)} — Days Off Glossary`;
+  const title = `${escapeAttr(termTitle)} — %PRODUCT_NAME% Glossary`;
   const desc = escapeAttr(description);
   return `<!doctype html>
 <html lang="en">
@@ -43,7 +43,7 @@ function page(termTitle: string, description: string, canonicalPath: string): st
     <link rel="canonical" href="%SITE_URL%${canonicalPath}" />
 
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Days Off" />
+    <meta property="og:site_name" content="%PRODUCT_NAME%" />
     <meta property="og:title" content="${title}" />
     <meta property="og:description" content="${desc}" />
     <meta property="og:url" content="%SITE_URL%${canonicalPath}" />

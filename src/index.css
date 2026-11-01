@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 /* Tailwind scans every text file in the repo. Keep the monorepo's other apps, the shared
    engine package, its docs (docs/teams/...) and the root notes (PROGRESS.md and friends) out
-   of Days Off's CSS, so changes there can never change this site's build output. */
+   of this site's CSS, so changes there can never change this site's build output. */
 @source not '../apps';
 @source not '../docs';
 @source not '../packages';

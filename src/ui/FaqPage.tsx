@@ -3,6 +3,7 @@ import { Footer } from './Footer';
 import { Container } from './Container';
 import { ITEMS as PTO_FAQ_ITEMS, type FAQItem } from './FAQ';
 import { SABBATICAL_FAQ_ITEMS } from './sabbaticalFaqItems';
+import { ABOUT_FAQ_ITEMS } from './aboutFaqItems';
 
 /**
  * Phase 6B: one page consolidating both tools' questions in anchored sections, so a
@@ -49,11 +50,15 @@ export function FaqPage() {
               <a href="#sabbatical" className="underline hover:text-slate-800">
                 Sabbatical Planning &darr;
               </a>
+              <a href="#about" className="underline hover:text-slate-800">
+                About &darr;
+              </a>
             </nav>
           </section>
 
           <FaqSection id="pto" title="PTO Optimizer" items={PTO_FAQ_ITEMS} />
           <FaqSection id="sabbatical" title="Sabbatical Planning" items={SABBATICAL_FAQ_ITEMS} />
+          <FaqSection id="about" title="About this site" items={ABOUT_FAQ_ITEMS} />
         </Container>
       </main>
       <Footer />

@@ -1,4 +1,5 @@
 import { Container } from './Container';
+import { PRODUCT_NAME } from '../brand';
 
 export type SiteRoute = 'landing' | 'pto' | 'sabbatical' | 'policy' | 'glossary';
 
@@ -28,7 +29,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
     <div className="border-b border-slate-200 bg-white">
       <Container className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3">
         <a href="/" className={`text-sm font-semibold ${active === 'landing' ? 'text-slate-900' : 'text-slate-700 hover:text-slate-900'}`}>
-          Days Off
+          {PRODUCT_NAME}
         </a>
         <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
           <nav className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm" aria-label="Plan">

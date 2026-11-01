@@ -2776,3 +2776,83 @@ h1. Screenshots: `gapless-redesign/` in the project files.
   replaces that section.
 - **Q36: Failing test on `main`.** The escalation test above fails on unmodified `main` today; it
   probably mixes the fixed test clock with real `created_at` times. Fix in its own PR?
+
+---
+
+# Redesign: Gapless PTO Optimizer (docs/REDESIGN-SPEC.md)
+
+Run of 2026-11-01, Phases 0-2, each merged after its gates (run overrides from Atiyk at the top
+of the spec).
+
+## Baseline (main @ a142c11, before any redesign change)
+
+- **Tests:** `npm test` = 644 tests, 640 pass, **4 fail on main already** - all in
+  `packages/engine/src/solver/solve.test.ts` (3 hit the 5 s vitest timeout, 1 asserts a solve
+  takes < 1000 ms and measured ~1100-1700 ms). They fail identically when that file runs alone,
+  so it is this sandbox's CPU speed, not a regression; the redesign does not touch the engine.
+  Every phase below reports the same 4 and nothing else.
+- **`npm run verify:dist`** already fails on main (data-sources/index.html and the canada page
+  differ from the committed hash list: date-relative prerendered content). It proves "the
+  build didn't change", so it doesn't apply to phases that change the build on purpose; each
+  phase rewrites the baseline with `--write` at the end so it stays useful for engine-only work.
+- **Lighthouse (mobile, local static server, this sandbox):**
+
+  | Route | Performance | Accessibility | SEO | LCP | TBT |
+  |---|---|---|---|---|---|
+  | `/` | 62 | 96 | 100 | 3.6 s | 2,130 ms |
+  | `/pto` | 71 | 91 | 100 | 3.9 s | 640 ms |
+  | `/sabbatical` | 98 | 96 | 100 | 1.5 s | 130 ms |
+
+  Lighthouse 13.6 via `npx lighthouse` with the preinstalled Chromium
+  (`/opt/pw-browsers/chromium-1243/chrome-linux64/chrome`, `--headless --no-sandbox`). Absolute
+  numbers are pessimistic (slow sandbox CPU, no compression on the local server); compare
+  phases against each other, not against production.
+- **Screenshots:** every route at 1440/768/375 in `docs/screenshots/redesign/before/`
+  (one country page, `/uk`, and one glossary term, `/glossary/carryover`), taken before the rename.
+
+## Phase 0: rules, rename, brand constants (`claude/redesign-0-foundations`)
+
+### What changed
+- `CLAUDE.md`: product renamed in the scope section; the "no backend, no accounts" rule
+  replaced with the spec's optional-accounts wording. Every other rule untouched.
+- `apps/teams/CLAUDE.md`: new "Personal accounts (shared infrastructure)" section. Nothing
+  else in `apps/teams` changed.
+- `src/brand.ts`: `PRODUCT_NAME`, `PRODUCT_SHORT_NAME`, `TAGLINE`, `FORMER_NAME`.
+- The HTML shells (`index.html`, every route folder, all 29 glossary term pages via
+  `scripts/generate-glossary-html.ts`) use a `%PRODUCT_NAME%` placeholder, filled in by the
+  same Vite HTML plugin that already fills `%SITE_URL%`, from `src/brand.ts`. `/pto`'s title
+  is now "Plan your PTO - Gapless PTO Optimizer" (not "PTO Optimizer - Gapless PTO
+  Optimizer").
+- Header wordmark, footer heading, JSON-LD (breadcrumb root, glossary set name, a
+  `publisher` on WebApplication, a new `WebSite` block on `/` with
+  `alternateName: ["Gapless PTO", "Days Off"]`), ICS `PRODID` plus a new `X-WR-CALNAME`
+  per export, OG images (regenerated), landing share-image filename, `404.html`,
+  `privacy.html`, `public/docs`, `llms.txt`.
+- `/faq` gets an "About this site" section with the rename question ("Days Off is now
+  Gapless PTO Optimizer. Your old links still work."), also in its FAQPage JSON-LD.
+- `src/brand.test.ts`: scans every user-facing source (HTML shells, `public/`, `src/`, the
+  build scripts) for a bare "Days Off" or any mention of the teams product. Mutation-checked:
+  adding "Days Off" to `404.html` fails it.
+- No teams cross-reference existed in the root app's footer/about copy (confirmed by grep).
+
+### Gates
+- Tests 648 (644 pass; the same 4 baseline engine timing failures). `tsc --noEmit` clean.
+  `npm run build` clean.
+- `dist/` grep for `Days Off`: only the FAQ rename entry (HTML + JSON-LD), the `WebSite`
+  `alternateName`, the bundled `FORMER_NAME` constant that FAQ entry reads, and the two
+  "formerly Days Off" mentions (`404.html`, `llms.txt`).
+- Layout unchanged: `docs/screenshots/redesign/0-foundations/` (/, /faq, /pto).
+
+### Surprises
+- `tsc -b` (the build) type-checks test files with the browser tsconfig, so a test can't
+  use `node:fs`; the brand test reads sources with `import.meta.glob(..., { query: '?raw' })`.
+- `playwright` in node_modules (1.64) expects a browser build this sandbox doesn't have;
+  `scripts/build-og-images.ts` now honours `PW_CHROMIUM_PATH` like `scripts/screenshot.mjs`.
+
+### Questions for Atiyk (Phase 0)
+1. The root `CLAUDE.md` "Unattended runs" paragraph still lists "no backend/accounts/stored
+   data" among the rules that always apply. The spec said to keep every other rule
+   word-for-word, so I left it, but it now contradicts the new accounts rule. Delete those
+   words when you next edit the file?
+2. The internal tool names "PTO Optimizer" / "Sabbatical Planning" stay as page headings
+   until Phase 1 switches the nav to the D2 labels.
