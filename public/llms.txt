@@ -1,4 +1,4 @@
-# PTO Optimizer
+# Gapless PTO Optimizer (formerly Days Off)
 
 > Free, client-side tool that plans which days to request off so public holidays and
 > weekends turn a small PTO budget into the most consecutive days off. No sign-up, no

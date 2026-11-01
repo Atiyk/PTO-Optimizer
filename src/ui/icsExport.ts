@@ -2,6 +2,7 @@ import type { Break } from '@daysoff/engine/solver/types';
 import { parseISO, addDays } from '@daysoff/engine/solver/dateUtils';
 import { formatDateRange, formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
 import type { Holiday } from '@daysoff/engine/data/holidays';
+import { PRODUCT_NAME } from '../brand';
 
 /** RFC 5545 TEXT escaping: backslash, comma, semicolon, and newline must be escaped. */
 function escapeText(s: string): string {
@@ -83,8 +84,9 @@ export function generateICS(
   const lines: string[] = [];
   lines.push('BEGIN:VCALENDAR');
   lines.push('VERSION:2.0');
-  lines.push('PRODID:-//PTO Optimizer//EN');
+  lines.push(`PRODID:-//${PRODUCT_NAME}//EN`);
   lines.push('CALSCALE:GREGORIAN');
+  lines.push(foldLine(`X-WR-CALNAME:${PRODUCT_NAME} - PTO plan`));
 
   const dtstamp = dtstampNow(now);
 
@@ -159,8 +161,9 @@ export function generateHolidaysICS(holidays: Holiday[], now: Date = new Date())
   const lines: string[] = [];
   lines.push('BEGIN:VCALENDAR');
   lines.push('VERSION:2.0');
-  lines.push('PRODID:-//PTO Optimizer//EN');
+  lines.push(`PRODID:-//${PRODUCT_NAME}//EN`);
   lines.push('CALSCALE:GREGORIAN');
+  lines.push(foldLine(`X-WR-CALNAME:${PRODUCT_NAME} - Public holidays`));
 
   const dtstamp = dtstampNow(now);
   for (const holiday of holidays) {
@@ -195,8 +198,9 @@ export function generateSabbaticalICS(extendedStart: string, extendedEnd: string
   const lines: string[] = [];
   lines.push('BEGIN:VCALENDAR');
   lines.push('VERSION:2.0');
-  lines.push('PRODID:-//PTO Optimizer//EN');
+  lines.push(`PRODID:-//${PRODUCT_NAME}//EN`);
   lines.push('CALSCALE:GREGORIAN');
+  lines.push(foldLine(`X-WR-CALNAME:${PRODUCT_NAME} - Sabbatical`));
 
   const dtstamp = dtstampNow(now);
   const dateStart = isoToICSDate(extendedStart);

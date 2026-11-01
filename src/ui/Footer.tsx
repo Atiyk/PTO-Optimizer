@@ -1,4 +1,5 @@
 import { Container } from './Container';
+import { PRODUCT_NAME } from '../brand';
 
 interface FooterProps {
   /** Only the /pto route has a keyboard-shortcuts modal to open - omitted on the landing
@@ -97,7 +98,7 @@ export function Footer({ onShowShortcuts }: FooterProps) {
           </ul>
         </div>
         <div>
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Days Off</h2>
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{PRODUCT_NAME}</h2>
           <p className="text-slate-400">A free, client-side way to make every PTO day count. No sign-up, no account.</p>
         </div>
       </Container>
