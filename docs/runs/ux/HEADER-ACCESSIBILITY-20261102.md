@@ -13,6 +13,7 @@ The shared site header rendered its mobile Menu button at `h-10` (40px), below t
 - Header logo, desktop navigation links, both CTA placements, and mobile disclosure links now expose a clear focus-visible outline.
 - Desktop navigation links have a 44px minimum target height; the compact CTA has a 44px minimum height.
 - Added regression coverage for target sizing and focus affordances alongside the existing Escape-to-close/focus-return test.
+- Added `scripts/consumer-header-qa.mjs` to the existing consumer-validation browser job. It runs real Chromium keyboard Tab, computed focus-outline, 44px hit-target, Escape/focus restoration, overflow and screenshots at 1440/768/375/320; JSON and PNG evidence are uploaded with the existing browser artifact.
 - No route, planner state, URL, solver, holiday data, tracking, B2B app, or third-party integration changed.
 
 ## Release/critic gates
