@@ -835,7 +835,15 @@ function solveCore(input: SolveInput): SolveResult {
     : budgetMax;
   const maxCandidateCost = Math.min(totalBudgetCeiling, n);
 
-  const candidates = buildCandidates(days, isOff, isBlackout, overlapSet, input.expiryDate, input.country, maxCandidateCost);
+  const builtCandidates = buildCandidates(days, isOff, isBlackout, overlapSet, input.expiryDate, input.country, maxCandidateCost);
+  // This is an opt-in constraint, applied BEFORE dynamic programming and alternative
+  // selection. Legacy/B2B callers omit it and keep their exact existing candidate set.
+  const minimumBreakDays = Number.isFinite(input.minimumBreakDays)
+    ? Math.max(1, Math.min(60, Math.floor(input.minimumBreakDays as number)))
+    : 1;
+  const candidates = minimumBreakDays > 1
+    ? builtCandidates.filter((candidate) => candidate.length >= minimumBreakDays)
+    : builtCandidates;
   candidates.sort((a, b) => a.endIdx - b.endIdx || a.startIdx - b.startIdx);
   if (candidates.length === 0)
     return { primary: [], alternatives: [], breakCountRequested, breakCountActual: 0, budgetSpent: 0, peakCapApplied: false };

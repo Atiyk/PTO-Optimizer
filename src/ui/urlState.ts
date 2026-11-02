@@ -42,7 +42,7 @@ export function readSliderStateFromURL(search: string): SliderURLState {
   let w = 30;
   let breakCount = 0;
 
-  if (legacyObjective && legacyObjective in OLD_OBJECTIVE_TO_W) {
+  if (legacyObjective && Object.hasOwn(OLD_OBJECTIVE_TO_W, legacyObjective)) {
     w = OLD_OBJECTIVE_TO_W[legacyObjective];
     breakCount = OLD_OBJECTIVE_TO_BREAK_COUNT[legacyObjective];
   }
@@ -97,11 +97,12 @@ export function isValidISODate(s: string): boolean {
 }
 
 function parseDateList(raw: string | null): string[] {
-  if (!raw) return [];
-  return raw
+  if (!raw || raw.length > 44_000) return [];
+  const dates = raw
     .split(',')
     .map((s) => s.trim())
     .filter(isValidISODate);
+  return dates.length <= 4000 ? [...new Set(dates)] : [];
 }
 
 function encodeDateList(dates: string[]): string {
