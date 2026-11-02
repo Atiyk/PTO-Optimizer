@@ -166,6 +166,15 @@ describe('consumer departure payout: company-policy assumptions only', () => {
     expect(withInput({ lines: [{ category: 'vacation', policy: { ...base, hoursPerDay: 0 }, companyRule: { kind: 'pays-all' } }] })).toBeNull();
   });
 
+  it('rejects malformed local data without throwing or leaking private ledger fields', () => {
+    expect(estimateDeparturePayout({ ...input, pay: null } as unknown as DeparturePayoutInput)).toBeNull();
+    expect(estimateDeparturePayout({ ...input, lines: [{ category: 'vacation', policy: {
+      ...base, planYear: { kind: 'unexpected' }, plannedDays: [],
+    }, companyRule: { kind: 'pays-all' } }] } as unknown as DeparturePayoutInput)).toBeNull();
+    expect(estimateDeparturePayout({ ...input, lines: [{ category: 'vacation', policy: base,
+      companyRule: { kind: 'pays-all' }, requests: [{ status: 'approved', ptoDates: null }] }] } as unknown as DeparturePayoutInput)).toBeNull();
+  });
+
   it('never applies voluntary/involuntary separation rules without verified jurisdiction evidence', () => {
     const voluntary = withInput({ separation: 'voluntary' })!;
     const involuntary = withInput({ separation: 'involuntary' })!;
