@@ -32,7 +32,7 @@ try {
         return route.continue();
       });
       await page.clock.setFixedTime(new Date('2027-01-01T17:00:00Z'));
-      await page.goto(new URL('/pto/?c=US&s=2027-01-01&e=2027-01-31&b=5&rv=0&pv=2', origin).href, { waitUntil: 'networkidle' });
+      await page.goto(new URL('/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15&rv=0&pv=2', origin).href, { waitUntil: 'networkidle' });
       assert.equal(await page.evaluate(() => matchMedia('(hover: hover)').matches), false, 'Browser must simulate a touch-only device');
       const day = page.locator('#day-2027-01-20');
       await day.waitFor({ state: 'visible' });
@@ -46,6 +46,7 @@ try {
       await page.screenshot({ path: resolve(out, `calendar-touch-open-${width}.png`), fullPage: false });
       await panel.getByRole('button', { name: 'Change this day' }).tap();
       await panel.waitFor({ state: 'detached' });
+      assert.ok(await day.count(), `Calendar day disappeared after applying an action. Status: ${JSON.stringify(await page.locator('[role="status"]').allInnerTexts())}; URL: ${page.url()}`);
       assert.equal(await day.getAttribute('aria-expanded'), 'false', 'Action should close the disclosure');
 
       await day.tap();
