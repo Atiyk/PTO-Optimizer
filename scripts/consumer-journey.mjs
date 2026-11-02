@@ -292,6 +292,11 @@ try {
       assert.equal(await warning.count(), 0, 'A resolved constraint should remove the warning.');
       assert.equal(await calendarDay.count(), 1, 'The calendar must remain visible after recovery.');
     }, 'Clearing only forced dates must recover the plan');
+    await eventually(async () => assert.equal(
+      await page.evaluate(() => document.activeElement?.id),
+      'complete-plan-heading',
+      'Keyboard focus should return to the complete plan heading after the recovery notice disappears.',
+    ), 'Focus recovery after clearing forced dates');
     assert.equal(new URL(page.url()).searchParams.get('b'), '0', 'Reset must preserve the PTO budget.');
     assert.equal(new URL(page.url()).searchParams.get('s'), '2027-01-15', 'Reset must preserve the planning dates.');
     await noOverflow(page);
