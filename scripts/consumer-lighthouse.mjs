@@ -71,7 +71,9 @@ try {
   }
   const { default: lighthouse } = await import(pathToFileURL(toolsRequire.resolve('lighthouse')).href);
   const chromeLauncher = await import(pathToFileURL(toolsRequire.resolve('chrome-launcher')).href);
-  const { chromium } = await import(pathToFileURL(appRequire.resolve('playwright')).href);
+  // createRequire resolves Playwright's CommonJS entry; its dynamic-import namespace
+  // exposes the API under default rather than guaranteed named chromium exports.
+  const { chromium } = appRequire('playwright');
   const axeModule = await import(pathToFileURL(toolsRequire.resolve('@axe-core/playwright')).href);
   const AxeBuilder = axeModule.AxeBuilder ?? axeModule.default?.default ?? axeModule.default;
   chrome = await chromeLauncher.launch({ chromePath: chromium.executablePath(), chromeFlags: ['--headless', '--no-sandbox', '--disable-dev-shm-usage'] });
