@@ -9,6 +9,7 @@ import { useMemo, useState } from 'react';
 import { SiteHeader } from './SiteHeader';
 import { Headline } from './Headline';
 import { SummaryMetrics } from './SummaryMetrics';
+import { PlanExplanation } from './PlanExplanation';
 import { PrimaryControls } from './PrimaryControls';
 import { PlanSliders } from './PlanSliders';
 import { SubdivisionSelect } from './CountrySelect';
@@ -297,6 +298,16 @@ export function App() {
             breakCountActual={state.breakCountActual}
             scores={state.scores}
           />
+
+          {!state.validationIssues.length && !state.solverIssue && (
+            <PlanExplanation
+              breaks={state.breaks}
+              workWeek={state.workWeek}
+              offDays={new Set(state.effectiveOffDays)}
+              budgetSpent={state.budgetSpent}
+              totalDaysOff={state.totalDaysOff}
+            />
+          )}
 
           <p className="mt-2 text-sm text-slate-600">{Math.max(0, state.budget - state.budgetSpent)} {state.unlimitedPto ? 'target days unplanned' : 'PTO days remaining'}, including {Math.min(state.budget, state.reserveDays)} reserved. Calendar days off include weekends, observed holidays, and PTO days.</p>
           {state.breaks.length > 0 && <section aria-labelledby="top-opportunities" className="mt-8">
