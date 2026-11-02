@@ -7,14 +7,17 @@ import { DateListEditor } from './DateListEditor';
 import { Term } from './Term';
 import { track } from './analytics';
 import { geolocateCountry } from './geo';
-import { projectBalance } from '../policy/projection';
+import { forecastWithRequests } from '../personal/forecast';
+import { initialPolicyPreferences, savePolicyPreferences, deletePolicyPreferences } from '../personal/policyPreferences';
+import { QuickForecast } from './QuickForecast';
+import { useRequestLedger } from './useRequestLedger';
 import { generateAlerts } from '../policy/alerts';
 import { generatePolicySummary } from '../policy/summary';
 import { generateHRQuestions, hrQuestionsMessage } from '../policy/hrQuestions';
 import { decodeParagraph, uniqueMatchedTerms } from '../policy/decode';
 import type { AccrualMethod, CarryoverRule, PlanYear, TimeOffPolicy } from '../policy/model';
 import { copyText } from './requestText';
-import { readPolicyStateFromURL, writePolicyStateToURL, defaultPolicyURLState, type PolicyURLState } from './policyUrlState';
+import { writePolicyStateToURL, type PolicyURLState } from './policyUrlState';
 
 const HORIZON_MONTHS = 18;
 
@@ -100,10 +103,10 @@ export function Policy() {
   // using the same conventions as src/ui/urlState.ts - a /policy link now reproduces the
   // exact policy described, same as every /pto link already does.
   const initial = useMemo(
-    () => (typeof window === 'undefined' ? null : readPolicyStateFromURL(window.location.search, geolocateCountry())),
+    () => (typeof window === 'undefined' ? null : initialPolicyPreferences(window.location.search, geolocateCountry())),
     [],
   );
-  const d = useMemo(() => initial ?? { ...defaultPolicyURLState(), country: geolocateCountry() }, [initial]);
+  const d = useMemo(() => initial ?? initialPolicyPreferences('', geolocateCountry()), [initial]);
 
   const [country, setCountry] = useState<string>(d.country);
 
@@ -137,6 +140,10 @@ export function Policy() {
   const [currentBalance, setCurrentBalance] = useState(d.currentBalance);
   const [balanceAsOf, setBalanceAsOf] = useState(d.balanceAsOf);
   const [plannedDays, setPlannedDays] = useState<string[]>(d.plannedDays);
+  const [currentCarriedBalance, setCurrentCarriedBalance] = useState(d.currentCarriedBalance ?? 0);
+  const [forecastDate, setForecastDate] = useState(d.forecastDate ?? addMonthsISO(d.balanceAsOf, 3));
+  const [saveMessage, setSaveMessage] = useState('');
+  const ledger = useRequestLedger();
 
   const [unit, setUnit] = useState<'days' | 'hours'>(d.unit);
   const [hoursPerDay, setHoursPerDay] = useState(d.hoursPerDay);
@@ -179,40 +186,39 @@ export function Policy() {
       negativeBalanceAllowance,
       payoutOnLeaving,
       currentBalance,
+      currentCarriedBalance,
       balanceAsOf,
       plannedDays,
     }),
     [
       unit, hoursPerDay, accrual, planYear, accrualCapEnabled, accrualKind, accrualCap, carryover,
-      waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance, payoutOnLeaving, currentBalance,
+      waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance, payoutOnLeaving, currentBalance, currentCarriedBalance,
       balanceAsOf, plannedDays,
     ],
   );
 
-  // Sync every input into the shareable URL whenever it changes - same pattern
-  // useAppState.ts already uses for /pto.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const url = new URL(window.location.href);
-    const state: PolicyURLState = {
-      unit, hoursPerDay, accrualKind, amount, frequency, payDateAnchor, grantDate, hourlyRate,
-      typicalWeeklyHours, expectedDaysPerYear, planYearKind, anniversaryStart, customResetDate,
-      accrualCapEnabled, accrualCap, carryoverMode, carryoverCap, carryoverUseByEnabled,
-      carryoverUseBy, waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance,
-      payoutOnLeaving, currentBalance, balanceAsOf, plannedDays, country,
-    };
-    writePolicyStateToURL(url.searchParams, state);
-    window.history.replaceState(null, '', url);
-  }, [
+  const currentPolicyURLState: PolicyURLState = useMemo(() => ({
     unit, hoursPerDay, accrualKind, amount, frequency, payDateAnchor, grantDate, hourlyRate,
     typicalWeeklyHours, expectedDaysPerYear, planYearKind, anniversaryStart, customResetDate,
     accrualCapEnabled, accrualCap, carryoverMode, carryoverCap, carryoverUseByEnabled,
     carryoverUseBy, waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance,
-    payoutOnLeaving, currentBalance, balanceAsOf, plannedDays, country,
-  ]);
+    payoutOnLeaving, currentBalance, currentCarriedBalance, balanceAsOf, plannedDays, country, forecastDate,
+  }), [unit, hoursPerDay, accrualKind, amount, frequency, payDateAnchor, grantDate, hourlyRate,
+    typicalWeeklyHours, expectedDaysPerYear, planYearKind, anniversaryStart, customResetDate,
+    accrualCapEnabled, accrualCap, carryoverMode, carryoverCap, carryoverUseByEnabled,
+    carryoverUseBy, waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance,
+    payoutOnLeaving, currentBalance, currentCarriedBalance, balanceAsOf, plannedDays, country, forecastDate]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    writePolicyStateToURL(url.searchParams, currentPolicyURLState);
+    window.history.replaceState(null, '', url);
+  }, [currentPolicyURLState]);
 
   const horizonEnd = useMemo(() => addMonthsISO(balanceAsOf, HORIZON_MONTHS), [balanceAsOf]);
-  const { series, events } = useMemo(() => projectBalance(policy, horizonEnd), [policy, horizonEnd]);
+  const projection = useMemo(() => forecastWithRequests(policy, horizonEnd, ledger.requests), [policy, horizonEnd, ledger.requests]);
+  const series = projection?.confirmed.series ?? [];
+  const events = projection?.confirmed.events ?? [];
   const summary = useMemo(() => generatePolicySummary(policy), [policy]);
   const alerts = useMemo(() => generateAlerts(policy, events, balanceAsOf, country), [policy, events, balanceAsOf, country]);
   const hrQuestions = useMemo(() => generateHRQuestions(policy), [policy]);
@@ -225,12 +231,39 @@ export function Policy() {
       <SiteHeader active="policy" />
       <main>
         <Container className="px-4 py-10">
-          <h1 className="text-3xl font-bold text-slate-900">Your time-off policy, in plain English</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Your PTO balance and policy</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
-            Describe your policy below. Everything updates live — nothing is sent anywhere, and your plan reproduces
-            from the page itself, not a stored account.
+            Start with your current balance and how you earn PTO. Your forecast updates as you type. Add the policy details you know in Advanced options.
           </p>
 
+          <section id="balance" aria-labelledby="quick-balance-heading" className="mt-8 grid items-start gap-6 lg:grid-cols-2">
+            <div className="min-w-0 rounded-2xl border border-line bg-surface p-5 sm:p-6">
+              <h2 id="quick-balance-heading" className="text-xl font-semibold text-ink">Quick balance forecast</h2>
+              <p className="mt-1 text-sm text-muted">Use your actual balance and employer rules. Full carryover at reset is assumed until you choose another rule.</p>
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <Field label={`Current PTO balance (${unit})`}><input type="number" step="any" value={currentBalance} onChange={event => setCurrentBalance(Number(event.target.value))} className={inputClass} /></Field>
+                <Field label="Balance as-of date"><input type="date" value={balanceAsOf} onChange={event => setBalanceAsOf(event.target.value)} className={inputClass} /></Field>
+                <Field label="How PTO accrues"><select value={accrualKind} onChange={event => setAccrualKind(event.target.value as AccrualMethod['kind'])} className={inputClass}><option value="front-loaded">Granted all at once</option><option value="per-pay-period">Each pay period</option><option value="per-hour-worked">For each hour worked</option><option value="unlimited">Unlimited PTO</option></select></Field>
+                <Field label="Balance unit"><select value={unit} onChange={event => setUnit(event.target.value as 'days' | 'hours')} className={inputClass}><option value="days">Days</option><option value="hours">Hours</option></select></Field>
+                {(accrualKind === 'per-pay-period' || accrualKind === 'front-loaded') && <Field label={`${unit === 'hours' ? 'Hours' : 'Days'} earned each ${accrualKind === 'front-loaded' ? 'grant' : 'pay period'}`}><input type="number" min={0} step="any" value={amount} onChange={event => setAmount(Number(event.target.value))} className={inputClass} /></Field>}
+                {accrualKind === 'per-pay-period' && <><Field label="Pay frequency"><select value={frequency} onChange={event => setFrequency(event.target.value as typeof frequency)} className={inputClass}><option value="weekly">Weekly</option><option value="biweekly">Every two weeks</option><option value="semi-monthly">Twice a month</option><option value="monthly">Monthly</option></select></Field><Field label="Known pay date"><input type="date" value={payDateAnchor} onChange={event => setPayDateAnchor(event.target.value)} className={inputClass} /></Field></>}
+                {accrualKind === 'front-loaded' && <Field label="Annual grant date"><input type="date" value={grantDate} onChange={event => setGrantDate(event.target.value)} className={inputClass} /></Field>}
+                {accrualKind === 'per-hour-worked' && <><Field label="Hours earned per hour worked"><input type="number" min={0} step="any" value={hourlyRate} onChange={event => setHourlyRate(Number(event.target.value))} className={inputClass} /></Field><Field label="Typical hours worked each week"><input type="number" min={0} step="any" value={typicalWeeklyHours} onChange={event => setTypicalWeeklyHours(Number(event.target.value))} className={inputClass} /></Field></>}
+                {(unit === 'hours' || accrualKind === 'per-hour-worked') && <Field label="Hours per working day for conversion"><input type="number" min={0.25} step="any" value={hoursPerDay} onChange={event => setHoursPerDay(Number(event.target.value))} className={inputClass} /></Field>}
+                {accrualKind !== 'unlimited' && <Field label="Expiry and carryover"><select value={carryoverMode} onChange={event => setCarryoverMode(event.target.value as CarryoverRule['mode'])} className={inputClass}><option value="all">Full carryover at reset</option><option value="none">Use it or lose it at reset</option><option value="capped">Limited carryover at reset</option></select></Field>}
+                {accrualKind !== 'unlimited' && carryoverMode !== 'all' && <Field label="Reset date (new plan year begins)"><input type="date" value={planYearKind === 'calendar' ? `${Number(balanceAsOf.slice(0, 4)) + 1}-01-01` : planYearKind === 'anniversary' ? anniversaryStart : customResetDate} onChange={event => { setPlanYearKind('custom'); setCustomResetDate(event.target.value); }} className={inputClass} /></Field>}
+                {accrualKind !== 'unlimited' && carryoverMode === 'capped' && <Field label={`Carryover limit (${unit})`}><input type="number" min={0} step="any" value={carryoverCap} onChange={event => setCarryoverCap(Number(event.target.value))} className={inputClass} /></Field>}
+              </div>
+              <div className="mt-5 flex flex-wrap gap-4 text-sm">
+                <button type="button" className="min-h-11 font-medium text-accent-ink underline" onClick={() => { const params = new URLSearchParams(); writePolicyStateToURL(params, currentPolicyURLState); setSaveMessage(savePolicyPreferences(params.toString()) ? 'Policy saved in this browser.' : 'Browser storage is unavailable. Your forecast still works from this link.'); }}>Save policy in this browser</button>
+                <button type="button" className="min-h-11 text-muted underline" onClick={() => setSaveMessage(deletePolicyPreferences() ? 'Saved policy deleted. Your current inputs stay on this page.' : 'Browser storage is unavailable.')}>Delete saved policy</button>
+              </div>
+              {saveMessage && <p role="status" className="mt-2 text-sm text-muted">{saveMessage}</p>}
+            </div>
+            <QuickForecast policy={policy} requests={ledger.requests} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')} />
+          </section>
+          <details className="mt-8 rounded-2xl border border-line bg-surface p-5 sm:p-6">
+            <summary className="cursor-pointer text-lg font-semibold text-ink">Advanced policy options and explanation</summary>
           <div className="mt-8 grid gap-10 lg:grid-cols-5">
             {/* Inputs */}
             <div className="flex flex-col gap-6 lg:col-span-2">
@@ -326,7 +359,7 @@ export function Policy() {
                   <option value="hours">Hours</option>
                 </select>
               </Field>
-              {unit === 'hours' && (
+              {(unit === 'hours' || accrualKind === 'per-hour-worked') && (
                 <Field label="Hours in a full working day">
                   <input type="number" min={1} step={0.5} value={hoursPerDay} onChange={(e) => setHoursPerDay(Number(e.target.value))} className={inputClass} />
                 </Field>
@@ -419,11 +452,15 @@ export function Policy() {
               <Field label="Current balance">
                 <input type="number" min={negativeBalanceAllowance * -1} step={0.5} value={currentBalance} onChange={(e) => setCurrentBalance(Number(e.target.value))} className={inputClass} />
               </Field>
+              <Field label={`Already-carried PTO included in your balance (${unit})`}>
+                <input type="number" min={0} max={Math.max(0, currentBalance)} step="any" value={currentCarriedBalance} onChange={event => setCurrentCarriedBalance(Number(event.target.value))} className={inputClass} />
+              </Field>
+              <p className="text-xs text-muted">Only enter the carried portion if you know it, and enter its separate use-by date above. It is part of your total balance.</p>
               <Field label="As of">
                 <input type="date" value={balanceAsOf} onChange={(e) => setBalanceAsOf(e.target.value)} className={inputClass} />
               </Field>
 
-              <Field label="Country (for the /pto hand-off)">
+              <Field label="Country for holiday calculations">
                 <CountrySelect country={country} onChangeCountry={setCountry} />
               </Field>
 
@@ -453,7 +490,7 @@ export function Policy() {
                   <h2 className="mb-2 text-sm font-semibold text-slate-500">What it means for you</h2>
                   <BalanceChart series={series} cap={policy.accrualCap} />
                 </section>
-              ) : (
+              ) : accrualKind === 'unlimited' ? (
                 <section className="rounded-md bg-slate-50 p-4 text-sm text-slate-600">
                   No balance to chart — unlimited PTO has no cap and nothing to run out of.{' '}
                   <a
@@ -464,11 +501,11 @@ export function Policy() {
                     Plan your {expectedDaysPerYear} days →
                   </a>
                 </section>
-              )}
+              ) : <p role="status" className="text-sm text-muted">Enter valid policy amounts and dates to see the projection.</p>}
 
               <section>
                 <h2 className="mb-2 text-sm font-semibold text-slate-500">Alerts</h2>
-                {alerts.length === 0 ? (
+                {!projection ? <p role="status" className="text-sm text-muted">Check the policy inputs before relying on expiration or cap warnings.</p> : alerts.length === 0 ? (
                   <p className="text-sm text-slate-500">Nothing to flag — no forfeiture, cap, or deadline risk in the next 18 months.</p>
                 ) : (
                   <ul className="flex flex-col gap-2">
@@ -520,6 +557,7 @@ export function Policy() {
               <PolicyFAQ />
             </div>
           </div>
+          </details>
         </Container>
       </main>
       <Footer />

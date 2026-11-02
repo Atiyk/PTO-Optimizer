@@ -1,0 +1,150 @@
+import type { ISODate, WorkWeek } from '@daysoff/engine/solver/types';
+import { addDays, isoToSerial, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
+import { isValidISODate } from '../ui/urlState';
+
+export const REQUEST_STORAGE_KEY = 'gapless.personal.requests.v1';
+export const REQUEST_CHANGE_EVENT = 'gapless:requests-changed';
+export const MAX_REQUESTS = 300;
+const MAX_REQUEST_DAYS = 1096;
+
+export const REQUEST_STATUSES = ['planned', 'requested', 'approved', 'rejected', 'canceled', 'completed'] as const;
+export type RequestStatus = typeof REQUEST_STATUSES[number];
+
+/** All states can be corrected manually. No transition represents an employer action. */
+const correctionsFrom = (status: RequestStatus) => REQUEST_STATUSES.filter((next) => next !== status);
+export const REQUEST_TRANSITIONS: Record<RequestStatus, readonly RequestStatus[]> = {
+  planned: correctionsFrom('planned'), requested: correctionsFrom('requested'), approved: correctionsFrom('approved'),
+  rejected: correctionsFrom('rejected'), canceled: correctionsFrom('canceled'), completed: correctionsFrom('completed'),
+};
+
+export interface RequestCalendar {
+  workWeek: WorkWeek;
+  /** Employer-observed days and schedule exceptions, including alternating Fridays. */
+  offDays: readonly ISODate[];
+}
+
+export interface PtoRequest {
+  id: string;
+  start: ISODate;
+  end: ISODate;
+  ptoDates: ISODate[];
+  ptoDays: number;
+  status: RequestStatus;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RequestInput {
+  start: ISODate;
+  end: ISODate;
+  status?: RequestStatus;
+  note?: string;
+}
+
+export interface RequestStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
+
+export function validRequestRange(start: string, end: string): boolean {
+  return isValidISODate(start) && isValidISODate(end) && end >= start
+    && isoToSerial(end) - isoToSerial(start) < MAX_REQUEST_DAYS;
+}
+
+export function requestPtoDates(start: ISODate, end: ISODate, calendar: RequestCalendar): ISODate[] {
+  if (!validRequestRange(start, end)) return [];
+  const off = new Set(calendar.offDays);
+  return rangeISO(start, end).filter((date) => calendar.workWeek[mondayIndexedDow(date)] && !off.has(date));
+}
+
+export function createPtoRequest(input: RequestInput, calendar: RequestCalendar, id: string, now = new Date().toISOString()): PtoRequest | null {
+  if (!validRequestRange(input.start, input.end) || !/^[A-Za-z0-9_-]{1,100}$/.test(id)) return null;
+  const ptoDates = requestPtoDates(input.start, input.end, calendar);
+  const status = input.status ?? 'planned';
+  if (!REQUEST_STATUSES.includes(status)) return null;
+  return {
+    id, start: input.start, end: input.end, ptoDates, ptoDays: ptoDates.length,
+    status, note: (input.note ?? '').slice(0, 1000), createdAt: now, updatedAt: now,
+  };
+}
+
+export function parseRequestLedger(raw: string | null): PtoRequest[] {
+  if (!raw || raw.length > 1_000_000) return [];
+  try {
+    const envelope: unknown = JSON.parse(raw);
+    if (!envelope || typeof envelope !== 'object' || !('version' in envelope) || envelope.version !== 1
+      || !('requests' in envelope) || !Array.isArray(envelope.requests)) return [];
+    const seen = new Set<string>();
+    const result: PtoRequest[] = [];
+    for (const item of envelope.requests.slice(0, MAX_REQUESTS)) {
+      if (!item || typeof item !== 'object' || typeof item.id !== 'string' || seen.has(item.id)
+        || !/^[A-Za-z0-9_-]{1,100}$/.test(item.id)
+        || typeof item.start !== 'string' || typeof item.end !== 'string' || !validRequestRange(item.start, item.end)
+        || !REQUEST_STATUSES.includes(item.status) || typeof item.note !== 'string'
+        || !Array.isArray(item.ptoDates) || item.ptoDates.length > MAX_REQUEST_DAYS
+        || typeof item.createdAt !== 'string' || !Number.isFinite(Date.parse(item.createdAt))
+        || typeof item.updatedAt !== 'string' || !Number.isFinite(Date.parse(item.updatedAt))) continue;
+      if (!item.ptoDates.every((date: unknown) => typeof date === 'string' && isValidISODate(date) && date >= item.start && date <= item.end)) continue;
+      const ptoDates = [...new Set<string>(item.ptoDates)].sort();
+      result.push({
+        id: item.id, start: item.start, end: item.end, status: item.status,
+        ptoDates, ptoDays: ptoDates.length, note: item.note.slice(0, 1000),
+        createdAt: item.createdAt, updatedAt: item.updatedAt,
+      });
+      seen.add(item.id);
+    }
+    return result;
+  } catch {
+    return [];
+  }
+}
+
+export function browserRequestStorage(): RequestStorage | null {
+  try { return typeof window === 'undefined' ? null : window.localStorage; } catch { return null; }
+}
+
+export function readRequestLedger(storage: RequestStorage | null = browserRequestStorage()): { requests: PtoRequest[]; available: boolean } {
+  if (!storage) return { requests: [], available: false };
+  try { return { requests: parseRequestLedger(storage.getItem(REQUEST_STORAGE_KEY)), available: true }; }
+  catch { return { requests: [], available: false }; }
+}
+
+export function writeRequestLedger(requests: readonly PtoRequest[], storage: RequestStorage | null = browserRequestStorage()): boolean {
+  if (!storage) return false;
+  try {
+    const serialized = JSON.stringify({ version: 1, requests: requests.slice(0, MAX_REQUESTS) });
+    if (serialized.length > 1_000_000) return false;
+    storage.setItem(REQUEST_STORAGE_KEY, serialized);
+    return true;
+  } catch { return false; }
+}
+
+export function isActiveRequest(request: PtoRequest): boolean {
+  return request.status !== 'canceled' && request.status !== 'rejected';
+}
+
+/** Dates are unioned before consumption; overlapping entries cannot spend a day twice. */
+export function requestDatesForScenario(requests: readonly PtoRequest[], asOf: ISODate, through: ISODate, includeTentative = false): ISODate[] {
+  const relevant = requests.filter((r) => r.status === 'approved' || r.status === 'completed'
+    || (includeTentative && (r.status === 'planned' || r.status === 'requested')));
+  return [...new Set(relevant.flatMap((request) => request.ptoDates))]
+    .filter((date) => date > asOf && date <= through).sort();
+}
+
+export function requestConflicts(requests: readonly PtoRequest[]): { firstId: string; secondId: string; start: ISODate; end: ISODate }[] {
+  const active = requests.filter(isActiveRequest);
+  const conflicts: { firstId: string; secondId: string; start: ISODate; end: ISODate }[] = [];
+  for (let i = 0; i < active.length; i++) {
+    for (let j = i + 1; j < active.length; j++) {
+      const start = active[i].start > active[j].start ? active[i].start : active[j].start;
+      const end = active[i].end < active[j].end ? active[i].end : active[j].end;
+      if (start <= end) conflicts.push({ firstId: active[i].id, secondId: active[j].id, start, end });
+    }
+  }
+  return conflicts;
+}
+
+export function tomorrowISO(now = new Date()): ISODate {
+  return addDays(now.toISOString().slice(0, 10), 1);
+}

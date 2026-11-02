@@ -25,6 +25,11 @@ describe('resetDatesInRange', () => {
   it('a custom reset date resets on the same month/day every year', () => {
     expect(resetDatesInRange({ kind: 'custom', resetDate: '2026-04-01' }, '2026-01-01', '2027-06-01')).toEqual(['2026-04-01', '2027-04-01']);
   });
+
+  it('clamps leap-day anniversaries to February 28 in a common year', () => {
+    expect(resetDatesInRange({ kind: 'anniversary', startDate: '2024-02-29' }, '2026-01-01', '2028-03-01'))
+      .toEqual(['2026-02-28', '2027-02-28', '2028-02-29']);
+  });
 });
 
 describe('payDatesInRange', () => {
@@ -36,6 +41,17 @@ describe('payDatesInRange', () => {
   it('semi-monthly pays on the 1st and 16th regardless of anchor', () => {
     const accrual: AccrualMethod = { kind: 'per-pay-period', amount: 1, frequency: 'semi-monthly', payDateAnchor: '2026-01-05' };
     expect(payDatesInRange(accrual, '2026-01-01', '2026-02-01')).toEqual(['2026-01-16', '2026-02-01']);
+  });
+
+  it('credits every month when a pay-date anchor is on the 31st', () => {
+    const accrual: AccrualMethod = { kind: 'per-pay-period', amount: 1, frequency: 'monthly', payDateAnchor: '2027-01-31' };
+    expect(payDatesInRange(accrual, '2027-01-01', '2027-04-30'))
+      .toEqual(['2027-01-31', '2027-02-28', '2027-03-31', '2027-04-30']);
+  });
+
+  it('keeps February 29 in a leap year for month-end monthly pay', () => {
+    const accrual: AccrualMethod = { kind: 'per-pay-period', amount: 1, frequency: 'monthly', payDateAnchor: '2028-01-31' };
+    expect(payDatesInRange(accrual, '2028-02-01', '2028-03-01')).toEqual(['2028-02-29']);
   });
 });
 
