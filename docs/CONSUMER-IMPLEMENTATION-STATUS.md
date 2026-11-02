@@ -1,85 +1,101 @@
-# Gapless consumer implementation status
+# Gapless consumer release report
 
-Evidence checkpoint: November 2, 2026. All eight phases are implemented in the stacked consumer pull requests below. **Merge, final journey CI, and production verification remain pending until the release owner records their actual results.** The passing foundation browser run covers phase 1, not the final eight-phase product.
+Release date: November 2, 2026. Repository: [Atiyk/PTO-Optimizer](https://github.com/Atiyk/PTO-Optimizer).
 
-## Scope and baseline
+## A. Executive summary
 
-- Repository: [Atiyk/PTO-Optimizer](https://github.com/Atiyk/PTO-Optimizer). Source baseline: `4a0a10de0075d0d9be4987ad02a6cc0326ba1758`.
-- Consumer production: https://pto-optimizer-seven.vercel.app/. Baseline deployment: `dpl_E5UMY9W2YCUnAkwVUhxByb9QvfB2`, READY when inspected.
-- The root React/Vite application is the consumer product. `apps/teams`, the `leave_management` deployment, B2B routes, database, accounts, and business data are excluded. No billing, secret, ownership, or hosting-access settings were changed.
-- Source was retrieved through authenticated GitHub tools because terminal GitHub credentials were unavailable. Remote commits preserve the original complete tree, including excluded B2B files; the partial local checkout is never treated as authority to delete missing remote paths.
-- Each release phase uses a feature branch and PR. The user authorized unattended validated merges; required checks and repository protections still apply.
+All eight consumer improvements were implemented and validated through separate phase pull requests. **All eight PRs are merged into `main`, and the consumer production deployment is READY with representative live flows verified.** The public consumer application is [Gapless](https://pto-optimizer-seven.vercel.app/).
 
-## Delivery ledger
+Final integrated CI [41409562702](https://github.com/Atiyk/PTO-Optimizer/actions/runs/41409562702) passed **926 tests in 94 files**, production build/type/lint checks, six complete mobile journeys, 12 responsive route checks and all five candidate axe scans with zero violations. Final mobile accessibility and SEO scores are 100 on all four measured routes. No outstanding QA defect was identified at that integrated snapshot.
 
-“Implemented” describes functioning source and local validation, not deployment. Replace each pending merge/deployment entry only after verifying it.
+The B2B application in `apps/teams` and its data flows were not edited. The complete remote subtree SHA is `ce2bedc3bca5c97593819583dc53506c25e70e98`, identical to the baseline subtree. Shared solver work is limited to an optional minimum-break hook and output-preserving performance improvements, backed by 24 frozen full-result compatibility fixtures. No B2B database, account, billing, secret or hosting configuration was changed.
 
-| Phase | Implemented behavior and reused system | Material files / dependencies | PR | Validation checkpoint | Merged SHA | Production |
-|---|---|---|---|---|---|---|
-| 1 · Employer holidays | Live employer calendar edits, save/delete/reset, country/region scope, explicit shared overrides; reuse existing holiday controls/loaders | `src/personal/employerCalendar.ts`, `consumerHolidays.ts`; `useAppState`, `urlState`, `MoreOptions`; privacy and CI foundation | [#73](https://github.com/Atiyk/PTO-Optimizer/pull/73) | Foundation checks/browser/metrics passed; final combined CI pending | Pending | Pending |
-| 2 · Optimizer quality | Minimum candidate length, Balanced/Long breaks/More breaks/Custom presets, one feasible top-three plan, clearer metrics; consumer checks for real spending dates, reserves, accrual, carryover, pins, and blackouts | `src/planning/optimizer.ts`; optional shared solver minimum; `App`, planning URL state, result components | [#74](https://github.com/Atiyk/PTO-Optimizer/pull/74) | Included in passing integrated local suite; final CI pending | Pending | Pending |
-| 3 · Homepage and UX | Live engine-derived preview with country, free-form dates, and PTO; plan/balance/policy entry points; warm existing brand and retained holiday opportunities/SEO routes | `Landing`, `landingState`, `landingCalendar`, `YearStrip`, homepage metadata | [#75](https://github.com/Atiyk/PTO-Optimizer/pull/75) | Included in passing integrated local suite; final responsive/metrics CI pending | Pending | Pending |
-| 4 · Balance forecast | Minimal quick inputs and arbitrary supported forecast date; confirmed/tentative breakdown, optional saved policy, advanced policy retained, unlimited-PTO handling | `src/personal/forecast.ts`, `policyPreferences.ts`; `QuickForecast`, `Policy`; existing `src/policy` projection/model | [#76](https://github.com/Atiyk/PTO-Optimizer/pull/76) | Included in passing integrated local suite; final journey pending | Pending | Pending |
-| 5 · Request tracker | Track directly from a break; six manual statuses, corrections, notes, editing/deletion, persistence, overlap warnings and unique-date deductions | `requestLedger.ts`, `PtoTracker`, ledger/calendar hooks; forecast integration | [#77](https://github.com/Atiyk/PTO-Optimizer/pull/77) | Included in passing integrated local suite; final journey pending | Pending | Pending |
-| 6 · Expiration guard | Policy-backed at-risk amounts, capped/full carryover and explicitly entered carried portion, correct units, feasible optimizer handoff, dismiss/disable and 60/30/7-day ICS reminders | `src/personal/expiration.ts`; `ExpirationGuard`, ICS export; existing alerts/projection | [#78](https://github.com/Atiyk/PTO-Optimizer/pull/78) | Unit/component coverage passed; final release CI pending | Pending | Pending |
-| 7 · Partner planner | Select availability and intentionally confirm it; bounded versioned `pp` links; independent recipient inputs; feasible joint alternatives, classifications and export; preserve legacy `ov` | `src/planning/partner.ts`, `PartnerPlanner`; consumer feasibility validator | [#79](https://github.com/Atiyk/PTO-Optimizer/pull/79) | Included in passing integrated local suite; final recipient journey pending | Pending | Pending |
-| 8 · Portrait sharing | Exact 1080×1350 canvas preview, balance hidden by default, dates/PTO/holiday assumptions and explicit overflow summary, copy/download fallback; landscape/ICS retained | `portraitExport`, `PortraitShare`; existing canvas copy helper; final journey script/workflow | [#80](https://github.com/Atiyk/PTO-Optimizer/pull/80) | Integrated local checks passed; final browser journey in progress | Pending | Pending |
+## B. Shipped functionality and release ledger
 
-Acceptance assertions and the 20 required scenarios are mapped in [CONSUMER-REGRESSION-MATRIX.md](CONSUMER-REGRESSION-MATRIX.md).
+Source baseline: `4a0a10de0075d0d9be4987ad02a6cc0326ba1758`. Each phase used a feature branch and PR; no direct commit to `main`, forced merge or required-check bypass was used. Each deployment below is the consumer `pto-optimizer` project and was matched to its merged commit.
 
-## Verified quality results
+| Phase | Delivered behavior | Pull request | Merged commit | Consumer production / verified flow |
+|---|---|---|---|---|
+| 1 · Employer holidays | Live holiday edits; save/delete/reset by country and region; shared URL overrides never replace local preferences. | [#73](https://github.com/Atiyk/PTO-Optimizer/pull/73) | [`4c12a8c6`](https://github.com/Atiyk/PTO-Optimizer/commit/4c12a8c629656d2c75f4f4ee310cfb1537aa0219) | READY · `dpl_EU7eNSxwZAzPmeKacQ1tTZENr1SC`. Exclusion changed a 4-PTO/8-calendar-day plan to 7 calendar days; save/revisit persisted it and reset restored defaults. |
+| 2 · Optimizer quality | Minimum break length, planning styles, a feasible top-three view, reserve-aware budgets and actual-date funding checks. | [#74](https://github.com/Atiyk/PTO-Optimizer/pull/74) | [`c9d3cbf2`](https://github.com/Atiyk/PTO-Optimizer/commit/c9d3cbf279487afefc4c2cbb8fc88e313e7f6cff) | READY · `dpl_HeA1rx6Rn4bVWY1rKRjXai6R6yJY`. Long-breaks plan recalculated live to 4 PTO days for 8 days off in one break, within budget. |
+| 3 · Homepage and UX | Live engine-derived preview, free-form dates, simpler core controls and direct plan/balance/policy entry points. | [#75](https://github.com/Atiyk/PTO-Optimizer/pull/75) | [`71a87edb`](https://github.com/Atiyk/PTO-Optimizer/commit/71a87edb71d083cf0588a5426b9b126c3130ba59) | READY · `dpl_3s26xja12By4FnesRTpXnfcToK3w`. Changing homepage PTO from 15 to 10 recalculated the live preview and exact full-plan handoff. |
+| 4 · Balance forecast | Quick inputs, chosen forecast date, precise confirmed/tentative scenarios, advanced rules and optional saved policy. | [#76](https://github.com/Atiyk/PTO-Optimizer/pull/76) | [`2c982787`](https://github.com/Atiyk/PTO-Optimizer/commit/2c98278729a7c33e8eb33673af1d3229bb555422) | READY · `dpl_9BhoDSKsWW3RuTeQYmR3p1ssgpeL`. 20 current days plus 1.25 monthly accrual projected 23.75 days on February 2, with live breakdown. |
+| 5 · Request tracker | Track a recommendation; six manual statuses, corrections, notes, persistence and overlap-safe deductions. | [#77](https://github.com/Atiyk/PTO-Optimizer/pull/77) | [`b7fc59ac`](https://github.com/Atiyk/PTO-Optimizer/commit/b7fc59ac23696bb3989505ab737bc66ce4815b2f) | READY · `dpl_DKqP5MEu7uTrUwjaC5TYDnPMczB7`. Synthetic tracked request was canceled; refresh preserved its manually entered status. |
+| 6 · Expiration guard | Policy-backed risk, carried balances, feasible use-by handoff and opt-in 60/30/7-day calendar reminders. | [#78](https://github.com/Atiyk/PTO-Optimizer/pull/78) | [`268f31b0`](https://github.com/Atiyk/PTO-Optimizer/commit/268f31b04d76431f2b68c2f9573d8d45ed649461) | READY · `dpl_B3L8bc9xjA7nMXD2uGp6vSedb4Jn`. 8-day risk at the April 1 reset handed off a plan ending March 31 with budget 8 and reserve 0. |
+| 7 · Partner planner | Select disclosed availability; independent recipient settings, feasible joint alternatives, private-data exclusions and legacy links. | [#79](https://github.com/Atiyk/PTO-Optimizer/pull/79) | [`a7125cd6`](https://github.com/Atiyk/PTO-Optimizer/commit/a7125cd6ed31c3a734385b1f878603ad27a427e3) | READY · `dpl_6Quw2SxtruefJnywYujgY7AghUc9`. Selected January 20–24 availability copied as five proposed dates; other free days and confirmation stayed off, with private fields excluded. |
+| 8 · Portrait sharing | 1080×1350 preview/copy/download, balance hidden by default, clear dates/costs/holiday assumptions and overflow summary. | [#80](https://github.com/Atiyk/PTO-Optimizer/pull/80) | [`430c9cda`](https://github.com/Atiyk/PTO-Optimizer/commit/430c9cda7268f994160cf5a7477207e69df75b77) | READY · `dpl_5K3uu8ZLDPeTzoM3RDJjz3K2jYyz`. Production preview defaulted to balance off and matched 3 PTO days for January 20–24 (5 calendar days). An actual PNG download was verified as 1080×1350. |
 
-| Check | Actual result | Evidence boundary |
+Final consumer deployment: **`dpl_5K3uu8ZLDPeTzoM3RDJjz3K2jYyz` — READY**, commit **`430c9cda7268f994160cf5a7477207e69df75b77`**, serving https://pto-optimizer-seven.vercel.app/. Production preview defaulted to balance off and matched 3 PTO days for January 20–24 (5 calendar days). An actual PNG download was verified as 1080×1350.
+
+The source reuses the existing deterministic planning engine, `src/policy` model/projection/alerts, holiday data, request-text generator, URL state and export helpers. New calculation modules are concentrated in `src/planning` and `src/personal`; UI integration is in the consumer `src/ui` application. The [regression matrix](CONSUMER-REGRESSION-MATRIX.md) maps all 20 requested scenarios to actual assertions.
+
+## C. Screenshots and browser artifacts
+
+The images below are committed release evidence. Before/after desktop views are 1440 pixels wide; new personal-management flows are 375 pixels wide. The portrait PNG is the actual 1080×1350 export with balance hidden, rather than a reconstructed mockup.
+
+| Experience | Before | After / new flow |
 |---|---|---|
-| Initial baseline tests | 673 passed, 2 pre-existing timing failures, 675 total, two thread workers | Recorded before implementation; no threshold or failing test was removed |
-| Solver performance repair | Count-DP skips mathematically unreachable counts and reuses candidate accrual calculations; original timing gates pass | 24 frozen legacy fixtures in `packages/engine/src/solver/performanceRegression.test.ts` retained identical result fingerprints; the B2B application subtree is unchanged |
-| Integrated final local suite | 94 test files, **922 tests passed** | Last complete run before the final unbounded-date-link regression was added |
-| Final date-range hardening | **18 targeted tests passed** across validation and live state integration | Includes the additional adversarial range case; overlaps the 922 suite, so counts must not be added. Complete aggregate rerun pending |
-| TypeScript | Consumer type checking and composite production compilation passed | Final CI remains the release gate |
-| Lint | Passed with warnings recorded in the logs | This is not a zero-warning claim; existing Fast Refresh/export and similar warnings remain |
-| Local production lifecycle | Equivalent TypeScript/Vite/prerender/SEO build passed | Direct `npm run build` is blocked locally by tsx Unix IPC permissions; direct Node/tsx loader lifecycle commands were used without changing production scripts |
-| Foundation GitHub CI | Tests, types, lint, production build, browser and metric gates passed | [Run 41400752850](https://github.com/Atiyk/PTO-Optimizer/actions/runs/41400752850), phase 1 only |
-| Final integrated browser/CI | **Pending** | PR #80 runs the final consumer journey; prepared scripts and unit tests are not substitutes for its result |
-| Final feature preview | **READY** at inspected phase-8 commit `d5e4c7ab…` | Consumer deployment `dpl_4FPJSnweRdCnM1dsV9oZPoTAbe17`: https://pto-optimizer-4q6442wag-atiyk-a.vercel.app. This is a preview, not a production promotion or final browser pass |
-| Production after merge | **Pending** | Verify merged commit, consumer Vercel READY deployment, and representative runtime flows |
+| Homepage | [Before](screenshots/consumer-release/before-home-1440.png) | [After](screenshots/consumer-release/after-home-1440.png) |
+| Optimizer | [Before](screenshots/consumer-release/before-pto-1440.png) | [After](screenshots/consumer-release/after-pto-1440.png) |
+| Policy / forecast | [Before](screenshots/consumer-release/before-policy-1440.png) | [After](screenshots/consumer-release/after-policy-1440.png) · [Approved forecast, mobile](screenshots/consumer-release/approved-forecast-375.png) |
+| Request tracker | New feature | [Mobile tracker](screenshots/consumer-release/request-tracker-375.png) |
+| Expiration guard | Expanded feature | [Risk and reminders](screenshots/consumer-release/expiration-reminders-375.png) |
+| Partner planning | Expanded feature | [Mobile partner planner](screenshots/consumer-release/partner-planner-375.png) |
+| Portrait export | New format | [Actual PNG, default privacy](screenshots/consumer-release/portrait-private-default.png) |
+| Live consumer production | — | [Actual production PNG](screenshots/consumer-release/production-portrait.png) |
 
-The foundation run tested synthetic merge `884c337f684ca1700dd6303f95169eb41c8d3927`, with parents baseline `4a0a10d…` and PR #73 head `af9a6d3dbefc44a71d6c197518b2748a3233ae27`. Its tree `fbce8e8f92f2e2636c8f651fa924a18558548467` matches that phase-1 head exactly. It does not attest later phase trees.
+[Final CI artifact 13124822600](https://github.com/Atiyk/PTO-Optimizer/actions/runs/41409562702/artifacts/13124822600) contains the full before/after 1440/768/375 screenshots, expanded PTO options, six-case journey report, downloadable PNGs/ICS, Lighthouse JSON, axe reports and analytics SDK hashes. The approved forecast, expiration flow, partner layout and actual portrait were visually reviewed without clipping in the captured states. A separate live-browser JPEG did not synchronize; the actual production PNG is archived instead, alongside the CI screenshots.
 
-## Browser, screenshots, and measured performance
+## D. Quality results
 
-The phase-1 [browser evidence artifact](https://github.com/Atiyk/PTO-Optimizer/actions/runs/41400752850/artifacts/13121810692) contains before/after consumer screenshots and raw reports. `/`, `/pto`, `/policy`, and `/sabbatical` passed all **12 route/viewport combinations** at 1440, 768, and 375 pixels. Expanded PTO options were also checked. Candidate reports recorded no application runtime errors, unexpected same-origin response failures, unlabeled controls, or horizontal page overflow in those tested states; mobile menu keyboard checks passed.
+| Check | Actual result |
+|---|---|
+| Tests | **926 passed, 94 files** in final integrated CI |
+| TypeScript | Consumer type check and composite production compilation passed |
+| Lint | Passed; non-fatal existing warnings remain recorded in CI |
+| Build | Standard `npm run build` passed in CI, including holiday refresh, Vite, prerendering and SEO output |
+| Responsive / runtime | **12/12** route/viewport combinations passed across `/`, `/pto`, `/policy`, `/sabbatical` at 1440/768/375; expanded options passed; no page overflow or application runtime errors reported |
+| Complete mobile journeys | **6/6 passed** at 375×812 with synthetic 2027 inputs; no unexpected account requests |
+| Accessibility | Candidate axe scans: **0 violations** on four initial routes plus expanded PTO options; Lighthouse accessibility **100** on all four routes |
+| SEO | Lighthouse **100** on all four routes; existing routes, canonical URLs and prerendering retained |
+| Compatibility | 24 frozen legacy solver result fingerprints preserved; optional minimum omitted/0/1 remains byte-identical; old consumer URL forms retained |
+| Production | All eight consumer deployments reached READY at their merged commits; final production `dpl_5K3uu8ZLDPeTzoM3RDJjz3K2jYyz` serves `430c9cda7268f994160cf5a7477207e69df75b77`. Live flows and the actual production PNG were verified; inspected application-domain error logs were empty. |
 
-Foundation mobile Lighthouse values below are **performance / accessibility / SEO**. Performance is the median of three sequential alternating baseline/candidate runs; accessibility and SEO use the lowest observed value. The fixture uses committed holidays and excludes third-party analytics consistently.
+The final CI head is `1316942b7323f063c50c8eadfd8e993a270d2f75`. Its Lighthouse artifact identifies synthetic tested merge `d2cd0ac3c6cbd7ce08604ed80ae0249149ecfc7e` against base `d82dedcb572a3e6e13a269dd9b1532dda90b852c`; this is distinct from the production merge commit. The production merge tree `cea3ab856fd2ca2e0e37c18ce96f3206fc876149` matches the tested final feature tree exactly. Evidence is attributed to the snapshot actually tested.
 
-| Consumer route | Baseline P / A / SEO | Phase-1 candidate P / A / SEO | Performance change |
+Final mobile Lighthouse values are **performance / accessibility / SEO**. Performance is the median of three sequential alternating baseline/candidate runs; accessibility and SEO use the lowest observation. The final PR comparison baseline already contains phases 1–7, so these deltas measure the last integration, not the total improvement since the original site.
+
+| Route | Final comparison baseline | Final candidate | Performance delta |
 |---|---|---|---|
-| `/` | 80 / 100 / 100 | 93 / 100 / 100 | +13 |
-| `/pto` | 72 / 91 / 100 | 83 / 98 / 100 | +11 |
-| `/policy` | 99 / 95 / 100 | 99 / 100 / 100 | 0 |
-| `/sabbatical` | 99 / 100 / 100 | 98 / 100 / 100 | −1 |
+| `/` | 90 / 100 / 100 | **90 / 100 / 100** | 0 |
+| `/pto` | 77 / 100 / 100 | **77 / 100 / 100** | 0 |
+| `/policy` | 97 / 100 / 100 | **97 / 100 / 100** | 0 |
+| `/sabbatical` | 96 / 100 / 100 | **97 / 100 / 100** | +1 |
 
-The foundation candidate passed the ≤3-point performance-regression, accessibility ≥95, and SEO 100 gates. Axe recorded zero candidate violations on the four initial routes and expanded PTO options; incomplete automated checks remain available for manual review. These are automated measurements, not a WCAG conformance certification. The phase-1 `/pto` Lighthouse report retained a non-blocking heading-order finding (accessibility 98); final-page measurements remain pending.
+All regression gates passed: no performance loss beyond three points, accessibility ≥95, SEO 100, and no serious/critical axe violation. Automated accessibility checks are not a WCAG conformance certification; incomplete checks remain available in raw reports.
 
-Earlier attempts exposed actual label contrast, small calendar targets, heading semantics, and nested timeline controls. Those findings were fixed or recorded explicitly; stale failing or differently routed runs are not reported as the passing evidence above. Local Chromium installers returned invalid archives, so exact responsive screenshots and Lighthouse evidence came from CI. Cloud-browser baseline images at 1363×936 were supplemental desktop evidence only.
+The six real browser journeys exercised:
 
-The final mobile journey in [CONSUMER-JOURNEY-QA.md](CONSUMER-JOURNEY-QA.md) uses fresh 375×812 contexts and synthetic 2027 inputs. It covers tracking/status/forecast persistence, employer-calendar precedence, partner privacy/constraints, portrait pixels and download fallback, and actual hosted analytics SDK transport. Its result is pending. Expiration risk, handoff, reminder dates, and dismissal also have dedicated unit/component coverage; the current journey does not separately exercise every expiration interaction in a browser.
+1. Live plan → track → requested → approved → canceled/corrected → forecast → refresh, with exact unique deductions.
+2. Saved employer calendars, custom days, reset and shared-default precedence without overwriting recipient preferences.
+3. An 8-day April 1 expiration risk → March 31 optimizer handoff; actual 60/30/7-day ICS reminders, three alarms, dismissal/refresh, restore and saved opt-out. The 2027 reminder dates were January 31, March 2 and March 25.
+4. Selected partner availability, privacy exclusions and an independently constrained recipient plan.
+5. Exact portrait dimensions, default-hidden balance, real PNG generation and the actual download fallback after image clipboard denial.
+6. Actual unmodified hosted Plausible/Vercel SDK transport: five safe intercepted POSTs, zero unsafe-referrer POSTs, no private canaries, query/hash or HTTP Referer leakage. All POSTs were fulfilled locally; no synthetic analytics event was sent externally.
 
-## Architecture, compatibility, and privacy
+Failure history was preserved rather than hidden. The initial 675-test baseline had two timing failures. Count-DP work now skips mathematically unreachable states and reuses candidate calculations, without weakening thresholds or changing legacy outputs. Local tsx IPC restrictions and failed Chromium archives were worked around with equivalent direct Node lifecycle checks; real standard builds and browser tools subsequently passed in CI. Early route-fallback, contrast, target-size and heading findings were corrected. An early final journey timed out because its QA locator could not find the Scheduled PTO row, while the actual 20 − 3 = 17 balance was correct. The locator was fixed, then the complete journey and metrics were rerun successfully.
 
-- Existing deterministic solver and policy projection remain the calculation sources. Date arithmetic uses existing UTC utilities. New consumer validation checks funds on each actual PTO date and treats carryover as part of one allocation. Valid legacy consumer outputs remain exact; unsafe legacy outcomes are repaired or explained rather than knowingly shown as feasible.
-- Shared engine changes are confined to an optional minimum-break field/candidate hook plus semantics-preserving performance work. Callers without the new field retain legacy solver behavior. The complete remote phase-8 `apps/teams` subtree SHA is `ce2bedc3bca5c97593819583dc53506c25e70e98`, exactly matching baseline. No B2B source or data flow was edited. Consumer and B2B preview deployment checks were both successful at the inspected phase-8 head; root tests still exclude `apps/**`, so this is not a claim that the B2B application was end-to-end tested.
-- Employer calendar precedence is explicit URL > saved country/region preferences > public defaults. Live edits recalculate immediately; only an explicit save persists them. Opening someone else’s override never rewrites local preferences. The consumer holiday adapter handles New Year observed in the preceding December without altering shared B2B holiday lookup.
-- Versioned browser storage holds employer calendars, request ledger, optional policy, and reminder preferences. Reads are validated and bounded; unsupported/malformed state falls back safely. Storage failures retain live in-memory use and report that saving failed. Request notes/status stay outside ordinary planning and partner URLs.
-- Request costs use the relevant workweek, alternating Friday settings, and employer calendar. Adding or changing dates requires loaded calendar coverage. Status/note corrections preserve saved historical costs. Forecasts union dates across requests and policy entries, distinguish tentative/approved consumption, and exclude dates already reflected in the starting balance.
-- Partner payloads contain selected dates, the disclosed free-day subset, and intentionally chosen proposed/confirmed availability. They omit balance, employer, notes, and policy; neutral `/pto` links preserve the recipient’s independent settings. Confirmation resets when the selected dates or free-day classification changes. Cards are independently feasible alternatives, not a combined promise to spend the same budget repeatedly.
-- Portrait export builds only the visible public model. Balance is opt-in; private company holiday names are replaced with generic labels. Readiness follows the visible image model so a privacy toggle cannot export stale pixels. Existing landscape and ICS exports remain available.
-- Analytics events contain action names only. Both providers receive sanitized public route URLs without query/hash state. Unsafe incoming referrers suppress tracking; an early referrer policy protects outgoing headers. Transport assertions in the final browser script use actual unmodified provider SDKs and intercept every POST locally; those final transport results remain pending.
+## E. Known limits and intentional exclusions
 
-## Known limits and release follow-through
+- Personal request notes, employer preferences, optional policies and reminder preferences save in the current browser. There is no new account requirement, cross-device sync, employer approval integration, database, payroll/billing feature, native app or paid service. Request statuses are entered manually.
+- In-app alerts appear during visits. Calendar reminders require downloading/importing ICS; no scheduled email or push delivery is promised.
+- Policy balances are estimates from user-entered rules. Hours/days retain native units and internal precision; unlimited PTO has no invented finite bank. Handbook assistance remains glossary matching, not full AI policy interpretation.
+- Planning/forecast ranges and URL/storage payloads have explicit bounds. New/date-edited requests require known employer-calendar coverage; status/note corrections retain historical pricing. Missing holiday data produces an explained degraded state.
+- Partner cards are alternative opportunities, not multiple allocations of the same PTO budget. The shared link discloses only selected dates, a free-day subset and intentionally selected availability status; anyone holding it can see those dates.
+- Portraits show up to three readable breaks and explicitly count any additional breaks. Balances default off, and custom company holiday names use generic labels.
+- Non-fatal lint warnings remain. No unresolved release blocker or known critical calculation/privacy defect was identified by the recorded checks. The B2B app was not functionally retested end-to-end; its subtree is unchanged and shared-engine compatibility was checked separately.
+- Production verification used a synthetic tracked request in the inspection browser, manually canceled and reloaded to confirm persistence. It did not create a server record or contact an employer.
 
-- No account, server synchronization, native app, HR approval integration, paid service, calendar OAuth, email scheduling, or push delivery was added. Request statuses are manual. Calendar reminders require the user to download/import ICS; in-app alerts appear during visits.
-- Policy forecasts are estimates from user-entered rules. They preserve native hours/days and internal precision. Unlimited PTO has no invented bank balance. The handbook feature remains glossary matching, not full AI interpretation.
-- Holiday data can degrade; new/date-edited requests and joint planning are held when calendar coverage is incomplete. Planning windows and forecasts are bounded to ten years; partner disclosure is bounded to 1,100 dates and a 12,000-character payload; employer edits and request ledgers have explicit size limits.
-- Portraits show up to three readable breaks and label any remaining count; the total summary still represents the full plan.
-- Final complete browser/metrics CI, sequential merges, and production verification must be recorded before calling the eight-phase release shipped. Confirm the consumer project and merged commit for each deployment; leave B2B settings and deployment untouched.
-- Highest-value follow-through: inspect final journey/PNG evidence, resolve any final gate failures through the phase PR, complete merges with required checks, then smoke-test live consumer persistence/forecast/sharing flows. No additional product scope is needed before that release verification.
+## F. Follow-up
+
+Monitor the consumer deployment after release and retain the CI/production evidence. Prioritize any real browser feedback on policy setup, reminder clarity or mobile exports before adding more features. No additional product scope or external service is required to use the shipped flows.
