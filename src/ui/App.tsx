@@ -273,7 +273,10 @@ export function App() {
           issue={state.solverIssue}
           hasForcedDays={Object.keys(state.forced).length > 0}
           onClearForcedDays={state.clearForcedDays}
-          onReviewSettings={() => setOptionsOpen(true)}
+          onReviewSettings={() => {
+            setOptionsOpen(true);
+            requestAnimationFrame(() => document.getElementById('planning-options')?.scrollIntoView({ block: 'start' }));
+          }}
         />
       )}
 
