@@ -1,12 +1,12 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Analytics } from '@vercel/analytics/react'
+import { PrivacyAnalytics } from './ui/PrivacyAnalytics'
 import './index.css'
 import { App } from './ui/App.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
-    <Analytics />
+    <PrivacyAnalytics />
   </StrictMode>,
 )
