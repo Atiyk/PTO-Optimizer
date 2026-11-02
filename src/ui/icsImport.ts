@@ -9,6 +9,7 @@ import { validCalendarDate } from '../personal/employerCalendar';
 export const MAX_IMPORT_EVENTS = 500;
 /** Hard local-only input and expansion bounds; no network or storage access. */
 export const MAX_IMPORT_CHARS = 1_000_000;
+export const MAX_IMPORT_FILE_BYTES = 1_000_000;
 export const MAX_IMPORT_SPAN_DAYS = 3660;
 export const MAX_IMPORT_BUSY_DAYS = 4000;
 
@@ -146,7 +147,7 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
 
   const lines = unfoldLines(raw);
   if (lines[0] !== 'BEGIN:VCALENDAR' || lines[lines.length - 1] !== 'END:VCALENDAR') {
-    throw new IcsParseError("This doesn't look like a complete calendar (.ics) file.");
+    throw new IcsParseError("This doesn't look like a calendar (.ics) file, or it is incomplete.");
   }
   const busy = new Set<string>();
   let eventCount = 0;
