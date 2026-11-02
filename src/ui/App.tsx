@@ -124,6 +124,8 @@ export function App() {
         <Container className="px-4 py-4">
           <button
             type="button"
+            aria-expanded={optionsOpen}
+            aria-controls="planning-options"
             onClick={() => setOptionsOpen((v) => !v)}
             className="text-sm font-medium text-slate-500 hover:text-slate-800"
           >
@@ -138,7 +140,7 @@ export function App() {
       </div>
 
       {optionsOpen && (
-        <div className="border-b border-slate-200 bg-white">
+        <div id="planning-options" className="border-b border-slate-200 bg-white">
           <Container className="flex flex-col gap-4 px-4 py-4">
             <SubdivisionSelect
               subdivisions={state.discoveredSubdivisions}
@@ -195,6 +197,10 @@ export function App() {
               onRemoveHoliday={state.removeHoliday}
               onToggleStateHoliday={state.toggleStateHoliday}
               onAddCustomHoliday={state.addCustomHoliday}
+              onToggleHoliday={state.toggleHoliday}
+              onSaveEmployerHolidays={state.saveEmployerHolidays}
+              onResetEmployerHolidays={state.resetEmployerHolidays}
+              employerCalendarMessage={state.employerCalendarMessage}
             />
           </Container>
         </div>

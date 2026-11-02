@@ -13,6 +13,17 @@
  * meant to answer and why no payment infrastructure gets built before they do.
  */
 export type AnalyticsEvent =
+  | 'quick_plan_engaged'
+  | 'holiday_preference_customized'
+  | 'meaningful_plan_interaction'
+  | 'request_tracking_started'
+  | 'request_status_updated'
+  | 'balance_forecast_used'
+  | 'expiration_alert_viewed'
+  | 'expiration_alert_action_taken'
+  | 'partner_share_generated'
+  | 'partner_share_opened'
+  | 'portrait_image_exported'
   | 'Solve completed'
   | 'ICS downloaded'
   | 'Image copied'

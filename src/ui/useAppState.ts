@@ -1,3 +1,4 @@
+import { defaultEmployerCalendar, readEmployerCalendar, saveEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { solve, computeScores } from '@daysoff/engine/solver/solve';
 import { computeMarginalValues } from '@daysoff/engine/solver/marginalValue';
@@ -83,6 +84,7 @@ export function discoverSubdivisions(holidays: Holiday[]): string[] {
  * fields the shareable URL carries, since "a plan" is defined by the same input set either
  * way (Phase 3 item 7). */
 export interface PlanSnapshot {
+  employerCalendar: EmployerCalendar;
   country: string;
   subdivision: string | undefined;
   rangeStart: string;
@@ -140,6 +142,7 @@ export function useAppState() {
     };
     if (typeof window === 'undefined') {
       return {
+        employerCalendar: undefined as EmployerCalendar | undefined,
         country: defaults.country,
         subdivision: undefined,
         rangeStart: defaults.rangeStart,
@@ -296,9 +299,42 @@ export function useAppState() {
   // seeing "no public holidays" before the fetch effect below has had a chance to run.
   const [nationalHolidays, setNationalHolidays] = useState<Holiday[]>(() => getPreloadedHolidays(country));
   const [stateHolidayCandidates, setStateHolidayCandidates] = useState<Holiday[]>([]);
-  const [removedHolidays, setRemovedHolidays] = useState<Set<string>>(new Set());
-  const [checkedStateHolidays, setCheckedStateHolidays] = useState<Set<string>>(new Set());
-  const [customHolidays, setCustomHolidays] = useState<HolidayEntry[]>([]);
+  const [employerCalendars, setEmployerCalendars] = useState<Record<string, EmployerCalendar>>(() => ({
+    [employerScope(country, subdivision)]: initial.employerCalendar ?? readEmployerCalendar(country, subdivision),
+  }));
+  const employerCalendar = useMemo(() => employerCalendars[employerScope(country, subdivision)] ?? readEmployerCalendar(country, subdivision), [employerCalendars, country, subdivision]);
+  const [employerCalendarMessage, setEmployerCalendarMessage] = useState('');
+  const updateEmployerCalendar = useCallback((update: (current: EmployerCalendar) => EmployerCalendar) => {
+    setEmployerCalendars(previous => {
+      const key = employerScope(country, subdivision);
+      const next = update(previous[key] ?? readEmployerCalendar(country, subdivision));
+      if (!encodeEmployerCalendar(next)) { setEmployerCalendarMessage('This calendar is too large to share. Remove an entry before adding another.'); return previous; }
+      return { ...previous, [key]: next };
+    });
+  }, [country, subdivision]);
+  const toggleHoliday = useCallback((date: string, name: string) => {
+    updateEmployerCalendar(current => {
+      const key = `${date}|${name}`;
+      return { ...current, excluded: current.excluded.includes(key) ? current.excluded.filter(item => item !== key) : [...current.excluded, key] };
+    });
+    setEmployerCalendarMessage('Calendar updated for this plan. Save to use it on future visits.');
+    track('holiday_preference_customized');
+  }, [updateEmployerCalendar]);
+  const saveEmployerHolidays = useCallback(() => {
+    setEmployerCalendarMessage(saveEmployerCalendar(employerCalendar) ? 'Employer calendar saved in this browser.' : 'Browser storage is unavailable. Your changes still apply to this plan and its link.');
+  }, [employerCalendar]);
+  const resetEmployerHolidays = useCallback(() => {
+    const removed = deleteEmployerCalendar(country, subdivision);
+    updateEmployerCalendar(() => defaultEmployerCalendar(country, subdivision));
+    setEmployerCalendarMessage(removed ? 'Public-holiday defaults restored. Saved customization deleted.' : 'Public-holiday defaults restored for this plan. Browser storage is unavailable.');
+  }, [country, subdivision, updateEmployerCalendar]);
+  const addCustomHoliday = useCallback((date: string, name: string) => {
+    if (!validCalendarDate(date)) { setEmployerCalendarMessage('Choose a valid company holiday date.'); return; }
+    const cleanName = name.trim().replace(/[\u0000-\u001f]/g, '').slice(0, 160) || 'Company holiday';
+    updateEmployerCalendar(current => ({ ...current, custom: [...current.custom.filter(item => item.date !== date || item.name !== cleanName), { date, name: cleanName }], excluded: current.excluded.filter(key => key !== `${date}|${cleanName}`) }));
+    setEmployerCalendarMessage('Company holiday added to this plan. Save to keep it in this browser.');
+    track('holiday_preference_customized');
+  }, [updateEmployerCalendar]);
 
   const [forced, setForced] = useState<Record<string, ForcedState>>(() => {
     const init: Record<string, ForcedState> = {};
@@ -315,6 +351,7 @@ export function useAppState() {
     writeFullStateToURL(url.searchParams, {
       country,
       subdivision,
+      employerCalendar,
       rangeStart,
       rangeEnd,
       budget,
@@ -344,6 +381,7 @@ export function useAppState() {
   }, [
     country,
     subdivision,
+    employerCalendar,
     rangeStart,
     rangeEnd,
     budget,
@@ -447,20 +485,22 @@ export function useAppState() {
   const discoveredSubdivisions = useMemo(() => discoverSubdivisions(subdivisionCandidates), [subdivisionCandidates]);
 
   const holidayEntries: HolidayEntry[] = useMemo(() => {
-    const national: HolidayEntry[] = nationalHolidays
-      .filter((h) => !removedHolidays.has(`${h.date}|${h.name}`))
-      .map((h) => ({ date: h.date, name: h.name, source: 'public' as const, checked: true }));
-    const state: HolidayEntry[] = stateHolidayCandidates
-      .filter((h) => !removedHolidays.has(`${h.date}|${h.name}`))
-      .map((h) => ({
-        date: h.date,
-        name: h.name,
-        source: 'state' as const,
-        checked: checkedStateHolidays.has(`${h.date}|${h.name}`),
-      }));
-    const custom = customHolidays.filter((h) => !removedHolidays.has(`${h.date}|${h.name}`));
-    return [...national, ...state, ...custom].sort((a, b) => a.date.localeCompare(b.date));
-  }, [nationalHolidays, stateHolidayCandidates, checkedStateHolidays, customHolidays, removedHolidays]);
+    const excluded = new Set(employerCalendar.excluded);
+    const entries = new Map<string, HolidayEntry>();
+    for (const h of nationalHolidays) {
+      const key = `${h.date}|${h.name}`;
+      entries.set(key, { date: h.date, name: h.name, source: 'public', checked: !excluded.has(key) });
+    }
+    for (const h of stateHolidayCandidates) {
+      const key = `${h.date}|${h.name}`;
+      if (!entries.has(key)) entries.set(key, { date: h.date, name: h.name, source: 'state', checked: !excluded.has(key) });
+    }
+    for (const h of employerCalendar.custom) {
+      const key = `${h.date}|${h.name}`;
+      if (!entries.has(key) && h.date >= rangeStart && h.date <= rangeEnd) entries.set(key, { ...h, source: 'custom', checked: !excluded.has(key) });
+    }
+    return [...entries.values()].sort((a, b) => `${a.date}|${a.name}`.localeCompare(`${b.date}|${b.name}`));
+  }, [nationalHolidays, stateHolidayCandidates, employerCalendar, rangeStart, rangeEnd]);
 
   // A pinned (forced 'include') day is NOT free - it must cost a real PTO day, unlike a
   // holiday. It used to be merged into offDays here, which made the solver treat it as
@@ -803,6 +843,7 @@ export function useAppState() {
       const snapshot: PlanSnapshot = {
         country,
         subdivision,
+        employerCalendar,
         rangeStart,
         rangeEnd,
         budget,
@@ -837,7 +878,7 @@ export function useAppState() {
       return [...prev, snapshot];
     });
   }, [
-    country, subdivision, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
+    country, subdivision, employerCalendar, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
     weekStartOverride, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap,
     overlapDays, blackouts, workWeek, forced, altFridayEnabled, altFridayStart,
     reserveDays, unlimitedPto, peakCapEnabled, peakCapStart, peakCapEnd, peakCapMaxDays,
@@ -852,6 +893,7 @@ export function useAppState() {
       if (!snap) return;
       setCountry(snap.country);
       setSubdivision(snap.subdivision);
+      setEmployerCalendars(previous => ({ ...previous, [employerScope(snap.country, snap.subdivision)]: snap.employerCalendar }));
       setRangeStart(snap.rangeStart);
       setRangeEnd(snap.rangeEnd);
       setBudget(snap.budget);
@@ -985,18 +1027,15 @@ export function useAppState() {
     altFridayStart,
     setAltFridayStart,
     holidayEntries,
-    removeHoliday: (date: string, name: string) =>
-      setRemovedHolidays((s) => new Set(s).add(`${date}|${name}`)),
-    toggleStateHoliday: (date: string, name: string) =>
-      setCheckedStateHolidays((s) => {
-        const key = `${date}|${name}`;
-        const next = new Set(s);
-        if (next.has(key)) next.delete(key);
-        else next.add(key);
-        return next;
-      }),
-    addCustomHoliday: (date: string, name: string) =>
-      setCustomHolidays((list) => [...list, { date, name, source: 'custom' as const, checked: true }]),
+    employerCalendar,
+    employerCalendarMessage,
+    saveEmployerHolidays,
+    resetEmployerHolidays,
+    toggleHoliday,
+    effectiveOffDays,
+    removeHoliday: (date: string, name: string) => updateEmployerCalendar(current => ({ ...current, custom: current.custom.filter(item => item.date !== date || item.name !== name), excluded: [...new Set([...current.excluded, `${date}|${name}`])] })),
+    toggleStateHoliday: toggleHoliday,
+    addCustomHoliday,
     breaks,
     orderedBreaks,
     alternatives,

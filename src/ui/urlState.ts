@@ -1,3 +1,4 @@
+import { decodeEmployerCalendar, encodeEmployerCalendar, employerScope, type EmployerCalendar } from '../personal/employerCalendar';
 import type { WorkWeek } from '@daysoff/engine/solver/types';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
@@ -117,6 +118,7 @@ function encodeWorkWeek(ww: WorkWeek): string {
 }
 
 export interface FullURLState {
+  employerCalendar?: EmployerCalendar;
   country?: string;
   subdivision?: string;
   rangeStart: string;
@@ -174,6 +176,8 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
 
   const country = params.get('c') || defaults.country;
   const subdivision = params.get('sd') || undefined;
+  const sharedCalendar = decodeEmployerCalendar(params.get('eh'));
+  const employerCalendar = sharedCalendar && employerScope(sharedCalendar.country, sharedCalendar.subdivision) === employerScope(country, subdivision) ? sharedCalendar : undefined;
 
   const wsRaw = params.get('ws');
   const weekStartOverride: WeekStart | 'auto' = wsRaw === '0' ? 0 : wsRaw === '1' ? 1 : 'auto';
@@ -221,6 +225,7 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
   return {
     country,
     subdivision,
+    ...(employerCalendar ? { employerCalendar } : {}),
     rangeStart,
     rangeEnd,
     budget,
@@ -250,6 +255,7 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
 }
 
 export interface WriteStateInput {
+  employerCalendar?: EmployerCalendar;
   country: string;
   subdivision: string | undefined;
   rangeStart: string;
@@ -283,6 +289,9 @@ export interface WriteStateInput {
  * viewer-independent default, to keep the URL readable. */
 export function writeFullStateToURL(params: URLSearchParams, state: WriteStateInput): void {
   writeSliderStateToURL(params, { w: state.w, breakCount: state.breakCount });
+  const calendar = state.employerCalendar ? encodeEmployerCalendar(state.employerCalendar) : '';
+  if (calendar) params.set('eh', calendar);
+  else params.delete('eh');
 
   params.set('c', state.country);
   params.set('s', state.rangeStart);
