@@ -2,6 +2,7 @@ import { SiteHeader } from './SiteHeader';
 import { Footer } from './Footer';
 import { Container } from './Container';
 import { findTerm } from '../content/glossary/terms';
+import { findPracticalGuide } from '../content/glossary/guides';
 import { track } from './analytics';
 
 /** Stage 3C's "interactive mini-example where it helps" - a tiny, static illustration for
@@ -63,6 +64,7 @@ export function GlossaryTermPage({ termId }: { termId: string }) {
     );
   }
 
+  const guide = findPracticalGuide(term.id);
   const relatedTerms = term.related.map((id) => findTerm(id)).filter((t): t is NonNullable<typeof t> => !!t);
 
   return (
@@ -77,6 +79,49 @@ export function GlossaryTermPage({ termId }: { termId: string }) {
           {term.aliases.length > 0 && <p className="mt-1 text-sm text-slate-400">Also called: {term.aliases.join(', ')}</p>}
           <p className="mt-4 text-base text-slate-700">{term.long}</p>
           <MiniExample id={term.id} />
+
+          {guide && (
+            <article className="mt-8 space-y-6 border-t border-line pt-7" aria-labelledby="practical-guide-heading">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-accent-ink">Practical guide</p>
+                <h2 id="practical-guide-heading" className="mt-2 text-2xl font-semibold tracking-tight text-ink">{guide.title}</h2>
+                <p className="mt-3 text-base leading-relaxed text-ink">{guide.answer}</p>
+              </div>
+
+              <section aria-labelledby="guide-steps-heading">
+                <h3 id="guide-steps-heading" className="text-lg font-semibold text-ink">What to check</h3>
+                <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-muted">
+                  {guide.steps.map((step) => <li key={step} className="pl-1">{step}</li>)}
+                </ol>
+              </section>
+
+              <section className="rounded-xl border border-line bg-surface-alt p-5" aria-labelledby="guide-example-heading">
+                <h3 id="guide-example-heading" className="text-lg font-semibold text-ink">A worked example</h3>
+                <p className="mt-3 text-sm leading-relaxed text-ink">{guide.example.setup}</p>
+                <p className="mt-3 rounded-lg bg-surface px-4 py-3 text-sm font-semibold leading-relaxed tabular-nums text-ink">{guide.example.calculation}</p>
+                <p className="mt-3 text-sm leading-relaxed text-muted">{guide.example.result}</p>
+              </section>
+
+              <section aria-labelledby="guide-mistakes-heading">
+                <h3 id="guide-mistakes-heading" className="text-lg font-semibold text-ink">Common mistakes</h3>
+                <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted">
+                  {guide.mistakes.map((mistake) => <li key={mistake} className="pl-1">{mistake}</li>)}
+                </ul>
+              </section>
+
+              <section className="rounded-xl border border-line bg-surface p-5" aria-labelledby="guide-hr-heading">
+                <h3 id="guide-hr-heading" className="text-lg font-semibold text-ink">Three questions for HR</h3>
+                <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted">
+                  {guide.hrQuestions.map((question) => <li key={question} className="pl-1">{question}</li>)}
+                </ul>
+              </section>
+
+              <p className="text-sm leading-relaxed text-muted">{guide.caveat}</p>
+              <a href={guide.action.href} className="inline-flex min-h-11 items-center rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-white hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+                {guide.action.label} <span aria-hidden="true" className="ml-2">→</span>
+              </a>
+            </article>
+          )}
 
           {(term.variesBy === 'location' || term.variesBy === 'both') && (
             <p className="mt-4 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
