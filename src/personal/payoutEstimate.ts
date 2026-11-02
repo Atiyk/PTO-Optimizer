@@ -1,6 +1,6 @@
 import type { TimeOffPolicy } from '../policy/model';
 import { forecastWithRequests } from './forecast';
-import type { PtoRequest } from './requestLedger';
+import { REQUEST_STATUSES, validRequestRange, type PtoRequest } from './requestLedger';
 
 /**
  * Consumer-only, local-first company-policy payout scenarios.
@@ -115,6 +115,7 @@ export function estimateDeparturePayout(input: DeparturePayoutInput): DepartureP
     || !/^[A-Z]{3}$/.test(input.currency)
     || (input.separation !== undefined && !['voluntary', 'involuntary', 'unknown'].includes(input.separation))) return null;
 
+  if (!input.pay || typeof input.pay !== 'object') return null;
   const rate = hourlyRate(input.pay);
   if (rate === null) return null;
 
@@ -123,10 +124,19 @@ export function estimateDeparturePayout(input: DeparturePayoutInput): DepartureP
   const warnings: string[] = [];
   for (const line of input.lines) {
     if (!line || !CATEGORIES.includes(line.category) || seen.has(line.category)
-      || !line.policy || !line.companyRule || !['pays-all', 'pays-none', 'pays-up-to', 'unknown'].includes(line.companyRule.kind)
+      || !line.policy || !['days', 'hours'].includes(line.policy.unit)
+      || !line.policy.accrual || !['front-loaded', 'per-pay-period', 'per-hour-worked', 'unlimited'].includes(line.policy.accrual.kind)
+      || !line.policy.planYear || !['calendar', 'anniversary', 'custom'].includes(line.policy.planYear.kind)
+      || !line.policy.carryover || !['none', 'all', 'capped'].includes(line.policy.carryover.mode)
+      || !Array.isArray(line.policy.plannedDays)
+      || !line.companyRule || !['pays-all', 'pays-none', 'pays-up-to', 'unknown'].includes(line.companyRule.kind)
       || (line.companyRule.kind === 'pays-up-to' && !validNumber(line.companyRule.cap, MAX_UNITS))
       || !validNumber(line.policy.hoursPerDay, 24, false)
-      || (line.requests !== undefined && !Array.isArray(line.requests))) return null;
+      || (line.requests !== undefined && (!Array.isArray(line.requests) || line.requests.length > 300
+        || !line.requests.every((request) => request && validRequestRange(request.start, request.end)
+          && REQUEST_STATUSES.includes(request.status) && Array.isArray(request.ptoDates)
+          && request.ptoDates.length <= 1096 && request.ptoDates.every((date) => typeof date === 'string'
+            && date >= request.start && date <= request.end))))) return null;
     seen.add(line.category);
     const forecast = forecastWithRequests(line.policy, input.departureDate, line.requests ?? []);
     if (!forecast) return null;
