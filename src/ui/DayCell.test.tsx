@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, fireEvent, screen, cleanup } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { DayCell } from './DayCell';
 import { COLORS, HOLIDAY_DOT } from './colorScheme';
@@ -107,5 +108,100 @@ describe('DayCell category rendering', () => {
   it('an in-range day of the same category is interactive, not disabled', () => {
     const html = renderCell('suggested-pto', { isOutOfRange: false });
     expect(html).not.toContain('disabled');
+  });
+});
+
+afterEach(cleanup);
+
+/** Coarse-pointer day cells must work even without marginal-value/holiday tooltips. */
+function mountTouchDay(overrides: {
+  category?: DayCategory;
+  isAlternative?: boolean;
+  isOutOfRange?: boolean;
+  holidayName?: string;
+} = {}) {
+  const onToggle = vi.fn();
+  const onSwapAlternative = vi.fn();
+  render(
+    <DayCell
+      date="2026-07-04"
+      dayOfMonth={4}
+      category={overrides.category ?? 'working'}
+      hasOverlap={false}
+      isAlternative={overrides.isAlternative ?? false}
+      isToday={false}
+      inBand={false}
+      isHighlighted={false}
+      isBlackout={false}
+      isOutOfRange={overrides.isOutOfRange ?? false}
+      marginalValue={null}
+      holidayName={overrides.holidayName}
+      hasHover={false}
+      onToggle={onToggle}
+      onSwapAlternative={onSwapAlternative}
+    />,
+  );
+  return { onToggle, onSwapAlternative, day: screen.getByRole('button', { name: /July 4/ }) };
+}
+
+describe('DayCell coarse-pointer disclosure', () => {
+  it('opens a usable action for an ordinary day with no tooltip, without silently changing the plan', () => {
+    const { day, onToggle } = mountTouchDay();
+    fireEvent.click(day);
+    expect(onToggle).not.toHaveBeenCalled();
+    expect(day.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('group', { name: 'Actions for July 4' })).toBeTruthy();
+    const action = screen.getByRole('button', { name: 'Change this day' });
+    fireEvent.blur(day, { relatedTarget: action });
+    expect(screen.getByRole('button', { name: 'Change this day' })).toBeTruthy();
+    fireEvent.click(action);
+    expect(onToggle).toHaveBeenCalledExactlyOnceWith('2026-07-04');
+    expect(screen.queryByRole('group', { name: 'Actions for July 4' })).toBeNull();
+  });
+
+  it('offers an action on holidays even without a marginal value', () => {
+    const { day, onToggle } = mountTouchDay({ category: 'public-holiday', holidayName: 'Independence Day' });
+    fireEvent.click(day);
+    expect(screen.getByText('Independence Day')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Change this day' }));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers the alternative swap on touch without requiring a marginal tooltip', () => {
+    const { day, onToggle, onSwapAlternative } = mountTouchDay({ isAlternative: true });
+    fireEvent.click(day);
+    fireEvent.click(screen.getByRole('button', { name: 'Swap this in' }));
+    expect(onSwapAlternative).toHaveBeenCalledTimes(1);
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it('keeps disabled out-of-range days noninteractive', () => {
+    const { day, onToggle } = mountTouchDay({ isOutOfRange: true });
+    expect((day as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(day);
+    expect(screen.queryByRole('group')).toBeNull();
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it('supports keyboard Enter and Space without requiring a touch disclosure', () => {
+    const { day, onToggle } = mountTouchDay();
+    fireEvent.keyDown(day, { key: 'Enter' });
+    fireEvent.keyDown(day, { key: ' ' });
+    expect(onToggle).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('group')).toBeNull();
+  });
+
+  it('dismisses touch details on Close, Escape, and outside pointer interaction', () => {
+    const { day, onToggle } = mountTouchDay();
+    fireEvent.click(day);
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('group')).toBeNull();
+    fireEvent.click(day);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('group')).toBeNull();
+    fireEvent.click(day);
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole('group')).toBeNull();
+    expect(onToggle).not.toHaveBeenCalled();
   });
 });
