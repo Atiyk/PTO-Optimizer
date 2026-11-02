@@ -50,3 +50,12 @@ The predecessor explicitly reports unfinished UX work, remains enabled and has t
 5. Keep the conditional handoff active while awaiting completion. Do not stop or modify the predecessor automation.
 
 This file records unreleased isolated implementation and a still-closed release gate.
+
+## 2026-11-02 19:59 UTC — isolated F5 vacation forecast comparison draft
+
+- Re-read full expansion directive, root CLAUDE.md and redesign spec, checked predecessor UX automation's latest completed run at 19:52 UTC. The UX agent explicitly reports unfinished work and retains ownership of PRs #87/#88/#90/#92. Latest UX PR #92 head `20d16209` has pending validation/review. **Release Gate 0 remains CLOSED.**
+- Verified GitHub main and production Vercel READY both at `3187596230768e4818720d1907475c9a3341a54c` (last merged UX PR #86), not the outstanding UX drafts. PRs #82/#83 are closed (only #83 merged); #85/#86 merged. No UX-owned files were edited.
+- Created non-overlapping consumer-only **draft [PR #93 — date-specific before/after vacation forecast](https://github.com/Atiyk/PTO-Optimizer/pull/93)**, branch `gapless/expansion-forecast-comparison-20261102` from main `31875962`, head `c9a4ae6d6d0b77b9dbc2b2a8ccd4883f40596dec`. Added `src/personal/forecastComparison.ts`, its focused tests and `FORECAST-COMPARISON-CONTRACT.md`. It reuses the existing `forecastWithRequests`, `projectBalance` and `requestPtoDates` rather than duplicating accrual, carryover, calendar or ledger math.
+- Confirmed/tentative scenario comparisons deduplicate previously approved, completed, requested and policy-planned days, use employer holiday/workweek, preserve native hours/days, show actual balance/expiry/cap changes, disclose missing calendar coverage and never serialize request notes or IDs. Regression tests cover accrual, overlap, tentative status, holidays/weekends, fractional hours, reset/carryover, unlimited and invalid inputs.
+- Exact-head [GitHub Actions run 41515051003](https://github.com/Atiyk/PTO-Optimizer/actions/runs/41515051003) is **in progress**, not yet verified passing. Independent critic, user-facing integration, responsive 1440/768/375/320 evidence and Vercel preview remain outstanding; do not merge or claim release.
+- Existing expansion draft PRs #89 (school/conflict) and #91 (payout) remain separate and unmerged. No B2B/app/teams changes. No actual independent subagent was available; implementation and initial self-review were sequential, not critic signoff. No deployment attempted.
