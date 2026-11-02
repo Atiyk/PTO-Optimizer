@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { MarginalValue } from '@daysoff/engine/solver/marginalValue';
 import { COLORS, HOLIDAY_DOT, TEXT_MUTED, TEXT_PRIMARY, BAND_TEXT } from './colorScheme';
 import type { DayCategory } from './types';
@@ -120,7 +120,7 @@ export function DayCell({
     const onOutsidePointer = (event: PointerEvent) => {
       if (!wrapperRef.current?.contains(event.target as Node)) setTooltipOpen(false);
     };
-    const onEscape = (event: globalThis.KeyboardEvent) => {
+    const onEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       setTooltipOpen(false);
       dayButtonRef.current?.focus();
@@ -163,7 +163,7 @@ export function DayCell({
     setTooltipOpen((v) => !v);
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
+  const handleKeyDown = (e: ReactKeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       primaryAction?.();
