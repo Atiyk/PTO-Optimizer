@@ -250,9 +250,9 @@ export function Sabbatical() {
                 extended.start/end from a second, independently-ptoToAdd'd extendSabbatical
                 call, so it could (and did) disagree with the card. Now there is only one
                 number, computed once, inside bestPlacements. */}
-            <p className="text-2xl font-bold tabular-nums leading-snug text-slate-900 sm:text-3xl">
+            <h1 className="text-2xl font-bold tabular-nums leading-snug text-slate-900 sm:text-3xl">
               Take it from {formatLong(selected.start)} and you&apos;re away for {selected.totalAwayDays} consecutive days.
-            </p>
+            </h1>
             <p className="mt-1 text-sm tabular-nums text-slate-600">
               {lengthWeeks} week{lengthWeeks === 1 ? '' : 's'} of sabbatical
               {/* 4C: unpaid leave is its own clause, distinct from PTO - "4 weeks
@@ -272,7 +272,8 @@ export function Sabbatical() {
           </Container>
         ) : (
           <Container className="px-4 py-6">
-            <p className="text-sm text-slate-500">Loading placements&hellip;</p>
+            <h1 className="text-2xl font-semibold text-slate-900">Plan your sabbatical</h1>
+            <p role="status" className="mt-2 text-sm text-slate-500">Loading placements&hellip;</p>
           </Container>
         )}
       </div>

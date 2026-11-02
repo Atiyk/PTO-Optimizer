@@ -50,7 +50,11 @@ The script creates fresh browser contexts at 1440px, 768px, and 375px for `/`, `
 same-origin holiday data, a fixed November 2, 2026 clock, US locale, New York timezone,
 and reduced motion. Reports record page errors, same-origin HTTP failures, page overflow,
 heading/label checks, and a keyboard/menu smoke check. Third-party analytics is blocked
-in these evidence contexts. No signed-in or B2B actions run.
+in these evidence contexts. Vercel's platform-only Insights script is stubbed because
+the local static server cannot serve it; other same-origin failures remain failures.
+Directory routes use a trailing slash for Vite preview, and route-specific title checks
+prevent its homepage fallback from being mistaken for an optimizer/policy/sabbatical
+test. No signed-in or B2B actions run.
 
 These are basic browser checks, not a WCAG conformance audit or Lighthouse measurement.
 Lighthouse accessibility, SEO, and performance scores must be reported separately.

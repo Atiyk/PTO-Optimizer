@@ -245,6 +245,7 @@ export function Policy() {
                 {pasteOpen && (
                   <div className="mt-2">
                     <textarea
+                      aria-label="Handbook paragraph for glossary matching"
                       value={pastedText}
                       onChange={(e) => {
                         setPastedText(e.target.value);

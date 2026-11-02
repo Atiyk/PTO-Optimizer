@@ -232,6 +232,7 @@ export function MoreOptions(props: MoreOptionsProps) {
       <section>
         <h4 className={H4_CLASS}>Week starts on</h4>
         <select
+          aria-label="Week starts on"
           value={props.weekStartOverride}
           onChange={(e) => {
             const v = e.target.value;

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { COUNTRIES, subdivisionLabel } from '@daysoff/engine/data/countries';
 
 interface CountrySelectProps {
@@ -18,6 +18,11 @@ export const CHEVRON_BG = { backgroundImage: "url(\"data:image/svg+xml,%3Csvg xm
 export function CountrySelect({ country, onChangeCountry }: CountrySelectProps) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const fieldId = `country-${useId()}`;
+  const listId = `${fieldId}-list`;
+  const labelId = `${fieldId}-label`;
 
   const matches = useMemo(() => {
     if (!query) return COUNTRIES;
@@ -26,49 +31,95 @@ export function CountrySelect({ country, onChangeCountry }: CountrySelectProps) 
   }, [query]);
 
   const current = COUNTRIES.find((c) => c.code === country);
+  const active = open ? matches[activeIndex] : undefined;
+  const activeId = active ? `${listId}-${active.code}` : undefined;
+
+  useEffect(() => {
+    if (activeId) document.getElementById(activeId)?.scrollIntoView?.({ block: 'nearest' });
+  }, [activeId]);
+
+  const selectCountry = (code: string) => {
+    onChangeCountry(code);
+    setOpen(false);
+    setQuery('');
+    inputRef.current?.focus();
+  };
+
+  const openCurrent = () => {
+    setQuery('');
+    setActiveIndex(Math.max(0, COUNTRIES.findIndex((entry) => entry.code === country)));
+    setOpen(true);
+  };
 
   return (
-    <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-      Country
-      <div className="relative w-48">
+    <div className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+      <label id={labelId} htmlFor={fieldId}>Country</label>
+      <div className="relative w-48 max-w-full">
         <input
+          id={fieldId}
+          ref={inputRef}
           value={open ? query : (current?.name ?? country)}
           onChange={(e) => {
             setQuery(e.target.value);
+            setActiveIndex(0);
             setOpen(true);
           }}
-          onFocus={() => {
+          onFocus={openCurrent}
+          onClick={() => { if (!open) openCurrent(); }}
+          onBlur={() => {
+            setOpen(false);
             setQuery('');
-            setOpen(true);
           }}
-          onBlur={() => setTimeout(() => setOpen(false), 100)}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault();
+              if (!open) {
+                openCurrent();
+              } else if (matches.length > 0) {
+                const direction = event.key === 'ArrowDown' ? 1 : -1;
+                setActiveIndex((index) => (index + direction + matches.length) % matches.length);
+              }
+            } else if (event.key === 'Enter' && open) {
+              event.preventDefault();
+              if (active) selectCountry(active.code);
+            } else if (event.key === 'Escape') {
+              event.preventDefault();
+              setOpen(false);
+              setQuery('');
+            }
+          }}
           role="combobox"
           aria-expanded={open}
           aria-autocomplete="list"
+          aria-controls={open ? listId : undefined}
+          aria-activedescendant={activeId}
+          aria-haspopup="listbox"
+          autoComplete="off"
           className={FIELD_CLASS}
           style={CHEVRON_BG}
         />
         {open && (
-          <ul className="absolute z-20 mt-1 max-h-56 w-56 overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
-            {matches.map((c) => (
-              <li key={c.code}>
-                <button
-                  type="button"
-                  className="block w-full px-3 py-1.5 text-left text-sm text-slate-800 hover:bg-slate-50"
-                  onClick={() => {
-                    onChangeCountry(c.code);
-                    setOpen(false);
-                  }}
-                >
-                  {c.name} <span className="text-slate-400">({c.code})</span>
-                </button>
+          <ul id={listId} role="listbox" aria-labelledby={labelId} className="absolute z-20 mt-1 max-h-56 w-56 max-w-[calc(100vw-2rem)] overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
+            {matches.map((c, index) => (
+              <li
+                id={`${listId}-${c.code}`}
+                key={c.code}
+                role="option"
+                aria-selected={c.code === country}
+                className={`block min-h-11 cursor-pointer px-3 py-2.5 text-left text-sm text-slate-800 ${index === activeIndex ? 'bg-slate-100 outline outline-1 -outline-offset-1 outline-slate-400' : 'hover:bg-slate-50'}`}
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseMove={() => setActiveIndex(index)}
+                onClick={() => selectCountry(c.code)}
+              >
+                {c.name} <span className="text-slate-400">({c.code})</span>
               </li>
             ))}
-            {matches.length === 0 && <li className="px-3 py-1.5 text-sm text-slate-400">No matches</li>}
+            {matches.length === 0 && <li role="presentation" className="px-3 py-2.5 text-sm text-slate-400">No matches</li>}
           </ul>
         )}
+        <span role="status" className="sr-only">{open && matches.length === 0 ? 'No countries match your search.' : ''}</span>
       </div>
-    </label>
+    </div>
   );
 }
 
