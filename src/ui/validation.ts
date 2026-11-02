@@ -5,6 +5,13 @@ import { isValidISODate } from './urlState';
  * paste gone wrong) and deserves a message instead of silently "working". */
 const MAX_REASONABLE_BUDGET = 3650;
 
+/** Bound untrusted links before building a calendar or a solver candidate table. */
+export function isSupportedPlanningRange(start: string, end: string): boolean {
+  if (!isValidISODate(start) || !isValidISODate(end) || end < start) return false;
+  const years = Number(end.slice(0, 4)) - Number(start.slice(0, 4));
+  return years < 10 || (years === 10 && end.slice(5) <= start.slice(5));
+}
+
 export interface ValidationInputs {
   rangeStart: string;
   rangeEnd: string;
@@ -23,6 +30,7 @@ export function validateInputs({ rangeStart, rangeEnd, budget, expiryEnabled, ex
   const issues: string[] = [];
 
   if (!isValidISODate(rangeStart) || !isValidISODate(rangeEnd)) issues.push('Choose valid planning start and end dates.');
+  if (isValidISODate(rangeStart) && isValidISODate(rangeEnd) && rangeEnd >= rangeStart && !isSupportedPlanningRange(rangeStart, rangeEnd)) issues.push('Choose a planning window of ten years or less.');
   if (!Number.isFinite(budget)) issues.push('Enter a valid PTO balance.');
   if (rangeEnd < rangeStart) {
     issues.push('End date is before the start date.');

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
+import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { useAppState } from './useAppState';
+import { App } from './App';
 import {
   defaultEmployerCalendar,
   EMPLOYER_STORAGE_PREFIX,
@@ -154,4 +155,24 @@ describe('employer calendar integrated with the live consumer state', () => {
     expect(result.current.employerCalendarMessage).toContain('storage is unavailable');
     expect(new URLSearchParams(window.location.search).has('eh')).toBe(true);
   });
+});
+
+
+it('rejects an unbounded planning link before building calendar derived data', () => {
+  navigate('?c=US&sd=US-CA&s=0100-01-01&e=9999-12-31&b=15&af=1&afs=2027-01-01');
+  const { result } = renderHook(() => useAppState());
+  expect(result.current.validationIssues).toContain('Choose a planning window of ten years or less.');
+  expect(result.current.offRuns).toEqual([]);
+  expect(result.current.allDaysOff).toEqual([]);
+  expect(result.current.marginalValues.size).toBe(0);
+  expect(result.current.budgetSpent).toBe(0);
+});
+
+it('shows an over-budget legacy pin issue and prevents exporting an invalid plan', async () => {
+  navigate('?c=US&s=2027-12-20&e=2027-12-31&b=1&rv=0&w=0&p=2027-12-27,2027-12-28');
+  render(<App />);
+  await screen.findByText('Required dates or the selected plan exceed your available PTO.');
+  expect(screen.getByText('Check your planning inputs before exporting.')).toBeTruthy();
+  expect(screen.getByText('Check your planning inputs to display the calendar.')).toBeTruthy();
+  expect(document.getElementById('shortcut-download-ics')).toBeNull();
 });

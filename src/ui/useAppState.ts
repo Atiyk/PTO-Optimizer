@@ -1,9 +1,9 @@
 import { getConsumerHolidays as getHolidays, getConsumerHolidaysWithStatus as getHolidaysWithStatus, getConsumerSubdivisionCandidates as getSubdivisionCandidates } from '../personal/consumerHolidays';
 import { SUBDIVISION_NAMES } from '@daysoff/engine/data/countries';
-import { solveConsumer, planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
+import { solveConsumer, solveLegacyConsumer, planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
 import { defaultEmployerCalendar, readEmployerCalendar, saveEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { solve, computeScores } from '@daysoff/engine/solver/solve';
+import { computeScores } from '@daysoff/engine/solver/solve';
 import { computeMarginalValues } from '@daysoff/engine/solver/marginalValue';
 import type { Alternative, Break, Scores, SolveInput, SolveResult, WorkWeek } from '@daysoff/engine/solver/types';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
@@ -19,7 +19,7 @@ import type { DayCategory, ForcedState } from './types';
 import { classifyDay } from './dayCategory';
 import { alternativeForDate as alternativeForDateImpl } from './alternativeForDate';
 import { track } from './analytics';
-import { validateInputs } from './validation';
+import { isSupportedPlanningRange, validateInputs } from './validation';
 import { policyFromLegacyPtoState, toLegacySolverFields } from '../policy/model';
 
 /** The slider's own stored position while unchecked - also what it falls back to showing
@@ -57,6 +57,7 @@ export function defaultRangeEnd(todayIso: string): string {
 }
 
 function yearsBetween(rangeStart: string, rangeEnd: string): number[] {
+  if (!isSupportedPlanningRange(rangeStart, rangeEnd)) return [];
   const startYear = Number(rangeStart.slice(0, 4));
   const endYear = Number(rangeEnd.slice(0, 4));
   const years: number[] = [];
@@ -551,7 +552,7 @@ export function useAppState() {
   // holiday list (free, no PTO cost), not treated as a weekend via workWeek, since
   // workWeek has no notion of week parity (see calendarMath.ts's own comment).
   const altFridayOffDates = useMemo(() => {
-    if (!altFridayEnabled || !altFridayStart) return [];
+    if (!altFridayEnabled || !altFridayStart || !isSupportedPlanningRange(rangeStart, rangeEnd)) return [];
     return rangeISO(rangeStart, rangeEnd).filter((d) => isAlternatingFridayOff(d, altFridayStart));
   }, [altFridayEnabled, altFridayStart, rangeStart, rangeEnd]);
 
@@ -654,12 +655,10 @@ export function useAppState() {
   const solved = useMemo((): { result: SolveResult; issue?: string } => {
     if (!isValidInput) return { result: lastGoodResultRef.current };
     try {
-      const outcome = planningVersion === 2 ? solveConsumer(solveInput, { minimumBreakDays, style: planningStyle }) : { result: solve(solveInput) };
+      const outcome = planningVersion === 2 ? solveConsumer(solveInput, { minimumBreakDays, style: planningStyle }) : solveLegacyConsumer(solveInput);
       lastGoodResultRef.current = outcome.result;
       return outcome;
     } catch {
-      // An unexpected solver throw on otherwise-valid input: still keep the last good plan
-      // on screen rather than blanking it, same as a validation failure would.
       return { result: EMPTY_RESULT, issue: 'This combination could not be calculated. Check your dates and settings.' };
     }
   }, [solveInput, isValidInput, planningVersion, minimumBreakDays, planningStyle]);
@@ -738,7 +737,7 @@ export function useAppState() {
   const weekStart: WeekStart = weekStartOverride === 'auto' ? weekStartForCountry(country) : weekStartOverride;
 
   // Recomputed once per solve (not per mouseover) and cached here; DayCell just reads the map.
-  const marginalValues = useMemo(() => computeMarginalValues(solveInput, breaks), [solveInput, breaks]);
+  const marginalValues = useMemo(() => isSupportedPlanningRange(rangeStart, rangeEnd) ? computeMarginalValues(solveInput, breaks) : new Map(), [solveInput, breaks, rangeStart, rangeEnd]);
 
   const holidayNameFor = useCallback(
     (iso: string): string | undefined => holidayEntries.find((h) => h.date === iso && h.checked)?.name,
@@ -791,7 +790,7 @@ export function useAppState() {
   );
 
   const offRuns = useMemo(
-    () => computeQualifyingRuns(rangeStart, rangeEnd, isOffForBand, isSuggestedPto),
+    () => isSupportedPlanningRange(rangeStart, rangeEnd) ? computeQualifyingRuns(rangeStart, rangeEnd, isOffForBand, isSuggestedPto) : [],
     [rangeStart, rangeEnd, isOffForBand, isSuggestedPto],
   );
 
@@ -834,7 +833,7 @@ export function useAppState() {
   // Every day this plan results in being off (weekends, holidays, suggested PTO combined) -
   // the payload a "share my days" partner-overlap link hands to its recipient.
   const allDaysOff = useMemo(
-    () => rangeISO(rangeStart, rangeEnd).filter(isOffForBand),
+    () => isSupportedPlanningRange(rangeStart, rangeEnd) ? rangeISO(rangeStart, rangeEnd).filter(isOffForBand) : [],
     [rangeStart, rangeEnd, isOffForBand],
   );
 
