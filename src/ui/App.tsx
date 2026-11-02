@@ -1,7 +1,10 @@
+import { rangeISO, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
+import { PartnerPlanner } from './PartnerPlanner';
+import { readPartnerAvailability } from '../planning/partner';
 import { PtoTracker } from './PtoTracker';
 import { useRequestLedger } from './useRequestLedger';
 import { track } from './analytics';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { SiteHeader } from './SiteHeader';
 import { Headline } from './Headline';
 import { SummaryMetrics } from './SummaryMetrics';
@@ -36,6 +39,13 @@ export function App() {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const state = useAppState();
   const ledger = useRequestLedger();
+  const partnerReceived = useMemo(() => readPartnerAvailability(typeof window === 'undefined' ? '' : window.location.search), []);
+  const freeDays = useMemo(() => {
+    if (state.validationIssues.length) return [];
+    const off = new Set(state.effectiveOffDays);
+    const unavailable = new Set(state.solveInput.blackouts);
+    return rangeISO(state.rangeStart, state.rangeEnd).filter(date => !unavailable.has(date) && (off.has(date) || !state.workWeek[mondayIndexedDow(date)]));
+  }, [state.validationIssues, state.effectiveOffDays, state.solveInput.blackouts, state.rangeStart, state.rangeEnd, state.workWeek]);
   const requestCalendar = { workWeek: state.workWeek, offDays: state.effectiveOffDays, rangeStart: state.rangeStart, rangeEnd: state.rangeEnd };
   const trackBreak = (brk: typeof state.breaks[number]) => {
     if (!state.holidaysReady || state.holidaysDegraded) return;
@@ -235,6 +245,8 @@ export function App() {
         <PartnerOverlapBanner overlapDayCount={state.overlapDays.length} onDismiss={state.dismissPartnerOverlapBanner} />
       )}
 
+      {partnerReceived.invalid && <Container className="px-4 py-3"><p role="alert" className="text-sm text-ink">This partner availability link is invalid or too large. Ask for a new link with fewer dates.</p></Container>}
+      {partnerReceived.availability && <Container className="px-4 py-3"><p role="status" className="rounded-lg border border-line bg-surface p-3 text-sm text-ink">Someone shared {partnerReceived.availability.days.length} {partnerReceived.availability.status} available dates. Your own PTO budget and calendar apply. <a className="font-medium text-accent-ink underline" href="#partner-planner">See dates you can both take off →</a></p></Container>}
       <ValidationBanner issues={[...state.validationIssues, ...(state.solverIssue ? [state.solverIssue] : [])]} />
 
       <PeakCapBanner
@@ -294,6 +306,10 @@ export function App() {
               noticePeriodDays={state.noticePeriodDays}
               buildOverlapLink={state.buildOverlapLink}
             /> : <p role="status" className="text-sm text-muted">Check your planning inputs before exporting.</p>}
+          </div>
+
+          <div id="partner-planner" className="mt-5 scroll-mt-24">
+            {state.holidaysReady && !state.holidaysDegraded && !state.validationIssues.length ? <PartnerPlanner breaks={state.breaks} freeDays={freeDays} input={state.solveInput} minimumBreakLength={state.minimumBreakDays} /> : <p role="status" className="text-sm text-muted">Partner planning will be available after your calendar loads with valid dates and holiday data.</p>}
           </div>
 
           {/* Phase 2: the two-column workspace. Calendar (~60%) and recommendations (~40%)
