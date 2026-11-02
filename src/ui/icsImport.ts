@@ -40,7 +40,7 @@ interface RawProp {
  * before any other parsing - a folded SUMMARY or DTSTART otherwise reads as two garbled
  * lines instead of one. */
 function unfoldLines(raw: string): string[] {
-  const normalized = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const normalized = raw.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const rawLines = normalized.split('\n');
   const lines: string[] = [];
   for (const line of rawLines) {
