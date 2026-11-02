@@ -106,46 +106,64 @@ export function App() {
         onRemove={state.removePinnedPlan}
       />
 
-      {/* UI density pass: country/date-range/PTO-days/reserve and the two plan-shaping
-          sliders share ONE flex row (wrapping to two rows below ~1100px, stacking below
-          768px) instead of two stacked full-width bands. */}
-      <div className="border-b border-slate-200 bg-slate-50">
-        <Container className="flex flex-wrap items-start gap-x-6 gap-y-3 px-4 py-4">
-          <PrimaryControls
-            advanced={optionsOpen}
-            country={state.country}
-            onChangeCountry={state.setCountry}
-            rangeStart={state.rangeStart}
-            rangeEnd={state.rangeEnd}
-            onChangeRangeStart={state.setRangeStart}
-            onChangeRangeEnd={state.setRangeEnd}
-            budget={state.budget}
-            onChangeBudget={state.setBudget}
-            budgetSpent={state.budgetSpent}
-            reserveDays={state.reserveDays}
-            onChangeReserveDays={state.setReserveDays}
-            effectiveBudget={state.effectiveBudget}
-            unlimitedPto={state.unlimitedPto}
-            onToggleUnlimitedPto={state.setUnlimitedPto}
-          />
-          <label className="flex min-w-40 flex-col gap-1 text-sm font-medium text-slate-700">
-            Planning style
-            <select aria-label="Planning style" className="min-h-11 rounded-md border border-line-strong bg-surface px-3" value={state.planningStyle} onChange={event => state.setPlanningStyle(event.target.value as typeof state.planningStyle)}>
-              <option value="balanced">Balanced</option><option value="long-breaks">Long breaks</option><option value="more-breaks">More breaks</option><option value="custom">Custom</option>
-            </select>
-          </label>
-          <PlanSliders
-            w={state.w}
-            onChangeW={state.setW}
-            manualBreakCount={state.manualBreakCount}
-            onChangeManualBreakCount={state.setManualBreakCount}
-            letSolverDecide={state.letSolverDecide}
-            onToggleLetSolverDecide={state.setLetSolverDecide}
-            breaks={state.breaks}
-            breakCountRequested={state.breakCountRequested}
-            breakCountActual={state.breakCountActual}
-            budget={state.effectiveBudget}
-          />
+      {/* Primary policy inputs and live plan-shaping controls are distinct reading groups.
+          Both sliders stay visible on every viewport, and no Generate step is introduced. */}
+      <div className="border-b border-line bg-surface-alt">
+        <Container className="px-4 py-5 sm:py-6">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] lg:items-start lg:gap-8">
+            <section aria-labelledby="plan-inputs-heading" className="min-w-0">
+              <div className="mb-4">
+                <h2 id="plan-inputs-heading" className="text-base font-semibold text-ink">Your time off</h2>
+                <p className="mt-1 text-sm text-muted">Start with your country, dates and available PTO.</p>
+              </div>
+              <div className="flex min-w-0 flex-wrap items-start gap-x-4 gap-y-4">
+                <PrimaryControls
+                  advanced={optionsOpen}
+                  country={state.country}
+                  onChangeCountry={state.setCountry}
+                  rangeStart={state.rangeStart}
+                  rangeEnd={state.rangeEnd}
+                  onChangeRangeStart={state.setRangeStart}
+                  onChangeRangeEnd={state.setRangeEnd}
+                  budget={state.budget}
+                  onChangeBudget={state.setBudget}
+                  budgetSpent={state.budgetSpent}
+                  reserveDays={state.reserveDays}
+                  onChangeReserveDays={state.setReserveDays}
+                  effectiveBudget={state.effectiveBudget}
+                  unlimitedPto={state.unlimitedPto}
+                  onToggleUnlimitedPto={state.setUnlimitedPto}
+                />
+              </div>
+            </section>
+            <section aria-labelledby="plan-shape-heading" className="min-w-0 rounded-xl border border-line bg-surface p-4 sm:p-5">
+              <h2 id="plan-shape-heading" className="text-base font-semibold text-ink">Shape your plan</h2>
+              <p className="mt-1 text-sm text-muted">Adjust either slider to update your results instantly.</p>
+              <div className="mt-4 grid min-w-0 gap-5">
+                <PlanSliders
+                  w={state.w}
+                  onChangeW={state.setW}
+                  manualBreakCount={state.manualBreakCount}
+                  onChangeManualBreakCount={state.setManualBreakCount}
+                  letSolverDecide={state.letSolverDecide}
+                  onToggleLetSolverDecide={state.setLetSolverDecide}
+                  breaks={state.breaks}
+                  breakCountRequested={state.breakCountRequested}
+                  breakCountActual={state.breakCountActual}
+                  budget={state.effectiveBudget}
+                />
+              </div>
+              <label className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-sm font-medium text-ink">
+                Planning style
+                <select aria-label="Planning style" className="min-h-11 min-w-0 rounded-md border border-line-strong bg-surface px-3 text-sm" value={state.planningStyle} onChange={event => state.setPlanningStyle(event.target.value as typeof state.planningStyle)}>
+                  <option value="balanced">Balanced</option>
+                  <option value="long-breaks">Long breaks</option>
+                  <option value="more-breaks">More breaks</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </label>
+            </section>
+          </div>
         </Container>
       </div>
 

@@ -7,12 +7,14 @@ Last updated: 2026-11-02. Scope: consumer root Vite application only; never `app
 - PR [#83](https://github.com/Atiyk/PTO-Optimizer/pull/83) merged as `e294fc5c408cf480fd87daf5fcdd40b2f74a7b31`. It restores both visible planner sliders, adds four curated Understand pathways and optional agent navigation guidance. Latest commit's consumer tests/typecheck/lint/build and browser/visual evidence checks passed.
 - Production `https://pto-optimizer-seven.vercel.app/` was observed READY on **exactly** `e294fc5c408cf480fd87daf5fcdd40b2f74a7b31` after merge. Duplicate PR #82 was closed without merging.
 
-## Current work — do not claim deployed
+## Newly shipped and verified
 
-- PR [#85](https://github.com/Atiyk/PTO-Optimizer/pull/85), branch `gapless/ux-understand-guides-20261102`: eight substantive guides on existing prerendered glossary term routes. Each has a clear answer, steps, arithmetic example, common errors, three HR questions, action and jurisdiction-neutral caveat.
-- Six guide links added to the Understand index. The existing /glossary/:term paths and all old routes are retained.
-- Added data/SSR tests and expanded the consumer browser QA to capture Understand and four guide pages at 1440, 768, 375 and 320 pixels, check headings, focus/labels and horizontal overflow.
-- **Merge gate:** Wait for actual CI results, browser artifacts and Vercel preview. Independent critic should review arithmetic, mobile overflow, accessibility and no legal entitlement claims. Do not bypass a failed check or assert production status for this PR.
+- PR [#85](https://github.com/Atiyk/PTO-Optimizer/pull/85) merged to main as `a05d6af2bd334becb6a0ba7c748813927c29df5b`: eight substantive, jurisdiction-neutral guides with examples, HR questions and tool links on existing prerendered glossary routes. Consumer tests/types/lint/build and browser/visual evidence passed on head `99f0345b827d2b0a9cb8fde8ac2e1936810674bd`; 20.9 MB screenshot artifact available. Vercel production READY was verified on exact merge SHA `a05d6af2bd334becb6a0ba7c748813927c29df5b` on 2026-11-02.
+
+## Current work — not yet merged or deployed
+
+- Branch `gapless/ux-planner-responsive-controls-20261102`: replace cramped single-row primary controls with distinct "Your time off" and "Shape your plan" sections, while retaining BOTH always-visible sliders and live calculation. Make native date inputs shrink within a responsive grid at 320px. Expand Playwright browser QA to exercise 320px planner, slider visibility, keyboard responsiveness and options disclosure overflow.
+- **Merge gate:** open a focused PR; verify exact-head GitHub tests/typecheck/lint/build and browser/visual screenshots at 1440/768/375/320, Vercel preview READY, scope and critic review. Do not merge if any check fails or the visual hierarchy regresses.
 
 ## Remaining approved UX scope after this PR
 
