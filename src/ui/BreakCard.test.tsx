@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -216,6 +216,30 @@ describe('BreakCard copy-request menu keyboard and touch access', () => {
     expect(document.activeElement).toBe(items[0]);
     key(items[0], 'ArrowUp');
     expect(document.activeElement).toBe(items[2]);
+  });
+
+  it('copies the selected format, returns focus, and announces clipboard success', async () => {
+    const writeText = vi.fn(async (_text: string) => undefined);
+    const previous = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    try {
+      mountInteractive({ defaultExpanded: true });
+      const button = trigger();
+      act(() => { button.click(); });
+      const email = Array.from(container!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))[1];
+      await act(async () => {
+        email.click();
+        await Promise.resolve();
+      });
+      expect(writeText).toHaveBeenCalledOnce();
+      expect(writeText.mock.calls[0][0]).toContain("I'd like to request time off");
+      expect(container!.querySelector('[role="menu"]')).toBeNull();
+      expect(document.activeElement).toBe(button);
+      expect(container!.querySelector('[role="status"]')?.textContent).toContain('Request copied');
+    } finally {
+      if (previous) Object.defineProperty(navigator, 'clipboard', previous);
+      else Reflect.deleteProperty(navigator, 'clipboard');
+    }
   });
 
   it('dismisses on outside pointer interaction and outside keyboard focus without trapping focus', () => {
