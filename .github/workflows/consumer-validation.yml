@@ -88,7 +88,7 @@ jobs:
       - name: Install Chromium
         working-directory: current
         run: npx playwright install --with-deps chromium
-      - name: Capture and check consumer routes at 1440, 768, and 375 pixels
+      - name: Capture consumer routes and header keyboard/touch evidence at 1440, 768, 375, and 320 pixels
         env:
           HAS_BASELINE: ${{ github.event_name == 'pull_request' }}
         run: |
@@ -122,6 +122,7 @@ jobs:
             printf 'Baseline browser evidence exit status: %s\n' "$baseline_exit"
           fi
           node current/scripts/consumer-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/after" after
+          node current/scripts/consumer-header-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/header"
       - name: Verify the complete consumer journey at 375 pixels
         if: ${{ !cancelled() }}
         run: |
