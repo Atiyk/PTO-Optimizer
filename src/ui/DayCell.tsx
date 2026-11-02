@@ -167,6 +167,7 @@ export function DayCell({
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       primaryAction?.();
+      setTooltipOpen(false);
       return;
     }
     const direction =
@@ -207,6 +208,9 @@ export function DayCell({
       ref={wrapperRef}
       className="relative"
       onBlur={(event) => {
+        // Mobile Safari can report a null relatedTarget when the action is tapped.
+        // Outside pointer events and Escape handle touch dismissal separately.
+        if (!hasHover && !event.relatedTarget) return;
         if (event.currentTarget.contains(event.relatedTarget)) return;
         if (isAlternative) onHoverAlternativeEnd?.();
         setTooltipOpen(false);
