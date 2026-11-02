@@ -43,7 +43,7 @@ describe('consumer calendar conflict classification', () => {
     });
     expect(result?.status).toBe('review-needed');
     expect(result?.schoolOffDays).toEqual(['2027-01-04']);
-    expect(result?.matches).toEqual([{ date: '2027-01-05', category: 'school-in-session', severity: 'review-needed' }]);
+    expect(result?.matches).toEqual([{ date: '2027-01-05', category: 'school-in-session', severity: 'review-needed', source: 'school-calendar' }]);
     expect(result?.partial).toBe(true);
   });
 
@@ -57,7 +57,7 @@ describe('consumer calendar conflict classification', () => {
     expect(result?.hardBlockDays).toBe(1);
     expect(result?.reviewNeededDays).toBe(1);
     expect(result?.partial).toBe(true);
-    expect(result?.matches).toContainEqual({ date: '2027-03-14', category: 'personal-calendar-busy', severity: 'review-needed' });
+    expect(result?.matches).toContainEqual({ date: '2027-03-14', category: 'personal-calendar-busy', severity: 'review-needed', source: 'personal-calendar' });
   });
 
   it('never says all-clear when sources are absent or only partially known', () => {
