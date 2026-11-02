@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
 import { formatWorkingDaysList, formatManagerEmailShort, formatManagerEmailDetailed, copyText } from './requestText';
 import { formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
@@ -41,53 +41,118 @@ interface CopyOption {
  */
 function CopyRequestDropdown({ options }: { options: CopyOption[] }) {
   const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [feedback, setFeedback] = useState<'copied' | 'failed' | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const initialFocusIndex = useRef(0);
+  const menuId = useId();
 
   useEffect(() => {
     if (!open) return;
-    function onClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    // A menu is not keyboard-operable until focus enters its items.
+    itemRefs.current[initialFocusIndex.current]?.focus();
+    function onPointerOutside(e: PointerEvent) {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
     }
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
+    function onFocusOutside(e: FocusEvent) {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    function onEscape(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      setOpen(false);
+      triggerRef.current?.focus();
+    }
+    document.addEventListener('pointerdown', onPointerOutside);
+    document.addEventListener('focusin', onFocusOutside);
+    document.addEventListener('keydown', onEscape);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerOutside);
+      document.removeEventListener('focusin', onFocusOutside);
+      document.removeEventListener('keydown', onEscape);
+    };
   }, [open]);
+
+  useEffect(() => {
+    if (!feedback) return;
+    const timeout = window.setTimeout(() => setFeedback(null), 2000);
+    return () => window.clearTimeout(timeout);
+  }, [feedback]);
+
+  function openAt(index: number) {
+    initialFocusIndex.current = index;
+    setOpen(true);
+  }
+
+  function onMenuKeyDown(e: ReactKeyboardEvent<HTMLDivElement>) {
+    if (e.key === 'Tab') {
+      // Let the browser continue normal tab order rather than trapping focus.
+      setOpen(false);
+      return;
+    }
+    const current = itemRefs.current.findIndex((item) => item === document.activeElement);
+    let next: number;
+    switch (e.key) {
+      case 'ArrowDown': next = (current + 1) % options.length; break;
+      case 'ArrowUp': next = (current + options.length - 1) % options.length; break;
+      case 'Home': next = 0; break;
+      case 'End': next = options.length - 1; break;
+      default: return;
+    }
+    e.preventDefault();
+    itemRefs.current[next]?.focus();
+  }
 
   return (
     <div ref={containerRef} className="relative inline-block">
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => open ? setOpen(false) : openAt(0)}
+        onKeyDown={(e) => {
+          if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+          e.preventDefault();
+          openAt(e.key === 'ArrowDown' ? 0 : options.length - 1);
+        }}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+        aria-controls={open ? menuId : undefined}
+        className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
       >
-        {copied ? 'Copied' : 'Copy request ▾'}
+        {feedback === 'copied' ? 'Copied' : feedback === 'failed' ? 'Copy unavailable' : 'Copy request ▾'}
       </button>
       {open && (
         <div
+          id={menuId}
           role="menu"
-          className="absolute left-0 z-10 mt-1 min-w-[12rem] rounded-md border border-slate-200 bg-white py-1 shadow-lg"
+          aria-label="Copy request format"
+          onKeyDown={onMenuKeyDown}
+          className="absolute left-0 z-20 mt-1 min-w-[12rem] max-w-[calc(100vw-2rem)] rounded-lg border border-slate-300 bg-white py-1 shadow-lg"
         >
-          {options.map((o) => (
+          {options.map((option, index) => (
             <button
-              key={o.label}
+              key={option.label}
+              ref={(element) => { itemRefs.current[index] = element; }}
               type="button"
               role="menuitem"
               onClick={async () => {
                 setOpen(false);
-                const ok = await copyText(o.text);
-                if (ok) {
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                }
+                triggerRef.current?.focus();
+                const ok = await copyText(option.text);
+                setFeedback(ok ? 'copied' : 'failed');
               }}
-              className="block w-full px-3 py-1.5 text-left text-xs text-slate-600 hover:bg-slate-50"
+              className="flex min-h-11 w-full items-center px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 focus-visible:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
             >
-              {o.label}
+              {option.label}
             </button>
           ))}
         </div>
+      )}
+      {feedback && (
+        <span role="status" className="sr-only">
+          {feedback === 'copied' ? 'Request copied to clipboard.' : 'Copy unavailable. Check clipboard permissions.'}
+        </span>
       )}
     </div>
   );
