@@ -272,19 +272,22 @@ function solveSingleWindow(candidates: Candidate[], input: SolveInput, budgetMax
   for (let i = 1; i <= m; i++) {
     const c = candidates[i - 1];
     const pRow = findCompatiblePrefix(candidates, i - 1);
+    const value = candidateValue(w, c);
+    const accrued = input.accrualPerMonth
+      ? accruedBy(c.end, input.rangeStart, input.budget, input.accrualPerMonth)
+      : budgetMax;
     for (let b = 0; b <= budgetMax; b++) {
       const skipState = dp[i - 1][b];
       let takeState: CellState | null = null;
       if (c.cost <= b) {
         let allowed = true;
         if (input.accrualPerMonth) {
-          const accrued = accruedBy(c.end, input.rangeStart, input.budget, input.accrualPerMonth);
           if (b > accrued) allowed = false;
         }
         if (allowed) {
           const prior = dp[pRow][b - c.cost];
           takeState = {
-            value: prior.value + candidateValue(w, c),
+            value: prior.value + value,
             spent: prior.spent + c.cost,
             breakCount: prior.breakCount + 1,
             earliestStart: prior.breakCount === 0 ? c.start : prior.earliestStart,
@@ -348,6 +351,7 @@ interface CountDPTable {
  */
 function buildCountDP(candidates: Candidate[], input: SolveInput, budgetMax: number, w: number, cMax: number): CountDPTable {
   const m = candidates.length;
+  const minimumCost = candidates.reduce((minimum, candidate) => Math.min(minimum, candidate.cost), Infinity);
   const dp: CellState[][][] = Array.from({ length: m + 1 }, (_, i) =>
     Array.from({ length: budgetMax + 1 }, () =>
       Array.from({ length: cMax + 1 }, (_, c) => (i === 0 && c === 0 ? EMPTY_CELL : UNREACHABLE)),
@@ -360,20 +364,26 @@ function buildCountDP(candidates: Candidate[], input: SolveInput, budgetMax: num
   for (let i = 1; i <= m; i++) {
     const c = candidates[i - 1];
     const pRow = findCompatiblePrefix(candidates, i - 1);
+    const value = candidateValue(w, c);
+    const accrued = input.accrualPerMonth
+      ? accruedBy(c.end, input.rangeStart, input.budget, input.accrualPerMonth)
+      : budgetMax;
     for (let b = 0; b <= budgetMax; b++) {
-      for (let cnt = 0; cnt <= cMax; cnt++) {
+      // A break costs at least minimumCost, so larger counts cannot be reached at
+      // this budget. Their prefilled UNREACHABLE/skip cells already have the answer.
+      const reachableCount = Math.min(cMax, Math.floor(b / minimumCost));
+      for (let cnt = 0; cnt <= reachableCount; cnt++) {
         const skipState = dp[i - 1][b][cnt];
         let takeState: CellState | null = null;
         if (cnt >= 1 && c.cost <= b) {
           const prior = dp[pRow][b - c.cost][cnt - 1];
           let allowed = prior.value !== -Infinity;
           if (allowed && input.accrualPerMonth) {
-            const accrued = accruedBy(c.end, input.rangeStart, input.budget, input.accrualPerMonth);
             if (b > accrued) allowed = false;
           }
           if (allowed) {
             takeState = {
-              value: prior.value + candidateValue(w, c),
+              value: prior.value + value,
               spent: prior.spent + c.cost,
               breakCount: cnt,
               earliestStart: prior.breakCount === 0 ? c.start : prior.earliestStart,
@@ -456,10 +466,21 @@ function solveAny(candidates: Candidate[], input: SolveInput, budgetMax: number,
   const targetCount = structural.length;
   if (targetCount === 0 || w === 0) return structural;
 
-  const table = buildCountDP(candidates, input, budgetMax, w, targetCount);
+  // Once the exact count is known, a candidate must leave enough budget for every
+  // other break. Removing only mathematically impossible candidates saves DP rows
+  // without changing any value or tie-breaking comparison.
+  const eligible = candidatesForCount(candidates, budgetMax, targetCount);
+  const table = buildCountDP(eligible, input, budgetMax, w, targetCount);
   const found = bestForExactCount(table, budgetMax, targetCount);
   if (!found) return structural; // defensive: phase 1 already proved this count is reachable
-  return reconstructCountDP(candidates, table, found.b, targetCount);
+  return reconstructCountDP(eligible, table, found.b, targetCount);
+}
+
+function candidatesForCount(candidates: Candidate[], budgetMax: number, count: number): Candidate[] {
+  if (count <= 1) return candidates;
+  const minimumCost = candidates.reduce((minimum, candidate) => Math.min(minimum, candidate.cost), Infinity);
+  const maximumCost = budgetMax - (count - 1) * minimumCost;
+  return candidates.filter((candidate) => candidate.cost <= maximumCost);
 }
 
 function solveExactCount(
@@ -473,7 +494,10 @@ function solveExactCount(
   // target=6 but only budget for 2 breaks) - so the nearest-achievable search below must
   // scan every reachable count in [0, cMax] and rank by distance from target, not expand
   // outward from target, which would never reach anything when target > cMax to begin with.
-  const cMax = Math.min(EXACT_COUNT_SEARCH_CAP, budgetMax, candidates.length);
+  // Count feasibility is downward-closed: taking a subset of a feasible schedule
+  // cannot increase spend or break the accrual ceiling. If target is unreachable,
+  // no larger count can be reachable either. Avoid building unused larger counts.
+  const cMax = Math.min(target, EXACT_COUNT_SEARCH_CAP, budgetMax, candidates.length);
   const table = buildCountDP(candidates, input, budgetMax, w, cMax);
 
   let bestCnt = -1;
@@ -497,13 +521,42 @@ function solveMaxCount(
   budgetMax: number,
   w: number,
 ): { chosen: Candidate[]; achieved: number } {
-  const cMax = Math.min(budgetMax, candidates.length);
-  const table = buildCountDP(candidates, input, budgetMax, w, cMax);
+  let eligible = candidates;
+  const minimumCost = candidates.reduce((minimum, candidate) => Math.min(minimum, candidate.cost), Infinity);
+  let cMax = Math.min(Math.floor(budgetMax / minimumCost), candidates.length);
+
+  const lastCostOneStart = new Map<number, number>();
+  for (const candidate of candidates) {
+    if (candidate.cost === 1) lastCostOneStart.set(candidate.endIdx, Math.max(lastCostOneStart.get(candidate.endIdx) ?? -1, candidate.startIdx));
+  }
+  const hasCostOneSuffixes = candidates.every((candidate) => candidate.cost === 1 || (lastCostOneStart.get(candidate.endIdx) ?? -1) >= candidate.startIdx);
+  if (hasCostOneSuffixes) {
+    // Every candidate can be replaced by a contained cost-1 suffix with the same
+    // end date. This holds for the legacy candidate set; verify it explicitly so
+    // minimum-length constraints automatically keep the general DP when needed.
+    // A suffix cannot hurt compatibility or accrual, so the maximum COUNT is the
+    // earliest-finish schedule of cost-1 spans.
+    // The ordinary value DP below still selects the final plan and tie-breaks; it
+    // may use more expensive spans when fewer than budgetMax breaks are feasible.
+    let count = 0;
+    let lastEnd = -1;
+    for (const candidate of candidates) {
+      if (count >= budgetMax) break;
+      if (candidate.cost !== 1 || candidate.startIdx <= lastEnd) continue;
+      if (input.accrualPerMonth && count + 1 > accruedBy(candidate.end, input.rangeStart, input.budget, input.accrualPerMonth)) continue;
+      count++;
+      lastEnd = candidate.endIdx;
+    }
+    cMax = count;
+    eligible = candidatesForCount(candidates, budgetMax, count);
+  }
+
+  const table = buildCountDP(eligible, input, budgetMax, w, cMax);
 
   for (let cnt = cMax; cnt >= 0; cnt--) {
     const found = bestForExactCount(table, budgetMax, cnt);
     if (found) {
-      return { chosen: reconstructCountDP(candidates, table, found.b, cnt), achieved: cnt };
+      return { chosen: reconstructCountDP(eligible, table, found.b, cnt), achieved: cnt };
     }
   }
   return { chosen: [], achieved: 0 };
@@ -782,7 +835,15 @@ function solveCore(input: SolveInput): SolveResult {
     : budgetMax;
   const maxCandidateCost = Math.min(totalBudgetCeiling, n);
 
-  const candidates = buildCandidates(days, isOff, isBlackout, overlapSet, input.expiryDate, input.country, maxCandidateCost);
+  const builtCandidates = buildCandidates(days, isOff, isBlackout, overlapSet, input.expiryDate, input.country, maxCandidateCost);
+  // This is an opt-in constraint, applied BEFORE dynamic programming and alternative
+  // selection. Legacy/B2B callers omit it and keep their exact existing candidate set.
+  const minimumBreakDays = Number.isFinite(input.minimumBreakDays)
+    ? Math.max(1, Math.min(60, Math.floor(input.minimumBreakDays as number)))
+    : 1;
+  const candidates = minimumBreakDays > 1
+    ? builtCandidates.filter((candidate) => candidate.length >= minimumBreakDays)
+    : builtCandidates;
   candidates.sort((a, b) => a.endIdx - b.endIdx || a.startIdx - b.startIdx);
   if (candidates.length === 0)
     return { primary: [], alternatives: [], breakCountRequested, breakCountActual: 0, budgetSpent: 0, peakCapApplied: false };

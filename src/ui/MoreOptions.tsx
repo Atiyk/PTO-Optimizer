@@ -60,6 +60,10 @@ interface MoreOptionsProps {
   onRemoveHoliday: (date: string, name: string) => void;
   onToggleStateHoliday: (date: string, name: string) => void;
   onAddCustomHoliday: (date: string, name: string) => void;
+  onToggleHoliday?: (date: string, name: string) => void;
+  onSaveEmployerHolidays?: () => void;
+  onResetEmployerHolidays?: () => void;
+  employerCalendarMessage?: string;
 }
 
 /** Pure, directly unit-testable: `n` consecutive days starting from (and including) `todayIso`
@@ -228,6 +232,7 @@ export function MoreOptions(props: MoreOptionsProps) {
       <section>
         <h4 className={H4_CLASS}>Week starts on</h4>
         <select
+          aria-label="Week starts on"
           value={props.weekStartOverride}
           onChange={(e) => {
             const v = e.target.value;
@@ -326,44 +331,45 @@ export function MoreOptions(props: MoreOptionsProps) {
       <ImportCalendar onImportBusyDays={props.onAddBlackouts} />
 
       <section>
-        <h4 className={H4_CLASS}>Public holidays</h4>
+        <h4 className={H4_CLASS}>My employer&apos;s holidays</h4>
+        <p className="mb-3 max-w-prose text-xs text-slate-600">We&apos;ve assumed your employer observes public holidays. Adjust these dates if your company follows a different calendar. Changes update your plan immediately.</p>
         <div className="flex max-h-56 flex-col gap-1 overflow-auto">
           {props.holidayEntries.map((h) => (
             <div key={`${h.date}-${h.name}`} className="flex items-center justify-between gap-2 text-sm text-slate-600">
               <label className="flex min-w-0 items-center gap-2">
-                {h.source === 'state' ? (
+                {(
                   <input
                     type="checkbox"
                     checked={h.checked}
-                    onChange={() => props.onToggleStateHoliday(h.date, h.name)}
+                    onChange={() => (props.onToggleHoliday ?? props.onToggleStateHoliday)(h.date, h.name)}
                   />
-                ) : (
-                  <span className="inline-block w-[13px]" />
                 )}
                 <span className="truncate">
                   {h.date} &mdash; {h.name}
-                  {h.source === 'custom' && <span className="ml-1 text-xs text-slate-400">(custom)</span>}
+                  <span className="ml-1 text-xs text-slate-500">({h.source === 'state' ? 'regional' : h.source === 'custom' ? 'company' : 'national'})</span>
                 </span>
               </label>
-              <button
+              {h.source === 'custom' && <button
                 type="button"
+                aria-label={`Delete ${h.name}`}
                 onClick={() => props.onRemoveHoliday(h.date, h.name)}
                 className="shrink-0 text-slate-400 hover:text-slate-700"
               >
                 &times;
-              </button>
+              </button>}
             </div>
           ))}
           {props.holidayEntries.some((h) => h.source === 'state') && (
             <p className="mt-1 text-xs text-slate-400">
-              State holiday &mdash; check if your employer observes this.
+              Regional holidays are included by default. Uncheck any your employer does not observe.
             </p>
           )}
           {props.holidayEntries.length === 0 && <span className="text-sm text-slate-400">None loaded yet.</span>}
         </div>
-        <div className="mt-2 flex items-center gap-2">
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           <input
             type="date"
+            aria-label="Company holiday date"
             value={newHolidayDate}
             onChange={(e) => setNewHolidayDate(e.target.value)}
             className={FIELD_CLASS}
@@ -371,6 +377,8 @@ export function MoreOptions(props: MoreOptionsProps) {
           <input
             type="text"
             placeholder="Holiday name"
+            aria-label="Company holiday name"
+            maxLength={160}
             value={newHolidayName}
             onChange={(e) => setNewHolidayName(e.target.value)}
             className={`${FIELD_CLASS} w-32`}
@@ -388,6 +396,12 @@ export function MoreOptions(props: MoreOptionsProps) {
             Add
           </button>
         </div>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <button type="button" onClick={props.onSaveEmployerHolidays} className="min-h-10 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white">Save employer calendar</button>
+          <button type="button" onClick={props.onResetEmployerHolidays} className="min-h-10 text-sm underline">Restore public holidays</button>
+        </div>
+        <p className="mt-2 text-xs text-slate-500">Saved calendars stay in this browser and apply only to this country and region.</p>
+        {props.employerCalendarMessage && <p role="status" className="mt-2 text-sm text-slate-700">{props.employerCalendarMessage}</p>}
       </section>
     </div>
   );

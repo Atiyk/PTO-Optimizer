@@ -1,12 +1,13 @@
 import { useState } from 'react';
 
 interface DateListEditorProps {
+  label?: string;
   dates: string[];
   onAdd: (date: string) => void;
   onRemove: (date: string) => void;
 }
 
-export function DateListEditor({ dates, onAdd, onRemove }: DateListEditorProps) {
+export function DateListEditor({ dates, onAdd, onRemove, label = 'Date to add' }: DateListEditorProps) {
   const [draft, setDraft] = useState('');
 
   return (
@@ -14,6 +15,7 @@ export function DateListEditor({ dates, onAdd, onRemove }: DateListEditorProps) 
       <div className="flex items-center gap-2">
         <input
           type="date"
+          aria-label={label}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           className="rounded-md border border-slate-200 bg-white text-slate-800 px-2 py-1 text-sm"
@@ -33,7 +35,7 @@ export function DateListEditor({ dates, onAdd, onRemove }: DateListEditorProps) 
         {dates.map((d) => (
           <span key={d} className="flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
             {d}
-            <button type="button" onClick={() => onRemove(d)} className="text-slate-400 hover:text-slate-700">
+            <button type="button" aria-label={`Remove ${d}`} onClick={() => onRemove(d)} className="text-slate-400 hover:text-slate-700">
               &times;
             </button>
           </span>

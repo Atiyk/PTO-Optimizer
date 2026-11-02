@@ -1,7 +1,9 @@
+import { useId } from 'react';
 import { localeForCountry } from './locale';
 import { CountrySelect } from './CountrySelect';
 
 interface PrimaryControlsProps {
+  advanced?: boolean;
   country: string;
   onChangeCountry: (code: string) => void;
   rangeStart: string;
@@ -19,7 +21,7 @@ interface PrimaryControlsProps {
 }
 
 const DATE_FIELD_CLASS =
-  'h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400';
+  'h-11 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400';
 
 /**
  * Always-visible primary inputs - country, date range, PTO days. Only the state
@@ -34,6 +36,7 @@ const DATE_FIELD_CLASS =
  * one row, wrapping as it runs out of width) instead of two stacked bands.
  */
 export function PrimaryControls({
+  advanced = true,
   country,
   onChangeCountry,
   rangeStart,
@@ -50,6 +53,7 @@ export function PrimaryControls({
   onToggleUnlimitedPto,
 }: PrimaryControlsProps) {
   const locale = localeForCountry(country);
+  const budgetId = useId();
 
   return (
     <>
@@ -78,9 +82,9 @@ export function PrimaryControls({
         </div>
       </fieldset>
 
-      <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-        PTO days available
-        <input
+      <div className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+        <label htmlFor={budgetId}>PTO days available</label>
+        <input id={budgetId}
           type="number"
           min={0}
           max={60}
@@ -94,7 +98,7 @@ export function PrimaryControls({
             concrete starting number rather than leaving the field blank/undefined. The
             budget field above stays fully editable either way - this is a default, not a
             lock on the number. */}
-        <span className="flex items-center gap-1.5 font-normal normal-case">
+        {advanced && <span className="flex items-center gap-1.5 font-normal normal-case">
           <input
             type="checkbox"
             id="unlimited-pto"
@@ -102,8 +106,8 @@ export function PrimaryControls({
             onChange={(e) => onToggleUnlimitedPto(e.target.checked)}
           />
           <label htmlFor="unlimited-pto">I have unlimited PTO</label>
-        </span>
-        {unlimitedPto && (
+        </span>}
+        {advanced && unlimitedPto && (
           <span className="max-w-[16rem] text-xs font-normal normal-case text-slate-500">
             Most people with unlimited PTO take 15 days or fewer. Adjust if yours differs.
           </span>
@@ -115,13 +119,12 @@ export function PrimaryControls({
         {budgetSpent < effectiveBudget && (
           <span className="text-xs font-normal normal-case text-amber-700">
             Using {budgetSpent} of {effectiveBudget} planned day{effectiveBudget === 1 ? '' : 's'} &mdash; the remaining{' '}
-            {effectiveBudget - budgetSpent} day{effectiveBudget - budgetSpent === 1 ? '' : 's'} add no days off at any
-            position.
+            {effectiveBudget - budgetSpent} day{effectiveBudget - budgetSpent === 1 ? '' : 's'} remain unplanned under your current constraints.
           </span>
         )}
-      </label>
+      </div>
 
-      <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+      {advanced && <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
         Keep in reserve
         <input
           type="number"
@@ -133,7 +136,7 @@ export function PrimaryControls({
           aria-label="Days to keep in reserve"
           className={`${DATE_FIELD_CLASS} w-24`}
         />
-      </label>
+      </label>}
     </>
   );
 }

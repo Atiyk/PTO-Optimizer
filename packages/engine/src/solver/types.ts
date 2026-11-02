@@ -45,6 +45,11 @@ export interface SolveInput {
    * Defaults to 0.
    */
   breakCount?: number;
+  /** Consumer planning constraint: only consider breaks of at least this many calendar
+   * days. Omitted/0/1 preserves the legacy candidate set and all existing callers.
+   * Required dates can still be returned separately; consumer callers must explain
+   * that conflict rather than presenting a shorter required date as a recommendation. */
+  minimumBreakDays?: number;
   /** Phase 5.1: an optional employer policy cap on PTO spend within one window (e.g. "no
    * more than 5 days between Jun 1 and Aug 31"). Off unless `enabled` - see solve.ts's
    * enforcePeakCap for how this is applied (a bounded blackout-and-retry loop around the
