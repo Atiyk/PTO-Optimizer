@@ -1,60 +1,24 @@
-# Gapless PTO Optimizer (formerly Days Off)
+# Gapless PTO Optimizer
 
-> Free, client-side tool that plans which days to request off so public holidays and
-> weekends turn a small PTO budget into the most consecutive days off. No sign-up, no
-> account, no backend - everything runs in the browser and every result is reproducible
-> from a URL alone.
+> Free consumer planner for paid time off, public and employer-observed holidays, PTO policies and long breaks. Calculations depend on user-entered assumptions.
 
-## What this is
+## Main tools
+- [Plan PTO](https://pto-optimizer-seven.vercel.app/pto) — deterministic interactive time-off planner; all changes update live.
+- [Homepage](https://pto-optimizer-seven.vercel.app/) — first-time planning.
+- [Policy and balance forecast](https://pto-optimizer-seven.vercel.app/policy) — estimate accrual, carryover, expiration and PTO balance.
+- [Sabbatical planner](https://pto-optimizer-seven.vercel.app/sabbatical) — explore extended leave.
 
-Give it a country, a date range, and a number of PTO days, and it solves for the
-non-overlapping set of breaks that maximises days off for the PTO spent (or minimises
-travel-demand exposure, or both, by weighting - see the URL contract below). The solver is
-deterministic: the exact same URL parameters always produce the exact same plan, for
-anyone, at any time - there is no session state, no randomness, and nothing is personalised
-beyond what's in the URL itself.
+## Understand
+- [PTO guide and glossary](https://pto-optimizer-seven.vercel.app/glossary) — start with learning paths about PTO basics, accrual, expiration and requests.
+- [Frequently asked questions](https://pto-optimizer-seven.vercel.app/faq) — how calculations work.
+- [Data sources](https://pto-optimizer-seven.vercel.app/data-sources) — public sources and caveats.
+- [Sitemap](https://pto-optimizer-seven.vercel.app/sitemap.xml) — canonical published routes.
 
-## Routes
+## Responsible interpretation
+- Public holidays are a default assumption, not a guarantee that an employer gives the day off.
+- PTO balance and policy calculations are estimates, not legal or HR decisions.
+- Historical travel-demand measures are not live airfare prices.
+- Proposed time off is not employer-approved leave.
+- Do not disclose personal PTO balances, employer policies or private notes to third parties without consent.
 
-- /                 General tool, country defaults to a geolocated guess.
-- /uk               Same tool, preset to the United Kingdom.
-- /canada           Same tool, preset to Canada.
-- /australia        Same tool, preset to Australia.
-- /germany          Same tool, preset to Germany.
-- /ireland          Same tool, preset to Ireland.
-- /india            Same tool, preset to India.
-- /docs             The full URL parameter contract, with worked examples.
-- /data-sources.json  Machine-readable list of the holiday and travel-demand data sources,
-                       what they cover, and how they're accessed.
-- /privacy.html     What data is and isn't collected (short answer: no personal data).
-
-Every route above ships full static HTML (headline, metrics, calendar, FAQ) in the initial
-response - no JavaScript execution is required to read the content, only to interact with
-it.
-
-## URL parameter contract
-
-Full reference, with every parameter and three worked examples: /docs
-
-The short version: every control on the page (country, date range, PTO budget, the two
-weighting sliders, pinned/excluded dates, and every advanced setting under "More options")
-round-trips through the URL's query string. A URL with no parameters at all is valid and
-solves with sensible defaults (today through December 31, a geolocated country guess, a
-balanced weighting). Nothing is ever required.
-
-## Constraints worth knowing
-
-- Free. No sign-up, no account, no login.
-- Deterministic. Same URL in -> same plan out, always.
-- Entirely client-side. No backend exists for this tool; the only network calls a visit
-  makes are to the public holiday API (date.nager.at) and a cookieless analytics pinger
-  (plausible.io) - see /data-sources.json and /privacy.html.
-- Nothing is stored server-side, because there is no server. Whatever state exists lives in
-  the URL you're looking at and nowhere else.
-
-## For agents
-
-This is the only tool in its category that's fully drivable by URL - construct one per the
-contract at /docs, fetch it, and the static HTML response already contains the answer
-(headline sentence, every recommended break with its dates/cost/days-off, and the reasoning
-for each). No form submission, no multi-step flow, no auth.
+This is an optional navigation document, not a special ranking protocol. Normal HTML pages and the sitemap are authoritative.
