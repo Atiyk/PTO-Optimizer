@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  MAX_REQUESTS, REQUEST_CHANGE_EVENT, REQUEST_STORAGE_KEY, createPtoRequest, parseRequestLedger,
+  MAX_REQUESTS, REQUEST_CHANGE_EVENT, REQUEST_STORAGE_KEY, REQUEST_STATUSES, calendarCoversRequest, createPtoRequest, parseRequestLedger,
   readRequestLedger, validRequestRange, writeRequestLedger,
   type PtoRequest, type RequestCalendar, type RequestInput,
 } from '../personal/requestLedger';
@@ -53,6 +53,11 @@ export function useRequestLedger() {
       setMessage(result.message);
       return result;
     }
+    if (validRequestRange(input.start, input.end) && !calendarCoversRequest(calendar, input.start, input.end)) {
+      const result = { ok: false, message: 'These dates are outside the employer calendar loaded on this page. Choose dates within its coverage or extend the planning range first.' };
+      setMessage(result.message);
+      return result;
+    }
     const id = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID() : `pto-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const request = createPtoRequest(input, calendar, id);
@@ -76,14 +81,22 @@ export function useRequestLedger() {
       setMessage('Choose valid start and end dates in order. The saved dates have not changed.');
       return false;
     }
-    const updated = createPtoRequest({ ...current, ...patch, start, end }, calendar, id);
-    if (!updated) return false;
-    updated.createdAt = current.createdAt;
-    // Status/note corrections do not reinterpret a historical calendar. Date edits
-    // explicitly recalculate the cost using the employer calendar shown now.
-    if (patch.start === undefined && patch.end === undefined) {
-      updated.ptoDates = current.ptoDates;
-      updated.ptoDays = current.ptoDays;
+    const editsDates = patch.start !== undefined || patch.end !== undefined;
+    let updated: PtoRequest;
+    if (editsDates) {
+      if (!calendarCoversRequest(calendar, start, end)) {
+        setMessage('These dates are outside the employer calendar loaded on this page. The saved request and PTO cost have not changed.');
+        return false;
+      }
+      const recalculated = createPtoRequest({ ...current, ...patch, start, end }, calendar, id);
+      if (!recalculated) return false;
+      updated = { ...recalculated, createdAt: current.createdAt };
+    } else {
+      // Correcting a status or note must not require historical holiday coverage or
+      // recalculate the cost using a calendar the user may since have changed.
+      const status = patch.status ?? current.status;
+      if (!REQUEST_STATUSES.includes(status)) return false;
+      updated = { ...current, status, note: patch.note === undefined ? current.note : patch.note.slice(0, 1000), updatedAt: new Date().toISOString() };
     }
     const saved = persist(state.requests.map((r) => r.id === id ? updated : r));
     setMessage(saved ? 'Request updated in this browser.' : 'Request updated for this visit. Browser storage is unavailable.');

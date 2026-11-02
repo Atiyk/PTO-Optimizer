@@ -1,3 +1,6 @@
+import { PtoTracker } from './PtoTracker';
+import { useRequestLedger } from './useRequestLedger';
+import { track } from './analytics';
 import { useState } from 'react';
 import { SiteHeader } from './SiteHeader';
 import { Headline } from './Headline';
@@ -32,6 +35,14 @@ export function App() {
   // inside it. See the button's own label below for the stated contents.
   const [optionsOpen, setOptionsOpen] = useState(false);
   const state = useAppState();
+  const ledger = useRequestLedger();
+  const requestCalendar = { workWeek: state.workWeek, offDays: state.effectiveOffDays, rangeStart: state.rangeStart, rangeEnd: state.rangeEnd };
+  const trackBreak = (brk: typeof state.breaks[number]) => {
+    if (!state.holidaysReady || state.holidaysDegraded) return;
+    const action = ledger.addRequest({ start: brk.start, end: brk.end }, requestCalendar);
+    if (action.ok) track('request_tracking_started');
+    requestAnimationFrame(() => document.getElementById('requests')?.scrollIntoView?.({ block: 'start' }));
+  };
   const hasHover = useHasHover();
   const today = todayISO();
 
@@ -261,7 +272,7 @@ export function App() {
             <h2 id="top-opportunities" className="text-xl font-semibold text-ink">Your top 3 time-off opportunities</h2>
             <p className="mt-1 text-sm text-muted">These breaks belong to one plan and fit together. Public holidays are assumed observed; customize your employer calendar in More options.</p>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {[...state.orderedBreaks].sort((a, b) => b.brk.multiplier - a.brk.multiplier || b.brk.totalDaysOff - a.brk.totalDaysOff || a.index - b.index).slice(0, 3).map(({ brk, index }) => <BreakCard key={brk.id} brk={brk} index={index} isPtoDay={state.isSuggestedPto} onHover={state.setHoveredBreakId} highlighted={state.hoveredBreakId === brk.id} isMostContested={false} reason={breakReason(brk, state.holidayNameFor)} today={today} noticePeriodDays={state.noticePeriodDays} workWeek={state.workWeek} />)}
+              {[...state.orderedBreaks].sort((a, b) => b.brk.multiplier - a.brk.multiplier || b.brk.totalDaysOff - a.brk.totalDaysOff || a.index - b.index).slice(0, 3).map(({ brk, index }) => <BreakCard onTrack={state.holidaysReady && !state.holidaysDegraded ? trackBreak : undefined} key={brk.id} brk={brk} index={index} isPtoDay={state.isSuggestedPto} onHover={state.setHoveredBreakId} highlighted={state.hoveredBreakId === brk.id} isMostContested={false} reason={breakReason(brk, state.holidayNameFor)} today={today} noticePeriodDays={state.noticePeriodDays} workWeek={state.workWeek} />)}
             </div>
           </section>}
 
@@ -349,6 +360,7 @@ export function App() {
                 {state.orderedBreaks.map(({ index, brk }) => (
                   <li key={brk.id}>
                     <BreakCard
+                      onTrack={state.holidaysReady && !state.holidaysDegraded ? trackBreak : undefined}
                       brk={brk}
                       index={index}
                       highlighted={state.highlightedBreakIds.has(brk.id) || state.hoveredBreakId === brk.id}
@@ -367,6 +379,10 @@ export function App() {
             </div>
           </div>
 
+          <div id="requests" className={`${SECTION_GAP} scroll-mt-24 space-y-3`}>
+            <PtoTracker today={today} ledger={ledger} calendar={requestCalendar} calendarReady={state.holidaysReady && !state.holidaysDegraded} calendarNotice={!state.holidaysReady ? 'Loading your employer calendar…' : state.holidaysDegraded ? 'Holiday data is incomplete. Check your employer calendar before adding or changing request dates.' : undefined} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
+            <p className="text-sm text-muted"><a href="/policy#balance" className="font-medium text-accent-ink underline">Forecast my balance and check expiration</a></p>
+          </div>
           <div className={SECTION_GAP}>
             <FAQ />
           </div>

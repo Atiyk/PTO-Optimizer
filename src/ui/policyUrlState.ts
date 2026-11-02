@@ -1,3 +1,4 @@
+import type { WorkWeek } from '@daysoff/engine/solver/types';
 import { isValidISODate } from './urlState';
 import { todayISO } from './useAppState';
 
@@ -16,6 +17,9 @@ export type CarryoverMode = 'none' | 'capped' | 'all';
 export type PayoutOnLeaving = 'pays' | 'doesnt' | 'not-sure';
 
 export interface PolicyURLState {
+  workWeek?: WorkWeek;
+  subdivision?: string;
+  altFridayStart?: string;
   forecastDate?: string;
   currentCarriedBalance?: number;
   unit: 'days' | 'hours';
@@ -115,6 +119,9 @@ export function readPolicyStateFromURL(search: string, defaultCountry: string): 
   const d = defaultPolicyURLState();
 
   return {
+    ...(params.get('ww') && /^[01]{7}$/.test(params.get('ww')!) ? { workWeek: [...params.get('ww')!].map(value => value === '1') as WorkWeek } : {}),
+    ...(params.get('sd') && /^[A-Z0-9-]{1,16}$/.test(params.get('sd')!) ? { subdivision: params.get('sd')! } : {}),
+    ...(params.get('afs') && isValidISODate(params.get('afs')!) ? { altFridayStart: params.get('afs')! } : {}),
     unit: params.get('u') === '1' ? 'hours' : 'days',
     hoursPerDay: num(params.get('hpd'), d.hoursPerDay),
     accrualKind: ACCRUAL_KIND_FROM_CODE[params.get('ak') ?? ''] ?? d.accrualKind,
@@ -149,6 +156,9 @@ export function readPolicyStateFromURL(search: string, defaultCountry: string): 
 
 export function writePolicyStateToURL(params: URLSearchParams, state: PolicyURLState): void {
   const d = defaultPolicyURLState();
+  if (state.workWeek) params.set('ww', state.workWeek.map(value => value ? '1' : '0').join('')); else params.delete('ww');
+  if (state.subdivision) params.set('sd', state.subdivision); else params.delete('sd');
+  if (state.altFridayStart && isValidISODate(state.altFridayStart)) params.set('afs', state.altFridayStart); else params.delete('afs');
 
   if (state.unit === 'hours') params.set('u', '1');
   else params.delete('u');

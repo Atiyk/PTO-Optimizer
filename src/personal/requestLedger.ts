@@ -21,6 +21,9 @@ export interface RequestCalendar {
   workWeek: WorkWeek;
   /** Employer-observed days and schedule exceptions, including alternating Fridays. */
   offDays: readonly ISODate[];
+  /** Inclusive dates for which the caller has loaded the employer holiday calendar. */
+  rangeStart?: ISODate;
+  rangeEnd?: ISODate;
 }
 
 export interface PtoRequest {
@@ -52,14 +55,36 @@ export function validRequestRange(start: string, end: string): boolean {
     && isoToSerial(end) - isoToSerial(start) < MAX_REQUEST_DAYS;
 }
 
+export function calendarCoversRequest(calendar: RequestCalendar, start: ISODate, end: ISODate): boolean {
+  if (!validRequestRange(start, end)) return false;
+  if (calendar.rangeStart !== undefined && (!isValidISODate(calendar.rangeStart) || start < calendar.rangeStart)) return false;
+  if (calendar.rangeEnd !== undefined && (!isValidISODate(calendar.rangeEnd) || end > calendar.rangeEnd)) return false;
+  return !(calendar.rangeStart && calendar.rangeEnd && calendar.rangeEnd < calendar.rangeStart);
+}
+
+export function requestCalendarCoverageHint(calendar: RequestCalendar): string {
+  if (calendar.rangeStart && calendar.rangeEnd) return `This calendar covers ${calendar.rangeStart} through ${calendar.rangeEnd}. Choose request dates within that range.`;
+  if (calendar.rangeStart) return `This calendar covers dates on or after ${calendar.rangeStart}.`;
+  if (calendar.rangeEnd) return `This calendar covers dates on or before ${calendar.rangeEnd}.`;
+  return '';
+}
+
+/** Keep a new draft inside the known calendar even when tomorrow falls outside it. */
+export function initialRequestDate(today: ISODate, calendar: RequestCalendar): ISODate {
+  let date = addDays(today, 1);
+  if (calendar.rangeStart && isValidISODate(calendar.rangeStart) && date < calendar.rangeStart) date = calendar.rangeStart;
+  if (calendar.rangeEnd && isValidISODate(calendar.rangeEnd) && date > calendar.rangeEnd) date = calendar.rangeEnd;
+  return date;
+}
+
 export function requestPtoDates(start: ISODate, end: ISODate, calendar: RequestCalendar): ISODate[] {
-  if (!validRequestRange(start, end)) return [];
+  if (!calendarCoversRequest(calendar, start, end)) return [];
   const off = new Set(calendar.offDays);
   return rangeISO(start, end).filter((date) => calendar.workWeek[mondayIndexedDow(date)] && !off.has(date));
 }
 
 export function createPtoRequest(input: RequestInput, calendar: RequestCalendar, id: string, now = new Date().toISOString()): PtoRequest | null {
-  if (!validRequestRange(input.start, input.end) || !/^[A-Za-z0-9_-]{1,100}$/.test(id)) return null;
+  if (!calendarCoversRequest(calendar, input.start, input.end) || !/^[A-Za-z0-9_-]{1,100}$/.test(id)) return null;
   const ptoDates = requestPtoDates(input.start, input.end, calendar);
   const status = input.status ?? 'planned';
   if (!REQUEST_STATUSES.includes(status)) return null;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
-import { createPtoRequest, parseRequestLedger, readRequestLedger, requestConflicts, requestDatesForScenario, requestPtoDates, REQUEST_STATUSES, REQUEST_TRANSITIONS, validRequestRange, writeRequestLedger, type PtoRequest, type RequestCalendar } from './requestLedger';
+import { calendarCoversRequest, createPtoRequest, initialRequestDate, parseRequestLedger, readRequestLedger, requestConflicts, requestDatesForScenario, requestPtoDates, REQUEST_STATUSES, REQUEST_TRANSITIONS, validRequestRange, writeRequestLedger, type PtoRequest, type RequestCalendar } from './requestLedger';
 
 const calendar: RequestCalendar = { workWeek: DEFAULT_WORK_WEEK, offDays: ['2027-01-01', '2027-01-01'] };
 function request(id: string, start = '2027-01-01', end = '2027-01-05', status: PtoRequest['status'] = 'planned'): PtoRequest {
@@ -21,6 +21,27 @@ describe('personal PTO requests', () => {
     expect(validRequestRange('2027-03-02', '2027-03-01')).toBe(false);
     expect(validRequestRange('2027-01-01', '2040-01-01')).toBe(false);
     expect(createPtoRequest({ start: '', end: '' }, calendar, 'one')).toBeNull();
+  });
+  it('accepts the inclusive coverage boundary and refuses unknown holiday dates outside it', () => {
+    const covered = { ...calendar, rangeStart: '2027-01-01', rangeEnd: '2027-01-31' };
+    expect(calendarCoversRequest(covered, '2027-01-01', '2027-01-31')).toBe(true);
+    expect(createPtoRequest({ start: '2027-01-31', end: '2027-02-01' }, covered, 'outside')).toBeNull();
+    expect(createPtoRequest({ start: '2026-12-31', end: '2027-01-01' }, covered, 'outside')).toBeNull();
+    expect(requestPtoDates('2027-01-31', '2027-02-01', covered)).toEqual([]);
+    expect(requestPtoDates('2027-01-01', '2027-01-05', covered)).toEqual(['2027-01-04', '2027-01-05']);
+  });
+  it('handles one-sided coverage and rejects malformed coverage safely', () => {
+    expect(calendarCoversRequest({ ...calendar, rangeStart: '2027-01-01' }, '2026-12-31', '2027-01-01')).toBe(false);
+    expect(calendarCoversRequest({ ...calendar, rangeEnd: '2027-12-31' }, '2027-12-31', '2028-01-01')).toBe(false);
+    expect(calendarCoversRequest({ ...calendar, rangeStart: 'bad' }, '2027-01-01', '2027-01-05')).toBe(false);
+    expect(calendarCoversRequest({ ...calendar, rangeStart: '2027-02-01', rangeEnd: '2027-01-01' }, '2027-01-01', '2027-01-05')).toBe(false);
+  });
+  it('initializes tomorrow within known calendar coverage without changing existing requests', () => {
+    const covered = { ...calendar, rangeStart: '2027-01-01', rangeEnd: '2027-12-31' };
+    expect(initialRequestDate('2026-11-02', covered)).toBe('2027-01-01');
+    expect(initialRequestDate('2027-01-04', covered)).toBe('2027-01-05');
+    expect(initialRequestDate('2028-01-01', covered)).toBe('2027-12-31');
+    expect(initialRequestDate('2027-01-04', calendar)).toBe('2027-01-05');
   });
   it('allows correction of every manually entered status', () => {
     for (const status of REQUEST_STATUSES) {

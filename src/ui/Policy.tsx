@@ -1,8 +1,12 @@
+import { DEFAULT_WORK_WEEK, type WorkWeek } from '@daysoff/engine/solver/types';
 import { cloneElement, isValidElement, useEffect, useId, useMemo, useState, type ReactElement } from 'react';
 import { SiteHeader } from './SiteHeader';
 import { Footer } from './Footer';
 import { Container } from './Container';
-import { CountrySelect } from './CountrySelect';
+import { CountrySelect, SubdivisionSelect } from './CountrySelect';
+import { PtoTracker } from './PtoTracker';
+import { useRequestCalendar } from './useRequestCalendar';
+import { todayISO } from './useAppState';
 import { DateListEditor } from './DateListEditor';
 import { Term } from './Term';
 import { track } from './analytics';
@@ -109,6 +113,10 @@ export function Policy() {
   const d = useMemo(() => initial ?? initialPolicyPreferences('', geolocateCountry()), [initial]);
 
   const [country, setCountry] = useState<string>(d.country);
+  const [trackerWorkWeek, setTrackerWorkWeek] = useState<WorkWeek>(d.workWeek ?? DEFAULT_WORK_WEEK);
+  const [trackerSubdivision, setTrackerSubdivision] = useState(d.subdivision);
+  const [trackerAltFridayStart, setTrackerAltFridayStart] = useState(d.altFridayStart ?? '');
+  const [trackerAltFridayEnabled, setTrackerAltFridayEnabled] = useState(Boolean(d.altFridayStart));
 
   const [accrualKind, setAccrualKind] = useState<AccrualMethod['kind']>(d.accrualKind);
   const [amount, setAmount] = useState(d.amount);
@@ -203,11 +211,13 @@ export function Policy() {
     accrualCapEnabled, accrualCap, carryoverMode, carryoverCap, carryoverUseByEnabled,
     carryoverUseBy, waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance,
     payoutOnLeaving, currentBalance, currentCarriedBalance, balanceAsOf, plannedDays, country, forecastDate,
+    workWeek: trackerWorkWeek, subdivision: trackerSubdivision, altFridayStart: trackerAltFridayEnabled ? trackerAltFridayStart : undefined,
   }), [unit, hoursPerDay, accrualKind, amount, frequency, payDateAnchor, grantDate, hourlyRate,
     typicalWeeklyHours, expectedDaysPerYear, planYearKind, anniversaryStart, customResetDate,
     accrualCapEnabled, accrualCap, carryoverMode, carryoverCap, carryoverUseByEnabled,
     carryoverUseBy, waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance,
-    payoutOnLeaving, currentBalance, currentCarriedBalance, balanceAsOf, plannedDays, country, forecastDate]);
+    payoutOnLeaving, currentBalance, currentCarriedBalance, balanceAsOf, plannedDays, country, forecastDate,
+    trackerWorkWeek, trackerSubdivision, trackerAltFridayEnabled, trackerAltFridayStart]);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const url = new URL(window.location.href);
@@ -222,6 +232,12 @@ export function Policy() {
   const summary = useMemo(() => generatePolicySummary(policy), [policy]);
   const alerts = useMemo(() => generateAlerts(policy, events, balanceAsOf, country), [policy, events, balanceAsOf, country]);
   const hrQuestions = useMemo(() => generateHRQuestions(policy), [policy]);
+
+  const [visitDate] = useState(todayISO);
+  const visitYear = Number(visitDate.slice(0, 4));
+  const calendarStart = Number(forecastDate.slice(0, 4)) - visitYear >= 10 ? visitDate : `${visitYear}-01-01`;
+  const calendarEnd = forecastDate > `${visitYear + 2}-12-31` ? forecastDate : `${visitYear + 2}-12-31`;
+  const trackerCalendar = useRequestCalendar({ country, subdivision: trackerSubdivision, rangeStart: calendarStart, rangeEnd: calendarEnd, workWeek: trackerWorkWeek, altFridayStart: trackerAltFridayEnabled ? trackerAltFridayStart : undefined });
 
   const decoded = useMemo(() => decodeParagraph(pastedText), [pastedText]);
   const decodedTerms = useMemo(() => uniqueMatchedTerms(decoded), [decoded]);
@@ -262,6 +278,20 @@ export function Policy() {
             </div>
             <QuickForecast policy={policy} requests={ledger.requests} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')} />
           </section>
+          <div id="requests" className="mt-8 scroll-mt-24 space-y-4">
+            <details className="rounded-xl border border-line bg-surface p-4">
+              <summary className="cursor-pointer font-medium text-ink">My request calendar and workweek</summary>
+              <div className="mt-4 flex flex-wrap items-start gap-4">
+                <CountrySelect country={country} onChangeCountry={code => { setCountry(code); setTrackerSubdivision(undefined); }} />
+                <SubdivisionSelect subdivisions={trackerCalendar.subdivisions} subdivision={trackerSubdivision} onChangeSubdivision={setTrackerSubdivision} />
+                <fieldset><legend className="text-sm font-medium text-ink">Working days</legend><div className="mt-2 flex flex-wrap gap-2">{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((name, index) => <label key={name} className="flex min-h-11 items-center gap-1 text-sm text-muted"><input type="checkbox" checked={trackerWorkWeek[index]} onChange={event => setTrackerWorkWeek(previous => previous.map((day, i) => i === index ? event.target.checked : day) as WorkWeek)} />{name}</label>)}</div></fieldset>
+              </div>
+              <label className="mt-4 flex min-h-11 items-center gap-2 text-sm text-muted"><input type="checkbox" checked={trackerAltFridayEnabled} onChange={event => setTrackerAltFridayEnabled(event.target.checked)} />Every other Friday off</label>
+              {trackerAltFridayEnabled && <label className="block text-sm text-muted">First non-working Friday<input type="date" value={trackerAltFridayStart} onChange={event => setTrackerAltFridayStart(event.target.value)} className={`${inputClass} mt-2 block`} /></label>}
+              <p className="mt-3 text-xs text-muted">Uses your saved employer holidays for this country and region. Adjust those in <a className="underline" href="/pto">the PTO planner</a>. Change the forecast date above to cover a later request.</p>
+            </details>
+            <PtoTracker today={visitDate} ledger={ledger} calendar={trackerCalendar.calendar} calendarReady={!trackerCalendar.loading && !trackerCalendar.degraded} calendarNotice={trackerCalendar.loading ? 'Loading your employer calendar…' : trackerCalendar.degraded ? 'Holiday data or a calendar input is unavailable. Check the calendar settings before adding or changing request dates.' : undefined} remainingPto={unit === 'days' ? projection?.confirmed.balance ?? undefined : projection?.confirmed.balance === null || projection?.confirmed.balance === undefined ? undefined : projection.confirmed.balance / hoursPerDay} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
+          </div>
           <details className="mt-8 rounded-2xl border border-line bg-surface p-5 sm:p-6">
             <summary className="cursor-pointer text-lg font-semibold text-ink">Advanced policy options and explanation</summary>
           <div className="mt-8 grid gap-10 lg:grid-cols-5">

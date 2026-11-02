@@ -6,6 +6,7 @@ import { requestByText, isContested } from '@daysoff/engine/calendar/requestDead
 
 interface BreakCardProps {
   brk: Break;
+  onTrack?: (brk: Break) => void;
   /** 1-based, chronological - the same number its calendar badge shows (see
    * useAppState's `orderedBreaks`, the one shared source for both). */
   index: number;
@@ -114,6 +115,7 @@ export function BreakCard({
   noticePeriodDays,
   workWeek,
   defaultExpanded = false,
+  onTrack,
 }: BreakCardProps) {
   // BUG FOUND: a plain `useState(defaultExpanded)` captures its initial value once, at
   // mount, and never again - but holidays load asynchronously (see useAppState.ts), so the
@@ -193,6 +195,7 @@ export function BreakCard({
       {/* Phase 3 step 4: visible on the card, not a tooltip - every recommendation states
           its own reasoning, not just the low-value ones. */}
       <p className="text-sm text-slate-600">{reason}</p>
+      {onTrack && <button type="button" onClick={() => onTrack(brk)} className="min-h-11 self-start rounded-md border border-line-strong bg-surface px-3 py-2 text-sm font-medium text-ink hover:bg-surface-alt">Track this PTO request</button>}
 
       {/* Layout fix: this used to be a full-width red bar, which reads as an error - it's
           advice, not a problem with the plan. Red is reserved for actual problems (an

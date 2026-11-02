@@ -1,7 +1,7 @@
 import { defaultPolicyURLState, readPolicyStateFromURL, type PolicyURLState } from '../ui/policyUrlState';
 
 const KEY = 'gapless.personal.policy.v1';
-const PARAMS = new Set(['ak', 'am', 'cb', 'bao', 'c', 'u', 'hpd', 'fq', 'pda', 'gd', 'hr', 'twh', 'edy', 'py', 'as', 'crd', 'ace', 'ac', 'cm', 'cc', 'cue', 'cub', 'wpe', 'wpd', 'nba', 'pol', 'pd', 'car']);
+const PARAMS = new Set(['ak', 'am', 'cb', 'bao', 'c', 'u', 'hpd', 'fq', 'pda', 'gd', 'hr', 'twh', 'edy', 'py', 'as', 'crd', 'ace', 'ac', 'cm', 'cc', 'cue', 'cub', 'wpe', 'wpd', 'nba', 'pol', 'pd', 'car', 'ww', 'sd', 'afs']);
 
 export function initialPolicyPreferences(search: string, country: string): PolicyURLState {
   const incoming = new URLSearchParams(search);

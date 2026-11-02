@@ -1,3 +1,5 @@
+import { getConsumerHolidays as getHolidays, getConsumerHolidaysWithStatus as getHolidaysWithStatus, getConsumerSubdivisionCandidates as getSubdivisionCandidates } from '../personal/consumerHolidays';
+import { SUBDIVISION_NAMES } from '@daysoff/engine/data/countries';
 import { solveConsumer, planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
 import { defaultEmployerCalendar, readEmployerCalendar, saveEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -5,7 +7,7 @@ import { solve, computeScores } from '@daysoff/engine/solver/solve';
 import { computeMarginalValues } from '@daysoff/engine/solver/marginalValue';
 import type { Alternative, Break, Scores, SolveInput, SolveResult, WorkWeek } from '@daysoff/engine/solver/types';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
-import { getHolidays, getHolidaysWithStatus, getSubdivisionCandidates, getPreloadedHolidays, type Holiday } from '@daysoff/engine/data/holidays';
+import { getPreloadedHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { getStateHolidaysFallback } from '@daysoff/engine/data/usStateHolidays';
 import { geolocateCountry } from './geo';
 import { activeCountryPreset } from '@daysoff/engine/data/countryPresets';
@@ -327,6 +329,8 @@ export function useAppState() {
   // seeing "no public holidays" before the fetch effect below has had a chance to run.
   const [nationalHolidays, setNationalHolidays] = useState<Holiday[]>(() => getPreloadedHolidays(country));
   const [stateHolidayCandidates, setStateHolidayCandidates] = useState<Holiday[]>([]);
+  const [nationalHolidayScope, setNationalHolidayScope] = useState('');
+  const [regionalHolidayScope, setRegionalHolidayScope] = useState('');
   const [employerCalendars, setEmployerCalendars] = useState<Record<string, EmployerCalendar>>(() => ({
     [employerScope(country, subdivision)]: initial.employerCalendar ?? readEmployerCalendar(country, subdivision),
   }));
@@ -454,6 +458,7 @@ export function useAppState() {
       if (cancelled) return;
       setNationalHolidays(holidays);
       setHolidaysDegraded(degraded);
+      setNationalHolidayScope(`${country}|${rangeStart}|${rangeEnd}`);
     });
     return () => {
       cancelled = true;
@@ -494,7 +499,7 @@ export function useAppState() {
         }
       }
 
-      if (!cancelled) setStateHolidayCandidates(stateOnly);
+      if (!cancelled) { setStateHolidayCandidates(stateOnly); setRegionalHolidayScope(`${country}|${subdivision}|${rangeStart}|${rangeEnd}`); }
     })();
     return () => {
       cancelled = true;
@@ -516,7 +521,8 @@ export function useAppState() {
     };
   }, [country, rangeStart, rangeEnd]);
 
-  const discoveredSubdivisions = useMemo(() => discoverSubdivisions(subdivisionCandidates), [subdivisionCandidates]);
+  const discoveredSubdivisions = useMemo(() => [...new Set([...discoverSubdivisions(subdivisionCandidates), ...(country === 'US' ? Object.keys(SUBDIVISION_NAMES).filter(code => code.startsWith('US-')) : [])])].sort(), [subdivisionCandidates, country]);
+  const holidaysReady = nationalHolidayScope === `${country}|${rangeStart}|${rangeEnd}` && (!subdivision || regionalHolidayScope === `${country}|${subdivision}|${rangeStart}|${rangeEnd}`);
 
   const holidayEntries: HolidayEntry[] = useMemo(() => {
     const excluded = new Set(employerCalendar.excluded);
@@ -995,6 +1001,7 @@ export function useAppState() {
     minimumBreakDays,
     setMinimumBreakDays,
     holidaysDegraded,
+    holidaysReady,
     country,
     setCountry: changeCountry,
     subdivision,
