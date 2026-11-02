@@ -78,7 +78,7 @@ export function GlossaryTermPage({ termId }: { termId: string }) {
           <h1 className="mt-2 text-3xl font-bold text-slate-900">{term.term}</h1>
           {term.aliases.length > 0 && <p className="mt-1 text-sm text-slate-400">Also called: {term.aliases.join(', ')}</p>}
           <p className="mt-4 text-base text-slate-700">{term.long}</p>
-          {!guide && <MiniExample id={term.id} />
+          {!guide && <MiniExample id={term.id} />}
 
           {guide && (
             <article className="mt-8 space-y-6 border-t border-line pt-7" aria-labelledby="practical-guide-heading">
