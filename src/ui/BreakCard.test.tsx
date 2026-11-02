@@ -164,3 +164,76 @@ describe('BreakCard reason (Phase 3 step 4: "why" line, computed by breakReason.
     expect(html).toContain('Bridges Thanksgiving — 1 PTO day for 4 days off.');
   });
 });
+
+
+describe('BreakCard copy-request menu keyboard and touch access', () => {
+  function trigger(): HTMLButtonElement {
+    const button = Array.from(container!.querySelectorAll('button')).find((el) => el.textContent?.includes('Copy request'));
+    if (!button) throw new Error('Copy request trigger missing');
+    return button;
+  }
+
+  function key(target: EventTarget, value: string) {
+    act(() => {
+      target.dispatchEvent(new KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true }));
+    });
+  }
+
+  it('opens with focus on first item, supports arrow/Home/End navigation, and restores trigger focus on Escape', () => {
+    mountInteractive({ defaultExpanded: true });
+    const button = trigger();
+    expect(button.className).toContain('min-h-11');
+    act(() => { button.click(); });
+    const items = Array.from(container!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+    expect(items).toHaveLength(3);
+    expect(document.activeElement).toBe(items[0]);
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(button.getAttribute('aria-controls')).toBe(container!.querySelector('[role="menu"]')?.id);
+    for (const item of items) expect(item.className).toContain('min-h-11');
+
+    key(items[0], 'ArrowDown');
+    expect(document.activeElement).toBe(items[1]);
+    key(items[1], 'End');
+    expect(document.activeElement).toBe(items[2]);
+    key(items[2], 'ArrowDown');
+    expect(document.activeElement).toBe(items[0]);
+    key(items[0], 'Home');
+    expect(document.activeElement).toBe(items[0]);
+
+    key(document, 'Escape');
+    expect(container!.querySelector('[role="menu"]')).toBeNull();
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(button);
+  });
+
+  it('ArrowUp opens at the last format and ArrowDown wraps back to the first', () => {
+    mountInteractive({ defaultExpanded: true });
+    const button = trigger();
+    key(button, 'ArrowUp');
+    const items = Array.from(container!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+    expect(document.activeElement).toBe(items[2]);
+    key(items[2], 'ArrowDown');
+    expect(document.activeElement).toBe(items[0]);
+    key(items[0], 'ArrowUp');
+    expect(document.activeElement).toBe(items[2]);
+  });
+
+  it('dismisses on outside pointer interaction and outside keyboard focus without trapping focus', () => {
+    mountInteractive({ defaultExpanded: true });
+    const button = trigger();
+    act(() => { button.click(); });
+    act(() => { document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })); });
+    expect(container!.querySelector('[role="menu"]')).toBeNull();
+
+    act(() => { button.click(); });
+    const outside = document.createElement('button');
+    document.body.appendChild(outside);
+    try {
+      act(() => { outside.focus(); });
+      expect(container!.querySelector('[role="menu"]')).toBeNull();
+      expect(document.activeElement).toBe(outside);
+    } finally {
+      outside.remove();
+    }
+  });
+});
