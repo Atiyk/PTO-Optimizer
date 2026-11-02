@@ -78,7 +78,7 @@ export function GlossaryTermPage({ termId }: { termId: string }) {
           <h1 className="mt-2 text-3xl font-bold text-slate-900">{term.term}</h1>
           {term.aliases.length > 0 && <p className="mt-1 text-sm text-slate-400">Also called: {term.aliases.join(', ')}</p>}
           <p className="mt-4 text-base text-slate-700">{term.long}</p>
-          <MiniExample id={term.id} />
+          {!guide && <MiniExample id={term.id} />
 
           {guide && (
             <article className="mt-8 space-y-6 border-t border-line pt-7" aria-labelledby="practical-guide-heading">
@@ -130,7 +130,7 @@ export function GlossaryTermPage({ termId }: { termId: string }) {
             </p>
           )}
 
-          {term.askHR && (
+          {!guide && term.askHR && (
             <div className="mt-6 rounded-md border border-slate-200 p-4">
               <p className="text-xs font-medium text-slate-500">Ask HR</p>
               <p className="mt-1 text-sm text-slate-800">{term.askHR}</p>
