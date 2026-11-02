@@ -21,20 +21,11 @@ interface PrimaryControlsProps {
 }
 
 const DATE_FIELD_CLASS =
-  'h-11 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400';
+  'h-11 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400';
 
-/**
- * Always-visible primary inputs - country, date range, PTO days. Only the state
- * (subdivision) picker and the "More options" panel (accrual, expiry, work week, blackout
- * dates, etc) are collapsed behind the "More options" disclosure in App.tsx - the two
- * sliders and "Show alternatives" are always visible too (see `PlanSliders`), since they're
- * how most visitors actually shape the plan, not an advanced/secondary setting.
- *
- * UI density pass: no longer owns its own full-width row - returns its fields directly so
- * App.tsx can lay them out in ONE shared flex row together with PlanSliders' two sliders
- * ("Country · Date range · PTO days · Reserve · What matters more? · How many breaks", all
- * one row, wrapping as it runs out of width) instead of two stacked bands.
- */
+/** Always-visible country, date and budget inputs. Dates stack into a shrinkable grid
+ * so the native pickers remain usable on 320px screens without page-level overflow.
+ * The advanced policy fields remain under More options; the two sliders never do. */
 export function PrimaryControls({
   advanced = true,
   country,
@@ -59,25 +50,25 @@ export function PrimaryControls({
     <>
       <CountrySelect country={country} onChangeCountry={onChangeCountry} />
 
-      <fieldset className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+      <fieldset className="flex min-w-0 w-full flex-col gap-1 text-xs font-medium text-slate-600 sm:w-auto">
         <legend className="text-xs font-medium text-slate-600">Date range</legend>
-        <div className="flex items-center gap-2">
+        <div className="grid min-w-0 w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 sm:gap-2">
           <input
             type="date"
             lang={locale}
             aria-label="Start date"
             value={rangeStart}
             onChange={(e) => onChangeRangeStart(e.target.value)}
-            className={DATE_FIELD_CLASS}
+            className={`${DATE_FIELD_CLASS} w-full max-w-full`}
           />
-          <span className="text-slate-400">&rarr;</span>
+          <span aria-hidden="true" className="text-slate-400">&rarr;</span>
           <input
             type="date"
             lang={locale}
             aria-label="End date"
             value={rangeEnd}
             onChange={(e) => onChangeRangeEnd(e.target.value)}
-            className={DATE_FIELD_CLASS}
+            className={`${DATE_FIELD_CLASS} w-full max-w-full`}
           />
         </div>
       </fieldset>
