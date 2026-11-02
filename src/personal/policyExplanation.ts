@@ -76,8 +76,8 @@ function accrualDescription(policy: TimeOffPolicy): string {
       return n(a.amount) + ' ' + policy.unit + ' are credited per ' + a.frequency
         + ' pay date. Semi-monthly dates are modeled as the 1st and 16th.';
     case 'per-hour-worked':
-      return n(a.rate) + ' ' + policy.unit + ' per hour worked, using the entered '
-        + n(a.typicalWeeklyHours) + '-hour typical week; actual timesheets are not imported.';
+      return n(a.rate) + ' PTO hours per hour worked, using the entered '
+        + n(a.typicalWeeklyHours) + '-hour typical week. This model converts earned hours to days when the policy uses days; actual timesheets are not imported.';
     case 'unlimited':
       return 'Unlimited PTO has no banked balance or accrued cash-like amount in this forecast.';
   }
@@ -120,6 +120,8 @@ export function explainConnectedPolicy(
   const carriedExpired = eventTotal(events, 'carried-days-expiring');
   const extraTentative = Math.max(0, tentative.scheduled - confirmed.scheduled);
   const waitingEnd = waitingPeriodEnd(policy);
+  const deadlineInWindow = Boolean(policy.carryover.useByDate
+    && policy.carryover.useByDate > policy.balanceAsOf && policy.carryover.useByDate <= through);
   const guidePath = '/glossary' as const;
   const rules: PolicyRuleExplanation[] = [
     {
@@ -183,9 +185,11 @@ export function explainConnectedPolicy(
         : n(carriedExpired) + ' ' + policy.unit + ' expired from the modeled carried portion in this window.',
       impact: unlimited
         ? { kind: 'not-projected', detail: 'No carried bank for unlimited PTO.' }
-        : policy.carryover.useByDate
+        : deadlineInWindow
           ? { kind: 'observed', amount: carriedExpired, date: policy.carryover.useByDate, detail: 'Carried units expired within the forecast window.' }
-          : { kind: 'configured', detail: 'No separate carried-bank deadline entered.' },
+          : { kind: 'configured', detail: policy.carryover.useByDate
+            ? 'The entered carried-bank deadline falls outside this forecast window.'
+            : 'No separate carried-bank deadline entered.' },
       hrQuestion: 'Do carried days expire on a different date from the plan-year reset?',
       guidePath,
     },
