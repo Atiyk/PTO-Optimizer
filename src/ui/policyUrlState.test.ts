@@ -97,3 +97,8 @@ describe('/policy URL round-trip (Stage 4A follow-through)', () => {
     expect(params.get('highlight')).toBe('accrual-cap');
   });
 });
+
+
+it('rejects oversized private-policy date lists', () => {
+  expect(readPolicyStateFromURL('?pd=' + Array(5000).fill('2027-01-04').join(','), 'US').plannedDays).toEqual([]);
+});

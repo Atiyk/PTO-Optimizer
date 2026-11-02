@@ -659,8 +659,6 @@ export function useAppState() {
       lastGoodResultRef.current = outcome.result;
       return outcome;
     } catch {
-      // An unexpected solver throw on otherwise-valid input: still keep the last good plan
-      // on screen rather than blanking it, same as a validation failure would.
       return { result: EMPTY_RESULT, issue: 'This combination could not be calculated. Check your dates and settings.' };
     }
   }, [solveInput, isValidInput, planningVersion, minimumBreakDays, planningStyle]);
