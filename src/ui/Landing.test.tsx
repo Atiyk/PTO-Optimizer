@@ -50,7 +50,7 @@ describe('live homepage planner', () => {
     expect(link.search).toContain('b=5');
     expect(link.search).toContain('pv=2');
     expect(new URLSearchParams(window.location.search).get('b')).toBe('5');
-    expect(event).toHaveBeenCalledExactlyOnceWith('quick_plan_engaged');
+    expect(event).toHaveBeenCalledExactlyOnceWith('quick_plan_engaged', { url: window.location.origin + '/' });
     expect(document.querySelector('button[type="submit"]')).toBeNull();
   });
 
