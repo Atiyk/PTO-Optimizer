@@ -358,19 +358,21 @@ try {
     await recipient.goto(new URL(holidayPath, origin).href, { waitUntil: 'networkidle' });
     await eventually(async () => assert.doesNotMatch(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Opening a share must not persist someone else’s preferences');
     await moreOptions(recipient);
-    await holidaySection(recipient).getByLabel('Company holiday date', { exact: true }).fill('2027-12-31');
+    // December 31 is the observed New Year's Day holiday from 2028; choose a
+    // distinct workday so this assertion exercises the new company holiday.
+    await holidaySection(recipient).getByLabel('Company holiday date', { exact: true }).fill('2027-12-30');
     await holidaySection(recipient).getByLabel('Company holiday name', { exact: true }).fill('QA company closure 2027');
     await holidaySection(recipient).getByRole('button', { name: 'Add', exact: true }).click();
-    await holidaySection(recipient).getByRole('checkbox', { name: /2027-12-31.*QA company closure 2027/ }).waitFor();
+    await holidaySection(recipient).getByRole('checkbox', { name: /2027-12-30.*QA company closure 2027/ }).waitFor();
     await holidaySection(recipient).getByRole('button', { name: 'Save employer calendar', exact: true }).click();
     await recipient.goto(new URL(holidayPath, origin).href, { waitUntil: 'networkidle' });
-    await eventually(async () => assert.match(await recipient.locator('#day-2027-12-31').getAttribute('aria-label'), /QA company closure 2027/), 'Company holidays must persist');
+    await eventually(async () => assert.match(await recipient.locator('#day-2027-12-30').getAttribute('aria-label'), /QA company closure 2027/), 'Company holidays must persist');
     await moreOptions(recipient);
     await holidaySection(recipient).getByRole('button', { name: 'Restore public holidays', exact: true }).click();
     await recipient.goto(new URL(holidayPath, origin).href, { waitUntil: 'networkidle' });
     await eventually(async () => {
       assert.match(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/);
-      assert.doesNotMatch(await recipient.locator('#day-2027-12-31').getAttribute('aria-label'), /QA company closure 2027/);
+      assert.doesNotMatch(await recipient.locator('#day-2027-12-30').getAttribute('aria-label'), /QA company closure 2027/);
     }, 'Reset must remove saved exceptions');
     await noOverflow(recipient); await screenshot(recipient, '03-employer-calendar-reset-375.png');
   });
