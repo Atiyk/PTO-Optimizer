@@ -1,3 +1,4 @@
+import { PortraitShare } from './PortraitShare';
 import { rangeISO, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { PartnerPlanner } from './PartnerPlanner';
 import { readPartnerAvailability } from '../planning/partner';
@@ -308,6 +309,9 @@ export function App() {
             /> : <p role="status" className="text-sm text-muted">Check your planning inputs before exporting.</p>}
           </div>
 
+          {!state.validationIssues.length && !state.solverIssue && state.holidaysReady && !state.holidaysDegraded && <div className="mt-4">
+            <PortraitShare breaks={state.breaks} rangeStart={state.rangeStart} rangeEnd={state.rangeEnd} holidayAssumption={state.employerCalendar.custom.length ? 'company' : state.employerCalendar.excluded.length ? 'customized' : 'public'} remainingBalance={state.unlimitedPto ? undefined : Math.max(0, state.budget - state.budgetSpent)} holidayNamesOf={brk => [...new Set(state.holidayEntries.filter(holiday => holiday.checked && holiday.date >= brk.start && holiday.date <= brk.end).map(holiday => holiday.source === 'custom' ? 'Company holiday' : holiday.name))]} />
+          </div>}
           <div id="partner-planner" className="mt-5 scroll-mt-24">
             {state.holidaysReady && !state.holidaysDegraded && !state.validationIssues.length ? <PartnerPlanner breaks={state.breaks} freeDays={freeDays} input={state.solveInput} minimumBreakLength={state.minimumBreakDays} /> : <p role="status" className="text-sm text-muted">Partner planning will be available after your calendar loads with valid dates and holiday data.</p>}
           </div>

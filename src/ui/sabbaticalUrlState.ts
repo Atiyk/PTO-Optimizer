@@ -1,3 +1,4 @@
+import { isValidISODate } from './urlState';
 /**
  * Phase 4B: URL round-tripping for /sabbatical, same conventions as src/ui/urlState.ts
  * (the main app's own full-state encoding) - clamp to a sane range on read rather than
@@ -35,10 +36,10 @@ export function readSabbaticalStateFromURL(search: string): SabbaticalURLState {
   return {
     country: params.get('c') ?? undefined,
     lengthWeeks: clampedInt(params.get('len'), 1, 52, DEFAULT_LENGTH_WEEKS),
-    eligibleFrom: params.get('s') ?? undefined,
+    eligibleFrom: params.get('s') && isValidISODate(params.get('s')!) ? params.get('s')! : undefined,
     ptoToAdd: clampedInt(params.get('pto'), 0, 15, DEFAULT_PTO_TO_ADD),
     unpaidWeeksToAdd: clampedInt(params.get('unpaid'), 0, 52, DEFAULT_UNPAID_WEEKS),
-    selectedStart: params.get('sel') ?? undefined,
+    selectedStart: params.get('sel') && isValidISODate(params.get('sel')!) ? params.get('sel')! : undefined,
   };
 }
 

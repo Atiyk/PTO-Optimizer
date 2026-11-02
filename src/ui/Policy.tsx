@@ -547,11 +547,11 @@ export function Policy() {
                         <p>{a.text}</p>
                         {a.daysAtStake > 0 && (
                           <a
-                            href={a.ptoHref}
+                            href="#expiration"
                             className="mt-1 inline-block font-medium underline"
                             onClick={() => track('policy_alert_action_clicked')}
                           >
-                            Plan those days →
+                            Review warnings and plans above →
                           </a>
                         )}
                       </li>

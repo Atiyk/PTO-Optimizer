@@ -19,7 +19,7 @@ import type { DayCategory, ForcedState } from './types';
 import { classifyDay } from './dayCategory';
 import { alternativeForDate as alternativeForDateImpl } from './alternativeForDate';
 import { track } from './analytics';
-import { isSupportedPlanningRange, validateInputs } from './validation';
+import { validateInputs, isSupportedPlanningRange } from './validation';
 import { policyFromLegacyPtoState, toLegacySolverFields } from '../policy/model';
 
 /** The slider's own stored position while unchecked - also what it falls back to showing
@@ -737,7 +737,7 @@ export function useAppState() {
   const weekStart: WeekStart = weekStartOverride === 'auto' ? weekStartForCountry(country) : weekStartOverride;
 
   // Recomputed once per solve (not per mouseover) and cached here; DayCell just reads the map.
-  const marginalValues = useMemo(() => isSupportedPlanningRange(rangeStart, rangeEnd) ? computeMarginalValues(solveInput, breaks) : new Map(), [solveInput, breaks, rangeStart, rangeEnd]);
+  const marginalValues = useMemo(() => isValidInput ? computeMarginalValues(solveInput, breaks) : new Map(), [solveInput, breaks, isValidInput]);
 
   const holidayNameFor = useCallback(
     (iso: string): string | undefined => holidayEntries.find((h) => h.date === iso && h.checked)?.name,

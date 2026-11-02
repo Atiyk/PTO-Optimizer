@@ -56,3 +56,10 @@ describe('writeSabbaticalStateToURL', () => {
     });
   });
 });
+
+
+it('ignores malformed sabbatical dates before calendar arithmetic', () => {
+  const state = readSabbaticalStateFromURL('?s=garbage&sel=2027-02-30');
+  expect(state.eligibleFrom).toBeUndefined();
+  expect(state.selectedStart).toBeUndefined();
+});

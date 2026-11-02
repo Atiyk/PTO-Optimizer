@@ -77,8 +77,9 @@ function date(raw: string | null, fallback: string): string {
 }
 
 function parseDateList(raw: string | null): string[] {
-  if (!raw) return [];
-  return raw.split(',').map((s) => s.trim()).filter(isValidISODate);
+  if (!raw || raw.length > 44_000) return [];
+  const dates = raw.split(',').map((s) => s.trim()).filter(isValidISODate);
+  return dates.length <= 4000 ? [...new Set(dates)] : [];
 }
 
 export function defaultPolicyURLState(): PolicyURLState {
