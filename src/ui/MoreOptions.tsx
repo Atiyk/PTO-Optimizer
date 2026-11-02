@@ -397,7 +397,7 @@ export function MoreOptions(props: MoreOptionsProps) {
           </button>
         </div>
         <div className="mt-3 flex flex-wrap gap-3">
-          <button type="button" onClick={props.onSaveEmployerHolidays} className="min-h-10 rounded-md bg-accent px-3 py-2 text-sm font-medium text-on-accent">Save employer calendar</button>
+          <button type="button" onClick={props.onSaveEmployerHolidays} className="min-h-10 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white">Save employer calendar</button>
           <button type="button" onClick={props.onResetEmployerHolidays} className="min-h-10 text-sm underline">Restore public holidays</button>
         </div>
         <p className="mt-2 text-xs text-slate-500">Saved calendars stay in this browser and apply only to this country and region.</p>
