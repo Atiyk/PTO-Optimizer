@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <meta name="referrer" content="no-referrer" />
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" href="/favicon.ico" />
@@ -39,9 +40,9 @@
     />
     <meta name="twitter:image" content="%SITE_URL%/og-images/pto.png" />
 
-    <!-- Cookieless analytics (Plausible) - no cookies, no cross-site identifiers, no
-         consent banner required. See src/ui/analytics.ts for the six tracked events. -->
-    <script defer data-domain="%SITE_HOST%" src="https://plausible.io/js/script.js"></script>
+    <!-- Manual analytics: src/ui/PrivacyAnalytics.tsx supplies a query-free route
+         and records one pageview per document. -->
+    <script defer data-domain="%SITE_HOST%" src="https://plausible.io/js/script.manual.js"></script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,0 +1,451 @@
+/**
+ * Final consumer journey, enabled only once phases 1–8 are integrated.
+ * node scripts/consumer-journey.mjs http://127.0.0.1:4177 /absolute/evidence/path
+ * Fresh mobile contexts, synthetic US 2027 inputs, no accounts or external messages.
+ */
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { setTimeout as pause } from 'node:timers/promises';
+import { chromium } from 'playwright';
+
+const [base = 'http://127.0.0.1:4177', output = 'qa-evidence/journey'] = process.argv.slice(2);
+const origin = new URL(base).origin;
+if (!['http:', 'https:'].includes(new URL(base).protocol)) throw new Error('Use an HTTP(S) consumer fixture URL.');
+const out = resolve(output);
+await mkdir(out, { recursive: true });
+const report = { status: 'running', viewport: { width: 375, height: 812 },
+  fixture: 'US 2027 dates, fresh browser storage, fixed January 1, 2027 clock.',
+  routing: 'Vite slashless consumer documents are served from their directory index, matching Vercel clean URLs.',
+  clipboard: 'Text clipboard enabled in synthetic contexts; PNG clipboard denial intentionally exercises download fallback.',
+  results: [], runtimeErrors: [], unexpectedAccountRequests: [] };
+const contexts = [];
+let browser;
+let main;
+let mainContext;
+let trackedCost;
+let trackedStart;
+const privateNote = 'qa-private-note-2027';
+const ptoPath = '/pto/?c=US&s=2027-01-15&e=2027-01-24&b=2&rv=0&pv=2&ps=long-breaks&mb=3';
+const holidayPath = '/pto/?c=US&s=2027-12-20&e=2027-12-31&b=4&rv=0&pv=2&ps=custom&mb=3';
+class EvidenceUnavailable extends Error { status = 'unavailable'; }
+
+async function eventually(check, message, timeout = 10000) {
+  const end = Date.now() + timeout;
+  let last;
+  while (Date.now() < end) {
+    try { return await check(); } catch (error) { last = error; await pause(100); }
+  }
+  throw new Error(`${message}: ${last instanceof Error ? last.message : String(last)}`);
+}
+
+async function screenshot(page, filename) {
+  await page.screenshot({ path: resolve(out, filename), fullPage: false });
+}
+
+async function check(name, action) {
+  try {
+    await action();
+    report.results.push({ name, status: 'passed' });
+    console.log(JSON.stringify({ kind: 'journey', name, status: 'passed' }));
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    const status = error instanceof EvidenceUnavailable ? 'unavailable' : 'failed';
+    report.results.push({ name, status, reason });
+    console.error(JSON.stringify({ kind: 'journey', name, status, reason }));
+    if (main && !main.isClosed()) await screenshot(main, `failure-${report.results.length}.png`).catch(() => {});
+  }
+}
+
+async function mobileContext() {
+  const context = await browser.newContext({ viewport: report.viewport, locale: 'en-US', timezoneId: 'America/New_York',
+    reducedMotion: 'reduce', colorScheme: 'light', acceptDownloads: true, permissions: ['clipboard-read', 'clipboard-write'] });
+  contexts.push(context);
+  await context.addInitScript(() => {
+    // Inspect strings actually sent to the PNG canvas, rather than trusting only an
+    // accessibility summary when checking balance privacy. No production code changes.
+    const textByCanvas = new WeakMap();
+    const fillText = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (text, ...args) {
+      const texts = textByCanvas.get(this.canvas) ?? [];
+      texts.push(String(text)); textByCanvas.set(this.canvas, texts);
+      return fillText.call(this, text, ...args);
+    };
+    window.__gaplessQaCanvasText = (canvas) => textByCanvas.get(canvas) ?? [];
+    try {
+      Object.defineProperty(navigator.clipboard, 'write', { configurable: true,
+        value: async () => { throw new DOMException('Synthetic PNG clipboard denial', 'NotAllowedError'); } });
+    } catch {
+      // The renderer also supports browsers without ClipboardItem. Keeping its property
+      // present but unavailable makes the existing guarded write fall back normally.
+      Object.defineProperty(window, 'ClipboardItem', { configurable: true, value: undefined });
+    }
+  });
+  await context.route('**/*', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.origin === origin && /^\/(?:api|auth|apps\/teams)(?:\/|$)/.test(url.pathname)) {
+      report.unexpectedAccountRequests.push({ path: url.pathname, method: request.method() });
+    }
+    if (url.origin === origin && url.pathname === '/_vercel/insights/script.js') {
+      await route.fulfill({ status: 200, contentType: 'application/javascript', body: '' }); return;
+    }
+    if (['http:', 'https:'].includes(url.protocol) && url.origin !== origin) { await route.abort(); return; }
+    if (request.resourceType() === 'document' && ['/pto', '/policy', '/sabbatical'].includes(url.pathname)) {
+      url.pathname += '/';
+      await route.fulfill({ response: await route.fetch({ url: url.href }) }); return;
+    }
+    await route.continue();
+  });
+  context.on('page', (page) => page.on('pageerror', (error) => report.runtimeErrors.push(error.message)));
+  return context;
+}
+
+async function open(context, path) {
+  const page = await context.newPage();
+  await page.clock.setFixedTime(new Date('2027-01-01T17:00:00Z'));
+  await page.goto(new URL(path, origin).href, { waitUntil: 'networkidle' });
+  await page.locator('#root').waitFor({ state: 'visible' });
+  return page;
+}
+
+async function noOverflow(page) {
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, '375px page must not overflow horizontally.');
+}
+
+async function moreOptions(page) {
+  const button = page.getByRole('button', { name: /More options|Hide options/ });
+  if (await button.getAttribute('aria-expanded') !== 'true') await button.click();
+}
+
+function holidaySection(page) {
+  return page.locator('section').filter({ has: page.getByRole('heading', { name: "My employer's holidays", exact: true }) });
+}
+
+async function clipboardText(page) { return page.evaluate(() => navigator.clipboard.readText()); }
+const numberIn = (text) => Number(text.replaceAll(',', '').replaceAll('−', '-').match(/-?\d+(?:\.\d+)?/)?.[0]);
+const forecastRegion = (page) => page.getByRole('region', { name: 'PTO balance forecast', exact: true });
+async function forecastBalance(page) { return numberIn(await forecastRegion(page).locator('[aria-live="polite"]').innerText()); }
+async function forecastScheduled(page) {
+  const region = forecastRegion(page);
+  return Math.abs(numberIn(await region.locator('dl > div').filter({ has: region.getByText('Scheduled PTO', { exact: true }) }).locator('dd').innerText()));
+}
+
+function datesBetween(start, end) {
+  const dates = [];
+  for (let time = Date.parse(`${start}T00:00:00Z`); time <= Date.parse(`${end}T00:00:00Z`); time += 86400000) dates.push(new Date(time).toISOString().slice(0, 10));
+  return dates;
+}
+
+function disclosedDays(url) {
+  assert.equal(new URL(url).pathname, '/pto', 'Partner shares must use the canonical consumer planner route.');
+  const params = new URL(url).searchParams;
+  assert.deepEqual([...params.keys()].sort(), ['e', 'pp', 's'], 'Partner links must contain only disclosed availability and its date bounds.');
+  const payload = params.get('pp');
+  assert.ok(payload && payload.length <= 12000);
+  const parts = payload.split(':');
+  assert.equal(parts.length, 4);
+  const [version, status, compact, free] = parts;
+  assert.equal(version, '1'); assert.equal(status, 'p', 'Availability is proposed unless explicitly confirmed.');
+  const expand = (raw) => raw.split(',').filter(Boolean).flatMap((part) => {
+    assert.match(part, /^\d{8}(?:~\d{8})?$/);
+    const [first, last = first] = part.split('~');
+    const iso = (value) => `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
+    const days = datesBetween(iso(first), iso(last));
+    assert.ok(days.length > 0 && days.length <= 1100); return days;
+  });
+  const days = [...new Set(expand(compact))];
+  assert.ok(days.length > 0 && days.length <= 1100);
+  if (free !== '-') assert.ok(expand(free).every((day) => days.includes(day)));
+  assert.equal(params.get('s'), days[0]); assert.equal(params.get('e'), days[days.length - 1]);
+  return days;
+}
+
+async function assertPng(download, filename) {
+  const path = resolve(out, filename);
+  await download.saveAs(path);
+  const bytes = await readFile(path);
+  assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+  assert.equal(bytes.readUInt32BE(16), 1080); assert.equal(bytes.readUInt32BE(20), 1350);
+}
+
+async function verifyAnalyticsTransport() {
+  const virtualOrigin = 'https://gapless-privacy.example';
+  const sources = [
+    { provider: 'plausible', url: 'https://plausible.io/js/script.manual.js' },
+    { provider: 'vercel', url: 'https://pto-optimizer-seven.vercel.app/_vercel/insights/script.js' },
+  ];
+  const scripts = await Promise.all(sources.map(async source => {
+    try {
+      const response = await fetch(source.url, { signal: AbortSignal.timeout(30000) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const body = await response.text();
+      if (body.length < 500 || /^\s*</.test(body)) throw new Error('Expected the actual JavaScript SDK.');
+      await writeFile(resolve(out, `sdk-${source.provider}.js`), body);
+      return { ...source, body, bytes: Buffer.byteLength(body), sha256: createHash('sha256').update(body).digest('hex') };
+    } catch (error) { throw new EvidenceUnavailable(`Actual ${source.provider} SDK unavailable: ${error.message}`); }
+  }));
+  const captures = [];
+  const loads = [];
+  report.analytics = { sources: scripts.map(({ body: _body, ...source }) => source), captures, loads,
+    fixture: 'Route-backed HTTPS origin; actual unmodified hosted SDKs; mobile user agent and webdriver=false opt into SDK transport; all analytics POSTs fulfilled locally.' };
+  const sensitive = ['139.25', 'qa-sdk-private-note-2027', 'qa-sdk-private-fragment', '2027-01-15', '2027-01-24', '2027-01-01'];
+  for (const unsafe of [false, true]) {
+    const context = await browser.newContext({ viewport: report.viewport, locale: 'en-US', timezoneId: 'America/New_York',
+      userAgent: `Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${browser.version()} Mobile Safari/537.36` });
+    contexts.push(context);
+    await context.addInitScript(() => {
+      // The official SDKs deliberately skip automation. Only this isolated fixture
+      // opts into their real transport so zero captured POSTs cannot be a bot skip.
+      Object.defineProperty(Navigator.prototype, 'webdriver', { configurable: true, get: () => false });
+      window.__plausible = true;
+    });
+    await context.route('**/*', async route => {
+      const request = route.request();
+      const url = new URL(request.url());
+      const source = scripts.find(script => script.provider === 'vercel'
+        ? url.origin === virtualOrigin && url.pathname === '/_vercel/insights/script.js'
+        : url.href === script.url);
+      if (source && request.method() === 'GET') {
+        loads.push({ visit: unsafe ? 'unsafe-referrer' : 'safe', provider: source.provider, headers: await request.allHeaders() });
+        await route.fulfill({ status: 200, contentType: 'application/javascript', body: source.body }); return;
+      }
+      if (request.method() === 'POST') {
+        const provider = url.hostname === 'plausible.io' && url.pathname === '/api/event' ? 'plausible'
+          : url.origin === virtualOrigin && url.pathname.startsWith('/_vercel/insights/') ? 'vercel' : 'unexpected';
+        captures.push({ visit: unsafe ? 'unsafe-referrer' : 'safe', provider, path: url.origin + url.pathname,
+          body: request.postData() ?? '', headers: await request.allHeaders() });
+        await route.fulfill({ status: 204, body: '' }); return;
+      }
+      if (url.origin === virtualOrigin) {
+        const local = new URL(url.pathname + url.search, origin);
+        if (request.resourceType() === 'document' && ['/pto', '/policy', '/sabbatical'].includes(local.pathname)) local.pathname += '/';
+        const response = await context.request.get(local.href);
+        await route.fulfill({ response }); return;
+      }
+      // This includes any SDK endpoint or dependency not explicitly recognized.
+      // No analytics request can leave the synthetic browser fixture.
+      await route.abort();
+    });
+    const page = await context.newPage();
+    await page.clock.setFixedTime(new Date('2027-01-01T17:00:00Z'));
+    const referer = unsafe ? `${virtualOrigin}/legacy?cb=139.25&note=qa-sdk-private-note-2027` : `${virtualOrigin}/`;
+    await page.goto(`${virtualOrigin}/policy/?b=7&s=2027-01-15&e=2027-01-24&cb=139.25&bao=2027-01-01&note=qa-sdk-private-note-2027#qa-sdk-private-fragment`, { referer, waitUntil: 'networkidle' });
+    await page.getByRole('heading', { name: 'Your PTO balance and policy', exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => navigator.webdriver), false);
+    assert.equal(await page.evaluate(() => document.referrer), referer, 'The incoming referrer must be real browser state, including the unsafe canary.');
+    try {
+      await eventually(async () => assert.equal(await page.evaluate(() => !!window.plausible?.l && window.vai === true), true), 'Both actual SDKs must initialize');
+    } catch (error) { throw new EvidenceUnavailable(`Analytics transport unavailable: ${error.message}`); }
+    await page.getByLabel('Current PTO balance (days)', { exact: true }).fill('139.25');
+    await page.getByLabel('Forecast my balance on', { exact: true }).fill('2027-02-01');
+    if (unsafe) {
+      await pause(1000);
+      assert.equal(captures.filter(entry => entry.visit === 'unsafe-referrer').length, 0, 'Unsafe incoming planning referrers must suppress both providers.');
+    } else {
+      try {
+        await eventually(async () => {
+          for (const provider of ['plausible', 'vercel']) assert.ok(captures.some(entry => entry.visit === 'safe' && entry.provider === provider
+            && (provider === 'plausible' ? JSON.parse(entry.body).n === 'pageview' : entry.path.endsWith('/view'))));
+        }, 'Both actual SDKs must emit a captured safe pageview');
+      } catch (error) { throw new EvidenceUnavailable(`Analytics transport unavailable: ${error.message}`); }
+      await pause(250);
+    }
+    await page.close();
+  }
+  for (const entry of captures) {
+    assert.notEqual(entry.provider, 'unexpected', 'Unexpected POST transport must be reviewed.');
+    const body = JSON.parse(entry.body);
+    assert.equal(entry.provider === 'plausible' ? body.u : body.o, `${virtualOrigin}/policy/`);
+    const wire = JSON.stringify({ body, headers: entry.headers });
+    for (const value of sensitive) assert.ok(!wire.includes(value), `Planning canary leaked into ${entry.provider} wire data: ${value}`);
+    assert.doesNotMatch(wire, /[?&](?:b|s|e|cb|bao|note)=/i);
+    assert.ok(!entry.headers.referer, 'Early no-referrer policy must remove HTTP Referer from analytics POSTs.');
+  }
+  for (const entry of loads) assert.ok(!entry.headers.referer, 'Hosted SDK requests must also have no HTTP Referer.');
+  assert.equal(loads.length, 4, 'Both real SDKs must be served in both independent visits.');
+  console.log(JSON.stringify({ kind: 'analytics-transport', status: 'passed', safePosts: captures.length,
+    unsafePosts: 0, sources: report.analytics.sources }));
+}
+
+try {
+  browser = await chromium.launch({ headless: true, ...(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {}) });
+  await check('Live plan → track → requested → approved → forecast → refresh, without duplicate deductions', async () => {
+    mainContext = await mobileContext(); main = await open(mainContext, ptoPath);
+    const initialHeadline = await main.locator('h1').innerText();
+    await main.getByLabel('PTO days available', { exact: true }).fill('3');
+    await eventually(async () => {
+      assert.equal(new URL(main.url()).searchParams.get('b'), '3');
+      assert.notEqual(await main.locator('h1').innerText(), initialHeadline);
+    }, 'PTO input should update the live plan without submission');
+    assert.equal(await main.getByRole('button', { name: /^(?:Generate|Submit)/i }).count(), 0);
+    const trackButton = main.getByRole('region', { name: 'Your top 3 time-off opportunities', exact: true }).getByRole('button', { name: 'Track this PTO request', exact: true }).first();
+    await trackButton.click();
+    const tracker = main.getByRole('region', { name: 'My PTO requests', exact: true });
+    await tracker.getByRole('article').waitFor({ state: 'visible' });
+    assert.equal(await tracker.getByRole('article').count(), 1);
+    const row = tracker.getByRole('article');
+    trackedStart = await row.locator('input[type="date"]').nth(0).inputValue();
+    const end = await row.locator('input[type="date"]').nth(1).inputValue();
+    trackedCost = datesBetween(trackedStart, end).filter((date) => {
+      const dow = new Date(`${date}T00:00:00Z`).getUTCDay();
+      return dow !== 0 && dow !== 6 && date !== '2027-01-18';
+    }).length;
+    assert.ok(trackedCost > 0 && trackedCost <= 3);
+    assert.match(await row.innerText(), new RegExp(`${trackedCost} PTO days?`));
+    await trackButton.click();
+    assert.equal(await tracker.getByRole('article').count(), 1, 'Tracking the same break twice must not duplicate it.');
+    await row.getByRole('combobox', { name: `Status for request ${trackedStart}`, exact: true }).selectOption('requested');
+    await row.locator('summary').filter({ hasText: 'Personal note' }).click();
+    await row.getByLabel(`Personal note for request ${trackedStart}`, { exact: true }).fill(privateNote);
+    assert.ok(!main.url().includes(privateNote));
+    await noOverflow(main); await screenshot(main, '01-requested-375.png');
+    await main.getByRole('link', { name: 'Forecast my balance and check expiration', exact: true }).click();
+    await main.getByRole('heading', { name: 'Your PTO balance and policy', exact: true }).waitFor();
+    const quick = main.getByRole('region', { name: 'Quick balance forecast', exact: true });
+    await quick.getByLabel('Current PTO balance (days)', { exact: true }).fill('20');
+    await quick.getByLabel('Balance as-of date', { exact: true }).fill('2027-01-01');
+    await quick.getByLabel('How PTO accrues', { exact: true }).selectOption('front-loaded');
+    await quick.getByLabel('Days earned each grant', { exact: true }).fill('0');
+    await quick.getByLabel('Annual grant date', { exact: true }).fill('2027-01-01');
+    await quick.getByLabel('Expiry and carryover', { exact: true }).selectOption('all');
+    await main.getByLabel('Forecast my balance on', { exact: true }).fill('2027-01-31');
+    await eventually(async () => {
+      assert.equal(await forecastBalance(main), 20);
+      assert.equal(await forecastScheduled(main), 0);
+      assert.equal(numberIn(await forecastRegion(main).locator('strong').innerText()), 20 - trackedCost);
+    }, 'Requested leave should be tentative, without reducing the confirmed forecast');
+    const status = main.getByRole('region', { name: 'My PTO requests', exact: true }).getByRole('combobox', { name: `Status for request ${trackedStart}`, exact: true });
+    await status.selectOption('approved');
+    await eventually(async () => {
+      assert.equal(await forecastBalance(main), 20 - trackedCost);
+      assert.equal(await forecastScheduled(main), trackedCost);
+    }, 'Approval should deduct each PTO working date once');
+    await status.selectOption('canceled');
+    await eventually(async () => { assert.equal(await forecastBalance(main), 20); assert.equal(await forecastScheduled(main), 0); }, 'Canceling should release future consumption');
+    await status.selectOption('approved');
+    await eventually(async () => assert.equal(await forecastBalance(main), 20 - trackedCost), 'Correcting status must not add another deduction');
+    await main.reload({ waitUntil: 'networkidle' });
+    await eventually(async () => {
+      assert.equal(await main.getByRole('combobox', { name: `Status for request ${trackedStart}`, exact: true }).inputValue(), 'approved');
+      assert.equal(await forecastBalance(main), 20 - trackedCost);
+      assert.equal(await forecastScheduled(main), trackedCost);
+    }, 'Status and forecast must survive refresh');
+    await noOverflow(main); await forecastRegion(main).screenshot({ path: resolve(out, '02-approved-forecast-375.png') });
+  });
+
+  await check('Employer calendar saves, resets, and shared defaults never overwrite recipient preferences', async () => {
+    const recipientContext = await mobileContext();
+    const recipient = await open(recipientContext, holidayPath);
+    await eventually(async () => assert.match(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Public holidays should load');
+    await moreOptions(recipient);
+    const holidays = holidaySection(recipient);
+    await holidays.getByRole('checkbox', { name: /2027-12-24.*Christmas Day/ }).uncheck();
+    await holidays.getByRole('button', { name: 'Save employer calendar', exact: true }).click();
+    await eventually(async () => assert.match(await holidays.getByRole('status').innerText(), /saved in this browser/), 'Calendar save should report success');
+    const saved = await recipient.evaluate(() => localStorage.getItem('gapless.employer.v1:US:'));
+    assert.ok(saved?.includes('Christmas Day'));
+    await recipient.goto(new URL(holidayPath, origin).href, { waitUntil: 'networkidle' });
+    await eventually(async () => assert.doesNotMatch(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Saved exclusions should survive a fresh URL');
+    const sender = await open(await mobileContext(), holidayPath);
+    await sender.getByRole('button', { name: 'Copy link', exact: true }).click();
+    const sharedDefault = await clipboardText(sender);
+    assert.ok(new URL(sharedDefault).searchParams.has('eh'));
+    await recipient.goto(sharedDefault, { waitUntil: 'networkidle' });
+    await eventually(async () => assert.match(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Explicit shared defaults must outrank local exclusions');
+    assert.equal(await recipient.evaluate(() => localStorage.getItem('gapless.employer.v1:US:')), saved);
+    await recipient.goto(new URL(holidayPath, origin).href, { waitUntil: 'networkidle' });
+    await eventually(async () => assert.doesNotMatch(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Opening a share must not persist someone else’s preferences');
+    await moreOptions(recipient);
+    await holidaySection(recipient).getByLabel('Company holiday date', { exact: true }).fill('2027-12-31');
+    await holidaySection(recipient).getByLabel('Company holiday name', { exact: true }).fill('QA company closure 2027');
+    await holidaySection(recipient).getByRole('button', { name: 'Add', exact: true }).click();
+    await holidaySection(recipient).getByRole('checkbox', { name: /2027-12-31.*QA company closure 2027/ }).waitFor();
+    await holidaySection(recipient).getByRole('button', { name: 'Save employer calendar', exact: true }).click();
+    await recipient.goto(new URL(holidayPath, origin).href, { waitUntil: 'networkidle' });
+    await eventually(async () => assert.match(await recipient.locator('#day-2027-12-31').getAttribute('aria-label'), /QA company closure 2027/), 'Company holidays must persist');
+    await moreOptions(recipient);
+    await holidaySection(recipient).getByRole('button', { name: 'Restore public holidays', exact: true }).click();
+    await recipient.goto(new URL(holidayPath, origin).href, { waitUntil: 'networkidle' });
+    await eventually(async () => {
+      assert.match(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/);
+      assert.doesNotMatch(await recipient.locator('#day-2027-12-31').getAttribute('aria-label'), /QA company closure 2027/);
+    }, 'Reset must remove saved exceptions');
+    await noOverflow(recipient); await screenshot(recipient, '03-employer-calendar-reset-375.png');
+  });
+
+  await check('Partner sharing contains only selected availability and honors independent recipient PTO', async () => {
+    assert.ok(mainContext && main && trackedCost, 'Complete the tracking journey before checking its private-note privacy.');
+    await main.goto(new URL(ptoPath.replace('b=2', 'b=3'), origin).href, { waitUntil: 'networkidle' });
+    const partner = main.getByRole('region', { name: 'Partner vacation planner', exact: true });
+    await partner.getByRole('button', { name: 'Plan with someone', exact: true }).click();
+    assert.equal(await partner.getByRole('checkbox', { name: 'I have confirmed the availability I am sharing.', exact: true }).isChecked(), false);
+    const options = partner.locator('fieldset').getByRole('checkbox');
+    let chosen = false;
+    for (const option of await options.all()) {
+      const label = await option.evaluate((element) => element.closest('label')?.textContent.trim() ?? '');
+      if (label.startsWith('Also share') || label.startsWith('I have confirmed')) { await option.uncheck(); continue; }
+      await option.setChecked(!chosen); chosen = true;
+    }
+    assert.ok(chosen, 'At least one break must be available to share.');
+    await partner.getByRole('button', { name: 'Copy partner link', exact: true }).click();
+    const link = await clipboardText(main);
+    assert.ok(!link.includes(privateNote));
+    const shared = disclosedDays(link);
+    assert.ok(shared.every((date) => date >= '2027-01-15' && date <= '2027-01-24'));
+    const recipient = await open(await mobileContext(), link);
+    const joint = recipient.getByRole('region', { name: 'Partner vacation planner', exact: true });
+    await joint.getByRole('heading', { name: 'Here are the dates you can both take off.', exact: true }).waitFor();
+    await recipient.getByLabel('PTO days available', { exact: true }).fill('1');
+    await moreOptions(recipient);
+    await recipient.getByLabel('Days to keep in reserve', { exact: true }).fill('0');
+    await eventually(async () => assert.ok(await joint.getByRole('article').count() > 0), 'At least one joint opportunity must fit one recipient PTO day');
+    const card = joint.getByRole('article').first();
+    const ownCost = numberIn(await card.getByText('You', { exact: true }).locator('..').innerText());
+    assert.ok(ownCost <= 1, 'Joint opportunity must respect recipient PTO budget.');
+    await card.getByRole('button', { name: 'Share these dates', exact: true }).click();
+    const jointDays = disclosedDays(await clipboardText(recipient));
+    assert.ok(jointDays.every((date) => shared.includes(date)), 'A joint opportunity cannot invent undisclosed availability.');
+    assert.equal(await recipient.getByText(privateNote, { exact: true }).count(), 0);
+    await noOverflow(recipient); await joint.screenshot({ path: resolve(out, '04-partner-opportunity-375.png') });
+  });
+
+  await check('Portrait preview is 1080×1350, hides balance by default, and copies through the real download fallback', async () => {
+    assert.ok(main && !main.isClosed(), 'The consumer planner must remain available.');
+    await main.getByRole('button', { name: 'Preview portrait share card', exact: true }).click();
+    const portrait = main.getByRole('region', { name: 'Portrait share card', exact: true });
+    const privacy = portrait.getByRole('checkbox', { name: 'Include my PTO balance.', exact: true });
+    assert.equal(await privacy.isChecked(), false);
+    const drawnText = async () => portrait.locator('canvas').evaluate((canvas) => window.__gaplessQaCanvasText(canvas));
+    await eventually(async () => {
+      assert.equal(await portrait.getByRole('button', { name: 'Download portrait PNG', exact: true }).isEnabled(), true);
+      assert.deepEqual(await portrait.locator('canvas').evaluate((canvas) => ({ width: canvas.width, height: canvas.height })), { width: 1080, height: 1350 });
+      assert.ok(!(await drawnText()).some((text) => /PTO remaining|qa-private-note/.test(text)));
+    }, 'The default PNG preview must hide private balance and notes');
+    await privacy.check();
+    await eventually(async () => assert.ok((await drawnText()).some((text) => /PTO remaining/.test(text))), 'Balance should appear only after opt-in');
+    await privacy.uncheck();
+    await eventually(async () => assert.ok(!(await drawnText()).some((text) => /PTO remaining/.test(text))), 'Disabling balance must replace the visible canvas before export');
+    const png = main.waitForEvent('download');
+    await portrait.getByRole('button', { name: 'Download portrait PNG', exact: true }).click();
+    await assertPng(await png, 'portrait-private-default.png');
+    const fallback = main.waitForEvent('download');
+    await portrait.getByRole('button', { name: 'Copy portrait image', exact: true }).click();
+    await assertPng(await fallback, 'portrait-copy-download-fallback.png');
+    await eventually(async () => assert.match(await portrait.getByRole('status').innerText(), /downloaded instead.*clipboard is unavailable/i), 'Clipboard denial must report the actual download fallback');
+    await noOverflow(main); await portrait.screenshot({ path: resolve(out, '05-portrait-preview-375.png') });
+  });
+  await check('Actual hosted analytics SDKs send only public paths and suppress unsafe incoming referrers', verifyAnalyticsTransport);
+  if (report.runtimeErrors.length || report.unexpectedAccountRequests.length) report.results.push({ name: 'No runtime errors, account requests, or B2B traffic', status: 'failed' });
+  report.status = report.results.every((result) => result.status === 'passed') ? 'passed'
+    : report.results.some(result => result.status === 'unavailable') ? 'unavailable' : 'failed';
+} catch (error) {
+  report.status = 'unavailable'; report.reason = error instanceof Error ? error.message : String(error);
+} finally {
+  for (const context of contexts) await context.close();
+  if (browser) await browser.close();
+  await writeFile(resolve(out, 'journey-report.json'), `${JSON.stringify(report, null, 2)}\n`);
+}
+console.log(JSON.stringify({ kind: 'consumer-journey', ...report }));
+if (report.status !== 'passed') process.exitCode = report.status === 'unavailable' ? 2 : 1;

@@ -122,6 +122,23 @@ jobs:
             printf 'Baseline browser evidence exit status: %s\n' "$baseline_exit"
           fi
           node current/scripts/consumer-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/after" after
+      - name: Verify the complete consumer journey at 375 pixels
+        if: ${{ !cancelled() }}
+        run: |
+          (cd current && exec node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 4177 --strictPort) > "$RUNNER_TEMP/consumer-journey.log" 2>&1 &
+          journey_pid=$!
+          trap 'kill "$journey_pid" 2>/dev/null || true' EXIT
+          node --input-type=module <<'NODE'
+          let ready = false;
+          for (let attempt = 0; attempt < 30; attempt += 1) {
+            try {
+              if ((await fetch('http://127.0.0.1:4177/')).ok) { ready = true; break; }
+            } catch { /* The preview may still be starting. */ }
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          if (!ready) throw new Error('Consumer journey preview did not start.');
+          NODE
+          node current/scripts/consumer-journey.mjs http://127.0.0.1:4177 "$GITHUB_WORKSPACE/qa-evidence/journey"
       - name: Install pinned metrics tools outside the checkout
         if: ${{ !cancelled() }}
         # Versions and Node engine requirements verified against npm on 2026-11-02.

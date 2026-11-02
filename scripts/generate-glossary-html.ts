@@ -31,6 +31,7 @@ function page(termTitle: string, description: string, canonicalPath: string): st
   return `<!doctype html>
 <html lang="en">
   <head>
+    <meta name="referrer" content="no-referrer" />
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" href="/favicon.ico" />
@@ -58,7 +59,7 @@ function page(termTitle: string, description: string, canonicalPath: string): st
     <meta name="twitter:description" content="${desc}" />
     <meta name="twitter:image" content="%SITE_URL%/og-image.png" />
 
-    <script defer data-domain="%SITE_HOST%" src="https://plausible.io/js/script.js"></script>
+    <script defer data-domain="%SITE_HOST%" src="https://plausible.io/js/script.manual.js"></script>
   </head>
   <body>
     <div id="root"></div>

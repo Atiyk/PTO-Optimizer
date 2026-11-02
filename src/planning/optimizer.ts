@@ -143,7 +143,7 @@ function emptyResult(input: SolveInput): SolveResult {
 /** New consumer plans use the existing deterministic optimizer, then verify every
  * spending date. Invalid/infeasible constraints produce an explicit empty plan; they
  * never silently relax a minimum, remove a pinned date, or charge future accrual early.
- * Legacy URLs should continue calling shared solve() directly. */
+ * Legacy URLs use solveLegacyConsumer() to retain every already-valid result. */
 export function solveConsumer(input: SolveInput, options: ConsumerSolveOptions = {}): { result: SolveResult; issue?: string } {
   const minimum = options.minimumBreakDays ?? input.minimumBreakDays ?? 0;
   if (!Number.isInteger(minimum) || minimum < 0 || minimum > 60) {
@@ -193,4 +193,26 @@ export function solveConsumer(input: SolveInput, options: ConsumerSolveOptions =
     return validatePtoDates(plannedInput, [...remaining, alternative].flatMap((brk) => brk.days)).valid;
   });
   return { result: { ...result, alternatives } };
+}
+
+/** Compatibility preserves fully valid legacy plans exactly, including ordering
+ * and manual controls. Unsafe alternatives are removed without changing a funded
+ * primary; unsafe primary plans are repaired without new minimums or presets. */
+export function solveLegacyConsumer(input: SolveInput): { result: SolveResult; issue?: string } {
+  const result = solve(input);
+  const check = validatePtoDates(input, result.primary.flatMap((brk) => brk.days));
+  if (check.valid) {
+    const alternatives = result.alternatives.filter((alternative) => {
+      const remaining = result.primary.filter((brk) => brk.start !== alternative.replaces.start || brk.end !== alternative.replaces.end);
+      return validatePtoDates(input, [...remaining, alternative].flatMap((brk) => brk.days)).valid;
+    });
+    return { result: alternatives.length === result.alternatives.length ? result : { ...result, alternatives } };
+  }
+
+  const corrected = solveConsumer(input, { minimumBreakDays: 0, style: 'custom' });
+  // A retry may legitimately find no funded dates. Explain why the old plan could
+  // not be retained even when the unconstrained solver's empty result is valid.
+  return corrected.result.primary.length === 0
+    ? { ...corrected, issue: corrected.issue ?? check.issue }
+    : corrected;
 }

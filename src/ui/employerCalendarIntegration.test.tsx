@@ -155,3 +155,14 @@ describe('employer calendar integrated with the live consumer state', () => {
     expect(new URLSearchParams(window.location.search).has('eh')).toBe(true);
   });
 });
+
+
+it('rejects an unbounded planning link before building calendar derived data', () => {
+  navigate('?c=US&sd=US-CA&s=0100-01-01&e=9999-12-31&b=15&af=1&afs=2027-01-01');
+  const { result } = renderHook(() => useAppState());
+  expect(result.current.validationIssues).toContain('Choose a planning window of ten years or less.');
+  expect(result.current.offRuns).toEqual([]);
+  expect(result.current.allDaysOff).toEqual([]);
+  expect(result.current.marginalValues.size).toBe(0);
+  expect(result.current.budgetSpent).toBe(0);
+});
