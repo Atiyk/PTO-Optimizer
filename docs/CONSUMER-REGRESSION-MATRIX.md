@@ -1,116 +1,70 @@
 # Consumer regression matrix
 
-This run changes the consumer Gapless application only. `apps/teams`, its routes, backend,
-database, configuration, and deployment are outside scope. The root Vitest configuration
-excludes `apps/**`; passing it is not a claim that B2B has been tested.
+Evidence checkpoint: November 2, 2026. Consumer Gapless only. `apps/teams` source, B2B routes/data, backend, and deployment are excluded. Root Vitest excludes `apps/**`; its success is not a B2B end-to-end test result.
 
-An automated test is evidence for its asserted behavior only. The matrix below records
-the required scenarios and where evidence belongs; a row remains pending until the
-integrated implementation and its actual test output have been reviewed.
+## Evidence rules
 
-| # | Scenario | Required assertion | Evidence / initial status |
+- The last complete integrated local run passed **922 tests in 94 files**. A subsequent adversarial date-range guard passed **18 targeted tests**; these suites overlap. The new complete aggregate result is pending and must not be guessed from arithmetic.
+- “Local pass” below identifies assertions present in those passing suites. It does not substitute for deployment, pixel inspection, or a full browser flow.
+- Foundation CI [41400752850](https://github.com/Atiyk/PTO-Optimizer/actions/runs/41400752850) passed phase-1 checks, 12 route/viewport combinations, and Lighthouse/axe gates. It predates the later features. Its synthetic tested commit `884c337f684ca1700dd6303f95169eb41c8d3927` has the exact phase-1 PR head tree.
+- PR [#80](https://github.com/Atiyk/PTO-Optimizer/pull/80) runs `scripts/consumer-journey.mjs` against the integrated product. **Final browser journey, release metrics, merges, and production checks remain pending** until actual reports are attached.
+
+## Required scenarios
+
+| # | Scenario and asserted behavior | Actual automated source | Recorded evidence / remaining gate |
 |---|---|---|---|
-| 1 | Default US plan, 15 PTO days | Unique PTO cost stays within effective budget and results are deterministic | Existing `packages/engine/src/solver/solve.test.ts`; integrated run pending |
-| 2 | Unobserved public holiday | Deselecting a weekday holiday makes it a working date and recalculates PTO cost | `src/ui/employerCalendarIntegration.test.tsx`: passed; browser flow pending |
-| 3 | Saved employer calendar | Country/region-specific settings survive reload; another region remains independent | Employer hook integration: passed for refresh/country/subdivision; browser reload pending |
-| 4 | Shared employer override | Explicit URL edits override local preferences without writing them into local storage | Employer hook integration: passed; shared default outranks saved exclusions and editing does not overwrite storage |
-| 5 | Minimum five-day break | Candidate eligibility changes before selection; no returned optional break silently violates the minimum | Consumer-planner regression checks pending |
-| 6 | Blackout collision | A mandatory work date is never purchased as PTO | Existing solver regression checks; integrated run pending |
-| 7 | Accrual limitations | Cumulative PTO consumption never exceeds the balance available on that date | Existing solver and policy projection checks; integrated run pending |
-| 8 | Carryover / expiration | At-risk amount matches configured cap/reset; full carryover has no false forfeiture | Existing `src/policy/acceptance.test.ts`, projection tests; new guard checks pending |
-| 9 | Forecast date | Changing the target changes ending balance consistently with the existing policy projection | Forecast checks pending |
-| 10 | Request status | Planned → requested → approved moves one unique future deduction between scenarios | Ledger transition and forecast checks pending |
-| 11 | Rejected/canceled request | Inactive requests reserve no confirmed or tentative future PTO | Ledger checks pending |
-| 12 | Duplicate/overlap | Overlapping working dates deduct once; UI identifies the conflict | Ledger and tracker checks pending |
-| 13 | Partner availability | Joint suggestions respect both disclosed calendars and independent PTO constraints | Partner-planner checks pending |
-| 14 | Share privacy | Default link contains availability only, excluding balances, notes, employer, and policy | Existing overlap URL checks plus new partner checks pending |
-| 15 | Portrait PNG | Canvas is 1080×1350; dates/costs match current plan; default pixels omit balance | Portrait renderer tests and visual review pending |
-| 16 | Legacy URLs | Old `w`, `count`, `ov`, policy and date parameters continue to decode and reproduce valid plans | Existing `src/ui/urlState.test.ts`, `policyUrlState.test.ts`; integrated run pending |
-| 17 | Mobile | All main flows at 375px have no page overflow/clipped controls | `scripts/consumer-qa.mjs`; browser initially unavailable |
-| 18 | Keyboard/accessibility | Inputs have names; menu opens with Enter/closes with Escape and restores focus; controls remain reachable | Existing component tests + browser smoke; browser initially unavailable |
-| 19 | Storage unavailable | Read/write/security/quota failures never crash planning; failed save is accurately reported | Employer hook storage-failure check passed; tracker failure checks pending |
-| 20 | Invalid/missing data | Malformed dates, oversized payloads, impossible constraints, and missing holidays degrade honestly | Existing URL/holiday checks plus new module checks pending |
+| 1 | US employee with 15 PTO days: deterministic meaningful breaks; unique cost fits balance after reserve | `src/planning/optimizer.test.ts` realistic consumer cases; `packages/engine/src/solver/solve.test.ts`; `src/ui/Headline.test.tsx` | Local pass. Foundation route smoke passed. Final integrated journey uses a smaller bounded fixture; production pending |
+| 2 | Uncheck an observed holiday: it becomes a working date, changing real PTO cost; restoring it reverses the change | `src/ui/employerCalendarIntegration.test.tsx`; `src/personal/employerCalendar.test.ts`; `src/planning/optimizer.test.ts` | Local pass. Final journey’s employer-calendar case tests saved exclusions/custom days; final browser result pending |
+| 3 | Save/revisit employer calendar: refresh restores it; country and subdivision stay independent | `src/ui/employerCalendarIntegration.test.tsx`; `src/personal/employerCalendar.test.ts`; `src/ui/useRequestCalendar.test.tsx` | Local pass. Reload/country/subdivision assertions exist. Final journey’s browser persistence result pending |
+| 4 | Shared holiday overrides outrank local settings without overwriting the recipient’s saved preferences | `src/ui/employerCalendarIntegration.test.tsx`; `src/personal/employerCalendar.test.ts`; `src/ui/Landing.test.tsx` | Local pass, including explicit public-default override. Final journey compares storage before/after incoming share; browser result pending |
+| 5 | Five-day minimum changes candidate eligibility before optimization; impossible constraints never silently relax it | `src/planning/optimizer.test.ts`; `src/ui/planningUrlState.test.ts`; `packages/engine/src/solver/minimumBreakDays.test.ts` | Local pass. Minimum and planning style round-trip. Final browser/production confirmation pending |
+| 6 | Blackout date cannot be purchased or bridged as time off, including required-date conflicts | `packages/engine/src/solver/solve.test.ts`; `src/planning/optimizer.test.ts`; `src/planning/partner.test.ts` | Local pass for normal/partner constraints and explicit conflicts; no separate final browser blackout case |
+| 7 | PTO is funded on the actual spending date; future accrual and break-end credit cannot fund earlier workdays | `src/planning/optimizer.test.ts`; `src/policy/projection.test.ts`; `src/personal/forecast.test.ts`; `src/planning/partner.test.ts` | Local pass for strict per-day funding, floating-point tolerance, and bounded rescheduling. No blanket claim that every policy combination has a browser case |
+| 8 | Capped carryover produces the right at-risk amount; full carryover does not invent year-end forfeiture; carried portion has its own inclusive deadline | `src/personal/expiration.test.ts`; `src/personal/forecast.test.ts`; `src/ui/ExpirationGuard.test.tsx`; `src/policy/summary.test.ts` | Local pass, including hours-to-days handoff, waiting periods, front-loaded grant dates and approved-leave deductions. Dedicated browser guard/reminder flow is not in the current final journey |
+| 9 | Changing forecast date updates the projected balance using the existing policy model, with native units/precision and unlimited-PTO semantics | `src/personal/forecast.test.ts`; `src/ui/PolicyForecastFlow.test.tsx`; `src/policy/projection.test.ts` | Local pass for date/rule changes, caps, shortfalls and optional saved policy. Final request-to-forecast browser result pending |
+| 10 | Planned → requested → approved moves one unique future deduction from tentative to confirmed; correction never duplicates consumption | `src/personal/requestLedger.test.ts`; `src/personal/forecast.test.ts`; `src/ui/PtoManagement.test.tsx` | Local pass. Final journey performs real status changes, forecast checks and refresh; browser result pending |
+| 11 | Canceled/rejected requests reserve no future tentative or confirmed PTO | `src/personal/requestLedger.test.ts`; `src/personal/forecast.test.ts`; `src/ui/PtoManagement.test.tsx` | Local pass. Final journey cancels and re-approves a request, checking the exact balance; browser result pending |
+| 12 | Duplicate/overlapping dates deduct once and show conflicts; completed past leave is already in the current balance | `src/personal/requestLedger.test.ts`; `src/personal/forecast.test.ts`; `src/ui/PtoManagement.test.tsx`; `src/ui/PtoTrackerCoverage.test.tsx` | Local pass for duplicate ranges, overlapping calendar dates, date edits and historical cost preservation. Final journey checks no duplicate deduction after status changes |
+| 13 | Two-person alternatives stay within disclosed dates and the recipient’s independent budget, workweek, holidays, accrual, expiry, minimum and peak rules | `src/planning/partner.test.ts`; `src/ui/PartnerPlanner.test.tsx` | Local pass. Confirmed sharing resets after selection/calendar changes; old links keep source PTO composition unknown. Final two-context recipient browser result pending |
+| 14 | Partner payload omits balance, employer, notes and policy; ordinary analytics never leaks query/hash state or unsafe incoming referrers | `src/planning/partner.test.ts`; `src/ui/analyticsPrivacy.test.ts`; `src/ui/analytics.test.ts`; `src/ui/PrivacyAnalytics.test.tsx` | Local pass. Final journey uses actual hosted provider SDKs with locally intercepted POSTs to verify transport; result pending |
+| 15 | Portrait canvas is 1080×1350; dates/costs match the plan; balance is hidden by default; copy failure falls back truthfully; long plans label overflow | `src/ui/portraitExport.test.ts`; `src/ui/PortraitShare.test.tsx`; existing `src/ui/imageExport.test.ts` and `src/ui/icsExport.test.ts` | Local pass for draw model/pixels, dimensions, cross-year dates, privacy toggle and result messages. Actual PNG/download browser evidence pending in final journey |
+| 16 | Existing `w`, `count`, `ov`, policy and historical root URLs remain usable; valid old results stay exact while unsafe old spending is repaired or explained | `src/ui/urlState.test.ts`; `src/ui/planningUrlState.test.ts`; `src/ui/policyUrlState.test.ts`; `src/ui/landingState.test.ts`; `src/planning/optimizer.test.ts` | Local pass plus 24 frozen shared-solver fingerprints in `packages/engine/src/solver/performanceRegression.test.ts` for the performance change. This is compatibility evidence, not a claim that legacy calculation defects are preserved |
+| 17 | Main consumer flows fit 375px without horizontal page overflow or clipped primary controls | `scripts/consumer-qa.mjs`; `scripts/consumer-journey.mjs`; `.github/workflows/consumer-validation.yml` | Foundation before/after screenshots and checks passed at 1440/768/375. Final-feature 375px journey/screenshots pending |
+| 18 | Named controls and semantic headings; keyboard menu opens with Enter, closes with Escape, restores focus; usable target sizes and contrast | `src/ui/SiteHeader.test.tsx`; `src/ui/DayCell.test.tsx`; `src/ui/YearStrip.test.tsx`; `src/ui/tokens.test.ts`; `scripts/consumer-qa.mjs`; `scripts/consumer-lighthouse.mjs` | Foundation menu/label/overflow smoke passed; candidate axe zero violations in tested initial/expanded states. Final feature-expanded scans pending; automated checks do not certify WCAG conformance |
+| 19 | Unavailable/quota/security-denied local storage does not crash live use or falsely claim a successful save | `src/personal/employerCalendar.test.ts`; `src/ui/employerCalendarIntegration.test.tsx`; `src/personal/requestLedger.test.ts`; `src/ui/PtoManagement.test.tsx`; `src/personal/policyPreferences.test.ts`; `src/ui/useRequestCalendar.test.tsx` | Local pass for live state, optional policy, request persistence and holiday fallback. This is an injected storage-failure assertion, not proof of every browser privacy mode |
+| 20 | Invalid/missing holidays, malformed URLs/dates, oversized payloads, overlong ranges, unavailable coverage and impossible constraints degrade clearly | `src/ui/validation.test.ts`; `src/ui/employerCalendarIntegration.test.tsx`; `src/personal/consumerHolidays.test.ts`; `src/ui/PtoTrackerCoverage.test.tsx`; `src/planning/optimizer.test.ts`; `src/planning/partner.test.ts`; `src/ui/Landing.test.tsx` | Local pass. Latest 18-test targeted run includes rejection before calendar-derived allocation for an unbounded link. Final aggregate and production verification pending |
 
-## Browser evidence
+## Additional cross-cutting coverage
 
-Employer-calendar hook integration was run against the real short-range consumer solver
-and mocked holiday loaders: 7/7 tests passed (251 ms test execution, 1.91 s total).
-Consumer TypeScript checking and targeted lint for the new test/script also passed.
-These results apply to the employer-calendar phase snapshot, not future integrated phases.
+- Holiday substitutes and New Year boundaries: `src/personal/consumerHolidays.test.ts`, `src/ui/useRequestCalendar.test.tsx`, `src/ui/landingCalendar.test.ts`. Two holiday names may share a date without charging that day twice; regional coverage is preserved.
+- Leap days, month/year boundaries and date validation: `src/planning/optimizer.test.ts`, `src/planning/partner.test.ts`, `src/ui/landingState.test.ts`, `src/ui/validation.test.ts`, policy projection and ICS tests. All use UTC calendar arithmetic.
+- Tracker calendar coverage: `src/ui/PtoTrackerCoverage.test.tsx` checks both UI and action boundaries, loading/degraded calendars, out-of-range edits, status/note corrections and saved historical costs.
+- Quick policy defaults/persistence: `src/personal/policyPreferences.test.ts` and `src/ui/PolicyForecastFlow.test.tsx` check no invented initial balance/forfeiture, explicit URL precedence, native carried balance, delete/reset, and unlimited PTO.
+- Expiration reminders: `src/personal/expiration.test.ts`, `src/ui/ExpirationGuard.test.tsx`, and `src/ui/icsExport.test.ts` check 60/30/7-day timing, inclusive deadlines, future-only reminders, all-day exclusive event ends, opt-out/dismissal, escaping and truthful delivery copy.
+- New homepage behavior: `src/ui/Landing.test.tsx`, `src/ui/landingState.test.ts`, and `src/ui/landingCalendar.test.ts` check real prerendered/interactive calculations, no submission, controls/URL handoff, saved holiday assumptions and explicit invalid/empty states.
 
-Run the existing consumer Vite server, then:
+## Browser and metrics protocol
 
-```sh
-node scripts/consumer-qa.mjs http://127.0.0.1:5173 /absolute/path/to/evidence before
-node scripts/consumer-qa.mjs http://127.0.0.1:5173 /absolute/path/to/evidence after
-```
+`consumer-qa.mjs` runs fresh contexts for four public consumer routes at 1440, 768, and 375 pixels, fixed November 2, 2026 time, US locale, New York timezone and reduced motion. It checks route-specific documents/titles, application errors, same-origin failures, horizontal overflow, input/button names, menu keyboard behavior and expanded PTO options. Directory routes use their actual index documents; a homepage fallback cannot satisfy a planner assertion. Third-party analytics is blocked consistently; the local platform-only Insights script is stubbed.
 
-The script creates fresh browser contexts at 1440px, 768px, and 375px for `/`, `/pto`,
-`/policy`, and `/sabbatical`, plus screenshots of expanded PTO options. It uses committed
-same-origin holiday data, a fixed November 2, 2026 clock, US locale, New York timezone,
-and reduced motion. Reports record page errors, same-origin HTTP failures, page overflow,
-heading/label checks, and a keyboard/menu smoke check. Third-party analytics is blocked
-in these evidence contexts. Vercel's platform-only Insights script is stubbed because
-the local static server cannot serve it; other same-origin failures remain failures.
-Directory routes use a trailing slash for Vite preview, and route-specific title checks
-prevent its homepage fallback from being mistaken for an optimizer/policy/sabbatical
-test. No signed-in or B2B actions run.
+`consumer-lighthouse.mjs` uses Lighthouse 13.6.0, axe Playwright 4.14.0, and chrome-launcher 1.2.2 installed under runner temporary storage without changing application dependencies. Three sequential alternating before/after mobile runs use 375×812 simulated throttling. Gates are accessibility ≥95, SEO 100, performance regression no worse than three points, and no serious/critical axe violation. Missing measurements are unavailable/failing evidence, never assumed passes. Axe incomplete checks stay in raw reports for manual review.
 
-These are basic browser checks, not a WCAG conformance audit.
+Actual foundation scores and artifact links appear in [CONSUMER-IMPLEMENTATION-STATUS.md](CONSUMER-IMPLEMENTATION-STATUS.md). Those results apply to phase 1 only. The final phase additionally runs `consumer-journey.mjs` at 375×812 with synthetic 2027 dates. It captures real downloads and screenshots and does not contact an employer, create an account, or send messages. Its isolated analytics transport fixture loads actual unmodified hosted SDKs, locally intercepts all POSTs, and records SDK hashes; preparing this script is not a passing transport result.
 
-## Lighthouse and axe measurements
+## Failure history and compatibility boundary
 
-The proposed consumer CI workflow installs `lighthouse@13.6.0`,
-`@axe-core/playwright@4.14.0`, and `chrome-launcher@1.2.2` under `RUNNER_TEMP` only.
-Exact versions and Node compatibility were verified against npm on November 2, 2026.
-The application package manifests and lockfile remain unchanged.
+Initial local baseline: 673/675 passed with two existing timing failures. The count-DP performance repair skips impossible count states and hoists repeated candidate calculations; tests and timing thresholds were preserved. Twenty-four frozen legacy fixtures retained identical outputs. The optional minimum-break hook is absent for legacy/B2B callers; stricter funding/carryover fixes are applied in the consumer adapter. No B2B application code or data route changed: the remote `apps/teams` subtree SHA `ce2bedc3bca5c97593819583dc53506c25e70e98` exactly matches baseline.
 
-`scripts/consumer-lighthouse.mjs` measures all four consumer routes at a 375×812
-mobile viewport using simulated throttling. Three sequential runs alternate the exact
-PR baseline and candidate to reduce timing bias. The performance comparison uses each
-route's median; accessibility and SEO use the lowest observed score. The gates require
-no more than a three-point mobile performance regression, candidate accessibility of at
-least 95, and candidate SEO of 100. Missing baseline measurements fail the regression
-assessment; a push without a baseline explicitly reports that comparison unavailable.
+The local runtime blocks tsx Unix IPC and supplied no usable Chromium archive. Equivalent direct Node/tsx-loader production lifecycle checks passed; foundation CI ran the real `npm run build` and browser tools successfully. Earlier browser passes that accidentally used Vite’s home fallback were discarded as route evidence; later checks assert the actual route. Contrast, target-size and nested-interactive findings were addressed, while a non-blocking foundation heading-order audit remained recorded. Missing final screenshots, metrics and production observations are still pending.
 
-A separate fresh browser runs axe against WCAG 2 A/AA, 2.1 AA, and 2.2 AA tags, including
-expanded PTO options. Serious or critical candidate violations fail the gate; incomplete
-checks are recorded for manual review. These automated checks are not a claim of WCAG
-conformance. Raw Lighthouse and axe JSON files and compact route/selector diagnostics
-are preserved with the browser evidence, including on failure. No actual Lighthouse
-scores have been obtained by preparing this script; only CI execution provides them.
+## Release evidence to record
 
-## Baseline environment limitations
-
-The initial environment has no installed Chromium executable. Both `npx playwright install
-chromium` and `npx playwright install chromium --only-shell` failed after five retries:
-the download was reported as 0 MiB and extraction failed with “End of central directory
-record signature not found.” Baseline screenshots at the requested exact viewports,
-local browser flows, and Lighthouse scores are unavailable until a usable local browser
-is supplied. A missing browser produces a report
-with `status: "unavailable"` and exit code 2; it does not count as a successful check.
-
-Cloud-browser baseline evidence was captured from the verified production consumer
-deployment at commit `4a0a10de0075d0d9be4987ad02a6cc0326ba1758`. Its observed viewport
-was 1363×936; the supported cloud API exposes no resize control, so these images are
-desktop evidence only, not substitutes for the 1440/768/375 matrix. The home image is
-full-page; optimizer, policy, and sabbatical images show their initial viewport.
-Files: `/workspace/scratch/gapless-baseline-home.jpg`,
-`/workspace/scratch/gapless-baseline-pto.jpg`,
-`/workspace/scratch/gapless-baseline-policy.jpg`, and
-`/workspace/scratch/gapless-baseline-sabbatical-verified.jpg`.
-
-An existing semantic defect was observed on `/sabbatical`: no `h1` is present in the
-rendered DOM. The page's lead result is visually prominent but uses a different element.
-This must be distinguished from a newly introduced regression. Cloud console errors
-observed during the baseline were from a browser extension, not application source.
-
-## Scope review before release
-
-- Compare changed paths against the consumer scope and reject any `apps/teams/**` edit.
-- Review any shared-engine change separately for opt-in behavior and legacy compatibility.
-- Check private ledger data stays in validated local browser storage and out of URL state.
-- Confirm analytics contains event names only, without personal event properties.
-- Confirm every new planning control round-trips, using versioned bounded URL payloads.
-- Record real tests, type checks, lint, production build, deployment, and runtime status.
-- Do not mark pending browser or production verification as passed.
+| Gate | Current status | Required release record |
+|---|---|---|
+| Final complete local/CI aggregate | 922-test snapshot passed; final 18-test range guard passed; new aggregate pending | Exact final commit, test-file/test counts and successful workflow |
+| Final browser journey and expanded features | Running / pending | PR #80 run, artifact, five journey case results, PNGs/screenshots, runtime and network diagnostics |
+| Final Lighthouse/axe | Pending for the integrated eight-phase tree | Baseline/candidate SHAs, route medians/minima, delta and findings |
+| Phase merges | Pending | PR #73–#80 merged commit SHAs; required checks preserved |
+| Consumer preview | READY at inspected phase-8 commit `d5e4c7ab…`; final journey pending | Deployment `dpl_4FPJSnweRdCnM1dsV9oZPoTAbe17`, https://pto-optimizer-4q6442wag-atiyk-a.vercel.app |
+| Consumer production | Pending; production remains the baseline until validated merges | Matching consumer Vercel deployment, READY state, verified public routes and representative flows |
+| B2B exclusion | Required before each merge | Changed-path review confirms no `apps/teams/**` modification; shared-engine compatibility reviewed separately |

@@ -129,7 +129,7 @@ const forecastRegion = (page) => page.getByRole('region', { name: 'PTO balance f
 async function forecastBalance(page) { return numberIn(await forecastRegion(page).locator('[aria-live="polite"]').innerText()); }
 async function forecastScheduled(page) {
   const region = forecastRegion(page);
-  return Math.abs(numberIn(await region.locator('dl > div').filter({ has: region.getByText('Scheduled PTO', { exact: true }) }).locator('dd').innerText()));
+  return Math.abs(numberIn(await region.getByText('Scheduled PTO', { exact: true }).locator('..').locator('dd').innerText()));
 }
 
 function datesBetween(start, end) {
@@ -375,6 +375,65 @@ try {
       assert.doesNotMatch(await recipient.locator('#day-2027-12-30').getAttribute('aria-label'), /QA company closure 2027/);
     }, 'Reset must remove saved exceptions');
     await noOverflow(recipient); await screenshot(recipient, '03-employer-calendar-reset-375.png');
+  });
+
+  await check('Expiration risk uses the real deadline, exports reminders, and persists dismissal controls', async () => {
+    const context = await mobileContext();
+    const page = await open(context, '/policy/?c=US');
+    const quick = page.getByRole('region', { name: 'Quick balance forecast', exact: true });
+    await quick.getByLabel('Current PTO balance (days)', { exact: true }).fill('8');
+    await quick.getByLabel('Balance as-of date', { exact: true }).fill('2027-01-01');
+    await quick.getByLabel('How PTO accrues', { exact: true }).selectOption('front-loaded');
+    await quick.getByLabel('Days earned each grant', { exact: true }).fill('0');
+    await quick.getByLabel('Annual grant date', { exact: true }).fill('2027-01-01');
+    await quick.getByLabel('Expiry and carryover', { exact: true }).selectOption('none');
+    await quick.getByLabel('Reset date (new plan year begins)', { exact: true }).fill('2027-04-01');
+    const guard = page.getByRole('region', { name: 'PTO expiration guard', exact: true });
+    await eventually(async () => {
+      assert.equal(await guard.getByText('You could lose 8 days on 2027-04-01.', { exact: true }).count(), 1);
+      assert.equal(await guard.getByText('Last day to use this PTO: 2027-03-31.', { exact: true }).count(), 1);
+    }, 'The entered reset must produce an exact use-by warning');
+    const handoff = guard.getByRole('link', { name: 'Find the best way to use those days →', exact: true });
+    const href = new URL(await handoff.getAttribute('href'), origin);
+    assert.equal(href.pathname, '/pto');
+    assert.equal(href.searchParams.get('b'), '8');
+    assert.equal(href.searchParams.get('s'), '2027-01-01');
+    assert.equal(href.searchParams.get('e'), '2027-03-31');
+    assert.equal(href.searchParams.get('rv'), '0');
+    await guard.locator('summary').filter({ hasText: 'Calendar reminders' }).click();
+    for (const lead of [60, 30, 7]) assert.equal(await guard.getByRole('checkbox', { name: `${lead} days before`, exact: true }).isChecked(), true);
+    const download = page.waitForEvent('download');
+    await guard.getByRole('button', { name: 'Download calendar reminders', exact: true }).click();
+    const reminderPath = resolve(out, 'expiration-reminders.ics');
+    await (await download).saveAs(reminderPath);
+    const calendar = (await readFile(reminderPath, 'utf8')).replace(/\r?\n[ \t]/g, '');
+    assert.equal((calendar.match(/BEGIN:VEVENT/g) ?? []).length, 3);
+    assert.equal((calendar.match(/BEGIN:VALARM/g) ?? []).length, 3);
+    for (const lead of [60, 30, 7]) {
+      const date = new Date(Date.parse('2027-04-01T00:00:00Z') - lead * 86400000).toISOString().slice(0, 10).replaceAll('-', '');
+      assert.ok(calendar.includes(`DTSTART;VALUE=DATE:${date}`), `${lead}-day reminder must use the reset date.`);
+    }
+    assert.match(calendar, /Use PTO by 2027-03-31/);
+    assert.ok(!calendar.includes(privateNote));
+    await noOverflow(page); await guard.screenshot({ path: resolve(out, 'expiration-risk-reminders-375.png') });
+    await handoff.click();
+    await eventually(async () => {
+      assert.equal(await page.getByLabel('PTO days available', { exact: true }).inputValue(), '8');
+      assert.equal(new URL(page.url()).searchParams.get('e'), '2027-03-31');
+    }, 'The real optimizer handoff must preserve the safe budget and use-by boundary');
+    await page.goBack({ waitUntil: 'networkidle' });
+    await guard.getByRole('button', { name: 'Dismiss You could lose 8 days on 2027-04-01.', exact: true }).click();
+    await page.reload({ waitUntil: 'networkidle' });
+    await eventually(async () => assert.equal(await guard.getByText('All current alerts are dismissed.', { exact: true }).count(), 1), 'Dismissal must survive refresh');
+    await guard.getByRole('button', { name: 'Show dismissed alerts', exact: true }).click();
+    await guard.getByText('You could lose 8 days on 2027-04-01.', { exact: true }).waitFor();
+    await guard.getByRole('checkbox', { name: 'Show in-app alerts', exact: true }).uncheck();
+    await page.reload({ waitUntil: 'networkidle' });
+    assert.equal(await guard.getByRole('checkbox', { name: 'Show in-app alerts', exact: true }).isChecked(), false);
+    await guard.getByText('In-app expiration alerts are off in this browser.', { exact: true }).waitFor();
+    await guard.getByRole('checkbox', { name: 'Show in-app alerts', exact: true }).check();
+    await guard.getByText('You could lose 8 days on 2027-04-01.', { exact: true }).waitFor();
+    await noOverflow(page);
   });
 
   await check('Partner sharing contains only selected availability and honors independent recipient PTO', async () => {

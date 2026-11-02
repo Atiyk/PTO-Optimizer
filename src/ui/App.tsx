@@ -306,7 +306,7 @@ export function App() {
               efficiencyPercentile={state.scores?.efficiency.percentile ?? null}
               noticePeriodDays={state.noticePeriodDays}
               buildOverlapLink={state.buildOverlapLink}
-            /> : <p role="status" className="text-sm text-muted">Check your planning inputs before exporting a plan.</p>}
+            /> : <p role="status" className="text-sm text-muted">Check your planning inputs before exporting.</p>}
           </div>
 
           {!state.validationIssues.length && !state.solverIssue && state.holidaysReady && !state.holidaysDegraded && <div className="mt-4">
@@ -328,7 +328,7 @@ export function App() {
           <h2 className="mt-8 text-xl font-semibold text-ink">Your complete plan</h2>
           <div className={`${SECTION_GAP} lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start`}>
             <div className="flex flex-col gap-4 lg:col-span-3">
-              {!state.validationIssues.length ? <CalendarErrorBoundary>
+              {!state.validationIssues.length && !state.solverIssue ? <CalendarErrorBoundary>
                 <Calendar
                   rangeStart={state.rangeStart}
                   rangeEnd={state.rangeEnd}
