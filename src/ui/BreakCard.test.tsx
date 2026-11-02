@@ -242,6 +242,16 @@ describe('BreakCard copy-request menu keyboard and touch access', () => {
     }
   });
 
+  it('allows Tab to leave the menu without a keyboard trap', () => {
+    mountInteractive({ defaultExpanded: true });
+    act(() => { trigger().click(); });
+    const first = container!.querySelector<HTMLButtonElement>('[role="menuitem"]')!;
+    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    act(() => { first.dispatchEvent(event); });
+    expect(event.defaultPrevented).toBe(false);
+    expect(container!.querySelector('[role="menu"]')).toBeNull();
+  });
+
   it('dismisses on outside pointer interaction and outside keyboard focus without trapping focus', () => {
     mountInteractive({ defaultExpanded: true });
     const button = trigger();
