@@ -132,6 +132,14 @@ export interface HolidayEntry {
   checked: boolean;
 }
 
+const EMPTY_RESULT: SolveResult = {
+    primary: [],
+    alternatives: [],
+    breakCountRequested: 0,
+    breakCountActual: 0,
+    budgetSpent: 0,
+    peakCapApplied: false,
+  };
 export function useAppState() {
   const initial = useMemo(() => {
     const defaults = {
@@ -634,14 +642,6 @@ export function useAppState() {
   );
   const isValidInput = validationIssues.length === 0;
 
-  const EMPTY_RESULT: SolveResult = {
-    primary: [],
-    alternatives: [],
-    breakCountRequested: 0,
-    breakCountActual: 0,
-    budgetSpent: 0,
-    peakCapApplied: false,
-  };
   const lastGoodResultRef = useRef<SolveResult>(EMPTY_RESULT);
   const lastGoodScoresRef = useRef<Scores | null>(null);
 

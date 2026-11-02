@@ -9,57 +9,40 @@
     <meta name="theme-color" content="#fbf8f3" />
     <link rel="preload" href="/fonts/figtree-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
 
-    <title>%PRODUCT_NAME% &mdash; Make Every PTO Day Count</title>
+    <title>%PRODUCT_NAME% &mdash; Plan and Track Your Time Off</title>
     <meta
       name="description"
-      content="See your next day off, every holiday left this year, and the closest long weekend &mdash; then plan ordinary time off or a sabbatical. Free, no sign-up."
+      content="Find longer breaks, customize employer holidays, track PTO requests, and forecast your balance. Plan your 2027 time off and any date range. Free, no sign-up."
     />
     <link rel="canonical" href="%SITE_URL%/" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="%PRODUCT_NAME%" />
-    <meta property="og:title" content="%PRODUCT_NAME% &mdash; Make Every PTO Day Count" />
+    <meta property="og:title" content="%PRODUCT_NAME% &mdash; Plan and Track Your Time Off" />
     <meta
       property="og:description"
-      content="See your next day off, every holiday left this year, and the closest long weekend &mdash; then plan ordinary time off or a sabbatical. Free, no sign-up."
+      content="Find longer breaks, customize employer holidays, track PTO requests, and forecast your balance. Plan your 2027 time off and any date range. Free, no sign-up."
     />
     <meta property="og:url" content="%SITE_URL%/" />
     <meta property="og:image" content="%SITE_URL%/og-images/landing.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="%PRODUCT_NAME% - Make every PTO day count, with the next upcoming public holiday." />
+    <meta property="og:image:alt" content="%PRODUCT_NAME% - Make the most of every day off you have earned." />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="%PRODUCT_NAME% &mdash; Make Every PTO Day Count" />
+    <meta name="twitter:title" content="%PRODUCT_NAME% &mdash; Plan and Track Your Time Off" />
     <meta
       name="twitter:description"
-      content="See your next day off, every holiday left this year, and the closest long weekend &mdash; then plan ordinary time off or a sabbatical. Free, no sign-up."
+      content="Find longer breaks, customize employer holidays, track PTO requests, and forecast your balance. Plan your 2027 time off and any date range. Free, no sign-up."
     />
     <meta name="twitter:image" content="%SITE_URL%/og-images/landing.png" />
 
-    <!-- Migration (site restructure): the optimizer used to live at "/" - every link anyone
-         has ever shared points here, carrying its state in the query string. The landing
-         page defines no query parameters of its own (country is detected from locale, not a
-         URL param), so ANY non-empty search string on "/" is, unambiguously, an old
-         optimizer link. Redirect before the bundle loads - not after React mounts - so a
-         visitor following a years-old link never sees the landing page flash first. A bare
-         "/" (no search string) continues straight through to the landing page below.
-
-         BUG FOUND testing this locally: without the pathname check, a server that serves
-         THIS SAME landing-page HTML as a catch-all fallback for /pto (vite's own preview
-         server does exactly this for a path with no trailing slash, and any misconfigured
-         static host could too) would run this script again at /pto?..., see a non-empty
-         search string, and `location.replace()` right back to the identical /pto URL -
-         forcing a real reload, which serves the fallback again, which redirects again:
-         an infinite reload loop, confirmed by watching the network tab repeat the same
-         request 35,000+ times in well under a minute. Checking pathname === '/' makes the
-         redirect fire only on the actual root, so it can never loop no matter how a
-         misconfigured host resolves /pto - the production host (Vercel, cleanUrls: true)
-         resolves /pto to its own distinct file as already proven by every existing country
-         route using the identical pattern, but this script no longer depends on that being
-         true to stay safe. -->
+    <!-- Historic optimizer links at the root keep their destination and exact query.
+         New homepage previews use an explicit home=1 marker; no legacy param is renamed.
+         The pathname guard prevents redirect loops on static-host fallback responses. -->
     <script>
-      if (window.location.pathname === '/' && window.location.search) {
+      if (window.location.pathname === '/' && window.location.search &&
+          new URLSearchParams(window.location.search).get('home') !== '1') {
         window.location.replace('/pto' + window.location.search + window.location.hash);
       }
     </script>
