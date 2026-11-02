@@ -127,7 +127,8 @@ export function Landing() {
             <h2 className="text-base font-semibold text-ink">Make this preview yours</h2>
             <p className="mt-1 text-sm text-muted">Change your PTO days, country or dates. Your recommendation updates automatically.</p>
           </div>
-          <div className="grid min-w-0 grid-cols-2 gap-3">
+          <div className="grid min-w-0 gap-4 lg:grid-cols-2 lg:items-start">
+            <div className="grid min-w-0 grid-cols-2 gap-3">
             <label htmlFor="landing-country" className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-muted">Country
               <select id="landing-country" className={FIELD} value={country} onChange={(event) => update({ country: event.target.value })}>{COUNTRIES.map((entry) => <option key={entry.code} value={entry.code}>{entry.name}</option>)}</select>
             </label>
@@ -143,6 +144,7 @@ export function Landing() {
             </div>
             <p className="mt-2 text-xs text-muted">Choose any dates, up to two years. Your preview updates as you edit.</p>
           </details>
+          </div>
           {!validRange && <p role="alert" className="text-sm text-accent-ink">Choose valid start and end dates, with the end after the start and no more than two years apart.</p>}
           <div className="hidden lg:block"><Button href={href}>See the full plan →</Button></div>
         </div>
