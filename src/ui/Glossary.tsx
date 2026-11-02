@@ -3,6 +3,7 @@ import { SiteHeader } from './SiteHeader';
 import { Footer } from './Footer';
 import { Container } from './Container';
 import { GLOSSARY_TERMS, type GlossaryTerm } from '../content/glossary/terms';
+import { PRACTICAL_GUIDES } from '../content/glossary/guides';
 
 const LEARNING_PATHS = [
   { title: 'Your PTO basics', detail: 'Understand your balance, how vacation differs from other leave, and the days you actually have.', terms: ['pto', 'vacation', 'sick-leave', 'floating-holiday'] },
@@ -67,6 +68,19 @@ export function Glossary() {
               </section>
             ))}
           </div>
+          <section className="mt-10" aria-labelledby="practical-guides-heading">
+            <h2 id="practical-guides-heading" className="text-xl font-semibold text-ink">Practical guides</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">Real questions, simple examples, and the details to confirm with HR before you make plans.</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {PRACTICAL_GUIDES.filter((guide) => ['pto', 'accrual', 'carryover', 'company-holiday', 'notice-period', 'payout'].includes(guide.termId)).map((guide) => (
+                <a key={guide.termId} href={`/glossary/${guide.termId}`} className="group flex min-h-36 flex-col rounded-xl border border-line bg-surface p-5 transition-colors hover:border-line-strong hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+                  <h3 className="text-base font-semibold text-ink group-hover:text-accent-ink">{guide.title}</h3>
+                  <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted">{guide.answer}</p>
+                  <span className="mt-auto pt-4 text-sm font-medium text-accent-ink">Read the guide <span aria-hidden="true">→</span></span>
+                </a>
+              ))}
+            </div>
+          </section>
           <section className="mt-7 rounded-xl bg-surface-alt p-5 sm:p-6" aria-label="Put your PTO knowledge to work">
             <h2 className="text-lg font-semibold text-ink">Make the policy work for you</h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">Already know how your time off works? Forecast your PTO balance and expiration dates, then find the best days to use it.</p>
