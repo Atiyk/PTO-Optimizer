@@ -86,6 +86,17 @@ describe('consumer calendar conflict classification', () => {
     expect(result?.matches).toEqual([]);
   });
 
+  it('refuses oversized imported collections instead of scanning unbounded data', () => {
+    expect(checkCalendarConflicts({
+      start: '2027-01-04', end: '2027-01-06',
+      personalBusyDays: Array(4001).fill('2027-01-04'),
+    })).toBeNull();
+    expect(checkCalendarConflicts({
+      start: '2027-01-04', end: '2027-01-06',
+      requests: Array(301).fill(request('one', 'approved')),
+    })).toBeNull();
+  });
+
   it('returns date-only summaries without request IDs, notes, calendar titles or share URLs', () => {
     const result = checkCalendarConflicts({
       start: '2027-01-04', end: '2027-01-06',
