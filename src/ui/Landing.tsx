@@ -1,10 +1,11 @@
+import { getConsumerHolidaysWithStatus as getHolidaysWithStatus } from '../personal/consumerHolidays';
 import { useEffect, useMemo, useState } from 'react';
 import { SiteHeader } from './SiteHeader';
 import { Footer } from './Footer';
 import { Container } from './Container';
 import { CountrySelect } from './CountrySelect';
 import { YearStrip } from './YearStrip';
-import { getHolidaysWithStatus, getPreloadedHolidays, type Holiday } from '@daysoff/engine/data/holidays';
+import { getPreloadedHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { getPrerenderedAt } from './prerenderedAt';
 import { geolocateCountry } from './geo';
 import { todayISO } from './useAppState';

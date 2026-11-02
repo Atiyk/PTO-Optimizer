@@ -3,6 +3,7 @@ import { isoToSerial, addDays } from '@daysoff/engine/solver/dateUtils';
 import { monthLabel } from '@daysoff/engine/calendar/calendarMath';
 import { findDrySpells } from './landingData';
 import type { Holiday } from '@daysoff/engine/data/holidays';
+import { formatLong } from '@daysoff/engine/calendar/dateFormat';
 
 interface YearStripProps {
   today: string;
@@ -71,8 +72,8 @@ export function YearStrip({ today, stripEnd, holidays, bridgeableHolidayDates }:
         width={WIDTH}
         height={HEIGHT}
         className="min-w-[920px]"
-        role="img"
-        aria-label={`A timeline of the next twelve months from today, marking ${holidays.length} public holiday${holidays.length === 1 ? '' : 's'} and the longest stretches without a day off.`}
+        role="group"
+        aria-label={`A timeline from ${formatLong(today)} through ${formatLong(stripEnd)}, marking ${holidays.length} public holiday${holidays.length === 1 ? '' : 's'} and the longest stretches without a public holiday.`}
       >
         {/* Dry-spell regions: shaded, not coloured - a neutral fill reads the same in greyscale. */}
         {drySpells.map((run) => (
@@ -92,7 +93,7 @@ export function YearStrip({ today, stripEnd, holidays, bridgeableHolidayDates }:
         {/* Today marker. */}
         <line x1={0} y1={BASELINE_Y - 24} x2={0} y2={BASELINE_Y + 24} className="stroke-slate-900" strokeWidth={2} />
         <text x={4} y={BASELINE_Y - 28} className="fill-slate-900 text-[10px] font-semibold">
-          Today
+          Start
         </text>
 
         {/* Holiday ticks - taller for a holiday already part of a longer break (>=3 days),
@@ -118,13 +119,20 @@ export function YearStrip({ today, stripEnd, holidays, bridgeableHolidayDates }:
               {/* 5B: tapping (no hover on touch) toggles the same info the <title> above
                   gives a mouse. */}
               <rect
-                x={x(h.date) - 6}
+                x={x(h.date) - 12}
                 y={BASELINE_Y - 24}
-                width={12}
+                width={24}
                 height={44}
                 fill="transparent"
                 className="cursor-pointer"
                 onClick={() => setTappedDate((d) => (d === h.date ? null : h.date))}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setTappedDate((date) => date === h.date ? null : h.date);
+                  }
+                }}
+                aria-pressed={tappedDate === h.date}
                 aria-label={`${h.name}, ${h.date}`}
                 role="button"
                 tabIndex={0}
