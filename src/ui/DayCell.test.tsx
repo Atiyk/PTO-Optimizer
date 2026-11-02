@@ -155,7 +155,8 @@ describe('DayCell coarse-pointer disclosure', () => {
     fireEvent.blur(day, { relatedTarget: action });
     expect(screen.getByRole('button', { name: 'Change this day' })).toBeTruthy();
     fireEvent.click(action);
-    expect(onToggle).toHaveBeenCalledExactlyOnceWith('2026-07-04');
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onToggle).toHaveBeenCalledWith('2026-07-04');
     expect(screen.queryByRole('group', { name: 'Actions for July 4' })).toBeNull();
   });
 
