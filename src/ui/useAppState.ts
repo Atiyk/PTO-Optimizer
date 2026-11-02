@@ -25,10 +25,6 @@ import { policyFromLegacyPtoState, toLegacySolverFields } from '../policy/model'
  * (disabled) when "let the solver decide" is checked. The middle of the 1-7 range, so
  * unchecking the box for the first time doesn't default to either extreme. */
 const DEFAULT_MANUAL_BREAK_COUNT = 4;
-const EMPTY_RESULT: SolveResult = {
-  primary: [], alternatives: [], breakCountRequested: 0,
-  breakCountActual: 0, budgetSpent: 0, peakCapApplied: false,
-};
 
 export function todayISO(): string {
   const now = new Date();
@@ -138,6 +134,14 @@ export interface HolidayEntry {
   checked: boolean;
 }
 
+const EMPTY_RESULT: SolveResult = {
+    primary: [],
+    alternatives: [],
+    breakCountRequested: 0,
+    breakCountActual: 0,
+    budgetSpent: 0,
+    peakCapApplied: false,
+  };
 export function useAppState() {
   const initial = useMemo(() => {
     const defaults = {

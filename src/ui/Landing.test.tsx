@@ -1,0 +1,102 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { Landing } from './Landing';
+import type { Holiday } from '@daysoff/engine/data/holidays';
+import { defaultEmployerCalendar, decodeEmployerCalendar, saveEmployerCalendar } from '../personal/employerCalendar';
+
+const calendar = vi.hoisted(() => [
+  { date: '2026-12-25', nominalDate: '2026-12-25', name: 'Christmas Day', countryCode: 'US', counties: null },
+  { date: '2027-01-01', nominalDate: '2027-01-01', name: 'New Year’s Day', countryCode: 'US', counties: null },
+  { date: '2027-07-05', nominalDate: '2027-07-04', name: 'Independence Day', countryCode: 'US', counties: null },
+] satisfies Holiday[]);
+
+vi.mock('@daysoff/engine/data/holidays', async (original) => ({
+  ...await original<typeof import('@daysoff/engine/data/holidays')>(),
+  getPreloadedHolidays: () => calendar,
+  getHolidaysWithStatus: async () => ({ holidays: calendar, degraded: false }),
+}));
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-11-02T12:00:00Z'));
+  window.history.replaceState(null, '', '/');
+  localStorage.clear();
+});
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); delete window.plausible; });
+
+describe('live homepage planner', () => {
+  it('prerenders a real planning preview from embedded holiday data', () => {
+    const html = renderToStaticMarkup(<Landing />);
+    expect(html).toContain('Your recommended break');
+    expect(html).toContain('calendar days off');
+    expect(html).toContain('15 of 15 PTO days');
+    expect(html).not.toContain('Calculating');
+    expect(html).not.toContain('Updating your holiday calendar');
+    expect((html.match(/<h1\b/g) ?? []).length).toBe(1);
+  });
+
+  it('updates a real plan and its URL when the PTO budget changes, without submission', async () => {
+    const event = vi.fn();
+    window.plausible = event;
+    await act(async () => { render(<Landing />); });
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toContain('every day off');
+    expect(screen.getByRole('spinbutton', { name: 'PTO days available' }).getAttribute('value')).toBe('15');
+    expect(screen.getByText(/15 of 15 PTO days/)).toBeTruthy();
+    await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '5' } }); });
+    expect(screen.getByText(/5 of 5 PTO days/)).toBeTruthy();
+    const link = screen.getAllByRole('link', { name: 'See the full plan →' })[0] as HTMLAnchorElement;
+    expect(link.search).toContain('b=5');
+    expect(link.search).toContain('pv=2');
+    expect(new URLSearchParams(window.location.search).get('b')).toBe('5');
+    expect(event).toHaveBeenCalledExactlyOnceWith('quick_plan_engaged', { url: window.location.origin + '/' });
+    expect(document.querySelector('button[type="submit"]')).toBeNull();
+  });
+
+  it('shows explicit empty and invalid-date states while preserving the basic controls', async () => {
+    await act(async () => { render(<Landing />); });
+    await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '0' } }); });
+    expect(screen.getByText(/No PTO days allocated/)).toBeTruthy();
+    await act(async () => { fireEvent.change(screen.getByLabelText('Through'), { target: { value: '2026-01-01' } }); });
+    expect(screen.getByRole('alert').textContent).toContain('Choose valid start and end dates');
+    expect(screen.getByLabelText('Country')).toBeTruthy();
+  });
+
+  it('restores all new homepage inputs and keeps forecasting and policy entry points', async () => {
+    window.history.replaceState(null, '', '/?home=1&c=GB&b=7&s=2027-01-01&e=2027-08-01');
+    await act(async () => { render(<Landing />); });
+    expect((screen.getByLabelText('Country') as HTMLSelectElement).value).toBe('GB');
+    expect((screen.getByLabelText('From') as HTMLInputElement).value).toBe('2027-01-01');
+    expect((screen.getByLabelText('Through') as HTMLInputElement).value).toBe('2027-08-01');
+    expect(screen.getByRole('link', { name: 'Forecast my balance →' }).getAttribute('href')).toBe('/policy#balance');
+    expect(screen.getByRole('link', { name: 'Check my policy →' }).getAttribute('href')).toBe('/policy');
+    expect(screen.getByText(/Preview assumes a Monday–Friday workweek/)).toBeTruthy();
+  });
+
+  it('applies a saved employer calendar and reproduces it in the full-plan link without writing preferences', async () => {
+    const employer = { ...defaultEmployerCalendar('US'), excluded: ['2026-12-25|Christmas Day'], custom: [{ date: '2026-11-20', name: 'Company day off' }] };
+    expect(saveEmployerCalendar(employer)).toBe(true);
+    const write = vi.spyOn(Storage.prototype, 'setItem');
+    await act(async () => { render(<Landing />); });
+    expect(screen.queryByText('Christmas Day')).toBeNull();
+    expect(screen.getAllByText('Company day off').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Your saved employer holiday calendar is applied/)).toBeTruthy();
+    const link = screen.getAllByRole('link', { name: 'See the full plan →' })[0] as HTMLAnchorElement;
+    expect(decodeEmployerCalendar(new URL(link.href).searchParams.get('eh'))).toEqual(employer);
+    expect(write).not.toHaveBeenCalled();
+    await act(async () => { fireEvent.change(screen.getByLabelText('Country'), { target: { value: 'GB' } }); });
+    const otherCountryLink = screen.getAllByRole('link', { name: 'See the full plan →' })[0] as HTMLAnchorElement;
+    expect(decodeEmployerCalendar(new URL(otherCountryLink.href).searchParams.get('eh'))).toEqual(defaultEmployerCalendar('GB'));
+    expect(screen.queryByText('Company day off')).toBeNull();
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it('keeps planning available when saved preferences cannot be read', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('storage disabled'); });
+    await act(async () => { render(<Landing />); });
+    expect(screen.getByText(/15 of 15 PTO days/)).toBeTruthy();
+    const link = screen.getAllByRole('link', { name: 'See the full plan →' })[0] as HTMLAnchorElement;
+    expect(decodeEmployerCalendar(new URL(link.href).searchParams.get('eh'))).toEqual(defaultEmployerCalendar('US'));
+  });
+});

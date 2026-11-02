@@ -90,6 +90,7 @@ export function App() {
       <div className="border-b border-slate-200 bg-slate-50">
         <Container className="flex flex-wrap items-start gap-x-6 gap-y-3 px-4 py-4">
           <PrimaryControls
+            advanced={optionsOpen}
             country={state.country}
             onChangeCountry={state.setCountry}
             rangeStart={state.rangeStart}
@@ -107,7 +108,7 @@ export function App() {
           />
           <label className="flex min-w-40 flex-col gap-1 text-sm font-medium text-slate-700">
             Planning style
-            <select aria-label="Planning style" className="min-h-11 rounded-md border border-control bg-surface px-3" value={state.planningStyle} onChange={event => state.setPlanningStyle(event.target.value as typeof state.planningStyle)}>
+            <select aria-label="Planning style" className="min-h-11 rounded-md border border-line-strong bg-surface px-3" value={state.planningStyle} onChange={event => state.setPlanningStyle(event.target.value as typeof state.planningStyle)}>
               <option value="balanced">Balanced</option><option value="long-breaks">Long breaks</option><option value="more-breaks">More breaks</option><option value="custom">Custom</option>
             </select>
           </label>
@@ -156,7 +157,7 @@ export function App() {
 
             <label className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
               Minimum length of a break
-              <select aria-label="Minimum length of a break" value={state.minimumBreakDays} onChange={event => state.setMinimumBreakDays(Number(event.target.value))} className="min-h-11 rounded-md border border-control px-3">
+              <select aria-label="Minimum length of a break" value={state.minimumBreakDays} onChange={event => state.setMinimumBreakDays(Number(event.target.value))} className="min-h-11 rounded-md border border-line-strong px-3">
                 <option value={0}>No minimum</option>
                 {Array.from({ length: 60 }, (_, i) => i + 1).map(days => <option key={days} value={days}>{days} calendar days</option>)}
               </select>
