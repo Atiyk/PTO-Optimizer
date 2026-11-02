@@ -25,6 +25,18 @@ Last updated: 2026-11-02. Scope: consumer root Vite application only; never `app
 5. Evaluate a deterministic, sourced "Why this plan?" explanation. Existing `src/ui/breakReason.ts` already produces grounded per-break reasons; avoid duplicating or hallucinating math.
 6. Independent QA/critic gate and production READY verification at every merge SHA. Full UX work is **not complete**.
 
+## Latest verified milestone
+
+- PR [#86](https://github.com/Atiyk/PTO-Optimizer/pull/86) is merged as `3187596230768e4818720d1907475c9a3341a54c`, adding responsive planner sections and live slider QA. Production Vercel was observed READY on this exact main SHA at the start of this run.
+- PR [#85](https://github.com/Atiyk/PTO-Optimizer/pull/85) remains merged. PR #83 was already merged; PR #82 remains closed as a duplicate.
+
+## Current focused implementation — independent QA required before merge
+
+- Branch `gapless/ux-explain-plan-20261102` adds a native, optional **Why this plan?** disclosure under live summary metrics.
+- The explanation uses unique solver-selected dates, actual workweek and selected employer/public calendar days. It partitions dates into PTO workdays, regular nonworking days and employer/holiday days without double counting overlapping categories; when the partition disagrees with solver totals, it displays a transparent loading/consistency message rather than invented arithmetic.
+- Added pure tests for a holiday bridge, overlapping holidays, nonstandard workweek, duplicate dates, empty plan and mismatch state. Browser QA now checks the explanation on 1440/768/375/320, captures screenshots and rejects overflow or inconsistent breakdowns.
+- **Do not merge until** exact-head tests/typecheck/lint/build, browser/visual evidence, matching Vercel preview, independent critic and no B2B changes are confirmed. Production for this branch is NOT yet verified.
+
 ## Known platform constraints
 
 This scheduled run can edit GitHub files through the connector, but this sandbox cannot clone GitHub over the network. Use GitHub Actions for full npm tests, production builds and real browser evidence. Never claim local execution or an unobserved reviewer approval. Keep draft PRs unmerged until quality gates pass. Work in focused feature branches; do not touch the B2B subtree.
