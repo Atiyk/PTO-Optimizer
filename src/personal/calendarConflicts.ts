@@ -23,6 +23,7 @@ export interface CalendarConflict {
   date: string;
   category: ConflictCategory;
   severity: ConflictSeverity;
+  source: ConflictSource;
 }
 
 export interface ConflictCheckInput {
@@ -74,13 +75,21 @@ export function checkCalendarConflicts(input: ConflictCheckInput): ConflictCheck
       || request.ptoDates.length > 1096)) return null;
   const selected = new Set(rangeISO(input.start, input.end));
   const matches = new Map<string, CalendarConflict>();
+  const provenance: Record<ConflictCategory, ConflictSource> = {
+    'employer-blackout': 'employer-blackouts',
+    'confirmed-leave': 'leave-ledger',
+    'tentative-leave': 'leave-ledger',
+    'personal-calendar-busy': 'personal-calendar',
+    'school-in-session': 'school-calendar',
+    commitment: 'commitments',
+  };
 
   const add = (date: string, category: ConflictCategory, severity: ConflictSeverity): void => {
     if (!validCalendarDate(date) || !selected.has(date)) return;
     const key = date + '|' + category;
     const existing = matches.get(key);
     if (!existing || (existing.severity !== 'hard-block' && severity === 'hard-block')) {
-      matches.set(key, { date, category, severity });
+      matches.set(key, { date, category, severity, source: provenance[category] });
     }
   };
 
