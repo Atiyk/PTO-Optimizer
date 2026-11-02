@@ -60,7 +60,7 @@ try {
     for (const route of routes) {
       // Narrowest viewport: enforce overflow and reading-order checks on the
       // Understand hub and guides, without changing legacy planner baselines.
-      if (width === 320 && !['pto', 'understand', 'guide-accrual', 'guide-carryover', 'guide-holidays', 'guide-payout'].includes(route.name)) continue;
+      if (width === 320 && !['home', 'pto', 'understand', 'guide-accrual', 'guide-carryover', 'guide-holidays', 'guide-payout'].includes(route.name)) continue;
       const context = await browser.newContext({
         viewport: { width, height: 1000 },
         timezoneId: 'America/New_York',
@@ -156,6 +156,20 @@ try {
             result.menuFocusReturned = await menu.evaluate((element) => document.activeElement === element);
           }
         }
+        if (route.name === 'home') {
+          // The first meaningful result must precede editable controls visually AND
+          // in DOM reading order, even on the narrowest 320px viewport.
+          const previewHeading = page.getByRole('heading', { name: 'Your recommended break' });
+          const budgetField = page.getByRole('spinbutton', { name: 'PTO days available' });
+          const previewBox = await previewHeading.boundingBox();
+          const budgetBox = await budgetField.boundingBox();
+          result.homeResultBeforeControls = Boolean(previewBox && budgetBox && previewBox.y < budgetBox.y);
+          result.homeReadingOrder = await page.evaluate(() => {
+            const preview = [...document.querySelectorAll('h2')].find((node) => node.textContent?.trim() === 'Your recommended break');
+            const budget = document.getElementById('landing-budget');
+            return Boolean(preview && budget && (preview.compareDocumentPosition(budget) & Node.DOCUMENT_POSITION_FOLLOWING));
+          });
+        }
         if (route.name === 'pto') {
           // The two live planning sliders must be directly visible without opening
           // More options, including on a 320px viewport.
@@ -184,7 +198,8 @@ try {
           || !result.correctRoute || result.guideContentVisible === false || result.guideExampleVisible === false || result.guideQuestionsVisible === false
           || result.menuOpenedWithKeyboard === false || result.menuClosedWithEscape === false
           || result.menuFocusReturned === false || result.slidersVisible === false || result.slidersOutsideAdvanced === false
-          || result.weightingKeyboardResponsive === false || result.plannerResponsiveHeadings === false ? 'failed' : 'passed';
+          || result.weightingKeyboardResponsive === false || result.plannerResponsiveHeadings === false
+          || result.homeResultBeforeControls === false || result.homeReadingOrder === false ? 'failed' : 'passed';
       } catch (error) {
         result.status = 'failed';
         result.error = error instanceof Error ? error.message : String(error);
