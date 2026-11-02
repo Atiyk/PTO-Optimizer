@@ -221,6 +221,7 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
     if (!prop) continue;
 
     if (prop.name === 'BEGIN' && prop.value === 'VEVENT') {
+      if (inEvent) throw new IcsParseError('Calendar has a nested event.');
       inEvent = true;
       dtstartProp = null;
       dtendProp = null;
@@ -234,7 +235,8 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
       continue;
     }
     if (prop.name === 'END' && prop.value === 'VEVENT') {
-      if (inEvent) flushEvent();
+      if (!inEvent) throw new IcsParseError('Calendar has an unmatched event end.');
+      flushEvent();
       inEvent = false;
       continue;
     }
