@@ -1,7 +1,7 @@
 import { rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { validCalendarDate } from './employerCalendar';
-import { validRequestRange, type PtoRequest } from './requestLedger';
-import type { SchoolCalendar, SchoolCalendarWarning } from './schoolCalendar';
+import { MAX_REQUESTS, validRequestRange, type PtoRequest } from './requestLedger';
+import { MAX_SCHOOL_CALENDAR_DAYS, type SchoolCalendar, type SchoolCalendarWarning } from './schoolCalendar';
 
 export type ConflictSeverity = 'hard-block' | 'review-needed';
 export type ConflictCategory =
@@ -63,6 +63,15 @@ export interface ConflictCheckResult {
  */
 export function checkCalendarConflicts(input: ConflictCheckInput): ConflictCheckResult | null {
   if (!input || !validRequestRange(input.start, input.end)) return null;
+  // Defend against malformed local data and oversized imported date collections.
+  if ((input.employerBlackouts?.length ?? 0) > MAX_SCHOOL_CALENDAR_DAYS
+    || (input.personalBusyDays?.length ?? 0) > MAX_SCHOOL_CALENDAR_DAYS
+    || (input.commitments?.length ?? 0) > MAX_SCHOOL_CALENDAR_DAYS
+    || (input.requests?.length ?? 0) > MAX_REQUESTS
+    || (input.school?.offDays.length ?? 0) > MAX_SCHOOL_CALENDAR_DAYS
+    || (input.school?.inSessionDays.length ?? 0) > MAX_SCHOOL_CALENDAR_DAYS
+    || input.requests?.some((request) => !request || !Array.isArray(request.ptoDates)
+      || request.ptoDates.length > 1096)) return null;
   const selected = new Set(rangeISO(input.start, input.end));
   const matches = new Map<string, CalendarConflict>();
 
