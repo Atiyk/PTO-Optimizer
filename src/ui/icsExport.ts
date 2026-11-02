@@ -3,6 +3,7 @@ import { parseISO, addDays } from '@daysoff/engine/solver/dateUtils';
 import { formatDateRange, formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
 import type { Holiday } from '@daysoff/engine/data/holidays';
 import { PRODUCT_NAME } from '../brand';
+import { isValidISODate } from './urlState';
 
 /** RFC 5545 TEXT escaping: backslash, comma, semicolon, and newline must be escaped. */
 function escapeText(s: string): string {
@@ -221,6 +222,34 @@ export function generateSabbaticalICS(extendedStart: string, extendedEnd: string
 
 export function downloadSabbaticalICS(extendedStart: string, extendedEnd: string, summary: string, description: string, filename = 'sabbatical.ics'): void {
   downloadICSContent(generateSabbaticalICS(extendedStart, extendedEnd, summary, description), filename);
+}
+
+export interface CalendarReminder {
+  id: string;
+  date: string;
+  title: string;
+  description: string;
+}
+
+/** Uses the same all-day dates, escaping, exclusive DTEND and display alarms as plan exports. */
+export function generateReminderICS(reminders: readonly CalendarReminder[], now: Date = new Date()): string {
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:-//${PRODUCT_NAME}//EN`, 'CALSCALE:GREGORIAN', foldLine(`X-WR-CALNAME:${PRODUCT_NAME} - PTO reminders`)];
+  const seen = new Set<string>();
+  for (const reminder of reminders) {
+    if (!isValidISODate(reminder.date) || !reminder.id || seen.has(reminder.id)) continue;
+    seen.add(reminder.id);
+    const start = isoToICSDate(reminder.date);
+    lines.push('BEGIN:VEVENT', foldLine(`UID:${encodeURIComponent(reminder.id)}@pto-optimizer.app`), `DTSTAMP:${dtstampNow(now)}`,
+      `DTSTART;VALUE=DATE:${start}`, `DTEND;VALUE=DATE:${addOneDayICS(start)}`,
+      foldLine(`SUMMARY:${escapeText(reminder.title)}`), foldLine(`DESCRIPTION:${escapeText(reminder.description)}`),
+      'TRANSP:TRANSPARENT', 'BEGIN:VALARM', 'ACTION:DISPLAY', foldLine(`DESCRIPTION:${escapeText(reminder.title)}`),
+      'TRIGGER:PT0S', 'END:VALARM', 'END:VEVENT');
+  }
+  return [...lines, 'END:VCALENDAR', ''].join('\r\n');
+}
+
+export function downloadReminderICS(reminders: readonly CalendarReminder[], filename = 'pto-expiration-reminders.ics'): void {
+  downloadICSContent(generateReminderICS(reminders), filename);
 }
 
 function downloadICSContent(content: string, filename: string): void {

@@ -1,3 +1,4 @@
+import { ExpirationGuard } from './ExpirationGuard';
 import { DEFAULT_WORK_WEEK, type WorkWeek } from '@daysoff/engine/solver/types';
 import { cloneElement, isValidElement, useEffect, useId, useMemo, useState, type ReactElement } from 'react';
 import { SiteHeader } from './SiteHeader';
@@ -227,6 +228,7 @@ export function Policy() {
 
   const horizonEnd = useMemo(() => addMonthsISO(balanceAsOf, HORIZON_MONTHS), [balanceAsOf]);
   const projection = useMemo(() => forecastWithRequests(policy, horizonEnd, ledger.requests), [policy, horizonEnd, ledger.requests]);
+  const selectedForecast = useMemo(() => forecastWithRequests(policy, forecastDate, ledger.requests), [policy, forecastDate, ledger.requests]);
   const series = projection?.confirmed.series ?? [];
   const events = projection?.confirmed.events ?? [];
   const summary = useMemo(() => generatePolicySummary(policy), [policy]);
@@ -278,6 +280,7 @@ export function Policy() {
             </div>
             <QuickForecast policy={policy} requests={ledger.requests} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')} />
           </section>
+          <div id="expiration" className="mt-8 scroll-mt-24"><ExpirationGuard policy={policy} country={country} requests={ledger.requests} today={visitDate} onAlertViewed={() => track('expiration_alert_viewed')} onAlertAction={() => track('expiration_alert_action_taken')} /></div>
           <div id="requests" className="mt-8 scroll-mt-24 space-y-4">
             <details className="rounded-xl border border-line bg-surface p-4">
               <summary className="cursor-pointer font-medium text-ink">My request calendar and workweek</summary>
@@ -290,7 +293,7 @@ export function Policy() {
               {trackerAltFridayEnabled && <label className="block text-sm text-muted">First non-working Friday<input type="date" value={trackerAltFridayStart} onChange={event => setTrackerAltFridayStart(event.target.value)} className={`${inputClass} mt-2 block`} /></label>}
               <p className="mt-3 text-xs text-muted">Uses your saved employer holidays for this country and region. Adjust those in <a className="underline" href="/pto">the PTO planner</a>. Change the forecast date above to cover a later request.</p>
             </details>
-            <PtoTracker today={visitDate} ledger={ledger} calendar={trackerCalendar.calendar} calendarReady={!trackerCalendar.loading && !trackerCalendar.degraded} calendarNotice={trackerCalendar.loading ? 'Loading your employer calendar…' : trackerCalendar.degraded ? 'Holiday data or a calendar input is unavailable. Check the calendar settings before adding or changing request dates.' : undefined} remainingPto={unit === 'days' ? projection?.confirmed.balance ?? undefined : projection?.confirmed.balance === null || projection?.confirmed.balance === undefined ? undefined : projection.confirmed.balance / hoursPerDay} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
+            <PtoTracker today={visitDate} ledger={ledger} calendar={trackerCalendar.calendar} calendarReady={!trackerCalendar.loading && !trackerCalendar.degraded} calendarNotice={trackerCalendar.loading ? 'Loading your employer calendar…' : trackerCalendar.degraded ? 'Holiday data or a calendar input is unavailable. Check the calendar settings before adding or changing request dates.' : `The remaining balance is projected for ${forecastDate}.`} remainingPto={unit === 'days' ? selectedForecast?.confirmed.balance ?? undefined : selectedForecast?.confirmed.balance === null || selectedForecast?.confirmed.balance === undefined ? undefined : selectedForecast.confirmed.balance / hoursPerDay} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
           </div>
           <details className="mt-8 rounded-2xl border border-line bg-surface p-5 sm:p-6">
             <summary className="cursor-pointer text-lg font-semibold text-ink">Advanced policy options and explanation</summary>
