@@ -61,3 +61,5 @@ This file records unreleased isolated implementation and a still-closed release 
 - Existing expansion draft PRs #89 (school/conflict) and #91 (payout) remain separate and unmerged. No B2B/app/teams changes. No actual independent subagent was available; implementation and initial self-review were sequential, not critic signoff. No deployment attempted.
 
 - **Follow-up:** Added an explicit insufficient-balance/unfunded-PTO regression to PR #93, bringing its focused cases to 10. Latest head is now `37de9fda95d1799cf1de77ea9745101732da89bd`. The earlier run `41515051003` targets the superseded `c9a4ae6d` head; it must not be used as exact-head release evidence. Await fresh CI for `37de9fda` and retain all release holds.
+
+- **Follow-up Gate 0 verification:** UX PR #92 exact-head [run 41513876073](https://github.com/Atiyk/PTO-Optimizer/actions/runs/41513876073) has now completed successfully on `20d16209`; it is still draft/unmerged, with no verified Vercel preview or explicit full UX handoff. This does **not** open the release gate. PR #93 exact-head [run 41515417701](https://github.com/Atiyk/PTO-Optimizer/actions/runs/41515417701) on `37de9fda` is in progress.
