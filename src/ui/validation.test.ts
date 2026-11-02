@@ -68,3 +68,13 @@ describe('validateInputs', () => {
     expect(issues).toEqual(['End date is before the start date.']);
   });
 });
+
+
+describe('untrusted calendar range bounds', () => {
+  it('rejects windows that could create an unbounded calendar while allowing future years', () => {
+    const base = { budget: 15, expiryEnabled: false, expiryDate: '' };
+    expect(validateInputs({ ...base, rangeStart: '0100-01-01', rangeEnd: '9999-12-31' })).toContain('Choose a planning window of ten years or less.');
+    expect(validateInputs({ ...base, rangeStart: '2050-01-01', rangeEnd: '2050-12-31' })).toEqual([]);
+    expect(validateInputs({ ...base, rangeStart: '2028-02-29', rangeEnd: '2038-02-28' })).toEqual([]);
+  });
+});

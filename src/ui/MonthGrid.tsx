@@ -121,7 +121,7 @@ export function MonthGrid({
                         onFocus={() => onHoverBreak(band.brk.id)}
                         onBlur={() => onHoverBreak(null)}
                         aria-label={`Break ${band.index}, ${formatCardDateRange(band.brk.start, band.brk.end)}`}
-                        className="flex h-3.5 w-3.5 cursor-default items-center justify-center rounded-full bg-slate-600 text-[9px] font-semibold leading-none text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]"
+                        className="flex h-6 w-6 cursor-default items-center justify-center rounded-full bg-slate-600 text-[10px] font-semibold leading-none text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]"
                       >
                         {band.index}
                       </button>

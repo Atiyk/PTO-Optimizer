@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Analytics } from '@vercel/analytics/react'
+import { PrivacyAnalytics } from './ui/PrivacyAnalytics'
 import './index.css'
 import { GlossaryTermPage } from './ui/GlossaryTermPage.tsx'
 
@@ -13,6 +13,6 @@ const termId = window.location.pathname.split('/').filter(Boolean).pop() ?? ''
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <GlossaryTermPage termId={termId} />
-    <Analytics />
+    <PrivacyAnalytics />
   </StrictMode>,
 )

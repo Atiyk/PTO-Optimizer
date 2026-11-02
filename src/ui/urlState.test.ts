@@ -235,3 +235,14 @@ describe('partner overlap link (Phase 1D)', () => {
     expect(params.has('ov')).toBe(false);
   });
 });
+
+
+describe('untrusted legacy link bounds', () => {
+  it('rejects oversized date payloads without expanding them', () => {
+    const state = readFullStateFromURL('?bo=' + Array(5000).fill('2027-01-04').join(','), { rangeStart: '2027-01-01', rangeEnd: '2027-12-31', budget: 15, country: 'US' });
+    expect(state.blackouts).toEqual([]);
+  });
+  it('ignores inherited objective names', () => {
+    expect(readSliderStateFromURL('?objective=toString')).toEqual({ w: 30, breakCount: 0 });
+  });
+});
