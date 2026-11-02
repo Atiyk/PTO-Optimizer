@@ -10,7 +10,7 @@ The existing shared local ICS parser is used by personal busy-day imports and is
 
 - Keep the **single canonical** `src/ui/icsImport.ts` parser. No second school ICS parser, network request, database, upload, or third-party dependency.
 - Reject input longer than **1,000,000 JavaScript characters** before line unfolding. The existing `ImportCalendar` UI now also checks `file.size` against a 1,000,000-byte cap **before** calling `file.text()`, preventing oversized local reads.
-- Require a complete `BEGIN:VCALENDAR` / `END:VCALENDAR` envelope and closed VEVENTs.
+- Require a complete `BEGIN:VCALENDAR` / `END:VCALENDAR` envelope and closed VEVENTs, while accepting an optional UTF-8 BOM.
 - Reject invalid Gregorian dates, invalid times, malformed suffixes, backwards ranges, excessive event spans (over 3,660 days) and imports exceeding **4,000 distinct busy dates**.
 - Preserve the existing **500-event truncation indicator**, explicit skipped-recurring count, exclusive all-day DTEND, short timed-meeting exclusion, and date-only private outputs.
 - Errors are generic; no private calendar titles, names, attendee information, salaries, employer details or event content appear in exception messages or URLs.
