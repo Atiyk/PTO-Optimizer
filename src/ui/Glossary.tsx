@@ -4,6 +4,13 @@ import { Footer } from './Footer';
 import { Container } from './Container';
 import { GLOSSARY_TERMS, type GlossaryTerm } from '../content/glossary/terms';
 
+const LEARNING_PATHS = [
+  { title: 'Your PTO basics', detail: 'Understand your balance, how vacation differs from other leave, and the days you actually have.', terms: ['pto', 'vacation', 'sick-leave', 'floating-holiday'] },
+  { title: 'How days are earned', detail: 'Decode pay periods, accrual rates, front-loaded grants and the limits on your balance.', terms: ['accrual', 'accrual-rate', 'front-loaded', 'accrual-cap'] },
+  { title: 'What expires—and when', detail: 'Learn what happens at year end, when days carry over, and what you might lose.', terms: ['carryover', 'use-it-or-lose-it', 'forfeiture', 'plan-year'] },
+  { title: 'Getting time off approved', detail: 'Understand notice requirements, restricted dates and the steps between planning and approval.', terms: ['notice-period', 'blackout-period', 'pto-request', 'company-holiday'] },
+] as const;
+
 function matches(term: GlossaryTerm, query: string): boolean {
   if (!query) return true;
   const q = query.toLowerCase();
@@ -41,18 +48,42 @@ export function Glossary() {
       <SiteHeader active="glossary" />
       <main>
         <Container className="px-4 py-10">
-          <h1 className="text-3xl font-bold text-slate-900">Glossary</h1>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-accent-ink">Understand your time off</p>
+          <h1 className="text-3xl font-bold text-ink sm:text-4xl">Your PTO, explained simply.</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
-            Plain-English definitions of the terms your handbook uses, written for you, not for HR. Every definition
-            links to a page with more detail and a question you can take to HR.
+            Practical guides to the benefits you have earned. Start with a topic, explore a short explanation, or look up a term from your handbook.
           </p>
-          <label className="mt-6 block max-w-sm">
+          <div className="mt-7 grid gap-3 md:grid-cols-2">
+            {LEARNING_PATHS.map((path) => (
+              <section key={path.title} className="rounded-xl border border-line bg-surface p-5">
+                <h2 className="text-lg font-semibold text-ink">{path.title}</h2>
+                <p className="mt-2 text-sm leading-relaxed text-muted">{path.detail}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {path.terms.map((id) => {
+                    const term = GLOSSARY_TERMS.find((item) => item.id === id);
+                    return term ? <a key={id} href={`/glossary/${id}`} className="inline-flex min-h-11 items-center rounded-full border border-line px-3 py-2 text-sm font-medium text-accent-ink hover:bg-surface-alt">{term.term}</a> : null;
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
+          <section className="mt-7 rounded-xl bg-surface-alt p-5 sm:p-6" aria-label="Put your PTO knowledge to work">
+            <h2 className="text-lg font-semibold text-ink">Make the policy work for you</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">Already know how your time off works? Forecast your PTO balance and expiration dates, then find the best days to use it.</p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <a href="/policy" className="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 py-2.5 font-semibold text-white hover:opacity-90">Understand my policy</a>
+              <a href="/pto" className="inline-flex min-h-11 items-center rounded-lg border border-line-strong bg-surface px-4 py-2.5 font-semibold text-ink hover:bg-page">Plan my time off</a>
+            </div>
+          </section>
+          <h2 className="mt-10 text-xl font-semibold text-ink">Look up a term</h2>
+          <p className="mt-1 text-sm text-muted">Search the complete glossary, including common names used in employee handbooks.</p>
+          <label className="mt-4 block max-w-sm">
             <span className="sr-only">Search the glossary</span>
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search terms…"
+              placeholder="Try “carryover” or “accrual”…"
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
             />
           </label>
