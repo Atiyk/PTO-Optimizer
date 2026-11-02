@@ -73,13 +73,10 @@ interface DateTimeValue {
   minutesOfDay: number; // 0 for an all-day value
 }
 
-/** Reads only the date (and, for a DATE-TIME value, the clock time) a DTSTART/DTEND
- * property carries - deliberately ignoring TZID/UTC offset entirely. That's a real
- * simplification (no timezone database is available client-side without a dependency), but
- * a safe one for this module's one real question - "is this event at least 24 hours long,
- * and which calendar day(s) does it touch" - since no realistic UTC offset (max ~14h) can
- * turn a genuinely short meeting into a day-long block or vice versa at the thresholds this
- * module cares about. */
+/** Reads local date and wall-clock time from DTSTART/DTEND. TZID and UTC offset
+ * conversion are NOT implemented: across DST or mixed zones a timed event near
+ * the 24-hour threshold can be misclassified. Callers must disclose partial
+ * coverage; all-day VALUE=DATE spans are handled as date-only intervals. */
 function parseDateTimeValue(prop: RawProp): DateTimeValue | null {
   const m = prop.value.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})Z?)?$/);
   if (!m) return null;
@@ -113,6 +110,9 @@ function totalMinutes(date: string, minutesOfDay: number): number {
 
 /** Guard BEFORE expanding ranges; an imported file must never freeze the browser. */
 function addBoundedDays(busy: Set<string>, first: string, last: string): void {
+  if (!validCalendarDate(first) || !validCalendarDate(last)) {
+    throw new IcsParseError('Calendar event has an invalid date.');
+  }
   const span = isoToSerial(last) - isoToSerial(first);
   if (!Number.isSafeInteger(span) || span < 0 || span > MAX_IMPORT_SPAN_DAYS) {
     throw new IcsParseError('Calendar event has an invalid or excessively long date range.');
