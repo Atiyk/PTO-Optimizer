@@ -28,3 +28,11 @@ Last updated: 2026-11-02. Scope: consumer root Vite application only; never `app
 ## Known platform constraints
 
 This scheduled run can edit GitHub files through the connector, but this sandbox cannot clone GitHub over the network. Use GitHub Actions for full npm tests, production builds and real browser evidence. Never claim local execution or an unobserved reviewer approval. Keep draft PRs unmerged until quality gates pass. Work in focused feature branches; do not touch the B2B subtree.
+
+## Active isolated UX PR #101 — date-list keyboard and touch recovery (2026-11-02)
+
+- Draft PR: https://github.com/Atiyk/PTO-Optimizer/pull/101. Owner-authorized consumer-only implementation adds Enter-to-add, duplicate feedback, distinct accessible labels for overlap and blackout dates, 44px touch targets, and focus recovery after removing a date chip.
+- Changed files: src/ui/DateListEditor.tsx, its new component tests, two label props in src/ui/MoreOptions.tsx, a dedicated Chromium QA script, consumer CI wiring, and a QA contract. No apps/teams, solver, policy, or expansion files changed.
+- Exact-head consumer tests/typecheck/lint/build, Chromium screenshots at 1440/768/375/320, responsive/accessibility/SEO checks, and independent critic approval are release gates; do not infer success from a queued job.
+- Vercel consumer project is pto-optimizer (prj_86pjTpGYXOIpt5HWxrRJVHJccjuD). The separate leave_management project is B2B; a READY preview there does not satisfy the consumer gate. Consumer preview must match the PR head SHA and report READY before merge.
+- Keep draft/unmerged while any gate is missing. Production remains READY on main 3187596230768e4818720d1907475c9a3341a54c as last verified. Continue unrelated UX fixes during any deployment quota wait and do not release expansion integration early.
