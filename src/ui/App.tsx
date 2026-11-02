@@ -272,7 +272,10 @@ export function App() {
         <PlanRecoveryNotice
           issue={state.solverIssue}
           hasForcedDays={Object.keys(state.forced).length > 0}
-          onClearForcedDays={state.clearForcedDays}
+          onClearForcedDays={() => {
+            state.clearForcedDays();
+            requestAnimationFrame(() => document.getElementById('complete-plan-heading')?.focus());
+          }}
           onReviewSettings={() => {
             setOptionsOpen(true);
             requestAnimationFrame(() => document.getElementById('planning-options')?.scrollIntoView({ block: 'start' }));
@@ -355,7 +358,7 @@ export function App() {
               calendar out of view - overscroll-behavior is left at its default (auto), so
               scrolling past either end of that region falls through to the page as normal,
               never trapped. */}
-          <h2 className="mt-8 text-xl font-semibold text-ink">Your complete plan</h2>
+          <h2 id="complete-plan-heading" tabIndex={-1} className="mt-8 text-xl font-semibold text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Your complete plan</h2>
           <div className={`${SECTION_GAP} lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start`}>
             <div className="flex flex-col gap-4 lg:col-span-3">
               {!state.validationIssues.length ? <CalendarErrorBoundary>
