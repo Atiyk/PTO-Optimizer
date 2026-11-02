@@ -168,46 +168,6 @@ export function App() {
       </div>
 
       <div className="border-b border-slate-200 bg-slate-50">
-        <Container className="flex flex-wrap items-start gap-x-6 gap-y-3 px-4 py-4">
-          <PrimaryControls
-            advanced={optionsOpen}
-            country={state.country}
-            onChangeCountry={state.setCountry}
-            rangeStart={state.rangeStart}
-            rangeEnd={state.rangeEnd}
-            onChangeRangeStart={state.setRangeStart}
-            onChangeRangeEnd={state.setRangeEnd}
-            budget={state.budget}
-            onChangeBudget={state.setBudget}
-            budgetSpent={state.budgetSpent}
-            reserveDays={state.reserveDays}
-            onChangeReserveDays={state.setReserveDays}
-            effectiveBudget={state.effectiveBudget}
-            unlimitedPto={state.unlimitedPto}
-            onToggleUnlimitedPto={state.setUnlimitedPto}
-          />
-          <label className="flex min-w-40 flex-col gap-1 text-sm font-medium text-slate-700">
-            Planning style
-            <select aria-label="Planning style" className="min-h-11 rounded-md border border-line-strong bg-surface px-3" value={state.planningStyle} onChange={event => state.setPlanningStyle(event.target.value as typeof state.planningStyle)}>
-              <option value="balanced">Balanced</option><option value="long-breaks">Long breaks</option><option value="more-breaks">More breaks</option><option value="custom">Custom</option>
-            </select>
-          </label>
-          <PlanSliders
-            w={state.w}
-            onChangeW={state.setW}
-            manualBreakCount={state.manualBreakCount}
-            onChangeManualBreakCount={state.setManualBreakCount}
-            letSolverDecide={state.letSolverDecide}
-            onToggleLetSolverDecide={state.setLetSolverDecide}
-            breaks={state.breaks}
-            breakCountRequested={state.breakCountRequested}
-            breakCountActual={state.breakCountActual}
-            budget={state.effectiveBudget}
-          />
-        </Container>
-      </div>
-
-      <div className="border-b border-slate-200 bg-slate-50">
         <Container className="px-4 py-4">
           <button
             type="button"
