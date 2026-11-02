@@ -108,6 +108,15 @@ describe('consumer vacation before/after forecast', () => {
     expect(result.employerCalendarCoverageDeclared).toBe(false);
   });
 
+  it('shows an unfunded shortfall when the proposed days exceed available PTO', () => {
+    const limited = { ...policy, currentBalance: 1 };
+    const result = compareVacationForecast(limited, '2027-01-14', [], calendar, '2027-01-04', '2027-01-05')!;
+    expect(result.confirmed.before.balance).toBe(1);
+    expect(result.confirmed.after.balance).toBe(0);
+    expect(result.confirmed.scheduledChange).toBe(2);
+    expect(result.confirmed.unfundedChange).toBe(1);
+  });
+
   it('rejects invalid, past, unbounded, out-of-coverage or malformed calendar inputs', () => {
     expect(compareVacationForecast(policy, '2027-01-14', [], calendar, '2027-01-00', '2027-01-04')).toBeNull();
     expect(compareVacationForecast(policy, '2027-01-14', [], calendar, '2027-01-01', '2027-01-04')).toBeNull();
