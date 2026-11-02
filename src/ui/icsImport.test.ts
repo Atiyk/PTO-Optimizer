@@ -175,6 +175,18 @@ describe('parseICSBusyDays: bounded and fail-closed school/personal imports', ()
     expect(() => parseICSBusyDays('noise\r\n' + wrapCalendar(''))).toThrow(IcsParseError);
   });
 
+  it('rejects nested and orphaned VEVENT boundaries instead of silently losing dates', () => {
+    const nested = wrapCalendar(
+      'BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261219\r\n'
+      + 'BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261220\r\nEND:VEVENT\r\nEND:VEVENT\r\n',
+    );
+    expect(() => parseICSBusyDays(nested)).toThrow(IcsParseError);
+    expect(() => parseICSBusyDays(wrapCalendar('END:VEVENT\r\n'))).toThrow(IcsParseError);
+    expect(() => parseICSBusyDays(wrapCalendar(
+      'BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261219\r\nEND:VEVENT\r\nEND:VEVENT\r\n',
+    ))).toThrow(IcsParseError);
+  });
+
   it('accepts a UTF-8 BOM without loosening complete-calendar validation', () => {
     const ics = '\uFEFF' + wrapCalendar(event('DTSTART;VALUE=DATE:20261219'));
     expect(parseICSBusyDays(ics).busyDays).toEqual(['2026-12-19']);
