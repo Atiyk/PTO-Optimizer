@@ -171,6 +171,21 @@ try {
           result.weightingKeyboardResponsive = nextWeight !== previousWeight;
           result.plannerResponsiveHeadings = await page.getByRole('heading', { name: 'Your time off' }).isVisible()
             && await page.getByRole('heading', { name: 'Shape your plan' }).isVisible();
+          // Check that the local-only explanation uses actual recommended dates,
+          // opens with keyboard-compatible native details, and stays readable at 320px.
+          const explanation = page.locator('[data-testid="plan-explanation"]');
+          result.planExplanationVisible = await explanation.isVisible();
+          if (result.planExplanationVisible) {
+            await explanation.locator('summary').click();
+            result.planExplanationExpanded = await explanation.evaluate((element) => element.open === true);
+            const explanationText = await explanation.innerText();
+            result.planExplanationConsistent = explanationText.includes('PTO used')
+              && explanationText.includes('Total time off')
+              && !explanationText.includes('plan is updating');
+            result.planExplanationOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+            await page.screenshot({ path: resolve(outputDirectory, `pto-explanation-${width}.png`), fullPage: true });
+            await explanation.locator('summary').click();
+          }
           const options = page.getByRole('button', { name: /More options/ });
           if (await options.isVisible()) {
             await options.click();
@@ -184,7 +199,9 @@ try {
           || !result.correctRoute || result.guideContentVisible === false || result.guideExampleVisible === false || result.guideQuestionsVisible === false
           || result.menuOpenedWithKeyboard === false || result.menuClosedWithEscape === false
           || result.menuFocusReturned === false || result.slidersVisible === false || result.slidersOutsideAdvanced === false
-          || result.weightingKeyboardResponsive === false || result.plannerResponsiveHeadings === false ? 'failed' : 'passed';
+          || result.weightingKeyboardResponsive === false || result.plannerResponsiveHeadings === false
+          || result.planExplanationVisible === false || result.planExplanationExpanded === false
+          || result.planExplanationConsistent === false || result.planExplanationOverflow === true ? 'failed' : 'passed';
       } catch (error) {
         result.status = 'failed';
         result.error = error instanceof Error ? error.message : String(error);
