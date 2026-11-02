@@ -154,6 +154,9 @@ describe('DayCell coarse-pointer disclosure', () => {
     const action = screen.getByRole('button', { name: 'Change this day' });
     fireEvent.blur(day, { relatedTarget: action });
     expect(screen.getByRole('button', { name: 'Change this day' })).toBeTruthy();
+    // iOS Safari may report null instead of the newly tapped action as the blur target.
+    fireEvent.blur(day, { relatedTarget: null });
+    expect(screen.getByRole('button', { name: 'Change this day' })).toBeTruthy();
     fireEvent.click(action);
     expect(onToggle).toHaveBeenCalledTimes(1);
     expect(onToggle).toHaveBeenCalledWith('2026-07-04');
