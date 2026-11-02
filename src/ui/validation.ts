@@ -1,3 +1,4 @@
+import { isValidISODate } from './urlState';
 /** More PTO days than exist in a decade - the solver itself handles any budget without a
  * fixed cap (see NOTES.md Phase 11/12), so this isn't a technical limit, just the line past
  * which a typed value is clearly not a real annual PTO balance (a stray extra digit, a
@@ -21,6 +22,8 @@ export interface ValidationInputs {
 export function validateInputs({ rangeStart, rangeEnd, budget, expiryEnabled, expiryDate }: ValidationInputs): string[] {
   const issues: string[] = [];
 
+  if (!isValidISODate(rangeStart) || !isValidISODate(rangeEnd)) issues.push('Choose valid planning start and end dates.');
+  if (!Number.isFinite(budget)) issues.push('Enter a valid PTO balance.');
   if (rangeEnd < rangeStart) {
     issues.push('End date is before the start date.');
   }

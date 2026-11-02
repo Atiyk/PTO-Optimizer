@@ -19,7 +19,7 @@ const CAPTIONS: Record<number, string> = {
   70: 'mostly minimising travel demand, with some weight on days off',
   80: 'mostly minimising travel demand',
   90: 'almost entirely minimising travel demand',
-  100: 'minimise travel demand, accept fewer days off',
+  100: 'prioritise quieter travel periods',
 };
 
 interface WeightingSliderProps {
@@ -39,7 +39,7 @@ export function WeightingSlider({ value, onChange }: WeightingSliderProps) {
       </h3>
       <div className="flex items-center justify-between text-xs text-slate-500">
         <span>Most days off</span>
-        <span>Cheapest to travel</span>
+        <span>Avoid busy travel periods</span>
       </div>
       <input
         type="range"

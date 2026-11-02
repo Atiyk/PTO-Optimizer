@@ -161,4 +161,10 @@ try {
 
 console.log(`Consumer browser QA: ${report.status}; ${report.results.length} route/viewport checks.`);
 console.log(`Evidence report: ${reportPath}`);
+for (const result of report.results.filter((item) => item.status !== 'passed')) {
+  // All contexts use synthetic fixtures. Print actionable findings so connector-only
+  // CI review does not require downloading a private binary artifact to read JSON.
+  const { keyboardFocus: _keyboardFocus, ...finding } = result;
+  console.error(JSON.stringify(finding));
+}
 if (report.status !== 'passed') process.exitCode = 1;

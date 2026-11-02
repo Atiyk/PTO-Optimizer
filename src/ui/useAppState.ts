@@ -1,3 +1,4 @@
+import { solveConsumer, planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
 import { defaultEmployerCalendar, readEmployerCalendar, saveEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { solve, computeScores } from '@daysoff/engine/solver/solve';
@@ -84,6 +85,9 @@ export function discoverSubdivisions(holidays: Holiday[]): string[] {
  * fields the shareable URL carries, since "a plan" is defined by the same input set either
  * way (Phase 3 item 7). */
 export interface PlanSnapshot {
+  planningVersion?: 2;
+  planningStyle: PlanningStyle;
+  minimumBreakDays: number;
   employerCalendar: EmployerCalendar;
   country: string;
   subdivision: string | undefined;
@@ -143,13 +147,16 @@ export function useAppState() {
     if (typeof window === 'undefined') {
       return {
         employerCalendar: undefined as EmployerCalendar | undefined,
+        planningVersion: 2 as const,
+        planningStyle: 'balanced' as PlanningStyle,
+        minimumBreakDays: 3,
         country: defaults.country,
         subdivision: undefined,
         rangeStart: defaults.rangeStart,
         rangeEnd: defaults.rangeEnd,
         budget: defaults.budget,
         w: 30,
-        breakCount: 0,
+        breakCount: 3,
         weekStartOverride: 'auto' as const,
         accrualEnabled: false,
         accrualPerMonth: 1.25,
@@ -229,14 +236,27 @@ export function useAppState() {
   const [peakCapEnd, setPeakCapEnd] = useState(initial.peakCapEnd ?? '');
   const [peakCapMaxDays, setPeakCapMaxDays] = useState(initial.peakCapMaxDays ?? 5);
 
-  const [w, setW] = useState(initial.w);
+  const [planningVersion, setPlanningVersion] = useState<2 | undefined>(initial.planningVersion);
+  const [planningStyle, setPlanningStyleRaw] = useState<PlanningStyle>(initial.planningStyle ?? 'custom');
+  const [minimumBreakDays, setMinimumBreakDaysRaw] = useState(initial.minimumBreakDays ?? 0);
+  const [w, setWRaw] = useState(initial.w);
   // breakCount 0 from the URL ("Any", now spelled "let the solver decide") maps to the
   // checkbox being checked; 1-7 maps to it being unchecked with that exact slider position.
-  const [letSolverDecide, setLetSolverDecide] = useState(initial.breakCount === 0);
-  const [manualBreakCount, setManualBreakCount] = useState(
+  const [letSolverDecide, setLetSolverDecideRaw] = useState(initial.breakCount === 0);
+  const [manualBreakCount, setManualBreakCountRaw] = useState(
     initial.breakCount === 0 ? DEFAULT_MANUAL_BREAK_COUNT : initial.breakCount,
   );
   const breakCount = letSolverDecide ? 0 : manualBreakCount;
+  const setPlanningStyle = useCallback((style: PlanningStyle) => {
+    setPlanningVersion(2);
+    setPlanningStyleRaw(style);
+    const preset = planningStyleSettings(style);
+    if (preset) { setWRaw(preset.w); setLetSolverDecideRaw(preset.breakCount === 0); if (preset.breakCount) setManualBreakCountRaw(preset.breakCount); }
+  }, []);
+  const setMinimumBreakDays = useCallback((days: number) => { setPlanningVersion(2); setMinimumBreakDaysRaw(days); }, []);
+  const setW = useCallback((value: number) => { setPlanningVersion(2); setPlanningStyleRaw('custom'); setWRaw(value); }, []);
+  const setLetSolverDecide = useCallback((value: boolean) => { setPlanningVersion(2); setPlanningStyleRaw('custom'); setLetSolverDecideRaw(value); }, []);
+  const setManualBreakCount = useCallback((value: number) => { setPlanningVersion(2); setPlanningStyleRaw('custom'); setManualBreakCountRaw(value); }, []);
   // Off by default: alternatives are an advanced/discoverable feature, not the primary
   // signal - they live behind the "Adjust" disclosure now, unchecked, so a first-time
   // visitor sees the plan itself first.
@@ -352,6 +372,9 @@ export function useAppState() {
       country,
       subdivision,
       employerCalendar,
+      planningVersion,
+      planningStyle,
+      minimumBreakDays,
       rangeStart,
       rangeEnd,
       budget,
@@ -382,6 +405,9 @@ export function useAppState() {
     country,
     subdivision,
     employerCalendar,
+    planningVersion,
+    planningStyle,
+    minimumBreakDays,
     rangeStart,
     rangeEnd,
     budget,
@@ -619,18 +645,19 @@ export function useAppState() {
   const lastGoodResultRef = useRef<SolveResult>(EMPTY_RESULT);
   const lastGoodScoresRef = useRef<Scores | null>(null);
 
-  const solveResult = useMemo(() => {
-    if (!isValidInput) return lastGoodResultRef.current;
+  const solved = useMemo((): { result: SolveResult; issue?: string } => {
+    if (!isValidInput) return { result: lastGoodResultRef.current };
     try {
-      const result = solve(solveInput);
-      lastGoodResultRef.current = result;
-      return result;
+      const outcome = planningVersion === 2 ? solveConsumer(solveInput, { minimumBreakDays, style: planningStyle }) : { result: solve(solveInput) };
+      lastGoodResultRef.current = outcome.result;
+      return outcome;
     } catch {
       // An unexpected solver throw on otherwise-valid input: still keep the last good plan
       // on screen rather than blanking it, same as a validation failure would.
-      return lastGoodResultRef.current;
+      return { result: EMPTY_RESULT, issue: 'This combination could not be calculated. Check your dates and settings.' };
     }
-  }, [solveInput, isValidInput]);
+  }, [solveInput, isValidInput, planningVersion, minimumBreakDays, planningStyle]);
+  const solveResult = solved.result;
 
   const breaks = solveResult.primary;
   const alternatives = solveResult.alternatives;
@@ -844,6 +871,9 @@ export function useAppState() {
         country,
         subdivision,
         employerCalendar,
+        planningVersion,
+        planningStyle,
+        minimumBreakDays,
         rangeStart,
         rangeEnd,
         budget,
@@ -878,7 +908,7 @@ export function useAppState() {
       return [...prev, snapshot];
     });
   }, [
-    country, subdivision, employerCalendar, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
+    country, subdivision, employerCalendar, planningVersion, planningStyle, minimumBreakDays, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
     weekStartOverride, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap,
     overlapDays, blackouts, workWeek, forced, altFridayEnabled, altFridayStart,
     reserveDays, unlimitedPto, peakCapEnabled, peakCapStart, peakCapEnd, peakCapMaxDays,
@@ -897,9 +927,12 @@ export function useAppState() {
       setRangeStart(snap.rangeStart);
       setRangeEnd(snap.rangeEnd);
       setBudget(snap.budget);
-      setW(snap.w);
-      setLetSolverDecide(snap.letSolverDecide);
-      setManualBreakCount(snap.manualBreakCount);
+      setPlanningVersion(snap.planningVersion);
+      setPlanningStyleRaw(snap.planningStyle);
+      setMinimumBreakDaysRaw(snap.minimumBreakDays);
+      setWRaw(snap.w);
+      setLetSolverDecideRaw(snap.letSolverDecide);
+      setManualBreakCountRaw(snap.manualBreakCount);
       setWeekStartOverride(snap.weekStartOverride);
       setAccrualEnabled(snap.accrualEnabled);
       setAccrualPerMonth(snap.accrualPerMonth);
@@ -954,6 +987,13 @@ export function useAppState() {
 
   return {
     validationIssues,
+    solverIssue: solved.issue,
+    solveInput,
+    planningVersion,
+    planningStyle,
+    setPlanningStyle,
+    minimumBreakDays,
+    setMinimumBreakDays,
     holidaysDegraded,
     country,
     setCountry: changeCountry,
