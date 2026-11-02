@@ -201,7 +201,7 @@ export function BreakCard({
           explanation above already uses. */}
       {isMostContested && (
         <p className="text-sm text-slate-600">
-          Most contested week in your plan &mdash; colleagues are likely to want it too.
+          Estimated popular vacation dates based on public travel demand, not coworkers&apos; calendars.
         </p>
       )}
 

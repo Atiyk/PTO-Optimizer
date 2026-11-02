@@ -105,7 +105,13 @@ export function App() {
             unlimitedPto={state.unlimitedPto}
             onToggleUnlimitedPto={state.setUnlimitedPto}
           />
-          <PlanSliders
+          <label className="flex min-w-40 flex-col gap-1 text-sm font-medium text-slate-700">
+            Planning style
+            <select aria-label="Planning style" className="min-h-11 rounded-md border border-control bg-surface px-3" value={state.planningStyle} onChange={event => state.setPlanningStyle(event.target.value as typeof state.planningStyle)}>
+              <option value="balanced">Balanced</option><option value="long-breaks">Long breaks</option><option value="more-breaks">More breaks</option><option value="custom">Custom</option>
+            </select>
+          </label>
+          {optionsOpen && <PlanSliders
             w={state.w}
             onChangeW={state.setW}
             manualBreakCount={state.manualBreakCount}
@@ -116,7 +122,7 @@ export function App() {
             breakCountRequested={state.breakCountRequested}
             breakCountActual={state.breakCountActual}
             budget={state.effectiveBudget}
-          />
+          />}
         </Container>
       </div>
 
@@ -148,6 +154,13 @@ export function App() {
               onChangeSubdivision={state.setSubdivision}
             />
 
+            <label className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+              Minimum length of a break
+              <select aria-label="Minimum length of a break" value={state.minimumBreakDays} onChange={event => state.setMinimumBreakDays(Number(event.target.value))} className="min-h-11 rounded-md border border-control px-3">
+                <option value={0}>No minimum</option>
+                {Array.from({ length: 60 }, (_, i) => i + 1).map(days => <option key={days} value={days}>{days} calendar days</option>)}
+              </select>
+            </label>
             <label className="flex items-center gap-2 text-sm text-slate-600">
               <input
                 type="checkbox"
@@ -242,6 +255,15 @@ export function App() {
             scores={state.scores}
           />
 
+          <p className="mt-2 text-sm text-slate-600">{Math.max(0, state.budget - state.budgetSpent)} {state.unlimitedPto ? 'target days unplanned' : 'PTO days remaining'}, including {Math.min(state.budget, state.reserveDays)} reserved. Calendar days off include weekends, observed holidays, and PTO days.</p>
+          {state.breaks.length > 0 && <section aria-labelledby="top-opportunities" className="mt-8">
+            <h2 id="top-opportunities" className="text-xl font-semibold text-ink">Your top 3 time-off opportunities</h2>
+            <p className="mt-1 text-sm text-muted">These breaks belong to one plan and fit together. Public holidays are assumed observed; customize your employer calendar in More options.</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {[...state.orderedBreaks].sort((a, b) => b.brk.multiplier - a.brk.multiplier || b.brk.totalDaysOff - a.brk.totalDaysOff || a.index - b.index).slice(0, 3).map(({ brk, index }) => <BreakCard key={brk.id} brk={brk} index={index} isPtoDay={state.isSuggestedPto} onHover={state.setHoveredBreakId} highlighted={state.hoveredBreakId === brk.id} isMostContested={false} reason={breakReason(brk, state.holidayNameFor)} today={today} noticePeriodDays={state.noticePeriodDays} workWeek={state.workWeek} />)}
+            </div>
+          </section>}
+
           {/* Phase 3 step 6: export actions sit directly beneath the metrics now, not below
               the calendar/break list - "free, no sign-up, no email" is as much a part of
               the page's first impression as the metrics it sits next to. */}
@@ -271,6 +293,7 @@ export function App() {
               calendar out of view - overscroll-behavior is left at its default (auto), so
               scrolling past either end of that region falls through to the page as normal,
               never trapped. */}
+          <h2 className="mt-8 text-xl font-semibold text-ink">Your complete plan</h2>
           <div className={`${SECTION_GAP} lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start`}>
             <div className="flex flex-col gap-4 lg:col-span-3">
               {!state.validationIssues.length && !state.solverIssue ? <CalendarErrorBoundary>
@@ -315,7 +338,7 @@ export function App() {
               )}
               {state.breaks.length > 1 && mostContestedIndex !== undefined && (
                 <p className="text-sm text-slate-600">
-                  Request break {mostContestedIndex} first &mdash; it&apos;s the most contested.
+                  Break {mostContestedIndex} falls in an estimated popular vacation period. This reflects public demand, not coworkers&apos; plans.
                 </p>
               )}
               {/* Semantic HTML pass (Phase 5): recommendations are a real list, not div soup -

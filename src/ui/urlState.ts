@@ -1,3 +1,4 @@
+import { planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
 import { decodeEmployerCalendar, encodeEmployerCalendar, employerScope, type EmployerCalendar } from '../personal/employerCalendar';
 import type { WorkWeek } from '@daysoff/engine/solver/types';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
@@ -119,6 +120,9 @@ function encodeWorkWeek(ww: WorkWeek): string {
 }
 
 export interface FullURLState {
+  planningVersion?: 2;
+  planningStyle?: PlanningStyle;
+  minimumBreakDays?: number;
   employerCalendar?: EmployerCalendar;
   country?: string;
   subdivision?: string;
@@ -164,6 +168,13 @@ export interface FullURLDefaults {
 export function readFullStateFromURL(search: string, defaults: FullURLDefaults): FullURLState {
   const params = new URLSearchParams(search);
   const slider = readSliderStateFromURL(search);
+  const isNewPlan = params.get('pv') === '2' || !['s', 'e', 'b', 'w', 'count', 'objective', 'shape'].some(key => params.has(key));
+  const styles: PlanningStyle[] = ['balanced', 'long-breaks', 'more-breaks', 'custom'];
+  const planningStyle: PlanningStyle = styles.includes(params.get('ps') as PlanningStyle) ? params.get('ps') as PlanningStyle : 'balanced';
+  const rawMinimum = params.get('mb');
+  const minimum = rawMinimum === null ? 3 : Number(rawMinimum);
+  const minimumBreakDays = Number.isInteger(minimum) && minimum >= 0 && minimum <= 60 ? minimum : 3;
+  const preset = isNewPlan ? planningStyleSettings(planningStyle) : undefined;
 
   const s = params.get('s');
   const e = params.get('e');
@@ -230,8 +241,9 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
     rangeStart,
     rangeEnd,
     budget,
-    w: slider.w,
-    breakCount: slider.breakCount,
+    ...(isNewPlan ? { planningVersion: 2 as const, planningStyle, minimumBreakDays } : {}),
+    w: preset?.w ?? slider.w,
+    breakCount: preset?.breakCount ?? slider.breakCount,
     weekStartOverride,
     accrualEnabled,
     accrualPerMonth,
@@ -256,6 +268,9 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
 }
 
 export interface WriteStateInput {
+  planningVersion?: 2;
+  planningStyle?: PlanningStyle;
+  minimumBreakDays?: number;
   employerCalendar?: EmployerCalendar;
   country: string;
   subdivision: string | undefined;
@@ -290,6 +305,11 @@ export interface WriteStateInput {
  * viewer-independent default, to keep the URL readable. */
 export function writeFullStateToURL(params: URLSearchParams, state: WriteStateInput): void {
   writeSliderStateToURL(params, { w: state.w, breakCount: state.breakCount });
+  if (state.planningVersion === 2) {
+    params.set('pv', '2');
+    params.set('ps', state.planningStyle ?? 'custom');
+    params.set('mb', String(state.minimumBreakDays ?? 3));
+  } else { params.delete('pv'); params.delete('ps'); params.delete('mb'); }
   const calendar = state.employerCalendar ? encodeEmployerCalendar(state.employerCalendar) : '';
   if (calendar) params.set('eh', calendar);
   else params.delete('eh');
