@@ -28,3 +28,9 @@ Last updated: 2026-11-02. Scope: consumer root Vite application only; never `app
 ## Known platform constraints
 
 This scheduled run can edit GitHub files through the connector, but this sandbox cannot clone GitHub over the network. Use GitHub Actions for full npm tests, production builds and real browser evidence. Never claim local execution or an unobserved reviewer approval. Keep draft PRs unmerged until quality gates pass. Work in focused feature branches; do not touch the B2B subtree.
+
+## Draft implementation: calendar recovery for infeasible pinned PTO (PR #92)
+
+- PR [#92](https://github.com/Atiyk/PTO-Optimizer/pull/92) on `gapless/ux-recover-calendar-after-constraint-20261102` fixes a specific UX trap: a solver issue (for example, a pinned working day with zero available PTO) previously removed the entire interactive calendar, leaving no way to unpin that date. The calendar now remains visible for **valid date inputs** even when no valid plan can be solved; export remains suppressed.
+- A separate accessible warning explains the real solver issue, offers **Clear pinned and excluded dates** without changing the budget, dates or employer policy, and opens advanced constraints. Component tests and a real 320px browser-journey fixture cover the recovery path.
+- **Not shipped:** exact-head CI/browser evidence, independent critic signoff, and Vercel preview are still required. Vercel reports a temporary deployment rate limit; no quota bypass, no merge and no production deployment are claimed. Reconcile `App.tsx` with PR #87 before merging.
