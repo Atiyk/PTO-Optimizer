@@ -9,7 +9,7 @@ The existing shared local ICS parser is used by personal busy-day imports and is
 ## Changes
 
 - Keep the **single canonical** `src/ui/icsImport.ts` parser. No second school ICS parser, network request, database, upload, or third-party dependency.
-- Reject input longer than **1,000,000 JavaScript characters** before line unfolding. The caller should also cap the file before `file.text()` for memory safety; that UI integration is not included.
+- Reject input longer than **1,000,000 JavaScript characters** before line unfolding. The existing `ImportCalendar` UI now also checks `file.size` against a 1,000,000-byte cap **before** calling `file.text()`, preventing oversized local reads.
 - Require a complete `BEGIN:VCALENDAR` / `END:VCALENDAR` envelope and closed VEVENTs.
 - Reject invalid Gregorian dates, invalid times, malformed suffixes, backwards ranges, excessive event spans (over 3,660 days) and imports exceeding **4,000 distinct busy dates**.
 - Preserve the existing **500-event truncation indicator**, explicit skipped-recurring count, exclusive all-day DTEND, short timed-meeting exclusion, and date-only private outputs.
@@ -23,4 +23,4 @@ The existing shared local ICS parser is used by personal busy-day imports and is
 - Independent critic must check file-size limits, extreme span behavior, ordinary export compatibility, timezone caveat, privacy, and that no UI silently converts parse failures to an empty calendar.
 - Run exact-head consumer Vitest, TypeScript, lint, build, browser QA, Lighthouse and accessibility checks. Do not merge until independent review, preceding UX completion, required Vercel preview and production SHA gates pass.
 
-**Ownership:** Agent C (calendar/scheduling) implementation, executed sequentially by the orchestrator; independent Q critic is **not** claimed. No UX-owned PR files, B2B `apps/teams`, shared engine, URLs, analytics or storage changed.
+**Ownership:** Agent C (calendar/scheduling) implementation, executed sequentially by the orchestrator; independent Q critic is **not** claimed. No active UX-PR-owned files, B2B `apps/teams`, shared engine, URLs, analytics or storage changed.
