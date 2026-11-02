@@ -161,6 +161,22 @@ describe('connected policy explanation uses canonical forecast events only', () 
     expect(rule(result, 'departure-payout').impact.amount).toBeUndefined();
   });
 
+  it('describes per-hour-worked accrual in PTO hours even when the balance is in days', () => {
+    const result = explain({
+      ...base, accrual: { kind: 'per-hour-worked', rate: 0.05, typicalWeeklyHours: 40 },
+    }, '2027-01-08')!;
+    expect(rule(result, 'accrual').explanation).toContain('PTO hours per hour worked');
+    expect(result.confirmedAccrued).toBeCloseTo(0.25);
+  });
+
+  it('labels an expiration deadline beyond the horizon as configured, not observed', () => {
+    const result = explain({
+      ...base, carryover: { mode: 'all', useByDate: '2027-03-31' },
+    }, '2027-02-01')!;
+    expect(rule(result, 'carried-expiration').impact).toMatchObject({ kind: 'configured' });
+    expect(rule(result, 'carried-expiration').impact.amount).toBeUndefined();
+  });
+
   it('does not leak request identifiers or notes in the explanatory output', () => {
     const result = explainConnectedPolicy(base, '2027-01-10', [
       request('private-request-id', '2027-01-05', 'approved', 'SECRET PRIVATE APPOINTMENT'),
