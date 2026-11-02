@@ -99,12 +99,34 @@ export function Landing() {
   return <div className="min-h-screen bg-page">
     <SiteHeader active="landing" />
     <main><Container className="space-y-12 px-4 py-9 sm:px-6 sm:py-14 lg:space-y-16">
-      <section className="grid items-start gap-7 lg:grid-cols-2 lg:gap-14" aria-labelledby="landing-heading">
-        <div className="flex min-w-0 flex-col gap-5">
+      <section className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:gap-x-12 lg:gap-y-6" aria-labelledby="landing-heading">
+        <div className="flex min-w-0 flex-col gap-4 lg:gap-5">
           <p className="text-sm font-semibold text-accent-ink">Your time off, working harder.</p>
           <h1 id="landing-heading" className="max-w-2xl text-[2.25rem] font-bold leading-[1.1] tracking-tight text-ink sm:text-5xl lg:text-[3.5rem]">Make the most of every day off you’ve earned.</h1>
           <p className="max-w-xl text-lg leading-relaxed text-muted">Find longer breaks, plan around your company’s holidays, and never lose track of your PTO.</p>
           <p className="text-sm text-muted">Free to use. No account needed.</p>
+        </div>
+        <Card as="section" className="min-w-0 lg:mt-6" eyebrow="A real opportunity from your plan">
+          <h2 className="text-xl font-semibold text-ink">Your recommended break</h2>
+          {bestBreak ? <>
+            <div className="my-5 flex flex-wrap items-end gap-x-6 gap-y-2">
+              <p className="text-muted"><span className="block text-display-sm font-bold leading-none text-ink sm:text-display">{bestBreak.totalDaysOff}</span><span className="mt-2 block text-sm">calendar days off</span></p>
+              <p className="pb-0.5 text-sm text-muted">using <strong className="text-2xl font-semibold text-accent-ink">{bestBreak.ptoCost}</strong> PTO day{bestBreak.ptoCost === 1 ? '' : 's'}</p>
+            </div>
+            <p className="mb-3 text-base font-semibold text-ink">{formatLong(bestBreak.start)} – {formatLong(bestBreak.end)}</p>
+            <MiniBreakStrip brk={bestBreak} holidaySet={holidaySet} />
+            <p className="mt-4 text-sm leading-relaxed text-muted">{breakReason(bestBreak, (date) => holidays.find((holiday) => holiday.date === date)?.name)}</p>
+            <p className="mt-4 border-t border-line pt-4 text-sm text-muted">Full plan: <strong className="text-ink">{used} of {budget} PTO days</strong> across {plan?.result.primary.length} break{plan?.result.primary.length === 1 ? '' : 's'}.</p>
+          </> : <p className="py-7 text-base leading-relaxed text-muted" role="status">{!validRange ? 'Your preview will appear once the planning dates are valid.' : loading ? 'Updating your holiday calendar…' : plan?.issue ?? (budget === 0 ? 'No PTO days allocated. You can still explore the holidays below.' : 'No qualifying break fits these dates and PTO days. Try a longer range or more available PTO.')}</p>}
+          <p className="mt-4 text-xs leading-relaxed text-muted">Preview assumes a Monday–Friday workweek. {customizedHolidays ? 'Your saved employer holiday calendar is applied' : 'National public holidays are assumed to be observed by your employer'}{employer.custom.length > 0 ? ', including additional company days off' : ''}. Calendar days off include weekends, observed holidays, and PTO days.</p>
+          {calendar.degraded && <p className="mt-2 text-xs text-accent-ink" role="status">Some holiday data is unavailable. This preview may miss public holidays.</p>}
+          <a href={href} className="mt-3 inline-block py-1 text-sm font-semibold text-accent-ink underline underline-offset-4">Customize workweek and employer holidays →</a>
+        </Card>
+        <div className="flex min-w-0 flex-col gap-4 border-t border-line pt-5 lg:col-span-2">
+          <div>
+            <h2 className="text-base font-semibold text-ink">Make this preview yours</h2>
+            <p className="mt-1 text-sm text-muted">Change your PTO days, country or dates. Your recommendation updates automatically.</p>
+          </div>
           <div className="grid min-w-0 grid-cols-2 gap-3">
             <label htmlFor="landing-country" className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-muted">Country
               <select id="landing-country" className={FIELD} value={country} onChange={(event) => update({ country: event.target.value })}>{COUNTRIES.map((entry) => <option key={entry.code} value={entry.code}>{entry.name}</option>)}</select>
@@ -124,22 +146,6 @@ export function Landing() {
           {!validRange && <p role="alert" className="text-sm text-accent-ink">Choose valid start and end dates, with the end after the start and no more than two years apart.</p>}
           <div className="hidden lg:block"><Button href={href}>See the full plan →</Button></div>
         </div>
-        <Card as="section" className="min-w-0 lg:mt-9" eyebrow="A real opportunity from your plan">
-          <h2 className="text-xl font-semibold text-ink">Your recommended break</h2>
-          {bestBreak ? <>
-            <div className="my-5 flex flex-wrap items-end gap-x-6 gap-y-2">
-              <p className="text-muted"><span className="block text-display-sm font-bold leading-none text-ink sm:text-display">{bestBreak.totalDaysOff}</span><span className="mt-2 block text-sm">calendar days off</span></p>
-              <p className="pb-0.5 text-sm text-muted">using <strong className="text-2xl font-semibold text-accent-ink">{bestBreak.ptoCost}</strong> PTO day{bestBreak.ptoCost === 1 ? '' : 's'}</p>
-            </div>
-            <p className="mb-3 text-base font-semibold text-ink">{formatLong(bestBreak.start)} – {formatLong(bestBreak.end)}</p>
-            <MiniBreakStrip brk={bestBreak} holidaySet={holidaySet} />
-            <p className="mt-4 text-sm leading-relaxed text-muted">{breakReason(bestBreak, (date) => holidays.find((holiday) => holiday.date === date)?.name)}</p>
-            <p className="mt-4 border-t border-line pt-4 text-sm text-muted">Full plan: <strong className="text-ink">{used} of {budget} PTO days</strong> across {plan?.result.primary.length} break{plan?.result.primary.length === 1 ? '' : 's'}.</p>
-          </> : <p className="py-7 text-base leading-relaxed text-muted" role="status">{!validRange ? 'Your preview will appear once the planning dates are valid.' : loading ? 'Updating your holiday calendar…' : plan?.issue ?? (budget === 0 ? 'No PTO days allocated. You can still explore the holidays below.' : 'No qualifying break fits these dates and PTO days. Try a longer range or more available PTO.')}</p>}
-          <p className="mt-4 text-xs leading-relaxed text-muted">Preview assumes a Monday–Friday workweek. {customizedHolidays ? 'Your saved employer holiday calendar is applied' : 'National public holidays are assumed to be observed by your employer'}{employer.custom.length > 0 ? ', including additional company days off' : ''}. Calendar days off include weekends, observed holidays, and PTO days.</p>
-          {calendar.degraded && <p className="mt-2 text-xs text-accent-ink" role="status">Some holiday data is unavailable. This preview may miss public holidays.</p>}
-          <a href={href} className="mt-3 inline-block py-1 text-sm font-semibold text-accent-ink underline underline-offset-4">Customize workweek and employer holidays →</a>
-        </Card>
         <div className="lg:hidden"><Button href={href} className="w-full sm:w-auto">See the full plan →</Button></div>
       </section>
 
