@@ -1,0 +1,164 @@
+/**
+ * Consumer-only browser evidence. Start the existing Vite server, then run:
+ * node scripts/consumer-qa.mjs http://127.0.0.1:5173 /absolute/evidence/path before
+ * PW_CHROMIUM_PATH may point to an already installed Chromium executable.
+ * A missing browser produces an explicit unavailable report (exit 2), never a pass.
+ */
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { chromium } from 'playwright';
+
+const [base = 'http://127.0.0.1:5173', output = 'qa-evidence', label = 'after'] = process.argv.slice(2);
+const baseUrl = new URL(base);
+if (!['http:', 'https:'].includes(baseUrl.protocol)) throw new Error('Use an HTTP(S) application URL.');
+const outputDirectory = resolve(output);
+await mkdir(outputDirectory, { recursive: true });
+const reportPath = resolve(outputDirectory, 'report.json');
+const report = {
+  label,
+  date: '2026-11-02',
+  baseUrl: baseUrl.origin,
+  status: 'running',
+  scope: 'Consumer routes only; no account, backend, or B2B actions.',
+  lighthouse: 'unavailable: this script does not run Lighthouse',
+  accessibility: 'Basic DOM and keyboard smoke checks; not a WCAG conformance audit.',
+  results: [],
+};
+
+let browser;
+try {
+  browser = await chromium.launch({
+    ...(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {}),
+    headless: true,
+  });
+} catch (error) {
+  report.status = 'unavailable';
+  report.reason = `Browser could not launch: ${error instanceof Error ? error.message : String(error)}`;
+  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  console.error(report.reason);
+  console.error(`Evidence report: ${reportPath}`);
+  process.exit(2);
+}
+
+const routes = [
+  { name: 'home', path: '/' },
+  { name: 'pto', path: '/pto?c=US&s=2027-01-01&e=2027-12-31&b=15' },
+  { name: 'policy', path: '/policy' },
+  { name: 'sabbatical', path: '/sabbatical' },
+];
+
+try {
+  for (const width of [1440, 768, 375]) {
+    for (const route of routes) {
+      const context = await browser.newContext({
+        viewport: { width, height: 1000 },
+        timezoneId: 'America/New_York',
+        locale: 'en-US',
+        colorScheme: 'light',
+        reducedMotion: 'reduce',
+      });
+      const page = await context.newPage();
+      await page.clock.setFixedTime(new Date('2026-11-02T17:00:00Z'));
+      const runtimeErrors = [];
+      const failedSameOriginResponses = [];
+      page.on('pageerror', (error) => runtimeErrors.push(error.message));
+      page.on('response', (response) => {
+        const url = new URL(response.url());
+        if (url.origin === baseUrl.origin && response.status() >= 400) {
+          failedSameOriginResponses.push({ path: url.pathname, status: response.status() });
+        }
+      });
+      // Keep third-party analytics out of an evidence run. Same-origin holiday fixtures
+      // still load normally, so the solver uses the repository's real holiday data.
+      await page.route('**/*', (requestRoute) => {
+        const protocol = new URL(requestRoute.request().url()).protocol;
+        const origin = new URL(requestRoute.request().url()).origin;
+        return ['http:', 'https:'].includes(protocol) && origin !== baseUrl.origin
+          ? requestRoute.abort()
+          : requestRoute.continue();
+      });
+
+      const result = { route: route.name, width, runtimeErrors, failedSameOriginResponses };
+      try {
+        await page.goto(new URL(route.path, baseUrl).href, { waitUntil: 'networkidle', timeout: 30000 });
+        await page.locator('#root').waitFor({ state: 'visible', timeout: 15000 });
+        await page.evaluate(() => document.fonts.ready);
+        // Allow asynchronous same-origin holiday loading and React effects to settle.
+        await page.waitForFunction(() => ![...document.querySelectorAll('p')].some((element) =>
+          element.getClientRects().length > 0 && /^Loading(?:\b|…)/.test(element.textContent.trim()),
+        ), undefined, { timeout: 15000 }).catch(() => { result.loadingDidNotSettle = true; });
+
+        Object.assign(result, await page.evaluate(() => {
+          const visible = (element) => element.getClientRects().length > 0;
+          const nameOf = (element) => (element.getAttribute('aria-label')
+            || (element.getAttribute('aria-labelledby') || '').split(/\s+/).map((id) => document.getElementById(id)?.textContent || '').join(' ')
+            || [...(element.labels || [])].map((item) => item.textContent).join(' ')
+            || element.textContent || '').trim();
+          const inputs = [...document.querySelectorAll('input:not([type="hidden"]),select,textarea')].filter(visible);
+          const buttons = [...document.querySelectorAll('button')].filter(visible);
+          return {
+            title: document.title,
+            heading: document.querySelector('h1')?.textContent.trim(),
+            h1Count: document.querySelectorAll('h1').length,
+            viewportWidth: window.innerWidth,
+            documentWidth: document.documentElement.scrollWidth,
+            horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+            unlabeledInputs: inputs.filter((item) => !nameOf(item)).map((item) => ({ tag: item.tagName, type: item.type, id: item.id })),
+            unnamedButtons: buttons.filter((item) => !nameOf(item)).map((item) => ({ id: item.id })),
+            canonical: document.querySelector('link[rel="canonical"]')?.getAttribute('href') || null,
+            formSubmitControls: [...document.querySelectorAll('button[type="submit"],input[type="submit"]')].filter(visible).length,
+          };
+        }));
+        await page.screenshot({ path: resolve(outputDirectory, `${route.name}-${width}.png`), fullPage: true });
+
+        result.keyboardFocus = [];
+        await page.locator('body').click({ position: { x: 1, y: 1 } });
+        for (let index = 0; index < 8; index += 1) {
+          await page.keyboard.press('Tab');
+          result.keyboardFocus.push(await page.evaluate(() => ({
+            tag: document.activeElement?.tagName,
+            name: (document.activeElement?.getAttribute('aria-label') || document.activeElement?.textContent || '').trim().slice(0, 100),
+          })));
+        }
+        if (width < 1024) {
+          const menu = page.getByRole('button', { name: 'Menu', exact: true });
+          if (await menu.isVisible()) {
+            await menu.focus();
+            await page.keyboard.press('Enter');
+            result.menuOpenedWithKeyboard = await menu.getAttribute('aria-expanded') === 'true';
+            await page.keyboard.press('Escape');
+            result.menuClosedWithEscape = await menu.getAttribute('aria-expanded') === 'false';
+            result.menuFocusReturned = await menu.evaluate((element) => document.activeElement === element);
+          }
+        }
+        if (route.name === 'pto') {
+          const options = page.getByRole('button', { name: /More options/ });
+          if (await options.isVisible()) {
+            await options.click();
+            await page.screenshot({ path: resolve(outputDirectory, `pto-options-${width}.png`), fullPage: true });
+            result.optionsHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+          }
+        }
+        result.status = runtimeErrors.length || failedSameOriginResponses.length || result.horizontalOverflow
+          || result.optionsHorizontalOverflow || result.h1Count !== 1 || result.unlabeledInputs.length
+          || result.unnamedButtons.length || result.loadingDidNotSettle || result.formSubmitControls
+          || result.menuOpenedWithKeyboard === false || result.menuClosedWithEscape === false
+          || result.menuFocusReturned === false ? 'failed' : 'passed';
+      } catch (error) {
+        result.status = 'failed';
+        result.error = error instanceof Error ? error.message : String(error);
+      } finally {
+        report.results.push(result);
+        await context.close();
+      }
+    }
+  }
+  report.status = report.results.every((result) => result.status === 'passed') ? 'passed' : 'failed';
+} finally {
+  await browser.close();
+  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+}
+
+console.log(`Consumer browser QA: ${report.status}; ${report.results.length} route/viewport checks.`);
+console.log(`Evidence report: ${reportPath}`);
+if (report.status !== 'passed') process.exitCode = 1;

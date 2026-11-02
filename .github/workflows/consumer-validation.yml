@@ -1,0 +1,127 @@
+name: Consumer validation
+
+on:
+  pull_request:
+    paths-ignore:
+      - 'apps/teams/**'
+      - 'docs/teams/**'
+      - 'docs/screenshots/**'
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'apps/teams/**'
+      - 'docs/teams/**'
+      - 'docs/screenshots/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: consumer-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Consumer tests, types, lint, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Action commits resolved from each official actions/* repository's v4 tag.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      # The root Vitest configuration excludes apps/**. Do not call test:all or
+      # workspace-recursive typecheck/build commands: this job is consumer-only.
+      - run: npm test
+      - run: npx tsc --noEmit -p tsconfig.app.json
+      - run: npm run lint
+      - run: npm run build
+
+  browser:
+    name: Consumer browser and visual evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: current
+          persist-credentials: false
+      - name: Check out the exact PR base for before screenshots
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: baseline
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: current/package-lock.json
+      - name: Install current dependencies
+        working-directory: current
+        run: npm ci
+      - name: Install baseline dependencies
+        if: github.event_name == 'pull_request'
+        working-directory: baseline
+        run: npm ci
+      - name: Build current browser fixture from committed holiday snapshots
+        working-directory: current
+        # The checks job runs the full production lifecycle. This visual fixture
+        # deliberately skips the prebuild holiday refresh and postbuild timestamp
+        # generation so before/after uses each commit's actual source data.
+        run: npm --ignore-scripts run build
+      - name: Build baseline browser fixture
+        if: github.event_name == 'pull_request'
+        working-directory: baseline
+        run: npm --ignore-scripts run build
+      - name: Install Chromium
+        working-directory: current
+        run: npx playwright install --with-deps chromium
+      - name: Capture and check consumer routes at 1440, 768, and 375 pixels
+        env:
+          HAS_BASELINE: ${{ github.event_name == 'pull_request' }}
+        run: |
+          npm --prefix current run preview -- --host 127.0.0.1 --port 4173 --strictPort > "$RUNNER_TEMP/consumer-current.log" 2>&1 &
+          current_pid=$!
+          baseline_pid=''
+          if [ "$HAS_BASELINE" = 'true' ]; then
+            npm --prefix baseline run preview -- --host 127.0.0.1 --port 4174 --strictPort > "$RUNNER_TEMP/consumer-baseline.log" 2>&1 &
+            baseline_pid=$!
+          fi
+          trap 'kill "$current_pid" ${baseline_pid:+"$baseline_pid"} 2>/dev/null || true' EXIT
+          node --input-type=module <<'NODE'
+          const ports = process.env.HAS_BASELINE === 'true' ? [4173, 4174] : [4173];
+          for (const port of ports) {
+            let ready = false;
+            for (let attempt = 0; attempt < 30; attempt += 1) {
+              try {
+                const response = await fetch(`http://127.0.0.1:${port}/`);
+                if (response.ok) { ready = true; break; }
+              } catch { /* The preview may still be starting. */ }
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            if (!ready) throw new Error(`Consumer preview on port ${port} did not start.`);
+          }
+          NODE
+          if [ "$HAS_BASELINE" = 'true' ]; then
+            # A baseline finding remains in its JSON report; it must not prevent
+            # collecting candidate evidence. Candidate checks below remain strict.
+            baseline_exit=0
+            node current/scripts/consumer-qa.mjs http://127.0.0.1:4174 "$GITHUB_WORKSPACE/qa-evidence/before" before || baseline_exit=$?
+            printf 'Baseline browser evidence exit status: %s\n' "$baseline_exit"
+          fi
+          node current/scripts/consumer-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/after" after
+      - name: Preserve browser evidence, including failure reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: consumer-browser-evidence
+          path: qa-evidence
+          if-no-files-found: error
+          retention-days: 14
