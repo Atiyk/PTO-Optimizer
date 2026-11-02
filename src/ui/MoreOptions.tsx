@@ -295,7 +295,7 @@ export function MoreOptions(props: MoreOptionsProps) {
 
       <section>
         <h4 className={H4_CLASS}>Overlap days (someone else&apos;s time off)</h4>
-        <DateListEditor dates={props.overlapDays} onAdd={props.onAddOverlapDay} onRemove={props.onRemoveOverlapDay} />
+        <DateListEditor label="Overlap date to add" dates={props.overlapDays} onAdd={props.onAddOverlapDay} onRemove={props.onRemoveOverlapDay} />
       </section>
 
       <section>
@@ -304,7 +304,7 @@ export function MoreOptions(props: MoreOptionsProps) {
           Mandatory coverage, notice periods, quarter close, or any week you simply don&apos;t want &mdash; these
           narrow what the solver can pick. They never count against your travel or efficiency scores.
         </p>
-        <DateListEditor dates={props.blackouts} onAdd={props.onAddBlackout} onRemove={props.onRemoveBlackout} />
+        <DateListEditor label="Unavailable date to add" dates={props.blackouts} onAdd={props.onAddBlackout} onRemove={props.onRemoveBlackout} />
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="text-xs text-slate-500">Block the next</span>
           <input
