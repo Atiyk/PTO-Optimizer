@@ -134,7 +134,7 @@ export function App() {
               <option value="balanced">Balanced</option><option value="long-breaks">Long breaks</option><option value="more-breaks">More breaks</option><option value="custom">Custom</option>
             </select>
           </label>
-          {optionsOpen && <PlanSliders
+          <PlanSliders
             w={state.w}
             onChangeW={state.setW}
             manualBreakCount={state.manualBreakCount}
@@ -145,7 +145,7 @@ export function App() {
             breakCountRequested={state.breakCountRequested}
             breakCountActual={state.breakCountActual}
             budget={state.effectiveBudget}
-          />}
+          />
         </Container>
       </div>
 
