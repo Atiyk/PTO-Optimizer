@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { planningStyleSettings, solveConsumer, validatePtoDates } from './optimizer';
+import { planningStyleSettings, solveConsumer, solveLegacyConsumer, validatePtoDates } from './optimizer';
+import { solve } from '@daysoff/engine/solver/solve';
+import { mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import type { SolveInput } from '@daysoff/engine/solver/types';
 
 const input: SolveInput = {
@@ -158,6 +160,19 @@ describe('PTO spending is checked on actual dates', () => {
     expect(validatePtoDates(policy, ['2028-02-29']).valid).toBe(true);
   });
 
+  it('tolerates floating-point accrual credit without relaxing the total balance cap', () => {
+    // Mathematically 29 days, but JavaScript multiplication is a few ulps below it.
+    expect(0.58 * 50).toBeLessThan(29);
+    const dates = rangeISO('2027-01-20', '2027-03-01').filter((date) => mondayIndexedDow(date) < 5);
+    expect(dates).toHaveLength(29);
+    const policy: SolveInput = {
+      offDays: [], rangeStart: '2023-01-01', rangeEnd: '2027-03-31',
+      budget: 29, accrualPerMonth: 0.58,
+    };
+    expect(validatePtoDates(policy, dates).valid).toBe(true);
+    expect(validatePtoDates({ ...policy, budget: 0.58 * 50 }, dates).valid).toBe(false);
+  });
+
   it('honors blackouts, the custom workweek, and the peak cap', () => {
     expect(validatePtoDates({ ...input, blackouts: ['2027-01-04'] }, ['2027-01-04']).valid).toBe(false);
     expect(validatePtoDates({ ...input, workWeek: [false, true, true, true, true, true, false] }, ['2027-01-04']).ptoDays).toEqual([]);
@@ -170,5 +185,98 @@ describe('PTO spending is checked on actual dates', () => {
     expect(validatePtoDates(input, ['2026-12-31']).valid).toBe(false);
     expect(validatePtoDates({ ...input, mustIncludeDays: ['2027-01-04'] }, []).valid).toBe(false);
     expect(validatePtoDates({ ...input, mustIncludeDays: ['2027-01-04'], blackouts: ['2027-01-04'] }, []).valid).toBe(false);
+  });
+});
+
+describe('legacy consumer URLs keep valid plans and repair unsafe outcomes', () => {
+  it('keeps complete valid legacy results exactly without adding minimums or presets', () => {
+    const examples: SolveInput[] = [
+      input,
+      { ...input, breakCount: 1, w: 70, blackouts: ['2027-01-15'] },
+      { ...input, breakCount: 7, w: 20, workWeek: [true, true, true, true, false, false, false] },
+      { ...input, budget: 0 },
+      { ...input, mustIncludeDays: ['2027-01-02'] },
+      { ...input, offDays: ['2027-01-04', '2027-02-15'] },
+      { ...input, budget: 4, accrualPerMonth: 4, breakCount: 1, blackouts: rangeISO('2027-01-01', '2027-01-31') },
+      { ...input, expiryDate: '2027-03-31', carryoverCap: 0 },
+    ];
+    for (const example of examples) {
+      const legacy = solve(example);
+      expect(validatePtoDates(example, legacy.primary.flatMap((brk) => brk.days)).valid).toBe(true);
+      for (const alternative of legacy.alternatives) {
+        const remaining = legacy.primary.filter((brk) => brk.start !== alternative.replaces.start || brk.end !== alternative.replaces.end);
+        expect(validatePtoDates(example, [...remaining, alternative].flatMap((brk) => brk.days)).valid).toBe(true);
+      }
+      const safe = solveLegacyConsumer(example);
+      expect(safe.issue).toBeUndefined();
+      expect(safe.result).toEqual(legacy);
+      expect(JSON.stringify(safe.result)).toBe(JSON.stringify(legacy));
+    }
+  });
+
+  it('removes unfunded February alternatives while preserving the valid March primary', () => {
+    const policy: SolveInput = {
+      offDays: ['2027-02-15'], rangeStart: '2027-01-01', rangeEnd: '2027-03-31',
+      budget: 2, accrualPerMonth: 1.25, w: 10, breakCount: 1, country: 'US',
+    };
+    const legacy = solve(policy);
+    expect(legacy.primary[0].start).toBe('2027-03-04');
+    expect(legacy.alternatives.some((alternative) => alternative.start === '2027-02-18' && alternative.end === '2027-02-21')).toBe(true);
+    const safe = solveLegacyConsumer(policy);
+    expect(safe.issue).toBeUndefined();
+    expect(safe.result.primary).toEqual(legacy.primary);
+    expect(safe.result.budgetSpent).toBe(legacy.budgetSpent);
+    expect(safe.result.breakCountActual).toBe(legacy.breakCountActual);
+    expect(safe.result.breakCountRequested).toBe(legacy.breakCountRequested);
+    expect(safe.result.peakCapApplied).toBe(legacy.peakCapApplied);
+    expect(safe.result.alternatives).toEqual([]);
+  });
+
+  it('returns an explicit issue when required legacy pins exceed the balance', () => {
+    const policy = { ...input, budget: 2, mustIncludeDays: ['2027-01-04', '2027-01-05', '2027-01-06'] };
+    expect(solve(policy).budgetSpent).toBeGreaterThan(policy.budget);
+    const safe = solveLegacyConsumer(policy);
+    expect(safe.result.primary).toEqual([]);
+    expect(safe.result.budgetSpent).toBe(0);
+    expect(safe.issue).toContain('exceed');
+  });
+
+  it('moves an endpoint-funded legacy break to actual funded working dates', () => {
+    const policy: SolveInput = {
+      offDays: [], rangeStart: '2026-01-01', rangeEnd: '2026-02-08',
+      budget: 4, accrualPerMonth: 4, breakCount: 1, w: 0,
+      blackouts: rangeISO('2026-01-01', '2026-01-26'),
+    };
+    const legacy = solve(policy);
+    expect(validatePtoDates(policy, legacy.primary.flatMap((brk) => brk.days)).valid).toBe(false);
+    const safe = solveLegacyConsumer(policy);
+    expect(safe.issue).toBeUndefined();
+    expect(safe.result.primary.length).toBeGreaterThan(0);
+    expect(safe.result.budgetSpent).toBeLessThanOrEqual(policy.budget);
+    expect(validatePtoDates(policy, safe.result.primary.flatMap((brk) => brk.days)).valid).toBe(true);
+    expect(safe.result.breakCountRequested).toBe(1);
+  });
+
+  it('explains an empty result when the legacy plan spends accrual that never arrives', () => {
+    const policy = { ...input, accrualPerMonth: 0 };
+    expect(solve(policy).budgetSpent).toBeGreaterThan(0);
+    const safe = solveLegacyConsumer(policy);
+    expect(safe.result.primary).toEqual([]);
+    expect(safe.result.budgetSpent).toBe(0);
+    expect(safe.issue).toContain('accrued PTO');
+  });
+
+  it('repairs the legacy carryover double allocation within the original budget', () => {
+    const policy: SolveInput = {
+      offDays: [], rangeStart: '2026-02-01', rangeEnd: '2026-03-31',
+      budget: 5, expiryDate: '2026-02-15', carryoverCap: 20, breakCount: 1, w: 0,
+    };
+    expect(solve(policy).budgetSpent).toBeGreaterThan(policy.budget);
+    const safe = solveLegacyConsumer(policy);
+    expect(safe.issue).toBeUndefined();
+    expect(safe.result.primary.length).toBeGreaterThan(0);
+    expect(safe.result.budgetSpent).toBeLessThanOrEqual(policy.budget);
+    expect(validatePtoDates(policy, safe.result.primary.flatMap((brk) => brk.days)).valid).toBe(true);
+    expect(safe.result.breakCountRequested).toBe(1);
   });
 });

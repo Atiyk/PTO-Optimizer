@@ -1,6 +1,7 @@
+import { getConsumerHolidaysWithStatus as getHolidaysWithStatus } from '../personal/consumerHolidays';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { COUNTRIES } from '@daysoff/engine/data/countries';
-import { getHolidaysWithStatus, getPreloadedHolidays, type Holiday } from '@daysoff/engine/data/holidays';
+import { getPreloadedHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { DEFAULT_WORK_WEEK, type Break } from '@daysoff/engine/solver/types';
 import { formatLong, formatShort } from '@daysoff/engine/calendar/dateFormat';
