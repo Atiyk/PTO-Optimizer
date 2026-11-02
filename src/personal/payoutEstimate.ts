@@ -133,9 +133,9 @@ export function estimateDeparturePayout(input: DeparturePayoutInput): DepartureP
       || (line.companyRule.kind === 'pays-up-to' && !validNumber(line.companyRule.cap, MAX_UNITS))
       || !validNumber(line.policy.hoursPerDay, 24, false)
       || (line.requests !== undefined && (!Array.isArray(line.requests) || line.requests.length > 300
-        || !line.requests.every((request) => request && validRequestRange(request.start, request.end)
+        || !line.requests.every((request: PtoRequest) => request && validRequestRange(request.start, request.end)
           && REQUEST_STATUSES.includes(request.status) && Array.isArray(request.ptoDates)
-          && request.ptoDates.length <= 1096 && request.ptoDates.every((date) => typeof date === 'string'
+          && request.ptoDates.length <= 1096 && request.ptoDates.every((date: string) => typeof date === 'string'
             && date >= request.start && date <= request.end))))) return null;
     seen.add(line.category);
     const forecast = forecastWithRequests(line.policy, input.departureDate, line.requests ?? []);
