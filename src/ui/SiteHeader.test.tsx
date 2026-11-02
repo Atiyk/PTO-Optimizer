@@ -44,6 +44,26 @@ describe('SiteHeader (redesign Phase 1)', () => {
     expect(html).toMatch(/data-slot="sign-in" aria-hidden="true"/);
   });
 
+  it('provides visible keyboard focus and 44px mobile navigation targets', () => {
+    const { getByRole, getAllByRole } = render(<SiteHeader active="pto" />);
+    const menu = getByRole('button', { name: 'Menu' });
+    expect(menu.className).toContain('min-h-11');
+    expect(menu.className).toContain('min-w-11');
+    expect(menu.className).toContain('focus-visible:outline');
+    fireEvent.click(menu);
+    for (const label of ['Plan PTO', 'Sabbatical', 'Your policy', 'Glossary']) {
+      const links = getAllByRole('link', { name: label });
+      expect(links.length).toBe(2);
+      for (const link of links) {
+        expect(link.className).toContain('focus-visible:outline');
+      }
+      expect(links[1].className).toContain('min-h-11');
+    }
+    for (const link of getAllByRole('link', { name: 'Plan my time off' })) {
+      expect(link.className).toContain('focus-visible:outline');
+    }
+  });
+
   it('collapses the groups into an accessible disclosure that starts closed', () => {
     const { getByRole, container } = render(<SiteHeader active="landing" />);
     const button = getByRole('button', { name: 'Menu' });
