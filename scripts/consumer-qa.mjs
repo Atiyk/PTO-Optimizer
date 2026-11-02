@@ -48,11 +48,19 @@ const routes = [
   { name: 'pto', path: '/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15', title: /Plan your PTO/ },
   { name: 'policy', path: '/policy/', title: /Your Time-Off Policy/ },
   { name: 'sabbatical', path: '/sabbatical/', title: /Sabbatical Planning/ },
+  { name: 'understand', path: '/glossary/', title: /Glossary/ },
+  { name: 'guide-accrual', path: '/glossary/accrual/', title: /Glossary/, guideHeading: 'How to forecast the PTO you will earn' },
+  { name: 'guide-carryover', path: '/glossary/carryover/', title: /Glossary/, guideHeading: 'What happens to unused PTO at year end?' },
+  { name: 'guide-holidays', path: '/glossary/company-holiday/', title: /Glossary/, guideHeading: 'Public holidays versus employer days off' },
+  { name: 'guide-payout', path: '/glossary/payout/', title: /Glossary/, guideHeading: 'What could unused PTO be worth if you leave?' },
 ];
 
 try {
-  for (const width of [1440, 768, 375]) {
+  for (const width of [1440, 768, 375, 320]) {
     for (const route of routes) {
+      // Narrowest viewport: enforce overflow and reading-order checks on the
+      // Understand hub and guides, without changing legacy planner baselines.
+      if (width === 320 && !['understand', 'guide-accrual', 'guide-carryover', 'guide-holidays', 'guide-payout'].includes(route.name)) continue;
       const context = await browser.newContext({
         viewport: { width, height: 1000 },
         timezoneId: 'America/New_York',
@@ -118,6 +126,11 @@ try {
           };
         }));
         result.correctRoute = route.title.test(result.title);
+        if (route.guideHeading) {
+          result.guideContentVisible = await page.getByRole('heading', { name: route.guideHeading, exact: true }).isVisible();
+          result.guideExampleVisible = await page.getByRole('heading', { name: 'A worked example', exact: true }).isVisible();
+          result.guideQuestionsVisible = await page.getByRole('heading', { name: 'Three questions for HR', exact: true }).isVisible();
+        }
         await page.screenshot({ path: resolve(outputDirectory, `${route.name}-${width}.png`), fullPage: true });
 
         result.keyboardFocus = [];
@@ -154,7 +167,7 @@ try {
         result.status = runtimeErrors.length || failedSameOriginResponses.length || result.horizontalOverflow
           || result.optionsHorizontalOverflow || result.h1Count !== 1 || result.unlabeledInputs.length
           || result.unnamedButtons.length || result.loadingDidNotSettle || result.formSubmitControls
-          || !result.correctRoute
+          || !result.correctRoute || result.guideContentVisible === false || result.guideExampleVisible === false || result.guideQuestionsVisible === false
           || result.menuOpenedWithKeyboard === false || result.menuClosedWithEscape === false
           || result.menuFocusReturned === false ? 'failed' : 'passed';
       } catch (error) {
