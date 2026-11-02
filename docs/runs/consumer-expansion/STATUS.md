@@ -6,13 +6,13 @@
 
 ## New isolated development work
 
-- Created consumer-only draft [PR #89 — school-calendar and conflict classification foundation](https://github.com/Atiyk/PTO-Optimizer/pull/89), branch \`gapless/expansion-school-conflict-foundation-20261102\`, head \`91ec3086c67f9476d48f91868d8a1acbe8ecf1ae\`, based on verified main \`3187596230768e4818720d1907475c9a3341a54c\`.
-- Added new pure domain modules \`src/personal/schoolCalendar.ts\` and \`src/personal/calendarConflicts.ts\` plus two focused test files and a canonical ownership/architecture contract. No \`src/ui\` changes, no B2B files, no URLs/storage or backend modifications. Existing ICS parser and request ledger are reused.
+- Created consumer-only draft [PR #89 — school-calendar and conflict classification foundation](https://github.com/Atiyk/PTO-Optimizer/pull/89), branch `gapless/expansion-school-conflict-foundation-20261102`, head `91ec3086c67f9476d48f91868d8a1acbe8ecf1ae`, based on verified main `3187596230768e4818720d1907475c9a3341a54c`.
+- Added new pure domain modules `src/personal/schoolCalendar.ts` and `src/personal/calendarConflicts.ts` plus two focused test files and a canonical ownership/architecture contract. No `src/ui` changes, no B2B files, no URLs/storage or backend modifications. Existing ICS parser and request ledger are reused.
 - Conflict states: explicit employer blackout and approved/completed leave are hard blocks; requested/planned leave, imported busy days, in-session school dates and advisory commitments require review; school closures are context. Source gaps are always disclosed, no private notes or calendar titles in results.
-- **Not released:** This is a domain foundation, not a completed school-calendar UI. Independent critic approval, GitHub Actions CI and screenshots for later UI integration remain outstanding. At initial check no workflow run had yet appeared for PR #89. Do not merge it while Gate 0 is closed.
-- The predecessor UX agent remains enabled and explicitly reports unfinished scope. UX-owned draft PRs [#87](https://github.com/Atiyk/PTO-Optimizer/pull/87) and [#88](https://github.com/Atiyk/PTO-Optimizer/pull/88) modify UI and browser QA only, with no overlap in #89's five changed files. Production Vercel READY remains on main \`3187596230768e4818720d1907475c9a3341a54c\`. Daily deployment quota is temporary.
+- **Not released:** This is a domain foundation, not a completed school-calendar UI. Independent critic approval, GitHub Actions CI and screenshots for later UI integration remain outstanding. GitHub Actions [run #41491428873](https://github.com/Atiyk/PTO-Optimizer/actions/runs/41491428873) started; tests/build and browser/visual jobs were both in progress at this check. Do not merge it while Gate 0 is closed.
+- The predecessor UX agent remains enabled and explicitly reports unfinished scope. UX-owned draft PRs [#87](https://github.com/Atiyk/PTO-Optimizer/pull/87) and [#88](https://github.com/Atiyk/PTO-Optimizer/pull/88) modify UI and browser QA only, with no overlap in #89's five changed files. Production Vercel READY remains on main `3187596230768e4818720d1907475c9a3341a54c`. Daily deployment quota is temporary.
 
-## Previous Gate 0 evidence (preserved)
+## Historical Gate 0 evidence (before owner update; release gate still closed)
 
 ## Latest verified handoff evidence
 
@@ -27,14 +27,14 @@
 
 ## Gate 0 decision: NOT PASSED
 
-The predecessor explicitly reports unfinished UX work, remains enabled and has two unmerged UX-owned PRs. A temporary Vercel free-plan deployment quota is an additional verified external blocker for those PRs. No evidence establishes independent critic signoff or an explicit final predecessor handoff. Starting consumer expansion feature implementation now would violate the owner-approved non-overlap gate.
+The predecessor explicitly reports unfinished UX work, remains enabled and has two unmerged UX-owned PRs. A temporary Vercel free-plan deployment quota is an additional verified external blocker for those PRs. No evidence establishes independent critic signoff or an explicit final predecessor handoff. Merging or deploying expansion code now would violate the still-closed release gate. The owner's later exception permits isolated, non-overlapping draft code only.
 
 ## Next conditional check
 
 1. Read the latest UX automation result and look for **explicit full-scope completion** (not merely one completed run).
 2. Inspect UX PRs #87/#88 and any successors, exact-head CI, independent critic review and Vercel preview status. Treat the quota limit as temporary; do not bypass it.
 3. Verify all intended UX releases merged to main and production Vercel READY on the final merged SHA; ensure no concurrent overlapping UX worker.
-4. Only after all requirements pass, record final UX handoff evidence, branch from fresh main and start expansion phases with independent critic review, scoped PRs and production SHA verification.
+4. Only after all requirements pass, record final UX handoff evidence, then integrate and merge reviewed expansion PRs sequentially with production SHA verification.
 5. Keep the conditional handoff active while awaiting completion. Do not stop or modify the predecessor automation.
 
-This file records the latest evidence and a prerequisite decision, not an expansion release.
+This file records unreleased isolated implementation and a still-closed release gate.
