@@ -42,7 +42,7 @@ describe('S1 — front-loaded + carryover forfeiture, with the /pto hand-off', (
     const alerts = generateAlerts(policy, events, '2026-10-28', 'US');
     const forfeitAlert = alerts.find((a) => a.id.startsWith('forfeit-'));
     expect(forfeitAlert).toBeDefined();
-    expect(forfeitAlert!.text).toBe("You'll lose 7 days on 2027-01-01 unless you take them.");
+    expect(forfeitAlert!.text).toBe('You could lose 7 days on 2027-01-01.');
     expect(forfeitAlert!.daysAtStake).toBe(7);
     const url = new URLSearchParams(forfeitAlert!.ptoHref.split('?')[1]);
     expect(url.get('b')).toBe('7');
