@@ -45,7 +45,7 @@ jobs:
   browser:
     name: Consumer browser and visual evidence
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -73,13 +73,18 @@ jobs:
       - name: Build current browser fixture from committed holiday snapshots
         working-directory: current
         # The checks job runs the full production lifecycle. This visual fixture
-        # deliberately skips the prebuild holiday refresh and postbuild timestamp
-        # generation so before/after uses each commit's actual source data.
-        run: npm --ignore-scripts run build
+        # skips only the prebuild holiday refresh, preserving committed source data.
+        # Keep production prerendering/SEO output: omitting robots.txt would create
+        # a fixture-induced Lighthouse SEO failure rather than measure the site.
+        run: |
+          npm --ignore-scripts run build
+          npm run postbuild
       - name: Build baseline browser fixture
         if: github.event_name == 'pull_request'
         working-directory: baseline
-        run: npm --ignore-scripts run build
+        run: |
+          npm --ignore-scripts run build
+          npm run postbuild
       - name: Install Chromium
         working-directory: current
         run: npx playwright install --with-deps chromium
@@ -117,6 +122,50 @@ jobs:
             printf 'Baseline browser evidence exit status: %s\n' "$baseline_exit"
           fi
           node current/scripts/consumer-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/after" after
+      - name: Install pinned metrics tools outside the checkout
+        if: ${{ !cancelled() }}
+        # Versions and Node engine requirements verified against npm on 2026-11-02.
+        # This modifies RUNNER_TEMP only; no manifest or repository lockfile changes.
+        run: npm install --prefix "$RUNNER_TEMP/gapless-qa-tools" --no-save --package-lock=false --ignore-scripts lighthouse@13.6.0 @axe-core/playwright@4.14.0 chrome-launcher@1.2.2
+      - name: Compare mobile Lighthouse and WCAG-oriented axe results
+        if: ${{ !cancelled() }}
+        env:
+          HAS_BASELINE: ${{ github.event_name == 'pull_request' }}
+          GAPLESS_BASELINE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+        run: |
+          (cd current && exec node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 4175 --strictPort) > "$RUNNER_TEMP/consumer-metrics-current.log" 2>&1 &
+          current_pid=$!
+          baseline_pid=''
+          if [ "$HAS_BASELINE" = 'true' ]; then
+            (cd baseline && exec node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 4176 --strictPort) > "$RUNNER_TEMP/consumer-metrics-baseline.log" 2>&1 &
+            baseline_pid=$!
+          fi
+          trap 'kill "$current_pid" ${baseline_pid:+"$baseline_pid"} 2>/dev/null || true' EXIT
+          node --input-type=module <<'NODE'
+          const ports = process.env.HAS_BASELINE === 'true' ? [4175, 4176] : [4175];
+          for (const port of ports) {
+            let ready = false;
+            for (let attempt = 0; attempt < 30; attempt += 1) {
+              try {
+                const response = await fetch(`http://127.0.0.1:${port}/`);
+                if (response.ok) { ready = true; break; }
+              } catch { /* The preview may still be starting. */ }
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            if (!ready) throw new Error(`Consumer metrics preview on port ${port} did not start.`);
+          }
+          NODE
+          baseline_args=()
+          if [ "$HAS_BASELINE" = 'true' ]; then
+            baseline_args=(--baseline-url http://127.0.0.1:4176)
+          fi
+          node current/scripts/consumer-lighthouse.mjs \
+            --current-url http://127.0.0.1:4175 \
+            "${baseline_args[@]}" \
+            --tools-dir "$RUNNER_TEMP/gapless-qa-tools" \
+            --app-dir "$GITHUB_WORKSPACE/current" \
+            --out-dir "$GITHUB_WORKSPACE/qa-evidence/lighthouse" \
+            --runs 3
       - name: Preserve browser evidence, including failure reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -1,6 +1,6 @@
 import type { ISODate } from '@daysoff/engine/solver/types';
 import { addDays, isoToSerial } from '@daysoff/engine/solver/dateUtils';
-import { payDatesInRange, resetDatesInRange, waitingPeriodEnd, type TimeOffPolicy } from './model';
+import { payDatesInRange, resetDatesInRange, waitingPeriodEnd, validateCurrentCarriedBalance, type TimeOffPolicy } from './model';
 
 export interface BalancePoint {
   date: ISODate;
@@ -23,16 +23,18 @@ export type PolicyEvent =
  * rounding for display happens in the UI layer, never here. `unlimited` policies have no
  * balance to project — callers show narrative copy instead (acceptance scenario S5).
  */
-export function projectBalance(policy: TimeOffPolicy, horizonEnd: ISODate): { series: BalancePoint[]; events: PolicyEvent[] } {
+export function projectBalance(policy: TimeOffPolicy, horizonEnd: ISODate): { series: BalancePoint[]; events: PolicyEvent[]; validationError?: string } {
   if (policy.accrual.kind === 'unlimited') return { series: [], events: [] };
+  const validationError = validateCurrentCarriedBalance(policy);
+  if (validationError) return { series: [], events: [], validationError };
 
   const series: BalancePoint[] = [{ date: policy.balanceAsOf, balance: policy.currentBalance }];
   const events: PolicyEvent[] = [];
   let balance = policy.currentBalance;
   // The portion of `balance` that was carried over at the most recent reset and is subject
   // to its own use-by deadline (only tracked while carryover.useByDate is set).
-  let carriedAmount = 0;
-  let carriedExpiry: ISODate | undefined;
+  let carriedAmount = policy.currentCarriedBalance ?? 0;
+  let carriedExpiry: ISODate | undefined = carriedAmount > 0 ? policy.carryover.useByDate : undefined;
 
   const plannedSet = new Set(policy.plannedDays);
   const resets = new Set(resetDatesInRange(policy.planYear, policy.balanceAsOf, horizonEnd));
@@ -41,12 +43,14 @@ export function projectBalance(policy: TimeOffPolicy, horizonEnd: ISODate): { se
   const balanceAsOfSerial = isoToSerial(policy.balanceAsOf);
 
   function credit(date: ISODate, amount: number): void {
-    const capped = policy.accrualCap !== undefined ? Math.min(balance + amount, policy.accrualCap) : balance + amount;
-    const lost = balance + amount - capped;
+    // An accrual cap pauses new earnings; it does not erase an already-earned balance
+    // entered above the cap (for example after a policy change or a manual adjustment).
+    const actuallyCredited = policy.accrualCap !== undefined
+      ? Math.min(amount, Math.max(0, policy.accrualCap - balance)) : amount;
+    const lost = amount - actuallyCredited;
     if (lost > 1e-9) events.push({ kind: 'cap-reached', date, lost });
-    const actuallyCredited = amount - Math.max(0, lost);
     if (actuallyCredited > 1e-9) events.push({ kind: 'accrual-credited', date, amount: actuallyCredited });
-    balance = capped;
+    balance += actuallyCredited;
   }
 
   let d = policy.balanceAsOf;

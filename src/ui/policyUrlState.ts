@@ -16,6 +16,8 @@ export type CarryoverMode = 'none' | 'capped' | 'all';
 export type PayoutOnLeaving = 'pays' | 'doesnt' | 'not-sure';
 
 export interface PolicyURLState {
+  forecastDate?: string;
+  currentCarriedBalance?: number;
   unit: 'days' | 'hours';
   hoursPerDay: number;
   accrualKind: AccrualKind;
@@ -136,6 +138,8 @@ export function readPolicyStateFromURL(search: string, defaultCountry: string): 
     waitingPeriodDays: num(params.get('wpd'), d.waitingPeriodDays),
     negativeBalanceAllowance: num(params.get('nba'), d.negativeBalanceAllowance),
     payoutOnLeaving: PAYOUT_FROM_CODE[params.get('pol') ?? ''] ?? d.payoutOnLeaving,
+    ...(params.has('fd') && isValidISODate(params.get('fd')!) ? { forecastDate: params.get('fd')! } : {}),
+    ...(params.has('car') ? { currentCarriedBalance: num(params.get('car'), 0) } : {}),
     currentBalance: num(params.get('cb'), d.currentBalance),
     balanceAsOf: date(params.get('bao'), d.balanceAsOf),
     plannedDays: parseDateList(params.get('pd')),
@@ -223,6 +227,10 @@ export function writePolicyStateToURL(params: URLSearchParams, state: PolicyURLS
   if (state.payoutOnLeaving !== 'not-sure') params.set('pol', PAYOUT_CODE[state.payoutOnLeaving]);
   else params.delete('pol');
 
+  if (state.forecastDate && isValidISODate(state.forecastDate)) params.set('fd', state.forecastDate);
+  else params.delete('fd');
+  if (state.currentCarriedBalance) params.set('car', String(state.currentCarriedBalance));
+  else params.delete('car');
   params.set('cb', String(state.currentBalance));
   params.set('bao', state.balanceAsOf);
   if (state.plannedDays.length) params.set('pd', state.plannedDays.join(','));

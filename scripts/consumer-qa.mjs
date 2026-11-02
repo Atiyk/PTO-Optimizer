@@ -129,6 +129,9 @@ try {
             name: (document.activeElement?.getAttribute('aria-label') || document.activeElement?.textContent || '').trim().slice(0, 100),
           })));
         }
+        // A keyboard walk may leave the country listbox open. Finish that interaction
+        // before independently testing the navigation menu and options disclosure.
+        await page.keyboard.press('Escape');
         if (width < 1024) {
           const menu = page.getByRole('button', { name: 'Menu', exact: true });
           if (await menu.isVisible()) {

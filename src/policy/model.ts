@@ -1,5 +1,5 @@
 import type { ISODate } from '@daysoff/engine/solver/types';
-import { addDays, isoToSerial, monthsElapsed, parseISO } from '@daysoff/engine/solver/dateUtils';
+import { addDays, isoToSerial, monthsElapsed, parseISO, serialToISO } from '@daysoff/engine/solver/dateUtils';
 
 /**
  * The shared policy model (Feature 1, Stage 2A) — pure TS, no React/DOM. /policy and /pto
@@ -47,9 +47,26 @@ export interface TimeOffPolicy {
   /** Display-only per P4 — never a legal claim about what an employer must do. */
   payoutOnLeaving: 'pays' | 'doesnt' | 'not-sure';
   currentBalance: number;
+  /** Portion of currentBalance already carried from a prior plan year, in native units.
+   * Not an additional balance. Only meaningful with a known future carryover.useByDate. */
+  currentCarriedBalance?: number;
   balanceAsOf: ISODate;
   /** Reuses DateListEditor on the /policy page. */
   plannedDays: ISODate[];
+}
+
+export function validateCurrentCarriedBalance(policy: TimeOffPolicy): string | null {
+  const carried = policy.currentCarriedBalance ?? 0;
+  if (!Number.isFinite(carried) || carried < 0 || carried > Math.max(0, policy.currentBalance)) {
+    return 'The current carried PTO portion must be between zero and your current balance, in the same unit.';
+  }
+  if (carried > 0) {
+    const deadline = policy.carryover.useByDate;
+    if (!deadline || !/^\d{4}-\d{2}-\d{2}$/.test(deadline) || serialToISO(isoToSerial(deadline)) !== deadline || deadline <= policy.balanceAsOf) {
+      return 'Enter a carried PTO use-by date after the balance as-of date to project the current carried portion.';
+    }
+  }
+  return null;
 }
 
 /** One calendar-year occurrence of the plan year's reset date, for the year containing `near`. */
@@ -58,10 +75,16 @@ function resetDateInYearOf(planYear: PlanYear, near: ISODate): ISODate {
   if (planYear.kind === 'calendar') return `${y}-01-01`;
   if (planYear.kind === 'custom') {
     const { m, d } = parseISO(planYear.resetDate);
-    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    return clampedDate(y, m, d);
   }
   const { m, d } = parseISO(planYear.startDate);
-  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  return clampedDate(y, m, d);
+}
+
+/** Month-end anchors stay on a real calendar date (Feb 29 becomes Feb 28 in common years). */
+function clampedDate(year: number, month: number, day: number): ISODate {
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${year}-${String(month).padStart(2, '0')}-${String(Math.min(day, lastDay)).padStart(2, '0')}`;
 }
 
 /** Every reset date in (from, through], in order. A policy resets once a year on the same
@@ -127,7 +150,7 @@ export function payDatesInRange(
   let cursor = accrual.payDateAnchor;
   for (let i = 0; i <= months; i++) {
     const { y, m } = parseISO(cursor);
-    const candidate = `${y}-${String(m).padStart(2, '0')}-${String(anchorDay).padStart(2, '0')}`;
+    const candidate = clampedDate(y, m, anchorDay);
     if (candidate > from && candidate <= through) out.push(candidate);
     const nextM = m === 12 ? 1 : m + 1;
     const nextY = m === 12 ? y + 1 : y;
