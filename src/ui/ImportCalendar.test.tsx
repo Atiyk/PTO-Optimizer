@@ -85,6 +85,13 @@ describe('ImportCalendar', () => {
     expect(onImportBusyDays).not.toHaveBeenCalled();
   });
 
+  it('rejects oversized ICS files before reading them and never imports private dates', async () => {
+    const { onImportBusyDays } = mount();
+    await selectFile('X'.repeat(1_000_001));
+    expect(container!.textContent).toContain('too large to import safely');
+    expect(onImportBusyDays).not.toHaveBeenCalled();
+  });
+
   it('shows a clear message when the file is a valid calendar but has nothing importable', async () => {
     mount();
     const emptyIcs = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n';
