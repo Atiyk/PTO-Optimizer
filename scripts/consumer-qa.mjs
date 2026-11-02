@@ -178,13 +178,30 @@ try {
             result.optionsHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
           }
         }
+        if (route.name === 'understand') {
+          const search = page.getByRole('searchbox', { name: 'Search the glossary' });
+          await search.fill('zzzxxyy');
+          result.searchEmptyState = await page.getByRole('status').innerText() === '0 terms found'
+            && await page.getByText('No terms match "zzzxxyy".').isVisible();
+          result.searchHidesUnrelatedPaths = await page.getByRole('heading', { name: 'Your PTO basics' }).count() === 0;
+          await page.screenshot({ path: resolve(outputDirectory, `understand-search-empty-${width}.png`), fullPage: true });
+          await search.fill('accrual');
+          result.searchFindsTerm = await page.getByRole('link', { name: 'accrual', exact: true }).isVisible();
+          await page.getByRole('button', { name: 'Clear search' }).click();
+          result.searchClearRestoresPaths = await page.getByRole('heading', { name: 'Your PTO basics' }).isVisible();
+          result.searchFocusReturned = await search.evaluate((element) => document.activeElement === element);
+          result.searchHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+        }
         result.status = runtimeErrors.length || failedSameOriginResponses.length || result.horizontalOverflow
           || result.optionsHorizontalOverflow || result.h1Count !== 1 || result.unlabeledInputs.length
           || result.unnamedButtons.length || result.loadingDidNotSettle || result.formSubmitControls
           || !result.correctRoute || result.guideContentVisible === false || result.guideExampleVisible === false || result.guideQuestionsVisible === false
           || result.menuOpenedWithKeyboard === false || result.menuClosedWithEscape === false
           || result.menuFocusReturned === false || result.slidersVisible === false || result.slidersOutsideAdvanced === false
-          || result.weightingKeyboardResponsive === false || result.plannerResponsiveHeadings === false ? 'failed' : 'passed';
+          || result.weightingKeyboardResponsive === false || result.plannerResponsiveHeadings === false
+          || result.searchEmptyState === false || result.searchHidesUnrelatedPaths === false
+          || result.searchFindsTerm === false || result.searchClearRestoresPaths === false
+          || result.searchFocusReturned === false || result.searchHorizontalOverflow === true ? 'failed' : 'passed';
       } catch (error) {
         result.status = 'failed';
         result.error = error instanceof Error ? error.message : String(error);
