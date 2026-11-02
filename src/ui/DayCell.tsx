@@ -232,7 +232,7 @@ export function DayCell({
         onFocus={() => {
           if (isOutOfRange) return;
           if (isAlternative) onHoverAlternativeStart?.();
-          if (tooltipText) setTooltipOpen(true);
+          if (hasHover && tooltipText) setTooltipOpen(true);
         }}
         aria-label={ariaLabel}
         aria-expanded={!hasHover ? tooltipOpen : undefined}
