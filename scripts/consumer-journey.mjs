@@ -273,8 +273,8 @@ try {
   browser = await chromium.launch({ headless: true, ...(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {}) });
   await check('Impossible pinned dates keep the calendar visible and recover without losing other inputs', async () => {
     const context = await mobileContext();
-    const page = await open(context, '/pto/?c=US&s=2027-01-15&e=2027-01-24&b=0&rv=0&pv=2&ps=custom&mb=3&p=2027-01-18');
-    const calendarDay = page.locator('button[data-date="2027-01-18"]');
+    const page = await open(context, '/pto/?c=US&s=2027-01-15&e=2027-01-24&b=0&rv=0&pv=2&ps=custom&mb=3&p=2027-01-19');
+    const calendarDay = page.locator('button[data-date="2027-01-19"]');
     const warning = page.getByRole('alert', { name: 'Planning needs attention' });
     await eventually(async () => {
       assert.equal(await warning.count(), 1, 'The impossible pinned day must produce an actionable warning.');
