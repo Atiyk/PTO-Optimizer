@@ -3,13 +3,13 @@
 **Date:** 2026-11-02  
 **Base:** main at `3187596230768e4818720d1907475c9a3341a54c`  
 **Scope:** Consumer planner only; no `apps/teams` changes.  
-**Status:** Implementation on an isolated branch; draft PR pending exact-head CI, browser evidence, critic review and Vercel preview.
+**Status:** Implementation on an isolated branch; draft PR pending exact-head CI, browser evidence, critic review and Vercel preview. The first exact-head CI run failed on one obsolete unit assertion and a holiday-based browser fixture; both have been corrected in subsequent commits and require fresh CI.
 
 ## Reproduced logic-level failure
 
 A valid planning range with a forced PTO day and insufficient available PTO can produce `solveConsumer(...).issue` with an empty result. The existing `App.tsx` renders the calendar only when **both** input validation and solver errors are absent. That hides the date the visitor just pinned and prevents the ordinary include → exclude → automatic cycle from recovering the plan. The shared `ValidationBanner` also incorrectly says the last valid plan is displayed when the solver has returned an empty result.
 
-Reproduction fixture: `/pto/?c=US&s=2027-01-15&e=2027-01-24&b=0&rv=0&pv=2&ps=custom&mb=3&p=2027-01-18`. The pinned date is a working day; the zero-day PTO budget cannot fund it. This is a valid URL with an impossible *planning constraint*, not an invalid date range.
+Reproduction fixture: `/pto/?c=US&s=2027-01-15&e=2027-01-24&b=0&rv=0&pv=2&ps=custom&mb=3&p=2027-01-19`. The pinned date is **Tuesday, January 19, 2027**, a regular working day; the zero-day PTO budget cannot fund it. The earlier January 18 fixture accidentally pinned Martin Luther King Jr. Day, a public holiday, so the solver correctly did **not** report a budget error. This is a valid URL with an impossible *planning constraint*, not an invalid date range.
 
 ## Changes
 
