@@ -268,7 +268,7 @@ export function App() {
               the calendar/break list - "free, no sign-up, no email" is as much a part of
               the page's first impression as the metrics it sits next to. */}
           <div className={`${SECTION_GAP} border-t border-slate-200 pt-4`}>
-            <ExportBar
+            {!state.validationIssues.length && !state.solverIssue ? <ExportBar
               breaks={state.breaks}
               isSuggestedPto={state.isSuggestedPto}
               categoryOf={state.categoryOf}
@@ -281,7 +281,7 @@ export function App() {
               efficiencyPercentile={state.scores?.efficiency.percentile ?? null}
               noticePeriodDays={state.noticePeriodDays}
               buildOverlapLink={state.buildOverlapLink}
-            />
+            /> : <p role="status" className="text-sm text-muted">Check your planning inputs before exporting.</p>}
           </div>
 
           {/* Phase 2: the two-column workspace. Calendar (~60%) and recommendations (~40%)
@@ -296,7 +296,7 @@ export function App() {
           <h2 className="mt-8 text-xl font-semibold text-ink">Your complete plan</h2>
           <div className={`${SECTION_GAP} lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start`}>
             <div className="flex flex-col gap-4 lg:col-span-3">
-              <CalendarErrorBoundary>
+              {!state.validationIssues.length && !state.solverIssue ? <CalendarErrorBoundary>
                 <Calendar
                   rangeStart={state.rangeStart}
                   rangeEnd={state.rangeEnd}
@@ -318,7 +318,7 @@ export function App() {
                   onSwapAlternative={state.swapAlternative}
                   onHoverAlternative={state.setHoveredAlternativeId}
                 />
-              </CalendarErrorBoundary>
+              </CalendarErrorBoundary> : <p role="status" className="text-sm text-muted">Check your planning inputs to display the calendar.</p>}
 
               <p className="max-w-prose text-xs text-slate-400">
                 Click any day to pin it in or rule it out. Hover or focus a day to see what it would gain.

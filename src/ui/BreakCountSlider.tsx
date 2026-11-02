@@ -69,11 +69,11 @@ export function BreakCountSlider({
           slider is actually the user's own setting - when the solver decides instead, the
           slider is inert and the caption below already states the result ("Solver chose N
           breaks..."), so a second number up here would just duplicate it. */}
-      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+      <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
         How many breaks
         <InfoHint text={BREAK_COUNT_HINT} />
         {!letSolverDecide && <span className="ml-auto tabular-nums text-slate-500">{positionLabel(value)}</span>}
-      </h3>
+      </div>
       <label className="flex items-center gap-2 text-xs text-slate-600">
         <input
           type="checkbox"
@@ -86,7 +86,7 @@ export function BreakCountSlider({
           left a still-fully-coloured thumb sitting at a specific position, which read as
           "a setting the user chose" even once the accent colour itself was muted. Combined
           with grayscale, it reads unambiguously as inert, not just faded. */}
-      <div className={letSolverDecide ? 'opacity-40 grayscale' : ''}>
+      <div className={letSolverDecide ? 'grayscale' : ''}>
         {/* Phase 3.3's full "more disruption/less pile-up" reasoning now lives in the
             InfoHint above - these are short axis labels (matching WeightingSlider's own
             "Most days off"/"Cheapest to travel" pattern), not the explanation itself. */}
@@ -104,7 +104,7 @@ export function BreakCountSlider({
           onChange={(e) => onChange(Number(e.target.value))}
           aria-label="How many breaks"
           aria-valuetext={`${positionLabel(value)}${letSolverDecide ? ' (disabled — letting the solver decide)' : ''}`}
-          className={`w-full disabled:cursor-not-allowed ${letSolverDecide ? 'accent-slate-300' : 'accent-slate-800'}`}
+          className={`w-full disabled:cursor-not-allowed disabled:opacity-40 ${letSolverDecide ? 'accent-slate-300' : 'accent-slate-800'}`}
         />
       </div>
       <p className="text-xs tabular-nums text-slate-600">{caption(breakCountRequested, breakCountActual, breaks, budget, letSolverDecide)}</p>

@@ -50,10 +50,35 @@ The script creates fresh browser contexts at 1440px, 768px, and 375px for `/`, `
 same-origin holiday data, a fixed November 2, 2026 clock, US locale, New York timezone,
 and reduced motion. Reports record page errors, same-origin HTTP failures, page overflow,
 heading/label checks, and a keyboard/menu smoke check. Third-party analytics is blocked
-in these evidence contexts. No signed-in or B2B actions run.
+in these evidence contexts. Vercel's platform-only Insights script is stubbed because
+the local static server cannot serve it; other same-origin failures remain failures.
+Directory routes use a trailing slash for Vite preview, and route-specific title checks
+prevent its homepage fallback from being mistaken for an optimizer/policy/sabbatical
+test. No signed-in or B2B actions run.
 
-These are basic browser checks, not a WCAG conformance audit or Lighthouse measurement.
-Lighthouse accessibility, SEO, and performance scores must be reported separately.
+These are basic browser checks, not a WCAG conformance audit.
+
+## Lighthouse and axe measurements
+
+The proposed consumer CI workflow installs `lighthouse@13.6.0`,
+`@axe-core/playwright@4.14.0`, and `chrome-launcher@1.2.2` under `RUNNER_TEMP` only.
+Exact versions and Node compatibility were verified against npm on November 2, 2026.
+The application package manifests and lockfile remain unchanged.
+
+`scripts/consumer-lighthouse.mjs` measures all four consumer routes at a 375×812
+mobile viewport using simulated throttling. Three sequential runs alternate the exact
+PR baseline and candidate to reduce timing bias. The performance comparison uses each
+route's median; accessibility and SEO use the lowest observed score. The gates require
+no more than a three-point mobile performance regression, candidate accessibility of at
+least 95, and candidate SEO of 100. Missing baseline measurements fail the regression
+assessment; a push without a baseline explicitly reports that comparison unavailable.
+
+A separate fresh browser runs axe against WCAG 2 A/AA, 2.1 AA, and 2.2 AA tags, including
+expanded PTO options. Serious or critical candidate violations fail the gate; incomplete
+checks are recorded for manual review. These automated checks are not a claim of WCAG
+conformance. Raw Lighthouse and axe JSON files and compact route/selector diagnostics
+are preserved with the browser evidence, including on failure. No actual Lighthouse
+scores have been obtained by preparing this script; only CI execution provides them.
 
 ## Baseline environment limitations
 

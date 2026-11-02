@@ -22,6 +22,7 @@ const report = {
   scope: 'Consumer routes only; no account, backend, or B2B actions.',
   lighthouse: 'unavailable: this script does not run Lighthouse',
   accessibility: 'Basic DOM and keyboard smoke checks; not a WCAG conformance audit.',
+  platformAnalytics: 'Vercel Insights script stubbed in this local static fixture; third-party analytics blocked.',
   results: [],
 };
 
@@ -41,10 +42,12 @@ try {
 }
 
 const routes = [
-  { name: 'home', path: '/' },
-  { name: 'pto', path: '/pto?c=US&s=2027-01-01&e=2027-12-31&b=15' },
-  { name: 'policy', path: '/policy' },
-  { name: 'sabbatical', path: '/sabbatical' },
+  { name: 'home', path: '/', title: /Gapless PTO Optimizer/ },
+  // Vite preview serves directory indexes at /pto/, whereas Vercel also maps the
+  // clean /pto URL. A slashless preview URL silently falls back to the homepage.
+  { name: 'pto', path: '/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15', title: /Plan your PTO/ },
+  { name: 'policy', path: '/policy/', title: /Your Time-Off Policy/ },
+  { name: 'sabbatical', path: '/sabbatical/', title: /Sabbatical Planning/ },
 ];
 
 try {
@@ -71,8 +74,13 @@ try {
       // Keep third-party analytics out of an evidence run. Same-origin holiday fixtures
       // still load normally, so the solver uses the repository's real holiday data.
       await page.route('**/*', (requestRoute) => {
-        const protocol = new URL(requestRoute.request().url()).protocol;
-        const origin = new URL(requestRoute.request().url()).origin;
+        const requestUrl = new URL(requestRoute.request().url());
+        const { protocol, origin } = requestUrl;
+        // This platform script exists only on Vercel, not the static Vite server.
+        // Exercise application requests normally; analytics is outside this fixture.
+        if (origin === baseUrl.origin && requestUrl.pathname === '/_vercel/insights/script.js') {
+          return requestRoute.fulfill({ status: 200, contentType: 'application/javascript', body: '' });
+        }
         return ['http:', 'https:'].includes(protocol) && origin !== baseUrl.origin
           ? requestRoute.abort()
           : requestRoute.continue();
@@ -109,6 +117,7 @@ try {
             formSubmitControls: [...document.querySelectorAll('button[type="submit"],input[type="submit"]')].filter(visible).length,
           };
         }));
+        result.correctRoute = route.title.test(result.title);
         await page.screenshot({ path: resolve(outputDirectory, `${route.name}-${width}.png`), fullPage: true });
 
         result.keyboardFocus = [];
@@ -120,6 +129,9 @@ try {
             name: (document.activeElement?.getAttribute('aria-label') || document.activeElement?.textContent || '').trim().slice(0, 100),
           })));
         }
+        // A keyboard walk may leave the country listbox open. Finish that interaction
+        // before independently testing the navigation menu and options disclosure.
+        await page.keyboard.press('Escape');
         if (width < 1024) {
           const menu = page.getByRole('button', { name: 'Menu', exact: true });
           if (await menu.isVisible()) {
@@ -142,6 +154,7 @@ try {
         result.status = runtimeErrors.length || failedSameOriginResponses.length || result.horizontalOverflow
           || result.optionsHorizontalOverflow || result.h1Count !== 1 || result.unlabeledInputs.length
           || result.unnamedButtons.length || result.loadingDidNotSettle || result.formSubmitControls
+          || !result.correctRoute
           || result.menuOpenedWithKeyboard === false || result.menuClosedWithEscape === false
           || result.menuFocusReturned === false ? 'failed' : 'passed';
       } catch (error) {

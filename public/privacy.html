@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <meta name="referrer" content="no-referrer" />
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" href="/favicon.ico" />
@@ -8,7 +9,7 @@
     <meta name="theme-color" content="#f8fafc" />
     <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
     <title>Privacy &mdash; Gapless PTO Optimizer</title>
-    <meta name="description" content="Gapless PTO Optimizer collects no personal data. Everything runs in your browser; analytics are anonymous." />
+    <meta name="description" content="How Gapless PTO Optimizer handles browser storage, shared plans, and aggregate analytics." />
     <style>
       :root {
         color-scheme: light dark;
@@ -64,13 +65,15 @@
   <body>
     <main>
       <h1>Privacy</h1>
-      <p>Short version: nothing about you is collected.</p>
+      <p>Your PTO records stay in this browser. Shared links and files contain the information you choose to share.</p>
 
       <h2>What this site does with your data</h2>
       <p>
-        Gapless PTO Optimizer runs entirely in your browser. The dates, PTO balance, country, and every other
-        setting you enter stay on your device and are never sent to a server &mdash; there isn't
-        one; your whole plan lives only in the page's URL and memory.
+        PTO planning and balance calculations run in your browser. Saved employer calendars,
+        policy settings, and personal request records are stored in this browser without an
+        account. They are not automatically synchronized to another device. You can remove
+        saved records using the relevant reset or delete controls, or by clearing this site's
+        browser data.
       </p>
       <p>
         Public holiday data is served from this site's own static files first. The only time a
@@ -82,20 +85,27 @@
 
       <h2>Analytics</h2>
       <p>
-        We use <a href="https://vercel.com/analytics" target="_blank" rel="noreferrer">Vercel Analytics</a>
-        (page views and which pages are visited, anonymized) and
-        <a href="https://plausible.io" target="_blank" rel="noreferrer">Plausible</a>, a cookieless
-        analytics service. Plausible sets no cookies and stores no cross-site identifier tied to
-        you &mdash; visit counts are derived from a rotating, salted daily hash that's discarded
-        after 24 hours. Between the two, we see page views and which export/share actions were
-        used, and nothing else: no inputs, no dates, no locations, no plan details.
+        We use <a href="https://vercel.com/analytics" target="_blank" rel="noreferrer">Vercel Web Analytics</a>
+        and <a href="https://plausible.io" target="_blank" rel="noreferrer">Plausible</a>
+        for aggregate page views and named feature actions, such as using a forecast or an export.
+        We remove query parameters and URL fragments before sending analytics events. These
+        events include the public page route, not your PTO balance, leave dates, request notes,
+        approval status, or policy inputs. We skip analytics when an incoming referrer URL
+        contains query parameters or a fragment.
+      </p>
+      <p>
+        Analytics providers may process browser and device information and approximate location
+        to produce aggregate statistics. Our pages prevent the full planning URL from being
+        sent in outgoing referrer headers.
       </p>
 
       <h2>Links you share</h2>
       <p>
-        If you copy a share link, download a calendar file, or copy an image, that file or link is
-        created on your own device and only goes wherever you choose to send it &mdash; we never see
-        it.
+        A planning or policy link can include the dates, PTO budget, and settings encoded in
+        its URL. Anyone with the link can read the included settings; opening a link also sends
+        that URL to the hosting service as a normal page request. Personal request notes and
+        tracker statuses are kept out of planning links. Calendar files and images are created
+        on your device. Review the dates and balance visibility before sharing a link or image.
       </p>
 
       <a class="back" href="/">&larr; Back to Gapless PTO Optimizer</a>

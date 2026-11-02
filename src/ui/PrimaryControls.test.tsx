@@ -39,7 +39,7 @@ describe('PrimaryControls (Phase 3.1/3.2: reserve days, unlimited PTO)', () => {
       <PrimaryControls {...baseProps} budget={15} budgetSpent={10} reserveDays={3} effectiveBudget={12} unlimitedPto={false} />,
     );
     expect(html).toContain('Using 10 of 12 planned days');
-    expect(html).toContain('add no days off at any position');
+    expect(html).toContain('remain unplanned under your current constraints');
   });
 
   it('shows the unlimited-PTO explanatory line only once the checkbox is on', () => {
