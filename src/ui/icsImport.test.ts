@@ -175,6 +175,11 @@ describe('parseICSBusyDays: bounded and fail-closed school/personal imports', ()
     expect(() => parseICSBusyDays('noise\r\n' + wrapCalendar(''))).toThrow(IcsParseError);
   });
 
+  it('accepts a UTF-8 BOM without loosening complete-calendar validation', () => {
+    const ics = '\uFEFF' + wrapCalendar(event('DTSTART;VALUE=DATE:20261219'));
+    expect(parseICSBusyDays(ics).busyDays).toEqual(['2026-12-19']);
+  });
+
   it('rejects unclosed VEVENTs instead of silently dropping their dates', () => {
     expect(() => parseICSBusyDays(wrapCalendar('BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261219\r\n'))).toThrow(IcsParseError);
   });
