@@ -5,6 +5,13 @@ import { FaqPage } from './FaqPage';
 import { SABBATICAL_FAQ_ITEMS } from './sabbaticalFaqItems';
 import { ABOUT_FAQ_ITEMS } from './aboutFaqItems';
 
+const escapeHtml = (text: string) => text
+  .replaceAll('&', '&amp;')
+  .replaceAll('"', '&quot;')
+  .replaceAll("'", '&#x27;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;');
+
 describe('consumer FAQ disclosure accessibility', () => {
   it('keeps every inline FAQ answer in server-rendered HTML with a native summary and visible affordance', () => {
     const html = renderToStaticMarkup(<FAQ />);
@@ -13,8 +20,8 @@ describe('consumer FAQ disclosure accessibility', () => {
     expect(html.match(/aria-hidden="true"/g)).toHaveLength(ITEMS.length);
     expect(html).toContain('focus-visible:outline-2');
     for (const item of ITEMS) {
-      expect(html).toContain(item.question.replaceAll("'", '&#x27;'));
-      expect(html).toContain(item.answer.replaceAll("'", '&#x27;'));
+      expect(html).toContain(escapeHtml(item.question));
+      expect(html).toContain(escapeHtml(item.answer));
     }
   });
 
