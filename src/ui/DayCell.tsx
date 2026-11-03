@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { MarginalValue } from '@daysoff/engine/solver/marginalValue';
 import { COLORS, HOLIDAY_DOT, TEXT_MUTED, TEXT_PRIMARY, BAND_TEXT } from './colorScheme';
 import type { DayCategory } from './types';
@@ -110,6 +110,28 @@ export function DayCell({
   onArrowKey,
 }: DayCellProps) {
   const [tooltipOpen, setTooltipOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const dayButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Touch actions are a disclosure, not a hover-only tooltip. Dismiss when
+  // tapping outside or pressing Escape, but preserve focus within the action panel.
+  useEffect(() => {
+    if (!tooltipOpen || hasHover) return;
+    const onOutsidePointer = (event: PointerEvent) => {
+      if (!wrapperRef.current?.contains(event.target as Node)) setTooltipOpen(false);
+    };
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setTooltipOpen(false);
+      dayButtonRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', onOutsidePointer);
+    document.addEventListener('keydown', onEscape);
+    return () => {
+      document.removeEventListener('pointerdown', onOutsidePointer);
+      document.removeEventListener('keydown', onEscape);
+    };
+  }, [tooltipOpen, hasHover]);
 
   const tooltipText = isOutOfRange
     ? null
@@ -141,9 +163,11 @@ export function DayCell({
     setTooltipOpen((v) => !v);
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter') {
+  const handleKeyDown = (e: ReactKeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
       primaryAction?.();
+      setTooltipOpen(false);
       return;
     }
     const direction =
@@ -180,9 +204,21 @@ export function DayCell({
       : textColor;
 
   return (
-    <div className="relative">
+    <div
+      ref={wrapperRef}
+      className="relative"
+      onBlur={(event) => {
+        // Mobile Safari can report a null relatedTarget when the action is tapped.
+        // Outside pointer events and Escape handle touch dismissal separately.
+        if (!hasHover && !event.relatedTarget) return;
+        if (event.currentTarget.contains(event.relatedTarget)) return;
+        if (isAlternative) onHoverAlternativeEnd?.();
+        setTooltipOpen(false);
+      }}
+    >
       <button
         type="button"
+        ref={dayButtonRef}
         id={`day-${date}`}
         data-date={date}
         disabled={isOutOfRange}
@@ -191,7 +227,7 @@ export function DayCell({
         onMouseEnter={() => {
           if (isOutOfRange) return;
           if (isAlternative) onHoverAlternativeStart?.();
-          if (tooltipText) setTooltipOpen(true);
+          if (hasHover && tooltipText) setTooltipOpen(true);
         }}
         onMouseLeave={() => {
           if (isAlternative) onHoverAlternativeEnd?.();
@@ -200,14 +236,12 @@ export function DayCell({
         onFocus={() => {
           if (isOutOfRange) return;
           if (isAlternative) onHoverAlternativeStart?.();
-          if (tooltipText) setTooltipOpen(true);
-        }}
-        onBlur={() => {
-          if (isAlternative) onHoverAlternativeEnd?.();
-          setTooltipOpen(false);
+          if (hasHover && tooltipText) setTooltipOpen(true);
         }}
         aria-label={ariaLabel}
-        aria-describedby={tooltipOpen ? `tooltip-${date}` : undefined}
+        aria-expanded={!hasHover ? tooltipOpen : undefined}
+        aria-controls={!hasHover && tooltipOpen ? `tooltip-${date}` : undefined}
+        aria-describedby={hasHover && tooltipOpen ? `tooltip-${date}` : undefined}
         // Every day cell is click-to-force (pin in / rule out), not just the ones with a
         // marginal-value tooltip - cursor-pointer plus a subtle hover outline is the only
         // signal that's true everywhere, which is why it isn't gated on tooltipText. An
@@ -263,36 +297,45 @@ export function DayCell({
         )}
       </button>
 
-      {tooltipOpen && tooltipText && (
+      {tooltipOpen && (tooltipText || !hasHover) && (
         <div
           id={`tooltip-${date}`}
-          role="tooltip"
-          className="absolute left-1/2 top-full z-20 mt-1 w-max max-w-[14rem] -translate-x-1/2 rounded-md bg-slate-900 px-2.5 py-1.5 text-xs text-white shadow-lg"
+          role={hasHover ? 'tooltip' : 'group'}
+          aria-label={!hasHover ? `Actions for ${formatMonthDay(date)}` : undefined}
+          className={hasHover
+            ? 'absolute left-1/2 top-full z-20 mt-1 w-max max-w-[14rem] -translate-x-1/2 rounded-md bg-slate-900 px-2.5 py-1.5 text-xs text-white shadow-lg'
+            : 'fixed inset-x-4 bottom-4 z-50 mx-auto max-w-sm rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-900 shadow-xl'}
         >
-          {tooltipText}
-          {!hasHover && !isAlternative && marginalValue && (
-            <button
-              type="button"
-              onClick={() => {
-                onToggle(date);
-                setTooltipOpen(false);
-              }}
-              className="mt-1.5 block w-full rounded bg-white/10 px-2 py-1 text-center font-medium hover:bg-white/20"
-            >
-              Toggle this day
-            </button>
-          )}
-          {!hasHover && isAlternative && (
-            <button
-              type="button"
-              onClick={() => {
-                onSwapAlternative?.();
-                setTooltipOpen(false);
-              }}
-              className="mt-1.5 block w-full rounded bg-white/10 px-2 py-1 text-center font-medium hover:bg-white/20"
-            >
-              Swap this in
-            </button>
+          <p>{tooltipText ?? stateLabel(category, isAlternative, isBlackout, isOutOfRange)}</p>
+          {!hasHover && (
+            <>
+              {!isAlternative && (
+                <p className="mt-1 text-xs text-slate-600">Change this date to include it, exclude it, or let the planner decide.</p>
+              )}
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    primaryAction?.();
+                    setTooltipOpen(false);
+                    dayButtonRef.current?.focus();
+                  }}
+                  className="min-h-11 flex-1 rounded-lg bg-slate-900 px-3 py-2 font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                >
+                  {isAlternative ? 'Swap this in' : 'Change this day'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTooltipOpen(false);
+                    dayButtonRef.current?.focus();
+                  }}
+                  className="min-h-11 rounded-lg border border-slate-300 px-3 py-2 font-medium text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                >
+                  Close
+                </button>
+              </div>
+            </>
           )}
         </div>
       )}

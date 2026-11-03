@@ -173,6 +173,8 @@ it('shows an over-budget legacy pin issue and prevents exporting an invalid plan
   render(<App />);
   await screen.findByText('Required dates or the selected plan exceed your available PTO.');
   expect(screen.getByText('Check your planning inputs before exporting.')).toBeTruthy();
-  expect(screen.getByText('Check your planning inputs to display the calendar.')).toBeTruthy();
+  expect(screen.getByRole('alert', { name: 'Planning needs attention' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Clear pinned and excluded dates' })).toBeTruthy();
+  expect(screen.queryByText('Choose valid dates and a PTO balance to display the calendar.')).toBeNull();
   expect(document.getElementById('shortcut-download-ics')).toBeNull();
 });

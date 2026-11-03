@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { SiteHeader } from './SiteHeader';
 import { Footer } from './Footer';
 import { Container } from './Container';
@@ -14,7 +14,7 @@ const LEARNING_PATHS = [
 
 function matches(term: GlossaryTerm, query: string): boolean {
   if (!query) return true;
-  const q = query.toLowerCase();
+  const q = query.trim().toLowerCase();
   return (
     term.term.toLowerCase().includes(q) ||
     term.short.toLowerCase().includes(q) ||
@@ -41,6 +41,13 @@ function groupAlphabetically(terms: GlossaryTerm[]): Map<string, GlossaryTerm[]>
  */
 export function Glossary() {
   const [query, setQuery] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const statusId = useId();
+  const searching = query.trim().length > 0;
+  const clearSearch = () => {
+    setQuery('');
+    inputRef.current?.focus();
+  };
   const filtered = useMemo(() => GLOSSARY_TERMS.filter((t) => matches(t, query)), [query]);
   const groups = useMemo(() => groupAlphabetically(filtered), [filtered]);
 
@@ -54,6 +61,36 @@ export function Glossary() {
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
             Practical guides to the benefits you have earned. Start with a topic, explore a short explanation, or look up a term from your handbook.
           </p>
+          <section className="mt-8" aria-labelledby="glossary-search-heading">
+            <h2 id="glossary-search-heading" className="text-xl font-semibold text-ink">Look up a term</h2>
+            <p className="mt-1 text-sm text-muted">Search definitions and common names used in employee handbooks.</p>
+            <div className="mt-4 flex max-w-lg items-center gap-2">
+              <label className="min-w-0 flex-1">
+                <span className="sr-only">Search the glossary</span>
+                <input
+                  ref={inputRef}
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  aria-describedby={statusId}
+                  placeholder="Try “carryover” or “accrual”…"
+                  className="h-11 w-full min-w-0 rounded-lg border border-line-strong bg-surface px-3 text-base text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                />
+              </label>
+              {query.length > 0 && (
+                <button type="button" onClick={clearSearch} className="min-h-11 shrink-0 rounded-lg border border-line-strong bg-surface px-4 text-sm font-medium text-accent-ink hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+                  Clear search
+                </button>
+              )}
+            </div>
+            <p id={statusId} role="status" className="mt-2 text-sm text-muted">
+              {searching
+                ? `${filtered.length} ${filtered.length === 1 ? 'term' : 'terms'} found`
+                : `${GLOSSARY_TERMS.length} terms available`}
+            </p>
+          </section>
+          {!searching && (
+            <>
           <div className="mt-7 grid gap-3 md:grid-cols-2">
             {LEARNING_PATHS.map((path) => (
               <section key={path.title} className="rounded-xl border border-line bg-surface p-5">
@@ -89,20 +126,10 @@ export function Glossary() {
               <a href="/pto" className="inline-flex min-h-11 items-center rounded-lg border border-line-strong bg-surface px-4 py-2.5 font-semibold text-ink hover:bg-page">Plan my time off</a>
             </div>
           </section>
-          <h2 className="mt-10 text-xl font-semibold text-ink">Look up a term</h2>
-          <p className="mt-1 text-sm text-muted">Search the complete glossary, including common names used in employee handbooks.</p>
-          <label className="mt-4 block max-w-sm">
-            <span className="sr-only">Search the glossary</span>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Try “carryover” or “accrual”…"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-            />
-          </label>
+            </>
+          )}
 
-          {filtered.length === 0 && <p className="mt-8 text-sm text-slate-500">No terms match "{query}".</p>}
+          {searching && filtered.length === 0 && <p className="mt-8 text-sm text-slate-500">No terms match "{query}".</p>}
 
           <div className="mt-8 flex flex-col gap-8">
             {Array.from(groups.entries()).map(([letter, terms]) => (

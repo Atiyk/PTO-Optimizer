@@ -88,7 +88,7 @@ jobs:
       - name: Install Chromium
         working-directory: current
         run: npx playwright install --with-deps chromium
-      - name: Capture and check consumer routes at 1440, 768, and 375 pixels
+      - name: Capture consumer routes, header, and responsive QA at 1440, 768, 375, 320 pixels
         env:
           HAS_BASELINE: ${{ github.event_name == 'pull_request' }}
         run: |
@@ -122,6 +122,7 @@ jobs:
             printf 'Baseline browser evidence exit status: %s\n' "$baseline_exit"
           fi
           node current/scripts/consumer-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/after" after
+          node current/scripts/consumer-header-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/header"
       - name: Verify the complete consumer journey at 375 pixels
         if: ${{ !cancelled() }}
         run: |
@@ -139,6 +140,8 @@ jobs:
           if (!ready) throw new Error('Consumer journey preview did not start.');
           NODE
           node current/scripts/consumer-journey.mjs http://127.0.0.1:4177 "$GITHUB_WORKSPACE/qa-evidence/journey"
+          node current/scripts/consumer-date-editor-qa.mjs http://127.0.0.1:4177 "$GITHUB_WORKSPACE/qa-evidence/date-editor"
+          node current/scripts/consumer-touch-calendar-qa.mjs http://127.0.0.1:4177 "$GITHUB_WORKSPACE/qa-evidence/touch-calendar"
       - name: Install pinned metrics tools outside the checkout
         if: ${{ !cancelled() }}
         # Versions and Node engine requirements verified against npm on 2026-11-02.

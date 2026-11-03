@@ -9,6 +9,7 @@ import { useMemo, useState } from 'react';
 import { SiteHeader } from './SiteHeader';
 import { Headline } from './Headline';
 import { SummaryMetrics } from './SummaryMetrics';
+import { PlanExplanation } from './PlanExplanation';
 import { PrimaryControls } from './PrimaryControls';
 import { PlanSliders } from './PlanSliders';
 import { SubdivisionSelect } from './CountrySelect';
@@ -23,6 +24,7 @@ import { FAQ } from './FAQ';
 import { Footer } from './Footer';
 import { CalendarErrorBoundary } from './CalendarErrorBoundary';
 import { ValidationBanner } from './ValidationBanner';
+import { PlanRecoveryNotice } from './PlanRecoveryNotice';
 import { PeakCapBanner } from './PeakCapBanner';
 import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
@@ -266,7 +268,21 @@ export function App() {
 
       {partnerReceived.invalid && <Container className="px-4 py-3"><p role="alert" className="text-sm text-ink">This partner availability link is invalid or too large. Ask for a new link with fewer dates.</p></Container>}
       {partnerReceived.availability && <Container className="px-4 py-3"><p role="status" className="rounded-lg border border-line bg-surface p-3 text-sm text-ink">Someone shared {partnerReceived.availability.days.length} {partnerReceived.availability.status} available dates. Your own PTO budget and calendar apply. <a className="font-medium text-accent-ink underline" href="#partner-planner">See dates you can both take off →</a></p></Container>}
-      <ValidationBanner issues={[...state.validationIssues, ...(state.solverIssue ? [state.solverIssue] : [])]} />
+      <ValidationBanner issues={state.validationIssues} />
+      {state.solverIssue && (
+        <PlanRecoveryNotice
+          issue={state.solverIssue}
+          hasForcedDays={Object.keys(state.forced).length > 0}
+          onClearForcedDays={() => {
+            state.clearForcedDays();
+            requestAnimationFrame(() => document.getElementById('complete-plan-heading')?.focus());
+          }}
+          onReviewSettings={() => {
+            setOptionsOpen(true);
+            requestAnimationFrame(() => document.getElementById('planning-options')?.scrollIntoView({ block: 'start' }));
+          }}
+        />
+      )}
 
       <PeakCapBanner
         applied={state.peakCapApplied}
@@ -297,6 +313,16 @@ export function App() {
             breakCountActual={state.breakCountActual}
             scores={state.scores}
           />
+
+          {!state.validationIssues.length && !state.solverIssue && (
+            <PlanExplanation
+              breaks={state.breaks}
+              workWeek={state.workWeek}
+              offDays={new Set(state.effectiveOffDays)}
+              budgetSpent={state.budgetSpent}
+              totalDaysOff={state.totalDaysOff}
+            />
+          )}
 
           <p className="mt-2 text-sm text-slate-600">{Math.max(0, state.budget - state.budgetSpent)} {state.unlimitedPto ? 'target days unplanned' : 'PTO days remaining'}, including {Math.min(state.budget, state.reserveDays)} reserved. Calendar days off include weekends, observed holidays, and PTO days.</p>
           {state.breaks.length > 0 && <section aria-labelledby="top-opportunities" className="mt-8">
@@ -343,10 +369,10 @@ export function App() {
               calendar out of view - overscroll-behavior is left at its default (auto), so
               scrolling past either end of that region falls through to the page as normal,
               never trapped. */}
-          <h2 className="mt-8 text-xl font-semibold text-ink">Your complete plan</h2>
+          <h2 id="complete-plan-heading" tabIndex={-1} className="mt-8 text-xl font-semibold text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Your complete plan</h2>
           <div className={`${SECTION_GAP} lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start`}>
             <div className="flex flex-col gap-4 lg:col-span-3">
-              {!state.validationIssues.length && !state.solverIssue ? <CalendarErrorBoundary>
+              {!state.validationIssues.length ? <CalendarErrorBoundary>
                 <Calendar
                   rangeStart={state.rangeStart}
                   rangeEnd={state.rangeEnd}
@@ -368,7 +394,7 @@ export function App() {
                   onSwapAlternative={state.swapAlternative}
                   onHoverAlternative={state.setHoveredAlternativeId}
                 />
-              </CalendarErrorBoundary> : <p role="status" className="text-sm text-muted">Check your planning inputs to display the calendar.</p>}
+              </CalendarErrorBoundary> : <p role="status" className="text-sm text-muted">Choose valid dates and a PTO balance to display the calendar.</p>}
 
               <p className="max-w-prose text-xs text-slate-400">
                 Click any day to pin it in or rule it out. Hover or focus a day to see what it would gain.
@@ -382,8 +408,9 @@ export function App() {
             <div className="mt-4 flex flex-col gap-3 lg:col-span-2 lg:mt-0 lg:sticky lg:top-16 lg:max-h-[calc(100vh-4.5rem)] lg:overflow-y-auto lg:pb-2 lg:pl-1">
               {state.breaks.length === 0 && (
                 <p className="max-w-prose text-sm text-slate-500">
-                  No PTO-worthy breaks fit this range and budget yet &mdash; try widening the date range or increasing
-                  PTO days.
+                  {state.solverIssue
+                    ? 'Your current constraints prevent a valid plan. Adjust your selected dates or review the settings above.'
+                    : 'No PTO-worthy breaks fit this range and budget yet — try widening the date range or increasing PTO days.'}
                 </p>
               )}
               {state.breaks.length > 1 && mostContestedIndex !== undefined && (
