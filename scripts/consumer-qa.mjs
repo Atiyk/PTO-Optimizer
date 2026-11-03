@@ -183,6 +183,7 @@ try {
             const countryBox = await page.locator('#landing-country').boundingBox();
             result.homeCountryNotCramped = (countryBox?.width ?? 0) >= width - 66;
             const gridColumns = await page.locator('.landing-input-pair').evaluate(element => getComputedStyle(element).gridTemplateColumns);
+            result.homeCountryComputedColumns = gridColumns;
             result.homeCountryGridSingleColumn = gridColumns.trim().split(/\s+/).length === 1;
             result.homeCountryAccessibleName = await page.getByRole('combobox', { name: 'Country', exact: true }).count() === 1;
           }

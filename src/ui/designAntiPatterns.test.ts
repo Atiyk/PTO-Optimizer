@@ -43,6 +43,12 @@ describe('Consumer anti-pattern source checks', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('avoids decorative accent-colored stripes on legal trust callouts', () => {
+    for (const path of ['../../public/privacy.html', '../../public/terms.html']) {
+      expect(PUBLIC_UI[path]).not.toMatch(/border-left:\s*4px\s+solid\s+var\(--accent\)/);
+    }
+  });
+
   it('keeps the real interactive preview and visible legal/help links', () => {
     expect(PUBLIC_UI['./Landing.tsx']).toContain('id="landing-budget-slider"');
     expect(PUBLIC_UI['./Landing.tsx']).toContain('type="date"');

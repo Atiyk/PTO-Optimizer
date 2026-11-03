@@ -109,7 +109,8 @@ describe('live homepage planner', () => {
 
   it('stacks country and PTO fields at phone widths and provides clear accessible names', () => {
     const html = renderToStaticMarkup(<Landing />);
-    expect(html).toContain('landing-input-pair grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2');
+    expect(html).toContain('landing-input-pair grid min-w-0 gap-3');
+    expect(html).toContain('repeat(auto-fit,minmax(min(100%, 16rem), 1fr))');
     expect(html).toContain('id="landing-country" aria-label="Country"');
     expect(html).toContain('id="landing-budget" aria-label="PTO days available"');
   });

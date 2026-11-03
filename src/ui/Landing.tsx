@@ -142,7 +142,7 @@ export function Landing() {
             <p className="mt-1 text-sm text-muted">Change your PTO days, country or dates. Your recommendation updates automatically.</p>
           </div>
           <div className="grid min-w-0 gap-4 lg:grid-cols-2 lg:items-start">
-            <div className="landing-input-pair grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="landing-input-pair grid min-w-0 gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 16rem), 1fr))' }}>
             <label htmlFor="landing-country" className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-muted">Country
               <select id="landing-country" aria-label="Country" className={FIELD} value={country} onChange={(event) => update({ country: event.target.value })}>{COUNTRIES.map((entry) => <option key={entry.code} value={entry.code}>{entry.name}</option>)}</select>
             </label>

@@ -190,11 +190,5 @@
   }
 }
 
-/* An observed regression showed the Country/PTO pair still split into narrow
-   columns at 320–375px despite responsive utilities. Keep the one-column
-   mobile rule explicit and scoped, then rely on sm:grid-cols-2 above 640px. */
-@media (max-width: 639px) {
-  .landing-input-pair {
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
-}
+/* The homepage Country/PTO pair uses a container-width-aware inline CSS grid;
+   its actual computed columns are asserted at 320 and 375 in consumer QA. */

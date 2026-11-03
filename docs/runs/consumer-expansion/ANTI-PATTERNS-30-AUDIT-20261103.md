@@ -31,3 +31,9 @@
 - Run exact final-head tests, TypeScript, lint, production build/prerender, URL/country/privacy checks, 1440/768/375/320 real-browser screenshots, keyboard/touch/focus, axe and Lighthouse.
 - Independent read-only critic must inspect actual visual results, document pattern count and all defects, then give explicit PASS only after fixes and revalidation. Terms wording needs human/legal approval if presented as enforceable legal terms.
 - Preserve B2B apps/teams and shared packages/engine. Avoid repeated Vercel previews on the free tier: batch changes before pushing and do not merge or production deploy early. Preserve owner's final coordinated-release preference.
+
+
+### Critic block correction — narrow-width grid and trust stripes
+- Candidate `b38277af447c83aca5c0f89b85a97a94c6103f6e` had green unit/type/lint/build, but browser run `41690761465` still failed `homeCountryNotCramped=false` and `homeCountryGridSingleColumn=false` at 375/320 despite a Tailwind class and a CSS media override. Root cause is not established, so replace the unreliable responsive utility + override with an inline, container-width-based `repeat(auto-fit, minmax(min(100%, 16rem), 1fr))` grid; require computed one-column tracks and width tests on both real viewports. Do not merely lower the width threshold.
+- Separate independent critic review `5757284674` identified a fourth visual anti-pattern: the accent-colored four-pixel left stripe on Terms. The code owner removed it on Terms in `2df78b7`; remove the same stripe on Privacy and retain a quiet neutral all-sides border. A new source regression scans both legal pages.
+- This staging note is not a QA PASS. Fresh full exact-head CI, viewport screenshots, axe/Lighthouse and a new separate independent critic review must precede merge/production publication.
