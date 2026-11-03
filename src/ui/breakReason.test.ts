@@ -39,7 +39,7 @@ describe('breakReason', () => {
   });
 
   it('does not invent percentages when demand metadata is invalid or contradicts its tag', () => {
-    const cases: Array<{ tag: string; meanDemand: number }> = [
+    const cases: Array<{ tag: Break['tags'][number]; meanDemand: number }> = [
       { tag: 'Low travel demand', meanDemand: Number.NaN },
       { tag: 'Low travel demand', meanDemand: -0.2 },
       { tag: 'Low travel demand', meanDemand: 1.2 },
@@ -59,7 +59,7 @@ describe('breakReason', () => {
   });
 
   it('does not present estimated low-demand or peak-demand data as observed', () => {
-    for (const demandTag of ['Low travel demand', 'Peak travel']) {
+    for (const demandTag of ['Low travel demand', 'Peak travel'] as const) {
       const brk: Break = { ...BASE, tags: [demandTag, 'Estimated'], meanDemand: demandTag === 'Low travel demand' ? 0.7 : 1.4 };
       const explanation = breakReason(brk, noHoliday);
       expect(explanation).toBe('1 PTO day for 4 days off — travel demand here is an estimate for this country.');
@@ -72,7 +72,7 @@ describe('breakReason', () => {
   });
 
   it('never fabricates a reason for a low-value (1.0x or worse) break - matches the existing lowValueExplanation copy', () => {
-    const lowValue: Break = { ...BASE, multiplier: 1, totalDaysOff: 1, ptoCost: 1, tags: ['Low travel demand'] };
+    const lowValue: Break = { ...BASE, multiplier: 1, totalDaysOff: 1, ptoCost: 1, tags: ['Low travel demand'], meanDemand: 0.7 };
     expect(breakReason(lowValue, noHoliday)).toBe('No extra days off — 1 PTO day for 1 day off; lower travel demand is tagged for these dates.');
 
     expect(breakReason(lowValue, noHoliday)).not.toMatch(/chosen|optimized|budget|unspent/i);
