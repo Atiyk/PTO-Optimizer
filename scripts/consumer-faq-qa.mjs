@@ -36,7 +36,7 @@ try {
       page.on('pageerror', e => errors.push(e.message));
       const result = { width, route: route.name, errors };
       try {
-        const response = await page.goto(new URL(route.path, base), { waitUntil: 'networkidle' });
+        const response = await page.goto(new URL(route.path, base).href, { waitUntil: 'networkidle' });
         if (!response?.ok()) throw new Error(`Route returned ${response?.status()}`);
         const serverHtml = await response.text();
         if (!serverHtml.includes('How does it choose which days to take?')) {
