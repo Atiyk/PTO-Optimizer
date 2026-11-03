@@ -50,10 +50,11 @@ export function FAQ() {
       <div className="flex flex-col divide-y divide-slate-100">
         {ITEMS.map((item) => (
           <details key={item.question} className="group py-2.5">
-            <summary className="cursor-pointer list-none">
-              <h3 className="inline text-sm font-normal text-slate-600 marker:content-none group-open:text-slate-800">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-md px-2 py-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900">
+              <h3 className="text-sm font-medium text-slate-700 group-open:text-slate-900">
                 {item.question}
               </h3>
+              <span aria-hidden="true" className="shrink-0 text-base text-slate-600 transition-transform group-open:rotate-180">▾</span>
             </summary>
             <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-slate-500">{item.answer}</p>
           </details>
@@ -63,7 +64,7 @@ export function FAQ() {
         TSA checkpoint travel numbers:{' '}
         <a
           href="https://www.tsa.gov/travel/passenger-volumes"
-          className="underline hover:text-slate-600"
+          className="rounded-sm underline hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
           target="_blank"
           rel="noreferrer"
         >
