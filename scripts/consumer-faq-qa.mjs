@@ -22,6 +22,16 @@ try {
         timezoneId: 'America/New_York',
       });
       const page = await context.newPage();
+      await page.clock.setFixedTime(new Date('2026-11-02T17:00:00Z'));
+      const origin = new URL(base).origin;
+      await page.route('**/*', requestRoute => {
+        const url = new URL(requestRoute.request().url());
+        if (url.origin === origin && url.pathname === '/_vercel/insights/script.js') {
+          return requestRoute.fulfill({ status: 200, contentType: 'application/javascript', body: '' });
+        }
+        return ['http:', 'https:'].includes(url.protocol) && url.origin !== origin
+          ? requestRoute.abort() : requestRoute.continue();
+      });
       const errors = [];
       page.on('pageerror', e => errors.push(e.message));
       const result = { width, route: route.name, errors };
