@@ -23,7 +23,7 @@ export function breakReason(brk: Break, holidayNameFor: (iso: string) => string 
   // of a reason that would read as a sales pitch for a break that isn't actually a bargain.
   if (brk.multiplier <= 1) {
     if (brk.tags.includes('Low travel demand')) return 'No extra days off — chosen for low travel demand.';
-    return 'No extra days off — this uses the full available budget rather than leaving a PTO day unspent.';
+    return `No extra days off — ${swap}.`;
   }
 
   const holidayName = brk.days.map(holidayNameFor).find((name): name is string => !!name);
