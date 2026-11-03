@@ -149,7 +149,7 @@ export function Landing() {
             <label htmlFor="landing-budget" className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-muted">PTO days available
               <input id="landing-budget" aria-label="PTO days available" type="number" inputMode="numeric" min={0} max={60} step={1} className={`${FIELD} font-semibold tabular-nums`} value={budget} onChange={(event) => update({ budget: Math.max(0, Math.min(60, Math.round(Number(event.target.value) || 0))) })} />
             </label>
-            <div className="col-span-2 rounded-xl border border-line bg-surface p-3 sm:p-4">
+            <div className="col-span-full rounded-xl border border-line bg-surface p-3 sm:p-4">
               <div className="flex items-center justify-between gap-3">
                 <label htmlFor="landing-budget-slider" className="text-sm font-semibold text-ink">Adjust PTO days</label>
                 <span className="text-sm font-semibold tabular-nums text-accent-ink" aria-hidden="true">{budget} / 60</span>
