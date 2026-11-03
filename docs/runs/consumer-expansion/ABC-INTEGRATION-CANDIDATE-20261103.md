@@ -16,3 +16,7 @@ All three PR file lists were independently compared and have **zero overlapping 
 - Verify preview READY matching exact combined SHA. Do not merge or deploy until branch protection and critic/release gates are genuinely satisfied.
 - Employer company-policy payout assumptions do NOT confer legal rights. Mandatory state/country law registry not yet implemented; none verified. Private salary is not saved/shared. Date-specific comparison function does not itself constitute a complete vacation editing screen.
 - Remaining unintegrated expansion drafts include #89 (school/conflicts), #96 (employer profiles), and #100 (ICS safety). The full owner-approved expansion program is **not complete**, even if this batch is green. Do not merge the source PRs again once this combined candidate lands.
+
+## Integrated behavior test
+
+This combined branch also runs `scripts/consumer-expansion-journey.mjs` on the actual /policy route at 1440/768/375/320. It opens the on-demand policy explanation and next-reset disclosure, changes forecast shortcuts live, enters synthetic hourly pay and a synthetic work location, switches company payout assumptions, verifies legal caveats and checks that neither the pay amount nor work location enter the shared URL. This runs **in addition to** each focused browser suite and general axe/Lighthouse workflow; it does not substitute for independent review.
