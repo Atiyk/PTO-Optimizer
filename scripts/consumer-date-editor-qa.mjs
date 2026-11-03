@@ -38,7 +38,7 @@ try {
       await page.getByRole('button', { name: /More options/ }).click();
       const blackout = page.locator('section').filter({ has: page.getByRole('heading', { name: "Days I can't take off", exact: true }) });
       const overlap = page.locator('section').filter({ has: page.getByRole('heading', { name: /Overlap days/ }) });
-      const input = blackout.getByLabel('Unavailable date to add');
+      const input = blackout.getByLabel('Unavailable date to add', { exact: true });
       const add = blackout.getByRole('button', { name: 'Add', exact: true });
       assert.equal(await add.isDisabled(), true, 'Add should be disabled with no date');
       await page.screenshot({ path: resolve(out, 'options-before-' + width + '.png'), fullPage: true });
@@ -56,7 +56,7 @@ try {
       assert.equal(await blackout.locator('time[datetime="2027-03-17"]').count(), 0);
       assert.equal(await input.evaluate((el) => document.activeElement === el), true, 'Remove must restore focus');
 
-      const overlapInput = overlap.getByLabel('Overlap date to add');
+      const overlapInput = overlap.getByLabel('Overlap date to add', { exact: true });
       await overlapInput.fill('2027-04-12');
       await overlap.getByRole('button', { name: 'Add', exact: true }).click();
       assert.equal(await overlap.locator('time[datetime="2027-04-12"]').count(), 1);
