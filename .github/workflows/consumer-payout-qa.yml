@@ -1,0 +1,77 @@
+name: Consumer payout scenario QA
+
+on:
+  pull_request:
+    paths:
+      - 'src/ui/DeparturePayoutEstimator.tsx'
+      - 'src/ui/DeparturePayoutEstimator.test.tsx'
+      - 'src/ui/Policy.tsx'
+      - 'src/personal/payoutEstimate.ts'
+      - 'scripts/consumer-payout-qa.mjs'
+      - '.github/workflows/consumer-payout-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  payout-browser:
+    name: Payout scenario before/after 1440/768/375/320
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: current
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 01a2368c07d43b15404710609ffae567ab2bc462
+          path: baseline
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: current/package-lock.json
+      - name: Install current and baseline
+        run: |
+          npm --prefix current ci
+          npm --prefix baseline ci
+      - name: Build candidate and baseline
+        run: |
+          npm --prefix current --ignore-scripts run build
+          npm --prefix current run postbuild
+          npm --prefix baseline --ignore-scripts run build
+          npm --prefix baseline run postbuild
+      - name: Install Chromium
+        working-directory: current
+        run: npx playwright install --with-deps chromium
+      - name: Run payout interactions and responsive screenshots
+        run: |
+          npm --prefix current run preview -- --host 127.0.0.1 --port 4173 --strictPort > "$RUNNER_TEMP/payout-current.log" 2>&1 &
+          current_pid=$!
+          npm --prefix baseline run preview -- --host 127.0.0.1 --port 4174 --strictPort > "$RUNNER_TEMP/payout-baseline.log" 2>&1 &
+          baseline_pid=$!
+          trap 'kill "$current_pid" "$baseline_pid" 2>/dev/null || true' EXIT
+          node --input-type=module <<'NODE'
+          for (const port of [4173, 4174]) {
+            let ready = false;
+            for (let attempt = 0; attempt < 30; attempt += 1) {
+              try {
+                if ((await fetch('http://127.0.0.1:' + port + '/policy/')).ok) { ready = true; break; }
+              } catch { /* preview starting */ }
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            if (!ready) throw new Error('Policy preview not available on port ' + port);
+          }
+          NODE
+          node current/scripts/consumer-payout-qa.mjs http://127.0.0.1:4174 "$GITHUB_WORKSPACE/qa-evidence/payout" before
+          node current/scripts/consumer-payout-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/payout" after
+      - name: Preserve screenshots and reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: consumer-payout-evidence
+          path: qa-evidence/payout
+          if-no-files-found: warn
+          retention-days: 14
