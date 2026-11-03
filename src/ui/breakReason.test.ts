@@ -83,6 +83,19 @@ describe('breakReason', () => {
     );
   });
 
+  it('does not repeat a low-demand tag when the numeric value contradicts it', () => {
+    for (const meanDemand of [Number.NaN, -1, 1, 1.3, Number.POSITIVE_INFINITY]) {
+      const lowValue: Break = {
+        ...BASE,
+        multiplier: 1,
+        totalDaysOff: 1,
+        tags: ['Low travel demand'],
+        meanDemand,
+      };
+      expect(breakReason(lowValue, noHoliday)).toBe('No extra days off — 1 PTO day for 1 day off.');
+    }
+  });
+
   it('qualifies estimated demand even for low-value recommendations', () => {
     for (const demandTag of ['Low travel demand', 'Peak travel']) {
       const lowValue: Break = {
