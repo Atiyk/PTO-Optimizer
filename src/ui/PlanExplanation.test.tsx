@@ -48,6 +48,46 @@ describe('summarizePlanDays', () => {
     });
   });
 
+
+  it('reconciles two disjoint recommended breaks against aggregate solver metrics', () => {
+    const second: Break = {
+      ...BREAK,
+      id: '2026-12-24|2026-12-27',
+      start: '2026-12-24',
+      end: '2026-12-27',
+      days: ['2026-12-24', '2026-12-25', '2026-12-26', '2026-12-27'],
+      totalDaysOff: 4,
+      ptoCost: 1,
+    };
+    const breaks = [BREAK, second];
+    const holidays = new Set(['2026-11-26', '2026-12-25']);
+    const result = summarizePlanDays(breaks, MON_FRI, holidays);
+    expect(result).toEqual({
+      calendarDays: 8,
+      ptoDays: 2,
+      regularDaysOff: 4,
+      calendarDaysOff: 2,
+      breakCount: 2,
+    });
+    expect(result!.calendarDays).toBe(breaks.reduce((sum, item) => sum + item.totalDaysOff, 0));
+    expect(result!.ptoDays).toBe(breaks.reduce((sum, item) => sum + item.ptoCost, 0));
+    const html = renderToStaticMarkup(
+      <PlanExplanation breaks={breaks} workWeek={MON_FRI} offDays={holidays} budgetSpent={2} totalDaysOff={8} />,
+    );
+    expect(html).toContain('2 recommended breaks combine');
+    expect(html).toContain('2 days of PTO');
+    expect(html).toContain('8 days off');
+    expect(html).not.toContain('plan is updating');
+  });
+
+  it('guards against inconsistent aggregate metrics even when individual break dates are valid', () => {
+    const html = renderToStaticMarkup(
+      <PlanExplanation breaks={[BREAK]} workWeek={MON_FRI} offDays={new Set(['2026-11-26'])} budgetSpent={1} totalDaysOff={5} />,
+    );
+    expect(html).toContain('plan is updating');
+    expect(html).not.toContain('That makes');
+  });
+
   it('does not display a breakdown when no recommendation exists', () => {
     expect(summarizePlanDays([], MON_FRI, new Set())).toBeNull();
     expect(renderToStaticMarkup(
