@@ -79,6 +79,12 @@ describe('live homepage planner', () => {
     expect(screen.getByRole('heading', { name: 'Take the next step with your plan.' })).toBeTruthy();
   });
 
+  it('provides a mobile quick-edit link from the long result to the live slider', () => {
+    const html = renderToStaticMarkup(<Landing />);
+    expect(html).toContain('href="#landing-budget-slider"');
+    expect(html).toContain('Change PTO days in this preview');
+  });
+
   it('keeps the full 23-day mobile calendar accessible but collapsed so the controls are nearer the top', () => {
     const html = renderToStaticMarkup(<Landing />);
     expect(html).toContain('View all 23 calendar days');

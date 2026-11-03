@@ -114,6 +114,10 @@ export function Landing() {
               <p className="pb-0.5 text-sm text-muted">using <strong className="text-2xl font-semibold text-accent-ink">{bestBreak.ptoCost}</strong> PTO day{bestBreak.ptoCost === 1 ? '' : 's'}</p>
             </div>
             <p className="mb-3 text-base font-semibold text-ink">{formatLong(bestBreak.start)} – {formatLong(bestBreak.end)}</p>
+            <a href="#landing-budget-slider"
+              className="mb-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-ink underline underline-offset-4 sm:hidden">
+              Change PTO days in this preview
+            </a>
             <div className="hidden sm:block">
               <MiniBreakStrip brk={bestBreak} holidaySet={holidaySet} />
             </div>

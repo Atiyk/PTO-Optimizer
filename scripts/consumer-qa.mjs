@@ -180,6 +180,12 @@ try {
           const through = page.getByLabel('Through', { exact: true });
           result.homeSliderVisible = await slider.isVisible() && (sliderBox?.height ?? 0) >= 44;
           if (width < 640) {
+            const adjust = page.getByRole('link', { name: 'Change PTO days in this preview' });
+            result.homeMobileAdjustLink = await adjust.isVisible();
+            await adjust.click();
+            result.homeMobileAdjustJump = new URL(page.url()).hash === '#landing-budget-slider';
+          }
+          if (width < 640) {
             const compactCalendar = page.locator('[data-testid="home-break-calendar"]');
             result.homeCompactCalendarCollapsed = await compactCalendar.evaluate((element) => element.open === false);
             const summary = compactCalendar.locator('summary');
@@ -274,6 +280,7 @@ try {
           || result.searchFocusReturned === false || result.searchHorizontalOverflow === true
           || result.homeResultBeforeControls === false || result.homeReadingOrder === false
           || result.homeCompactCalendarCollapsed === false || result.homeCompactCalendarExpandable === false
+          || result.homeMobileAdjustLink === false || result.homeMobileAdjustJump === false
           || result.homeSliderVisible === false || result.homeDatesDirectlyVisible === false
           || result.homeSliderKeyboardAndNumberSync === false || result.homeSliderURLParity === false
           || result.homeMainValueAndActVisible === false || result.mainLandmarkTargeted === false
