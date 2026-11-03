@@ -38,6 +38,21 @@ describe('breakReason', () => {
     expect(breakReason(brk, noHoliday)).toBe('Busier travel week (about 40% above average) — 1 PTO day for 4 days off regardless.');
   });
 
+  it('does not invent percentages when demand metadata is invalid or contradicts its tag', () => {
+    const cases: Array<{ tag: string; meanDemand: number }> = [
+      { tag: 'Low travel demand', meanDemand: Number.NaN },
+      { tag: 'Low travel demand', meanDemand: -0.2 },
+      { tag: 'Low travel demand', meanDemand: 1.2 },
+      { tag: 'Peak travel', meanDemand: Number.POSITIVE_INFINITY },
+      { tag: 'Peak travel', meanDemand: 0.8 },
+    ];
+    for (const { tag, meanDemand } of cases) {
+      const explanation = breakReason({ ...BASE, tags: [tag], meanDemand }, noHoliday);
+      expect(explanation).toBe('Efficient swap — 1 PTO day for 4 days off (4.00x).');
+      expect(explanation).not.toMatch(/NaN|Infinity|%/);
+    }
+  });
+
   it('flags estimated demand data explicitly rather than presenting it as measured', () => {
     const brk: Break = { ...BASE, tags: ['Estimated'] };
     expect(breakReason(brk, noHoliday)).toBe('1 PTO day for 4 days off — travel demand here is an estimate for this country.');
