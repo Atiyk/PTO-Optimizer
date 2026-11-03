@@ -15,3 +15,7 @@ Add a unit case for a 0.5x break using 2 PTO days for 1 day off. Check the expla
 Draft-only until exact-head consumer test/typecheck/lint/build, real 1440/768/375/320 screenshots and browser accessibility/SEO checks, independent tester/critic approval, and an exact-head consumer Vercel READY preview are available. This focused text change should be checked in the existing consumer browser evidence workflow; do not claim those checks passed before they finish.
 
 **Owner's single-release policy:** Do not merge to main if that triggers automatic production deployments. Queue this with the other approved UX PRs for one coordinated production release after all UX deliverables pass; verify READY at the final production SHA. Expansion PRs remain gated.
+
+## Follow-up implementation and QA (2026-11-03 UTC)
+
+The low-demand low-value branch still claimed the solver *chose* dates for their travel demand, which the tag alone cannot prove. Revised it to state the factual PTO cost and that the dates are tagged lower-demand, without attributing a solver motive. Added a regression expectation rejecting motive wording. Exact-head CI must be rerun on `3e493d2d763a7538d46fed3d2c4f6b9a91d3484f`; previous green checks apply only to the older head. Independent critic review and 1440/768/375/320 browser evidence remain required. A consumer preview READY for an older head does not establish this head's readiness. Hold PR draft/unmerged for the owner's consolidated production release.
