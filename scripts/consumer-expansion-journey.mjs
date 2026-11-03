@@ -30,7 +30,8 @@ try {
         && await page.getByRole('heading', { name: 'What might my unused vacation be worth?' }).isVisible();
       const forecastDate = page.getByLabel('Forecast my balance on');
       const beforeDate = await forecastDate.inputValue();
-      await page.getByRole('button', { name: '3 months', exact: true }).click();
+      // Initial forecast can already be 3 months ahead. Use a 1-month shortcut to test a real change.
+      await page.getByRole('button', { name: '1 month', exact: true }).click();
       const afterDate = await forecastDate.inputValue();
       result.forecastLive = afterDate !== beforeDate;
       await page.getByRole('button', { name: 'Explain this forecast using my policy' }).click();
