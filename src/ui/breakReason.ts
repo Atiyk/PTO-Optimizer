@@ -29,6 +29,11 @@ export function breakReason(brk: Break, holidayNameFor: (iso: string) => string 
   const holidayName = brk.days.map(holidayNameFor).find((name): name is string => !!name);
   if (holidayName) return `Bridges ${holidayName} — ${swap}.`;
 
+  // Estimated demand must not be presented as an observed quiet/peak comparison.
+  // This takes precedence when a recommendation carries both tags.
+  if (brk.tags.includes('Estimated')) {
+    return `${swap} — travel demand here is an estimate for this country.`;
+  }
   if (brk.tags.includes('Low travel demand')) {
     const pct = Math.round((1 - brk.meanDemand) * 100);
     return `Quiet travel week — about ${pct}% less demand than an average day.`;
@@ -36,9 +41,6 @@ export function breakReason(brk: Break, holidayNameFor: (iso: string) => string 
   if (brk.tags.includes('Peak travel')) {
     const pct = Math.round((brk.meanDemand - 1) * 100);
     return `Busier travel week (about ${pct}% above average) — ${swap} regardless.`;
-  }
-  if (brk.tags.includes('Estimated')) {
-    return `${swap} — travel demand here is an estimate for this country.`;
   }
   return `Efficient swap — ${swap} (${brk.multiplier.toFixed(2)}x).`;
 }
