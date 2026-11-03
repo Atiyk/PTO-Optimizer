@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { validateCurrentCarriedBalance, type TimeOffPolicy } from '../policy/model';
 import { forecastWithRequests } from '../personal/forecast';
 import type { PtoRequest } from '../personal/requestLedger';
+import { forecastPresets } from './forecastPresets';
 
 export interface QuickForecastProps {
   policy: TimeOffPolicy;
@@ -29,6 +30,20 @@ export function QuickForecast({ policy, requests = [], forecastDate, onForecastD
         className="mt-2 h-11 w-full min-w-0 rounded-lg border border-line-strong bg-surface px-3 text-ink sm:w-auto"
         onChange={(event) => { onForecastDateChange(event.target.value); onForecastUsed?.(); }}
       />
+      <div role="group" aria-label="Quick forecast dates" className="mt-3 flex flex-wrap gap-2">
+        {forecastPresets(policy.balanceAsOf).map((preset) => (
+          <button
+            key={preset.key}
+            type="button"
+            aria-pressed={forecastDate === preset.date}
+            className="min-h-11 rounded-lg border border-line-strong bg-surface px-3 text-sm font-medium text-ink transition-colors hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink aria-pressed:border-ink aria-pressed:bg-surface-alt"
+            onClick={() => { onForecastDateChange(preset.date); onForecastUsed?.(); }}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-muted">Shortcuts count from your balance as-of date ({policy.balanceAsOf}); choose any date above instead.</p>
       {!forecast ? (
         <p role="status" className="mt-4 text-sm text-muted">{validateCurrentCarriedBalance(policy) ?? 'Enter a valid date on or after your balance as-of date, within ten years, and valid policy amounts.'}</p>
       ) : policy.accrual.kind === 'unlimited' ? (
