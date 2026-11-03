@@ -1,7 +1,7 @@
 # Consumer expansion — execution status
 
-**State:** BUILDING_ISOLATED_DRAFTS / RELEASE_GATE_0_CLOSED
-**Last evaluated:** 2026-11-02 ~17:25 UTC (owner-approved Vercel-quota exception)
+**State:** BUILDING_A2_INTEGRATION / UX_PREDECESSOR_RELEASE_VERIFIED / EXPANSION_NOT_RELEASED
+**Last evaluated:** 2026-11-03 after 09:28 America/New_York (direct owner-authorized expansion resumption)
 **Implementation authorization:** Owner's 2026-11-02 update supersedes the Gate 0 prohibition on **non-overlapping draft feature-code edits only**. It does NOT authorize merging, publishing, claiming UX completion, touching B2B, or bypassing QA/Vercel.
 
 ## New isolated development work
@@ -155,3 +155,12 @@ This file records unreleased isolated implementation and a still-closed release 
 - Independently inspected Vercel production deployment list for `pto-optimizer` under team `atiyk-a`: latest production **READY** deployment `dpl_6yeSoVSbQ1ib29BVXa7c1rmhHGbC` points to `3187596230768e4818720d1907475c9a3341a54c`, the earlier UX #86 release; this is not a release of the open UX PRs.
 - Sequentially reviewed F4 PR #103's `src/ui/forecastPresets.ts` and `src/ui/QuickForecast.test.tsx`: presets use the balance as-of date and month-end clamping, with invalid-date and leap-year tests, controlled input callback parity, and unlimited-PTO caveat. This inspection is **not independent Q approval** and does not replace the required exact-head checks, browser evidence or Vercel preview. Its prior dedicated four-width browser run passed per previous recorded evidence; general browser job and critic state must be refreshed before release.
 - No merges or deployments attempted. Remaining blocker is substantive: prior UX full-scope completion, submitted independent reviews, exact-head preview and coordinated release verification. Keep all expansion PRs draft until release gates pass.
+
+
+## 2026-11-03 — verified UX handoff and substantive A2 integration (manual run)
+
+- Predecessor task `6ae888a6a99c819180777bbd6ec10377` confirmed **DISABLED**. UX integrated PR [#106](https://github.com/Atiyk/PTO-Optimizer/pull/106) merged as `01a2368c07d43b15404710609ffae567ab2bc462`; [two GitHub combined QA runs](https://github.com/Atiyk/PTO-Optimizer/actions/runs/41646736993) and [FAQ browser](https://github.com/Atiyk/PTO-Optimizer/actions/runs/41646737034) succeeded at source candidate `d26ad0129722a3144a122776d29b11e6d0a7fd33`. Vercel production `dpl_4r1hK6VUPjSu7CpuZGsTxPduziQ7` independently observed **READY** at merged SHA `01a2368c`, matching the official consumer alias. Independent GitHub review not present; owner ordered UX released as-is.
+- Owner directed immediate continuation of remaining consumer expansion now that UX changes are released. No B2B or shared solver edits authorized; owner clarified separate expansion merge/release when finished.
+- Created **draft [PR #107](https://github.com/Atiyk/PTO-Optimizer/pull/107)** based directly on the verified UX main `01a2368c`, exact candidate commit `b30ea131def7bef2d5e31b8d0086e0480337f9ac` (13 paths). Integrates previously isolated and separately draft PR #93 (vacation forecast comparison), #98 (policy rule explanations), #103 (forecast shortcuts) and *new* demand-loaded, plain-English explanation UI directly in the existing QuickForecast. Added a UI interaction test, a typed deterministic explanation dependency and integration QA contract. Tested file overlap: additive consumer modules and QuickForecast only; no `apps/teams`, `packages/engine`, backend, URLs or new local storage.
+- GitHub exact-head [consumer validation run 41654933943](https://github.com/Atiyk/PTO-Optimizer/actions/runs/41654933943) and [dedicated four-viewport forecast QA run 41654934095](https://github.com/Atiyk/PTO-Optimizer/actions/runs/41654934095) **started; in progress** at last check, **not passing yet**. Preview deployment `dpl_GpVCpGDwbPYLjjHdzNiYhPCpYFKF` **QUEUED** at last check. Do not claim finished, merged, independent Q approval or production READY.
+- **Source PRs #93, #98, #103 are subsumed for this integration candidate**; do not merge separately if #107 is merged. Payout #91, school/conflicts #89, carryover #94, employer profiles #96, local ICS safety #100, and directive #84 remain separate draft/unmerged. More user-facing integration, responsive evidence, accessibility/critic approval and legal verification remain needed. Do not confuse a compiled domain module with a released feature.
