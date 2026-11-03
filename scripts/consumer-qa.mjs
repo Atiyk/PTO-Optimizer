@@ -180,7 +180,7 @@ try {
           const through = page.getByLabel('Through', { exact: true });
           result.homeSliderVisible = await slider.isVisible() && (sliderBox?.height ?? 0) >= 44;
           if (width <= 375) {
-            const countryBox = await page.getByLabel('Country', { exact: true }).boundingBox();
+            const countryBox = await page.locator('#landing-country').boundingBox();
             result.homeCountryNotCramped = (countryBox?.width ?? 0) >= width - 66;
           }
           if (width < 640) {
