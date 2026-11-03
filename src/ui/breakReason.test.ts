@@ -49,7 +49,9 @@ describe('breakReason', () => {
 
   it('never fabricates a reason for a low-value (1.0x or worse) break - matches the existing lowValueExplanation copy', () => {
     const lowValue: Break = { ...BASE, multiplier: 1, totalDaysOff: 1, ptoCost: 1, tags: ['Low travel demand'] };
-    expect(breakReason(lowValue, noHoliday)).toBe('No extra days off — chosen for low travel demand.');
+    expect(breakReason(lowValue, noHoliday)).toBe('No extra days off — 1 PTO day for 1 day off; lower travel demand is tagged for these dates.');
+
+    expect(breakReason(lowValue, noHoliday)).not.toMatch(/chosen|optimized|budget|unspent/i);
 
     const lowValueNoTag: Break = { ...BASE, multiplier: 1, totalDaysOff: 1, ptoCost: 1, tags: [] };
     expect(breakReason(lowValueNoTag, noHoliday)).toBe(
