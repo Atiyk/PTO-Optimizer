@@ -43,6 +43,15 @@ describe('breakReason', () => {
     expect(breakReason(brk, noHoliday)).toBe('1 PTO day for 4 days off — travel demand here is an estimate for this country.');
   });
 
+  it('does not present estimated low-demand or peak-demand data as observed', () => {
+    for (const demandTag of ['Low travel demand', 'Peak travel']) {
+      const brk: Break = { ...BASE, tags: [demandTag, 'Estimated'], meanDemand: demandTag === 'Low travel demand' ? 0.7 : 1.4 };
+      const explanation = breakReason(brk, noHoliday);
+      expect(explanation).toBe('1 PTO day for 4 days off — travel demand here is an estimate for this country.');
+      expect(explanation).not.toMatch(/quiet travel week|busier travel week|% less|% above/i);
+    }
+  });
+
   it('falls back to the plain multiplier swap when nothing else applies', () => {
     expect(breakReason(BASE, noHoliday)).toBe('Efficient swap — 1 PTO day for 4 days off (4.00x).');
   });
