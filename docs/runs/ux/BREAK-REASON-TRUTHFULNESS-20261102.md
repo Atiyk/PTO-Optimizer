@@ -19,3 +19,9 @@ Draft-only until exact-head consumer test/typecheck/lint/build, real 1440/768/37
 ## Follow-up implementation and QA (2026-11-03 UTC)
 
 The low-demand low-value branch still claimed the solver *chose* dates for their travel demand, which the tag alone cannot prove. Revised it to state the factual PTO cost and that the dates are tagged lower-demand, without attributing a solver motive. Added a regression expectation rejecting motive wording. Exact-head CI must be rerun on `3e493d2d763a7538d46fed3d2c4f6b9a91d3484f`; previous green checks apply only to the older head. Independent critic review and 1440/768/375/320 browser evidence remain required. A consumer preview READY for an older head does not establish this head's readiness. Hold PR draft/unmerged for the owner's consolidated production release.
+
+## Mixed estimated-demand tags (2026-11-03 UTC)
+
+The `Estimated` tag must take precedence over `Low travel demand` and `Peak travel` when both are present. Previously a measured-sounding quiet/peak percentage was shown despite the estimate flag. The explanation now uses the existing explicit country-estimate caveat and factual PTO exchange. Regression tests cover both tag combinations. This is consumer-only copy logic; solver and B2B remain unchanged.
+
+Latest implementation/test head before this note: `fed54ebf188aabe772dcfdde217366fd470cbc05`. All exact-head CI, four-width browser evidence, independent critic review, and matching Vercel READY preview must be rechecked after this documentation commit. Keep PR #104 draft and unmerged. Coordinate a single production release after the complete UX stack is approved; do not trigger per-PR main deployments.
