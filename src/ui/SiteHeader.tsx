@@ -68,7 +68,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
   }, [open]);
 
   const linkClass = (route: SiteRoute) =>
-    `relative whitespace-nowrap rounded-md px-1 py-1 text-[15px] transition-colors duration-150 ${
+    `relative inline-flex min-h-11 items-center whitespace-nowrap rounded-md px-1 py-1 text-[15px] transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
       active === route
         ? 'font-semibold text-ink after:absolute after:inset-x-1 after:-bottom-[13px] after:h-[3px] after:rounded-full after:bg-accent'
         : 'text-muted hover:text-ink'
@@ -77,7 +77,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
   return (
     <header className="border-b border-line bg-page">
       <Container className="flex h-16 items-center gap-4 px-4">
-        <a href="/" aria-label={`${PRODUCT_NAME}, home`} className="-ml-1 rounded-md px-1 py-1" aria-current={active === 'landing' ? 'page' : undefined}>
+        <a href="/" aria-label={`${PRODUCT_NAME}, home`} className="-ml-1 inline-flex min-h-11 items-center rounded-md px-1 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" aria-current={active === 'landing' ? 'page' : undefined}>
           <Logo />
         </a>
 
@@ -102,14 +102,14 @@ export function SiteHeader({ active }: SiteHeaderProps) {
               left of the primary link, which stays flush with the content's right edge. */}
           <div className="hidden h-9 w-[76px] shrink-0 sm:block" data-slot="sign-in" aria-hidden="true" />
           <span className="hidden sm:inline-flex">
-            <a href={HEADER_CTA.href} className={buttonClasses('primary', 'sm')}>
+            <a href={HEADER_CTA.href} className={`${buttonClasses('primary', 'sm')} min-h-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}>
               {HEADER_CTA.label}
             </a>
           </span>
           <button
             ref={buttonRef}
             type="button"
-            className="inline-flex h-10 items-center gap-2 rounded-full border border-line-strong/40 bg-surface px-3.5 text-sm font-semibold text-ink hover:bg-surface-alt lg:hidden"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-line-strong/40 bg-surface px-3.5 text-sm font-semibold text-ink hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:hidden"
             aria-expanded={open}
             aria-controls={panelId}
             onClick={() => setOpen((o) => !o)}
@@ -139,7 +139,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
                     <a
                       href={item.href}
                       aria-current={active === item.route ? 'page' : undefined}
-                      className={`flex min-h-11 items-center justify-between rounded-lg text-base ${active === item.route ? 'font-semibold text-ink' : 'text-ink'}`}
+                      className={`flex min-h-11 items-center justify-between rounded-lg text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${active === item.route ? 'font-semibold text-ink' : 'text-ink'}`}
                     >
                       {item.label}
                       {active === item.route && <span className="h-2 w-2 rounded-full bg-accent" aria-hidden="true" />}
@@ -149,7 +149,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
               </ul>
             </nav>
           ))}
-          <a href={HEADER_CTA.href} className={buttonClasses('primary', 'md', 'w-full sm:hidden')}>
+          <a href={HEADER_CTA.href} className={`${buttonClasses('primary', 'md', 'w-full sm:hidden')} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}>
             {HEADER_CTA.label}
           </a>
         </Container>

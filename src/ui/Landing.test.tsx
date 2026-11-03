@@ -37,6 +37,19 @@ describe('live homepage planner', () => {
     expect((html.match(/<h1\b/g) ?? []).length).toBe(1);
   });
 
+  it('places the real recommended break before editable fields in reading and focus order', () => {
+    const html = renderToStaticMarkup(<Landing />);
+    const heading = html.indexOf('Your recommended break');
+    const budgetField = html.indexOf('id="landing-budget"');
+    const dateDisclosure = html.indexOf('Planning dates');
+    expect(heading).toBeGreaterThan(0);
+    expect(budgetField).toBeGreaterThan(heading);
+    expect(dateDisclosure).toBeGreaterThan(heading);
+    expect(html).toContain('Make this preview yours');
+    expect(html).toContain('Your recommendation updates automatically.');
+    expect(html).toContain('grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]');
+  });
+
   it('updates a real plan and its URL when the PTO budget changes, without submission', async () => {
     const event = vi.fn();
     window.plausible = event;

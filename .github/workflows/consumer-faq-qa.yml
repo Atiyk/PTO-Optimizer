@@ -1,0 +1,61 @@
+name: Consumer FAQ browser evidence
+
+on:
+  pull_request:
+    paths:
+      - 'src/ui/FAQ.tsx'
+      - 'src/ui/FaqPage.tsx'
+      - 'src/ui/FaqAccessibility.test.tsx'
+      - 'scripts/consumer-faq-qa.mjs'
+      - '.github/workflows/consumer-faq-qa.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/ui/FAQ.tsx'
+      - 'src/ui/FaqPage.tsx'
+      - 'src/ui/FaqAccessibility.test.tsx'
+      - 'scripts/consumer-faq-qa.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  faq-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: |
+          npm --ignore-scripts run build
+          npm run postbuild
+      - run: npx playwright install --with-deps chromium
+      - name: FAQ keyboard and responsive screenshots
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4178 --strictPort > "$RUNNER_TEMP/faq-preview.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          node --input-type=module <<'NODE'
+          let ready = false;
+          for (let i = 0; i < 30; i++) {
+            try {
+              if ((await fetch('http://127.0.0.1:4178/faq/')).ok) { ready = true; break; }
+            } catch { /* preview still starting */ }
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          if (!ready) throw new Error('FAQ preview did not start');
+          NODE
+          node scripts/consumer-faq-qa.mjs http://127.0.0.1:4178 "$GITHUB_WORKSPACE/faq-evidence" after
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: faq-browser-evidence
+          path: faq-evidence
+          if-no-files-found: error
+          retention-days: 14

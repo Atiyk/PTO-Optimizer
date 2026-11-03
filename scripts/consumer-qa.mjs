@@ -60,7 +60,7 @@ try {
     for (const route of routes) {
       // Narrowest viewport: enforce overflow and reading-order checks on the
       // Understand hub and guides, without changing legacy planner baselines.
-      if (width === 320 && !['pto', 'understand', 'guide-accrual', 'guide-carryover', 'guide-holidays', 'guide-payout'].includes(route.name)) continue;
+      if (width === 320 && !['home', 'pto', 'understand', 'guide-accrual', 'guide-carryover', 'guide-holidays', 'guide-payout'].includes(route.name)) continue;
       const context = await browser.newContext({
         viewport: { width, height: 1000 },
         timezoneId: 'America/New_York',
@@ -156,6 +156,20 @@ try {
             result.menuFocusReturned = await menu.evaluate((element) => document.activeElement === element);
           }
         }
+        if (route.name === 'home') {
+          // The first meaningful result must precede editable controls visually AND
+          // in DOM reading order, even on the narrowest 320px viewport.
+          const previewHeading = page.getByRole('heading', { name: 'Your recommended break' });
+          const budgetField = page.getByRole('spinbutton', { name: 'PTO days available' });
+          const previewBox = await previewHeading.boundingBox();
+          const budgetBox = await budgetField.boundingBox();
+          result.homeResultBeforeControls = Boolean(previewBox && budgetBox && previewBox.y < budgetBox.y);
+          result.homeReadingOrder = await page.evaluate(() => {
+            const preview = [...document.querySelectorAll('h2')].find((node) => node.textContent?.trim() === 'Your recommended break');
+            const budget = document.getElementById('landing-budget');
+            return Boolean(preview && budget && (preview.compareDocumentPosition(budget) & Node.DOCUMENT_POSITION_FOLLOWING));
+          });
+        }
         if (route.name === 'pto') {
           // The two live planning sliders must be directly visible without opening
           // More options, including on a 320px viewport.
@@ -171,6 +185,21 @@ try {
           result.weightingKeyboardResponsive = nextWeight !== previousWeight;
           result.plannerResponsiveHeadings = await page.getByRole('heading', { name: 'Your time off' }).isVisible()
             && await page.getByRole('heading', { name: 'Shape your plan' }).isVisible();
+          // Check that the local-only explanation uses actual recommended dates,
+          // opens with keyboard-compatible native details, and stays readable at 320px.
+          const explanation = page.locator('[data-testid="plan-explanation"]');
+          result.planExplanationVisible = await explanation.isVisible();
+          if (result.planExplanationVisible) {
+            await explanation.locator('summary').click();
+            result.planExplanationExpanded = await explanation.evaluate((element) => element.open === true);
+            const explanationText = await explanation.innerText();
+            result.planExplanationConsistent = explanationText.includes('PTO used')
+              && explanationText.includes('Total time off')
+              && !explanationText.includes('plan is updating');
+            result.planExplanationOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+            await page.screenshot({ path: resolve(outputDirectory, `pto-explanation-${width}.png`), fullPage: true });
+            await explanation.locator('summary').click();
+          }
           const options = page.getByRole('button', { name: /More options/ });
           if (await options.isVisible()) {
             await options.click();
@@ -178,13 +207,33 @@ try {
             result.optionsHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
           }
         }
+        if (route.name === 'understand') {
+          const search = page.getByRole('searchbox', { name: 'Search the glossary' });
+          await search.fill('zzzxxyy');
+          result.searchEmptyState = await page.getByRole('status').innerText() === '0 terms found'
+            && await page.getByText('No terms match "zzzxxyy".').isVisible();
+          result.searchHidesUnrelatedPaths = await page.getByRole('heading', { name: 'Your PTO basics' }).count() === 0;
+          await page.screenshot({ path: resolve(outputDirectory, `understand-search-empty-${width}.png`), fullPage: true });
+          await search.fill('accrual');
+          result.searchFindsTerm = await page.getByRole('link', { name: 'accrual', exact: true }).isVisible();
+          await page.getByRole('button', { name: 'Clear search' }).click();
+          result.searchClearRestoresPaths = await page.getByRole('heading', { name: 'Your PTO basics' }).isVisible();
+          result.searchFocusReturned = await search.evaluate((element) => document.activeElement === element);
+          result.searchHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+        }
         result.status = runtimeErrors.length || failedSameOriginResponses.length || result.horizontalOverflow
           || result.optionsHorizontalOverflow || result.h1Count !== 1 || result.unlabeledInputs.length
           || result.unnamedButtons.length || result.loadingDidNotSettle || result.formSubmitControls
           || !result.correctRoute || result.guideContentVisible === false || result.guideExampleVisible === false || result.guideQuestionsVisible === false
           || result.menuOpenedWithKeyboard === false || result.menuClosedWithEscape === false
           || result.menuFocusReturned === false || result.slidersVisible === false || result.slidersOutsideAdvanced === false
-          || result.weightingKeyboardResponsive === false || result.plannerResponsiveHeadings === false ? 'failed' : 'passed';
+          || result.weightingKeyboardResponsive === false || result.plannerResponsiveHeadings === false
+          || result.searchEmptyState === false || result.searchHidesUnrelatedPaths === false
+          || result.searchFindsTerm === false || result.searchClearRestoresPaths === false
+          || result.searchFocusReturned === false || result.searchHorizontalOverflow === true
+          || result.homeResultBeforeControls === false || result.homeReadingOrder === false
+          || result.planExplanationVisible === false || result.planExplanationExpanded === false
+          || result.planExplanationConsistent === false || result.planExplanationOverflow === true ? 'failed' : 'passed';
       } catch (error) {
         result.status = 'failed';
         result.error = error instanceof Error ? error.message : String(error);

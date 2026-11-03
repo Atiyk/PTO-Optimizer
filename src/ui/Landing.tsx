@@ -99,32 +99,14 @@ export function Landing() {
   return <div className="min-h-screen bg-page">
     <SiteHeader active="landing" />
     <main><Container className="space-y-12 px-4 py-9 sm:px-6 sm:py-14 lg:space-y-16">
-      <section className="grid items-start gap-7 lg:grid-cols-2 lg:gap-14" aria-labelledby="landing-heading">
-        <div className="flex min-w-0 flex-col gap-5">
+      <section className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:gap-x-12 lg:gap-y-6" aria-labelledby="landing-heading">
+        <div className="flex min-w-0 flex-col gap-4 lg:gap-5">
           <p className="text-sm font-semibold text-accent-ink">Your time off, working harder.</p>
           <h1 id="landing-heading" className="max-w-2xl text-[2.25rem] font-bold leading-[1.1] tracking-tight text-ink sm:text-5xl lg:text-[3.5rem]">Make the most of every day off you’ve earned.</h1>
           <p className="max-w-xl text-lg leading-relaxed text-muted">Find longer breaks, plan around your company’s holidays, and never lose track of your PTO.</p>
           <p className="text-sm text-muted">Free to use. No account needed.</p>
-          <div className="grid min-w-0 grid-cols-2 gap-3">
-            <label htmlFor="landing-country" className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-muted">Country
-              <select id="landing-country" className={FIELD} value={country} onChange={(event) => update({ country: event.target.value })}>{COUNTRIES.map((entry) => <option key={entry.code} value={entry.code}>{entry.name}</option>)}</select>
-            </label>
-            <label htmlFor="landing-budget" className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-muted">PTO days available
-              <input id="landing-budget" type="number" inputMode="numeric" min={0} max={60} step={1} className={`${FIELD} font-semibold tabular-nums`} value={budget} onChange={(event) => update({ budget: Math.max(0, Math.min(60, Math.round(Number(event.target.value) || 0))) })} />
-            </label>
-          </div>
-          <details className="rounded-lg border border-line bg-surface/60 px-4 py-3">
-            <summary className="cursor-pointer text-sm font-medium text-ink">Planning dates · {validRange ? `${formatShort(rangeStart)}–${formatShort(rangeEnd)}` : 'Choose a valid range'}</summary>
-            <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2">
-              <label className="flex min-w-0 flex-col gap-1.5 text-sm text-muted">From<input type="date" className={FIELD} value={rangeStart} onChange={(event) => update({ rangeStart: event.target.value })} /></label>
-              <label className="flex min-w-0 flex-col gap-1.5 text-sm text-muted">Through<input type="date" className={FIELD} value={rangeEnd} onChange={(event) => update({ rangeEnd: event.target.value })} /></label>
-            </div>
-            <p className="mt-2 text-xs text-muted">Choose any dates, up to two years. Your preview updates as you edit.</p>
-          </details>
-          {!validRange && <p role="alert" className="text-sm text-accent-ink">Choose valid start and end dates, with the end after the start and no more than two years apart.</p>}
-          <div className="hidden lg:block"><Button href={href}>See the full plan →</Button></div>
         </div>
-        <Card as="section" className="min-w-0 lg:mt-9" eyebrow="A real opportunity from your plan">
+        <Card as="section" className="min-w-0 lg:mt-6" eyebrow="A real opportunity from your plan">
           <h2 className="text-xl font-semibold text-ink">Your recommended break</h2>
           {bestBreak ? <>
             <div className="my-5 flex flex-wrap items-end gap-x-6 gap-y-2">
@@ -140,6 +122,32 @@ export function Landing() {
           {calendar.degraded && <p className="mt-2 text-xs text-accent-ink" role="status">Some holiday data is unavailable. This preview may miss public holidays.</p>}
           <a href={href} className="mt-3 inline-block py-1 text-sm font-semibold text-accent-ink underline underline-offset-4">Customize workweek and employer holidays →</a>
         </Card>
+        <div className="flex min-w-0 flex-col gap-4 border-t border-line pt-5 lg:col-span-2">
+          <div>
+            <h2 className="text-base font-semibold text-ink">Make this preview yours</h2>
+            <p className="mt-1 text-sm text-muted">Change your PTO days, country or dates. Your recommendation updates automatically.</p>
+          </div>
+          <div className="grid min-w-0 gap-4 lg:grid-cols-2 lg:items-start">
+            <div className="grid min-w-0 grid-cols-2 gap-3">
+            <label htmlFor="landing-country" className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-muted">Country
+              <select id="landing-country" className={FIELD} value={country} onChange={(event) => update({ country: event.target.value })}>{COUNTRIES.map((entry) => <option key={entry.code} value={entry.code}>{entry.name}</option>)}</select>
+            </label>
+            <label htmlFor="landing-budget" className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-muted">PTO days available
+              <input id="landing-budget" type="number" inputMode="numeric" min={0} max={60} step={1} className={`${FIELD} font-semibold tabular-nums`} value={budget} onChange={(event) => update({ budget: Math.max(0, Math.min(60, Math.round(Number(event.target.value) || 0))) })} />
+            </label>
+          </div>
+          <details className="rounded-lg border border-line bg-surface/60 px-4 py-3">
+            <summary className="cursor-pointer text-sm font-medium text-ink">Planning dates · {validRange ? `${formatShort(rangeStart)}–${formatShort(rangeEnd)}` : 'Choose a valid range'}</summary>
+            <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2">
+              <label className="flex min-w-0 flex-col gap-1.5 text-sm text-muted">From<input type="date" className={FIELD} value={rangeStart} onChange={(event) => update({ rangeStart: event.target.value })} /></label>
+              <label className="flex min-w-0 flex-col gap-1.5 text-sm text-muted">Through<input type="date" className={FIELD} value={rangeEnd} onChange={(event) => update({ rangeEnd: event.target.value })} /></label>
+            </div>
+            <p className="mt-2 text-xs text-muted">Choose any dates, up to two years. Your preview updates as you edit.</p>
+          </details>
+          </div>
+          {!validRange && <p role="alert" className="text-sm text-accent-ink">Choose valid start and end dates, with the end after the start and no more than two years apart.</p>}
+          <div className="hidden lg:block"><Button href={href}>See the full plan →</Button></div>
+        </div>
         <div className="lg:hidden"><Button href={href} className="w-full sm:w-auto">See the full plan →</Button></div>
       </section>
 

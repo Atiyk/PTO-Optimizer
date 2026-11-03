@@ -271,6 +271,38 @@ async function verifyAnalyticsTransport() {
 
 try {
   browser = await chromium.launch({ headless: true, ...(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {}) });
+  await check('Impossible pinned dates keep the calendar visible and recover without losing other inputs', async () => {
+    const context = await mobileContext();
+    const page = await open(context, '/pto/?c=US&s=2027-01-15&e=2027-01-24&b=0&rv=0&pv=2&ps=custom&mb=3&p=2027-01-19');
+    const calendarDay = page.locator('button[data-date="2027-01-19"]');
+    const warning = page.getByRole('alert', { name: 'Planning needs attention' });
+    await eventually(async () => {
+      assert.equal(await warning.count(), 1, 'The impossible pinned day must produce an actionable warning.');
+      assert.equal(await calendarDay.count(), 1, 'The calendar must stay mounted despite a solver issue.');
+      assert.equal(await calendarDay.isEnabled(), true, 'The selected date must remain editable.');
+    }, 'Solver recovery UI must remain interactive');
+    await page.setViewportSize({ width: 320, height: 812 });
+    await noOverflow(page);
+    await screenshot(page, '06-pinned-recovery-before-320.png');
+    await warning.getByRole('button', { name: 'Review advanced settings' }).click();
+    assert.equal(await page.getByRole('button', { name: /Hide options/ }).getAttribute('aria-expanded'), 'true');
+    await warning.getByRole('button', { name: 'Clear pinned and excluded dates' }).click();
+    await eventually(async () => {
+      assert.equal(new URL(page.url()).searchParams.has('p'), false, 'Reset must remove the pinned date from the shareable plan URL.');
+      assert.equal(await warning.count(), 0, 'A resolved constraint should remove the warning.');
+      assert.equal(await calendarDay.count(), 1, 'The calendar must remain visible after recovery.');
+    }, 'Clearing only forced dates must recover the plan');
+    await eventually(async () => assert.equal(
+      await page.evaluate(() => document.activeElement?.id),
+      'complete-plan-heading',
+      'Keyboard focus should return to the complete plan heading after the recovery notice disappears.',
+    ), 'Focus recovery after clearing forced dates');
+    assert.equal(new URL(page.url()).searchParams.get('b'), '0', 'Reset must preserve the PTO budget.');
+    assert.equal(new URL(page.url()).searchParams.get('s'), '2027-01-15', 'Reset must preserve the planning dates.');
+    await noOverflow(page);
+    await screenshot(page, '06-pinned-recovery-after-320.png');
+    await page.close();
+  });
   await check('Live plan → track → requested → approved → forecast → refresh, without duplicate deductions', async () => {
     mainContext = await mobileContext(); main = await open(mainContext, ptoPath);
     const initialHeadline = await main.locator('h1').innerText();

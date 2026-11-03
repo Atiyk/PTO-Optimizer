@@ -974,6 +974,10 @@ export function useAppState() {
       return next;
     });
   }, []);
+  // A rejected combination of pinned dates and PTO policy can leave no valid
+  // solver plan. Offer an explicit, reversible recovery action without resetting
+  // the user's employer calendar, budget, dates or other policy settings.
+  const clearForcedDays = useCallback(() => setForced({}), []);
 
   const swapAlternative = useCallback(
     (alt: Alternative) => {
@@ -1101,6 +1105,7 @@ export function useAppState() {
     offRuns,
     breakBandByRunIndex,
     toggleDay,
+    clearForcedDays,
     forced,
     pinnedPlans,
     canPin,
