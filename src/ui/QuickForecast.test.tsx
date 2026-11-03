@@ -59,7 +59,10 @@ describe('quick forecast date shortcuts', () => {
     render(<QuickForecast policy={policy} forecastDate="2026-04-30"
       onForecastDateChange={onForecastDateChange} />);
     expect(screen.queryByText('How time is earned')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Explain this forecast using my policy' }).getAttribute('aria-controls')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Explain this forecast using my policy' }));
+    const disclosure = screen.getByRole('button', { name: 'Hide policy explanation' });
+    expect(document.getElementById(disclosure.getAttribute('aria-controls')!)).toBeTruthy();
     expect(screen.getByText('How time is earned')).toBeTruthy();
     expect(screen.getByText(/Your modeled plan year resets on January 1/)).toBeTruthy();
     expect(screen.getByText(/not a legal determination/)).toBeTruthy();

@@ -58,10 +58,22 @@ try {
         document.documentElement.scrollWidth <= window.innerWidth + 1);
       result.freeformDateVisible = await page.getByLabel('Forecast my balance on').isVisible();
       result.noSubmitButton = await page.locator('button[type="submit"],input[type="submit"]').count() === 0;
+      const explainButton = page.getByRole('button', { name: 'Explain this forecast using my policy' });
+      await explainButton.click();
+      const hideButton = page.getByRole('button', { name: 'Hide policy explanation' });
+      result.onDemandPolicyExplanation = await page.getByText('How time is earned').isVisible()
+        && await page.getByText(/not a legal determination/).isVisible();
+      result.explanationAccessibleTarget = await hideButton.evaluate((button) => {
+        const targetId = button.getAttribute('aria-controls');
+        return Boolean(targetId && document.getElementById(targetId));
+      });
+      result.explanationDoesNotExposeSalary = !decodeURIComponent(page.url()).includes('annualSalary');
       await page.screenshot({ path: resolve(output, `policy-forecast-${width}.png`), fullPage: true });
       result.status = errors.length === 0 && result.allPresetsVisible && result.touchTargetHeight >= 44
         && result.changedLive && result.restoredFromURL && result.keyboardChangesDate
         && result.noHorizontalOverflow && result.freeformDateVisible && result.noSubmitButton
+        && result.onDemandPolicyExplanation && result.explanationAccessibleTarget
+        && result.explanationDoesNotExposeSalary
         ? 'passed' : 'failed';
     } catch (error) {
       result.error = error instanceof Error ? error.message : String(error);

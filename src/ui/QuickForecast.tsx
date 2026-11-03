@@ -79,7 +79,7 @@ export function QuickForecast({ policy, requests = [], forecastDate, onForecastD
           <button
             type="button"
             aria-expanded={showExplanation}
-            aria-controls={`${dateId}-policy-explanation`}
+            aria-controls={showExplanation ? `${dateId}-policy-explanation` : undefined}
             className="min-h-11 rounded-lg border border-line-strong px-4 text-sm font-semibold text-ink hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
             onClick={() => setShowExplanation((open) => !open)}
           >
