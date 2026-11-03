@@ -23,7 +23,7 @@ export function breakReason(brk: Break, holidayNameFor: (iso: string) => string 
   // of a reason that would read as a sales pitch for a break that isn't actually a bargain.
   if (brk.multiplier <= 1) {
     if (brk.tags.includes('Estimated')) return `No extra days off — ${swap}; travel demand here is an estimate for this country.`;
-    if (brk.tags.includes('Low travel demand')) return `No extra days off — ${swap}; lower travel demand is tagged for these dates.`;
+    if (brk.tags.includes('Low travel demand') && Number.isFinite(brk.meanDemand) && brk.meanDemand >= 0 && brk.meanDemand < 1) return `No extra days off — ${swap}; lower travel demand is tagged for these dates.`;
     return `No extra days off — ${swap}.`;
   }
 
