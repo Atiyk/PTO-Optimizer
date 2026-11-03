@@ -41,7 +41,7 @@ import { GLOSSARY_TERMS } from '../src/content/glossary/terms.ts';
 import { rawHolidaysToHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { getSiteUrl } from './siteUrl.ts';
 import { ENTRIES, type Entry, type ComponentKind } from './routes.ts';
-import { PRODUCT_NAME, PRODUCT_SHORT_NAME, FORMER_NAME } from '../src/brand.ts';
+import { PRODUCT_NAME, PRODUCT_SHORT_NAME } from '../src/brand.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '..');
@@ -138,7 +138,7 @@ function buildJsonLd(entry: Entry, meta: { title: string; description: string; c
       '@context': 'https://schema.org',
       '@type': 'WebSite',
       name: PRODUCT_NAME,
-      alternateName: [PRODUCT_SHORT_NAME, FORMER_NAME],
+      alternateName: [PRODUCT_SHORT_NAME],
       url: `${SITE_URL}/`,
     });
   }

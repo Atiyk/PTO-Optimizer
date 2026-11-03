@@ -28,3 +28,9 @@ The privacy page documents only behaviors grounded in current implementation: br
 - Keep the UI work in the existing consolidated draft PR #112, not multiple small PRs. Subsequent features are reviewed independently; production main merges/deployments only when the complete coordinated consumer release is ready and free-tier Vercel capacity permits. Branch protection stays enabled.
 
 This document describes intended checks; it does not claim an independent critic has passed the latest SHA.
+
+
+## CI defect and follow-up verification (2026-11-03)
+- At commit 3733528e, Consumer validation Actions 41685132341 failed in postbuild because scripts/prerender.ts still imported the deleted FORMER_NAME constant, and it emitted that former name in WebSite alternateName schema. Fix the import and structured metadata and rerun on the exact new head. This is a real packaging defect, not a quota issue.
+- The privacy page should describe only capabilities presently released; assertions about an ICS calendar import are deferred until the separate calendar feature is independently reviewed.
+- The modern SVG and source logo colors now match evergreen teal. Legacy raster touch/PWA icons still require icon regeneration from scripts/build-icons.ts before release; flag for critic visual inspection.
