@@ -5,8 +5,9 @@ import { chromium } from 'playwright';
 
 const base = new URL(process.argv[2] || 'http://127.0.0.1:4173');
 const output = resolve(process.argv[3] || 'qa-evidence/quick-forecast');
+const mode = process.argv[4] === 'before' ? 'before' : 'after';
 await mkdir(output, { recursive: true });
-const report = { scope: 'Synthetic signed-out /policy quick forecast', results: [] };
+const report = { scope: 'Synthetic signed-out /policy quick forecast', mode, results: [] };
 const browser = await chromium.launch({ headless: true });
 
 try {
@@ -29,6 +30,11 @@ try {
     try {
       await page.goto(new URL('/policy/', base).href, { waitUntil: 'networkidle', timeout: 30000 });
       await page.getByRole('heading', { name: 'PTO balance forecast' }).waitFor();
+      if (mode === 'before') {
+        await page.screenshot({ path: resolve(output, `policy-forecast-before-${width}.png`), fullPage: true });
+        result.status = 'captured';
+        continue;
+      }
       const input = page.getByLabel('Forecast my balance on');
       const oneMonth = page.getByRole('button', { name: '1 month', exact: true });
       const sixMonths = page.getByRole('button', { name: '6 months', exact: true });
@@ -66,7 +72,7 @@ try {
   }
 } finally {
   await browser.close();
-  await writeFile(resolve(output, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
+  await writeFile(resolve(output, `${mode}-report.json`), `${JSON.stringify(report, null, 2)}\n`);
 }
 for (const result of report.results) console.log(JSON.stringify(result));
-if (report.results.some((result) => result.status !== 'passed')) process.exitCode = 1;
+if (report.results.some((result) => result.status === 'failed')) process.exitCode = 1;
