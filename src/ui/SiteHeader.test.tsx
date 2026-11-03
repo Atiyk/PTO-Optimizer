@@ -17,10 +17,15 @@ describe('SiteHeader (redesign Phase 1)', () => {
 
   it('derives the home link name from visible brand text and an unobtrusive home cue', () => {
     const { getByRole } = render(<SiteHeader active="pto" />);
-    const home = getByRole('link', { name: /Gapless\s+PTO Optimizer\s+home/i });
+    // JSDOM's accessible-name calculator concatenates nested flex spans without
+    // the whitespace supplied by real browser layout. The Playwright header QA
+    // and Lighthouse WCAG 2.5.3 gate assert the exact normalized name in Chromium.
+    const home = getByRole('link', { name: /Gapless.*PTO Optimizer.*home/i });
     expect(home.getAttribute('href')).toBe('/');
     expect(home.hasAttribute('aria-label')).toBe(false);
     expect(home.querySelector('.sr-only')?.textContent?.trim()).toBe('home');
+    expect(home.textContent).toContain('Gapless');
+    expect(home.textContent).toContain('PTO Optimizer');
   });
 
   it('uses three flat destinations and one primary PTO action without nested categories', () => {
