@@ -179,6 +179,14 @@ try {
           const from = page.getByLabel('From', { exact: true });
           const through = page.getByLabel('Through', { exact: true });
           result.homeSliderVisible = await slider.isVisible() && (sliderBox?.height ?? 0) >= 44;
+          if (width < 640) {
+            const compactCalendar = page.locator('[data-testid="home-break-calendar"]');
+            result.homeCompactCalendarCollapsed = await compactCalendar.evaluate((element) => element.open === false);
+            const summary = compactCalendar.locator('summary');
+            await summary.click();
+            result.homeCompactCalendarExpandable = await compactCalendar.evaluate((element) => element.open === true);
+            await summary.click();
+          }
           result.homeDatesDirectlyVisible = await from.isVisible() && await through.isVisible()
             && await from.evaluate(element => !element.closest('details'))
             && await through.evaluate(element => !element.closest('details'));
@@ -265,6 +273,7 @@ try {
           || result.searchFindsTerm === false || result.searchClearRestoresPaths === false
           || result.searchFocusReturned === false || result.searchHorizontalOverflow === true
           || result.homeResultBeforeControls === false || result.homeReadingOrder === false
+          || result.homeCompactCalendarCollapsed === false || result.homeCompactCalendarExpandable === false
           || result.homeSliderVisible === false || result.homeDatesDirectlyVisible === false
           || result.homeSliderKeyboardAndNumberSync === false || result.homeSliderURLParity === false
           || result.homeMainValueAndActVisible === false || result.mainLandmarkTargeted === false

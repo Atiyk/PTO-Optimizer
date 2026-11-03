@@ -114,7 +114,17 @@ export function Landing() {
               <p className="pb-0.5 text-sm text-muted">using <strong className="text-2xl font-semibold text-accent-ink">{bestBreak.ptoCost}</strong> PTO day{bestBreak.ptoCost === 1 ? '' : 's'}</p>
             </div>
             <p className="mb-3 text-base font-semibold text-ink">{formatLong(bestBreak.start)} – {formatLong(bestBreak.end)}</p>
-            <MiniBreakStrip brk={bestBreak} holidaySet={holidaySet} />
+            <div className="hidden sm:block">
+              <MiniBreakStrip brk={bestBreak} holidaySet={holidaySet} />
+            </div>
+            <details data-testid="home-break-calendar" className="mt-3 rounded-lg border border-line bg-surface-alt sm:hidden">
+              <summary className="flex min-h-11 cursor-pointer items-center px-3 py-2 text-sm font-semibold text-ink">
+                View all {bestBreak.totalDaysOff} calendar days
+              </summary>
+              <div className="px-3 pb-3">
+                <MiniBreakStrip brk={bestBreak} holidaySet={holidaySet} />
+              </div>
+            </details>
             <p className="mt-4 text-sm leading-relaxed text-muted">{breakReason(bestBreak, (date) => holidays.find((holiday) => holiday.date === date)?.name)}</p>
             <p className="mt-4 border-t border-line pt-4 text-sm text-muted">Full plan: <strong className="text-ink">{used} of {budget} PTO days</strong> across {plan?.result.primary.length} break{plan?.result.primary.length === 1 ? '' : 's'}.</p>
           </> : <p className="py-7 text-base leading-relaxed text-muted" role="status">{!validRange ? 'Your preview will appear once the planning dates are valid.' : loading ? 'Updating your holiday calendar…' : plan?.issue ?? (budget === 0 ? 'No PTO days allocated. You can still explore the holidays below.' : 'No qualifying break fits these dates and PTO days. Try a longer range or more available PTO.')}</p>}

@@ -79,6 +79,14 @@ describe('live homepage planner', () => {
     expect(screen.getByRole('heading', { name: 'Take the next step with your plan.' })).toBeTruthy();
   });
 
+  it('keeps the full 23-day mobile calendar accessible but collapsed so the controls are nearer the top', () => {
+    const html = renderToStaticMarkup(<Landing />);
+    expect(html).toContain('View all 23 calendar days');
+    expect(html).toContain('data-testid="home-break-calendar"');
+    expect(html).toContain('sm:hidden');
+    expect(html).toContain('hidden sm:block');
+  });
+
   it('shows explicit empty and invalid-date states while preserving the basic controls', async () => {
     await act(async () => { render(<Landing />); });
     await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '0' } }); });
