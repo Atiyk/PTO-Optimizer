@@ -97,7 +97,7 @@ describe('breakReason', () => {
   });
 
   it('qualifies estimated demand even for low-value recommendations', () => {
-    for (const demandTag of ['Low travel demand', 'Peak travel']) {
+    for (const demandTag of ['Low travel demand', 'Peak travel'] as const) {
       const lowValue: Break = {
         ...BASE,
         multiplier: 1,
