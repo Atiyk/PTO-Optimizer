@@ -19,8 +19,9 @@ function FaqSection({ id, title, items }: { id: string; title: string; items: FA
       <div className="flex flex-col divide-y divide-slate-100">
         {items.map((item) => (
           <details key={item.question} className="group py-2.5">
-            <summary className="cursor-pointer list-none">
-              <h3 className="inline text-sm font-medium text-slate-700 marker:content-none group-open:text-slate-900">{item.question}</h3>
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-md px-2 py-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900">
+              <h3 className="text-sm font-medium text-slate-700 group-open:text-slate-900">{item.question}</h3>
+              <span aria-hidden="true" className="shrink-0 text-base text-slate-600 transition-transform group-open:rotate-180">▾</span>
             </summary>
             <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-slate-500">{item.answer}</p>
           </details>
@@ -39,18 +40,18 @@ export function FaqPage() {
           <section>
             <h1 className="m-0 text-3xl font-bold text-slate-900">Frequently asked questions</h1>
             <p className="mt-2 max-w-prose text-sm text-slate-600">
-              Questions about <a href="/pto" className="underline hover:text-slate-800">Plan PTO</a> and{' '}
-              <a href="/sabbatical" className="underline hover:text-slate-800">Sabbatical</a> tools, consolidated here. Each tool's
+              Questions about <a href="/pto" className="rounded-sm underline hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900">Plan PTO</a> and{' '}
+              <a href="/sabbatical" className="rounded-sm underline hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900">Sabbatical</a> tools, consolidated here. Each tool's
               own page has this same content inline, right where it's relevant.
             </p>
-            <nav className="mt-3 flex gap-4 text-sm">
-              <a href="#pto" className="underline hover:text-slate-800">
+            <nav aria-label="FAQ sections" className="mt-3 flex flex-wrap gap-2 text-sm">
+              <a href="#pto" className="inline-flex min-h-11 items-center rounded-md px-2 underline hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900">
                 Plan PTO &darr;
               </a>
-              <a href="#sabbatical" className="underline hover:text-slate-800">
+              <a href="#sabbatical" className="inline-flex min-h-11 items-center rounded-md px-2 underline hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900">
                 Sabbatical &darr;
               </a>
-              <a href="#about" className="underline hover:text-slate-800">
+              <a href="#about" className="inline-flex min-h-11 items-center rounded-md px-2 underline hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900">
                 About &darr;
               </a>
             </nav>
