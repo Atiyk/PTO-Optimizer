@@ -53,8 +53,15 @@ describe('breakReason', () => {
 
     const lowValueNoTag: Break = { ...BASE, multiplier: 1, totalDaysOff: 1, ptoCost: 1, tags: [] };
     expect(breakReason(lowValueNoTag, noHoliday)).toBe(
-      'No extra days off — this uses the full available budget rather than leaving a PTO day unspent.',
+      'No extra days off — 1 PTO day for 1 day off.',
     );
+  });
+
+  it('does not invent an optimization motive when a low-value break has no travel tag', () => {
+    const lowValue: Break = { ...BASE, multiplier: 0.5, ptoCost: 2, totalDaysOff: 1, tags: [] };
+    const explanation = breakReason(lowValue, noHoliday);
+    expect(explanation).toBe('No extra days off — 2 PTO days for 1 day off.');
+    expect(explanation).not.toMatch(/budget|unspent|optimized/i);
   });
 
   it('a low-value break never gets a holiday/demand reason even if it technically bridges one or is tagged', () => {
