@@ -54,7 +54,7 @@ export function Glossary() {
   return (
     <div className="min-h-screen bg-page">
       <SiteHeader active="glossary" />
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <Container className="px-4 py-10">
           <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-accent-ink">Understand your time off</p>
           <h1 className="text-3xl font-bold text-ink sm:text-4xl">Your PTO, explained simply.</h1>

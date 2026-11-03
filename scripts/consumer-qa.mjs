@@ -170,6 +170,28 @@ try {
             return Boolean(preview && budget && (preview.compareDocumentPosition(budget) & Node.DOCUMENT_POSITION_FOLLOWING));
           });
         }
+        if (label === 'after' && route.name === 'home') {
+          // UI-first regression: visible direct controls, synchronized updates,
+          // no intermediate Submit button or extra closed date disclosure.
+          const slider = page.getByRole('slider', { name: 'Adjust PTO days available' });
+          const numberInput = page.getByRole('spinbutton', { name: 'PTO days available' });
+          const sliderBox = await slider.boundingBox();
+          const from = page.getByLabel('From', { exact: true });
+          const through = page.getByLabel('Through', { exact: true });
+          result.homeSliderVisible = await slider.isVisible() && (sliderBox?.height ?? 0) >= 44;
+          result.homeDatesDirectlyVisible = await from.isVisible() && await through.isVisible()
+            && await from.evaluate(element => !element.closest('details'))
+            && await through.evaluate(element => !element.closest('details'));
+          await slider.focus();
+          await page.keyboard.press('Home');
+          await page.keyboard.press('ArrowRight');
+          const selected = await slider.inputValue();
+          result.homeSliderKeyboardAndNumberSync = selected === '1' && await numberInput.inputValue() === selected;
+          result.homeSliderURLParity = new URL(page.url()).searchParams.get('b') === selected;
+          result.homeMainValueAndActVisible = await page.getByRole('heading', { name: 'Make your PTO worth more time away.' }).isVisible()
+            && await page.getByRole('heading', { name: 'Take the next step with your plan.' }).isVisible();
+          await page.screenshot({ path: resolve(outputDirectory, `home-controls-${width}.png`), fullPage: true });
+        }
         if (route.name === 'pto') {
           // The two live planning sliders must be directly visible without opening
           // More options, including on a 320px viewport.
@@ -221,6 +243,17 @@ try {
           result.searchFocusReturned = await search.evaluate((element) => document.activeElement === element);
           result.searchHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
         }
+        if (label === 'after') {
+          const skip = page.getByRole('link', { name: 'Skip to main content' });
+          result.mainLandmarkTargeted = await page.locator('main#main-content[tabindex="-1"]').count() === 1;
+          result.keyboardSkipAvailable = await skip.count() === 1;
+          if (result.keyboardSkipAvailable) {
+            await skip.focus();
+            await page.keyboard.press('Enter');
+            result.skipFocusOrNavigation = await page.evaluate(() =>
+              document.activeElement?.id === 'main-content' || window.location.hash === '#main-content');
+          }
+        }
         result.status = runtimeErrors.length || failedSameOriginResponses.length || result.horizontalOverflow
           || result.optionsHorizontalOverflow || result.h1Count !== 1 || result.unlabeledInputs.length
           || result.unnamedButtons.length || result.loadingDidNotSettle || result.formSubmitControls
@@ -232,6 +265,10 @@ try {
           || result.searchFindsTerm === false || result.searchClearRestoresPaths === false
           || result.searchFocusReturned === false || result.searchHorizontalOverflow === true
           || result.homeResultBeforeControls === false || result.homeReadingOrder === false
+          || result.homeSliderVisible === false || result.homeDatesDirectlyVisible === false
+          || result.homeSliderKeyboardAndNumberSync === false || result.homeSliderURLParity === false
+          || result.homeMainValueAndActVisible === false || result.mainLandmarkTargeted === false
+          || result.keyboardSkipAvailable === false || result.skipFocusOrNavigation === false
           || result.planExplanationVisible === false || result.planExplanationExpanded === false
           || result.planExplanationConsistent === false || result.planExplanationOverflow === true ? 'failed' : 'passed';
       } catch (error) {

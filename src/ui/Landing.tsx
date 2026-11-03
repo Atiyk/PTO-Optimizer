@@ -98,7 +98,7 @@ export function Landing() {
 
   return <div className="min-h-screen bg-page">
     <SiteHeader active="landing" />
-    <main><Container className="space-y-12 px-4 py-9 sm:px-6 sm:py-14 lg:space-y-16">
+    <main id="main-content" tabIndex={-1}><Container className="space-y-12 px-4 py-9 sm:px-6 sm:py-14 lg:space-y-16">
       <section className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:gap-x-12 lg:gap-y-6" aria-labelledby="landing-heading">
         <div className="flex min-w-0 flex-col gap-4 lg:gap-5">
           <p className="text-sm font-semibold text-accent-ink">Your time off, working harder.</p>
@@ -151,14 +151,19 @@ export function Landing() {
               <p className="text-xs leading-5 text-muted">Drag or use the arrow keys to see your recommended break change live.</p>
             </div>
           </div>
-          <details className="rounded-lg border border-line bg-surface/60 px-4 py-3">
-            <summary className="cursor-pointer text-sm font-medium text-ink">Planning dates · {validRange ? `${formatShort(rangeStart)}–${formatShort(rangeEnd)}` : 'Choose a valid range'}</summary>
+          <fieldset className="min-w-0 rounded-xl border border-line bg-surface p-3 sm:p-4">
+            <legend className="px-1 text-sm font-semibold text-ink">Planning dates</legend>
+            <p className="mt-1 text-xs text-muted">{validRange ? `Preview: ${formatShort(rangeStart)}–${formatShort(rangeEnd)}.` : 'Choose a valid range.'} Edit either date to update your plan live.</p>
             <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2">
-              <label className="flex min-w-0 flex-col gap-1.5 text-sm text-muted">From<input type="date" className={FIELD} value={rangeStart} onChange={(event) => update({ rangeStart: event.target.value })} /></label>
-              <label className="flex min-w-0 flex-col gap-1.5 text-sm text-muted">Through<input type="date" className={FIELD} value={rangeEnd} onChange={(event) => update({ rangeEnd: event.target.value })} /></label>
+              <label className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-ink">From
+                <input type="date" className={FIELD} value={rangeStart} onChange={(event) => update({ rangeStart: event.target.value })} />
+              </label>
+              <label className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-ink">Through
+                <input type="date" className={FIELD} value={rangeEnd} onChange={(event) => update({ rangeEnd: event.target.value })} />
+              </label>
             </div>
-            <p className="mt-2 text-xs text-muted">Choose any dates, up to two years. Your preview updates as you edit.</p>
-          </details>
+            <p className="mt-2 text-xs text-muted">Choose any dates, up to two years. No extra steps or submission.</p>
+          </fieldset>
           </div>
           {!validRange && <p role="alert" className="text-sm text-accent-ink">Choose valid start and end dates, with the end after the start and no more than two years apart.</p>}
           <div className="hidden lg:block"><Button href={href}>See the full plan →</Button></div>

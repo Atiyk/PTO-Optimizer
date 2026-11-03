@@ -76,6 +76,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
 
   return (
     <header className="border-b border-line bg-page">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:inline-flex focus:min-h-11 focus:items-center focus:rounded-lg focus:border focus:border-line-strong focus:bg-surface focus:px-4 focus:text-sm focus:font-semibold focus:text-ink focus:shadow-lg">Skip to main content</a>
       <Container className="flex h-16 items-center gap-4 px-4">
         <a href="/" aria-label={`${PRODUCT_NAME}, home`} className="-ml-1 inline-flex min-h-11 items-center rounded-md px-1 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" aria-current={active === 'landing' ? 'page' : undefined}>
           <Logo />

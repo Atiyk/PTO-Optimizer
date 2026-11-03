@@ -12,3 +12,8 @@ This *initial batch* updates the current UX main without duplicating already-mer
 **Outstanding on this draft:** inspect production-quality 1440/768/375/320 before/after screenshots, tab/focus, mobile touch, performance/Lighthouse/axe, unrelated route and country regressions, independent critic, and fix all observed bugs on the final head. Continue refining this **same UI PR** in coherent batches; do not create small separate UI release PRs and do not merge feature PR #111 first. Keep B2B `apps/teams` and `packages/engine` untouched.
 
 This document is a draft scope ledger, **not** a passed test report or approval.
+
+
+## UI-first batch B — visible date inputs and universal keyboard navigation
+
+The homepage's planning dates are now exposed in a labelled fieldset, not hidden behind another details dropdown. Both date fields remain controlled by the same validated canonical landing state; the budget slider and number field continue to share one value and URL. On every consumer route (including glossary fallback pages), `main#main-content` has focusable `tabIndex=-1`; `SiteHeader` adds a visually-hidden-until-focus **Skip to main content** control before the logo/nav. The consumer browser script tests at 1440/768/375/320: direct date field visibility, keyboard slider changes/URL parity, Value/Act headings, skip link and main target, with an additional post-interaction screenshot. These are staged changes; a passing run on the future final exact head and independent critic are still required. No new feature logic, local storage, backend or B2B changes.

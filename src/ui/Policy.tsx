@@ -247,7 +247,7 @@ export function Policy() {
   return (
     <div className="min-h-screen bg-page">
       <SiteHeader active="policy" />
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <Container className="px-4 py-10">
           <h1 className="text-3xl font-bold text-slate-900">Your PTO balance and policy</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">

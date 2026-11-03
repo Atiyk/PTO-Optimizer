@@ -49,7 +49,7 @@ export function GlossaryTermPage({ termId }: { termId: string }) {
     return (
       <div className="min-h-screen bg-page">
         <SiteHeader active="glossary" />
-        <main>
+        <main id="main-content" tabIndex={-1}>
           <Container className="px-4 py-10">
             <h1 className="text-2xl font-bold text-slate-900">Term not found</h1>
             <p className="mt-2 text-sm text-slate-600">
@@ -70,7 +70,7 @@ export function GlossaryTermPage({ termId }: { termId: string }) {
   return (
     <div className="min-h-screen bg-page">
       <SiteHeader active="glossary" />
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <Container className="max-w-2xl px-4 py-10">
           <a href="/glossary" className="text-sm text-slate-500 hover:underline">
             ← Glossary

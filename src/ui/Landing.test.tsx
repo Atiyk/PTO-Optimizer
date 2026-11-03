@@ -88,6 +88,16 @@ describe('live homepage planner', () => {
     expect(screen.getByLabelText('Country')).toBeTruthy();
   });
 
+  it('keeps planning dates visible and accessible without a hidden disclosure', async () => {
+    await act(async () => { render(<Landing />); });
+    expect(screen.getByRole('group', { name: 'Planning dates' })).toBeTruthy();
+    expect(screen.getByLabelText('From').closest('details')).toBeNull();
+    expect(screen.getByLabelText('Through').closest('details')).toBeNull();
+    expect(document.getElementById('main-content')?.tagName).toBe('MAIN');
+    await act(async () => { fireEvent.change(screen.getByLabelText('Through'), { target: { value: '2027-10-31' } }); });
+    expect(new URLSearchParams(window.location.search).get('e')).toBe('2027-10-31');
+  });
+
   it('restores all new homepage inputs and keeps forecasting and policy entry points', async () => {
     window.history.replaceState(null, '', '/?home=1&c=GB&b=7&s=2027-01-01&e=2027-08-01');
     await act(async () => { render(<Landing />); });

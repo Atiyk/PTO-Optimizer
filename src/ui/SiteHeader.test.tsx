@@ -31,6 +31,14 @@ describe('SiteHeader (redesign Phase 1)', () => {
     expect(html).not.toContain('>Sabbatical Planning<');
   });
 
+  it('provides an accessible skip-to-main link before the navigation', () => {
+    const html = renderToStaticMarkup(<SiteHeader active="pto" />);
+    expect(html).toContain('href="#main-content"');
+    expect(html).toContain('Skip to main content');
+    expect(html).toContain('focus:not-sr-only');
+    expect(html.indexOf('Skip to main content')).toBeLessThan(html.indexOf('aria-label="Plan"'));
+  });
+
   it('the primary action is a link into the tool, not a submit', () => {
     expect(html).toMatch(/<a href="\/pto"[^>]*>Plan my time off<\/a>/);
     expect(html).not.toMatch(/type="submit"/);
