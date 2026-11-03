@@ -13,9 +13,9 @@ const PUBLIC_UI: Record<string, string> = import.meta.glob(
     './Logo.tsx',
     './App.tsx',
     './Glossary.tsx',
-    '../public/privacy.html',
-    '../public/terms.html',
-    '../public/404.html',
+    '../../public/privacy.html',
+    '../../public/terms.html',
+    '../../public/404.html',
   ],
   { query: '?raw', import: 'default', eager: true },
 );
@@ -23,8 +23,8 @@ const PUBLIC_UI: Record<string, string> = import.meta.glob(
 describe('Consumer anti-pattern source checks', () => {
   it('scans the real consumer screens and legal pages', () => {
     expect(Object.keys(PUBLIC_UI).length).toBe(10);
-    expect(PUBLIC_UI['../public/privacy.html']).toContain('Privacy at Gapless');
-    expect(PUBLIC_UI['../public/terms.html']).toContain('<h1>Terms of use</h1>');
+    expect(PUBLIC_UI['../../public/privacy.html']).toContain('Privacy at Gapless');
+    expect(PUBLIC_UI['../../public/terms.html']).toContain('<h1>Terms of use</h1>');
   });
 
   it('does not introduce gradient orbs, dot grids, neon colors or decorative looping animation', () => {
@@ -48,6 +48,6 @@ describe('Consumer anti-pattern source checks', () => {
     expect(PUBLIC_UI['./Landing.tsx']).toContain('type="date"');
     expect(PUBLIC_UI['./Footer.tsx']).toContain('href="/privacy.html"');
     expect(PUBLIC_UI['./Footer.tsx']).toContain('href="/terms.html"');
-    expect(PUBLIC_UI['../public/terms.html']).toContain('href="/privacy.html"');
+    expect(PUBLIC_UI['../../public/terms.html']).toContain('href="/privacy.html"');
   });
 });
