@@ -1,7 +1,9 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { validateCurrentCarriedBalance, type TimeOffPolicy } from '../policy/model';
 import { forecastWithRequests } from '../personal/forecast';
+import { explainConnectedPolicy } from '../personal/policyExplanation';
 import type { PtoRequest } from '../personal/requestLedger';
+import { forecastPresets } from './forecastPresets';
 
 export interface QuickForecastProps {
   policy: TimeOffPolicy;
@@ -15,10 +17,13 @@ const number = (value: number) => new Intl.NumberFormat('en', { maximumFractionD
 
 export function QuickForecast({ policy, requests = [], forecastDate, onForecastDateChange, onForecastUsed }: QuickForecastProps) {
   const dateId = useId();
+  const [showExplanation, setShowExplanation] = useState(false);
   const forecast = forecastWithRequests(policy, forecastDate, requests);
   const unit = policy.unit;
   const confirmed = forecast?.confirmed;
   const tentative = forecast?.tentative;
+  // The optional explanation runs only when requested; the default live forecast stays fast.
+  const explanation = showExplanation && forecast ? explainConnectedPolicy(policy, forecastDate, requests) : null;
   return (
     <section aria-labelledby={`${dateId}-heading`} className="min-w-0 rounded-2xl border border-line bg-surface p-5 sm:p-6">
       <h2 id={`${dateId}-heading`} className="text-xl font-semibold text-ink">PTO balance forecast</h2>
@@ -29,6 +34,20 @@ export function QuickForecast({ policy, requests = [], forecastDate, onForecastD
         className="mt-2 h-11 w-full min-w-0 rounded-lg border border-line-strong bg-surface px-3 text-ink sm:w-auto"
         onChange={(event) => { onForecastDateChange(event.target.value); onForecastUsed?.(); }}
       />
+      <div role="group" aria-label="Quick forecast dates" className="mt-3 flex flex-wrap gap-2">
+        {forecastPresets(policy.balanceAsOf).map((preset) => (
+          <button
+            key={preset.key}
+            type="button"
+            aria-pressed={forecastDate === preset.date}
+            className="min-h-11 rounded-lg border border-line-strong bg-surface px-3 text-sm font-medium text-ink transition-colors hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink aria-pressed:border-ink aria-pressed:bg-surface-alt"
+            onClick={() => { onForecastDateChange(preset.date); onForecastUsed?.(); }}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-muted">Shortcuts count from your balance as-of date ({policy.balanceAsOf}); choose any date above instead.</p>
       {!forecast ? (
         <p role="status" className="mt-4 text-sm text-muted">{validateCurrentCarriedBalance(policy) ?? 'Enter a valid date on or after your balance as-of date, within ten years, and valid policy amounts.'}</p>
       ) : policy.accrual.kind === 'unlimited' ? (
@@ -55,6 +74,39 @@ export function QuickForecast({ policy, requests = [], forecastDate, onForecastD
           {forecast.conflicts.length > 0 && <p className="mt-4 text-sm text-muted">Some tracked requests overlap. Each PTO date is deducted only once.</p>}
         </>
       ) : null}
+      {forecast && (
+        <div className="mt-6 border-t border-line pt-5">
+          <button
+            type="button"
+            aria-expanded={showExplanation}
+            aria-controls={`${dateId}-policy-explanation`}
+            className="min-h-11 rounded-lg border border-line-strong px-4 text-sm font-semibold text-ink hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+            onClick={() => setShowExplanation((open) => !open)}
+          >
+            {showExplanation ? 'Hide policy explanation' : 'Explain this forecast using my policy'}
+          </button>
+          {showExplanation && (
+            <div id={`${dateId}-policy-explanation`} className="mt-4 space-y-3">
+              <p className="text-sm text-muted">These are explanations of the policy you entered, calculated using the same forecast as your balance. They are not a legal determination or an employer-policy verification.</p>
+              {explanation ? (
+                <div className="space-y-2">
+                  {explanation.rules.map((rule) => (
+                    <details key={rule.id} className="rounded-lg border border-line bg-surface-alt p-3">
+                      <summary className="cursor-pointer text-sm font-semibold text-ink">{rule.title}</summary>
+                      <p className="mt-2 text-sm text-ink">{rule.explanation}</p>
+                      <p className="mt-2 text-sm text-muted">{rule.example}</p>
+                      <p className="mt-2 text-xs text-muted"><strong>Ask HR:</strong> {rule.hrQuestion}</p>
+                    </details>
+                  ))}
+                  <a className="inline-flex min-h-11 items-center text-sm font-semibold text-accent-ink underline underline-offset-4" href="/glossary">Learn how PTO policies work</a>
+                </div>
+              ) : (
+                <p role="status" className="text-sm text-muted">These policy assumptions could not be explained for the selected date.</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }
