@@ -14,7 +14,7 @@ export interface ColorTokens {
   focusRing: string;
 }
 
-// Values live in index.css (redesign Phase 1: burnt-orange accent, orange-100 band wash).
+// Values live in index.css (calm premium design: deep teal accent, sage-tinted days-off band).
 // Every pair is verified against the real stylesheet in tokens.test.ts / colorScheme.test.ts.
 /**
  * THE primary-action treatment - the accent's second of its three reserved uses (suggested

@@ -67,6 +67,18 @@ describe('live homepage planner', () => {
     expect(document.querySelector('button[type="submit"]')).toBeNull();
   });
 
+  it('shows a directly visible, keyboard-friendly PTO slider that stays synchronized with the number field', async () => {
+    await act(async () => { render(<Landing />); });
+    const slider = screen.getByRole('slider', { name: 'Adjust PTO days available' });
+    expect(slider.getAttribute('aria-valuetext')).toBe('15 PTO days available');
+    await act(async () => { fireEvent.change(slider, { target: { value: '7' } }); });
+    expect((screen.getByRole('spinbutton', { name: 'PTO days available' }) as HTMLInputElement).value).toBe('7');
+    expect(slider.getAttribute('aria-valuetext')).toBe('7 PTO days available');
+    expect(new URLSearchParams(window.location.search).get('b')).toBe('7');
+    expect(screen.getByRole('heading', { name: 'Make your PTO worth more time away.' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Take the next step with your plan.' })).toBeTruthy();
+  });
+
   it('shows explicit empty and invalid-date states while preserving the basic controls', async () => {
     await act(async () => { render(<Landing />); });
     await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '0' } }); });

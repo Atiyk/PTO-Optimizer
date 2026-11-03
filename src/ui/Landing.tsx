@@ -135,6 +135,21 @@ export function Landing() {
             <label htmlFor="landing-budget" className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-muted">PTO days available
               <input id="landing-budget" type="number" inputMode="numeric" min={0} max={60} step={1} className={`${FIELD} font-semibold tabular-nums`} value={budget} onChange={(event) => update({ budget: Math.max(0, Math.min(60, Math.round(Number(event.target.value) || 0))) })} />
             </label>
+            <div className="col-span-2 rounded-xl border border-line bg-surface p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="landing-budget-slider" className="text-sm font-semibold text-ink">Adjust PTO days</label>
+                <span className="text-sm font-semibold tabular-nums text-accent-ink" aria-hidden="true">{budget} / 60</span>
+              </div>
+              <input
+                id="landing-budget-slider"
+                type="range" min={0} max={60} step={1} value={budget}
+                aria-label="Adjust PTO days available"
+                aria-valuetext={`${budget} PTO ${budget === 1 ? 'day' : 'days'} available`}
+                className="mt-3 h-11 w-full cursor-pointer accent-[var(--accent)]"
+                onChange={(event) => update({ budget: Number(event.target.value) })}
+              />
+              <p className="text-xs leading-5 text-muted">Drag or use the arrow keys to see your recommended break change live.</p>
+            </div>
           </div>
           <details className="rounded-lg border border-line bg-surface/60 px-4 py-3">
             <summary className="cursor-pointer text-sm font-medium text-ink">Planning dates · {validRange ? `${formatShort(rangeStart)}–${formatShort(rangeEnd)}` : 'Choose a valid range'}</summary>
@@ -151,8 +166,15 @@ export function Landing() {
         <div className="lg:hidden"><Button href={href} className="w-full sm:w-auto">See the full plan →</Button></div>
       </section>
 
-      <section aria-labelledby="landing-capabilities">
-        <h2 id="landing-capabilities" className="mb-5 text-h2 font-semibold text-ink">A little more control over your time.</h2>
+      <section aria-label="Your PTO value and next steps" className="space-y-6">
+        <div aria-labelledby="landing-value">
+          <p className="text-xs font-semibold uppercase tracking-widest text-accent-ink">Value</p>
+          <h2 id="landing-value" className="mt-2 text-h2 font-semibold text-ink">Make your PTO worth more time away.</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">Your preview above connects the days you have with the holidays ahead. Change the inputs and see the effect immediately—no signup or guessing.</p>
+        </div>
+        <div aria-labelledby="landing-capabilities" className="border-t border-line pt-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-accent-ink">Act</p>
+          <h2 id="landing-capabilities" className="mb-5 mt-2 text-h2 font-semibold text-ink">Take the next step with your plan.</h2>
         <div className="grid gap-4 md:grid-cols-3">
           {[
             { title: 'Plan PTO', text: 'Find longer vacations and useful long weekends, around the dates that work for you.', href, action: 'Explore my plan' },
@@ -161,6 +183,7 @@ export function Landing() {
           ].map((entry) => <Card key={entry.title} as="article" className="flex flex-col"><h3 className="text-lg font-semibold text-ink">{entry.title}</h3><p className="mt-2 flex-1 text-sm leading-relaxed text-muted">{entry.text}</p><a className="mt-4 inline-block min-h-11 py-2.5 text-sm font-semibold text-accent-ink underline underline-offset-4" href={entry.href}>{entry.action} →</a></Card>)}
         </div>
         <p className="mt-4 text-sm text-muted">Planning something bigger? <a href="/sabbatical" className="font-medium text-accent-ink underline underline-offset-4">Explore sabbatical planning.</a></p>
+        </div>
       </section>
 
       <section aria-labelledby="landing-holidays">
