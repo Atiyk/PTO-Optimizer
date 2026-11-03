@@ -11,8 +11,8 @@ describe('SiteHeader (redesign Phase 1)', () => {
 
   it('uses one strong Gapless wordmark with an accessible full product name', () => {
     expect(html).not.toContain('aria-label="Gapless PTO Optimizer, home"');
-    expect(html).toContain('>Gapless<');
-    expect(html).toContain('>PTO Optimizer<');
+    expect(html).toMatch(/>Gapless\s*<\/span>/);
+    expect(html).toMatch(/>PTO Optimizer\s*<\/span>/);
   });
 
   it('derives the home link name from visible brand text and an unobtrusive home cue', () => {
@@ -35,7 +35,7 @@ describe('SiteHeader (redesign Phase 1)', () => {
     }
     expect(html).toContain('aria-label="Explore"');
     expect(html).not.toContain('aria-label="Understand"');
-    expect(html).toContain('>PTO Optimizer<');
+    expect(html).toMatch(/>PTO Optimizer\s*<\/span>/);
     expect(html).not.toContain('>Sabbatical Planning<');
   });
 
