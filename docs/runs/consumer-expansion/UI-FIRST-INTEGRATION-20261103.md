@@ -25,3 +25,8 @@ The homepage's planning dates are now exposed in a labelled fieldset, not hidden
 **Targeted fix staged:** dedicated `.landing-input-pair` class and scoped <=639px one-column CSS with precedence, explicit country/budget accessible names, render unit regression and *computed* Playwright grid-column + control-width and country-combobox accessible-name checks at 320 and 375. The canonical country value, PTO budget, URL and shared solver remain unchanged. Do not weaken assertions. Re-run all checks on the exact new commit; independent critic must review the new screenshots and report PASS only if confirmed.
 
 Current release scope remains the one consolidated Consumer UI PR; feature PRs, B2B and shared engine untouched. No merge/production release with a red responsive job.
+
+
+## 2026-11-03 — WCAG 2.5.3 visible-name review remediation (staged)
+
+Independent CI Lighthouse artifact for UI PR head `8ca76cfbea60bfbdab7d12c3033b480b11608608` recorded repeated `label-content-name-mismatch` on the home brand link even when overall accessibility category displayed 100. See source-backed [review 5757868326](https://github.com/Atiyk/PTO-Optimizer/pull/112). The fix removes the overriding `aria-label` from the React wordmark link so its accessible name includes its own visible text, adds a screenreader-only "home" suffix, removes redundant labels from static privacy/terms header brand links, and adds a **blocking Lighthouse WCAG 2.5.3 rule** rather than relying on rounded category scores. Header SSR/browser checks must revalidate the real computed name and keyboard navigation. This is code staged for new exact-head CI and independent critic review, not QA sign-off; do not merge/deploy until those pass.

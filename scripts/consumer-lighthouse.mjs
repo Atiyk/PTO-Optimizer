@@ -171,6 +171,12 @@ try {
     if (values['baseline-url'] && !before) failures.push('Baseline measurements unavailable; performance regression cannot be assessed.');
     if (after?.accessibility < 95) failures.push('Candidate accessibility is below 95.');
     if (after?.seo < 100) failures.push('Candidate SEO is below 100.');
+    // Lighthouse's category score can round to 100 while an individual WCAG
+    // 2.5.3 visible-label/accessibility-name audit still fails.
+    if (records.some((record) => record.variant === 'after'
+      && record.failingAudits?.some((audit) => audit.id === 'label-content-name-mismatch'))) {
+      failures.push('Candidate failed WCAG 2.5.3 label-content-name-mismatch; accessible names must include visible labels.');
+    }
     const performanceDelta = before && after ? after.performance - before.performance : null;
     if (performanceDelta !== null && performanceDelta < -3) failures.push('Mobile performance regressed by more than 3 points.');
     const axe = summary.axe.filter((record) => record.route === route.name && record.variant === 'after');

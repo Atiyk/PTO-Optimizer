@@ -38,6 +38,12 @@ try {
       await page.evaluate(() => document.fonts.ready);
       const logo = page.getByRole('link', { name: /home/i }).first();
       if (!(await logo.isVisible())) throw new Error('Logo/home link not visible');
+      if (await logo.getAttribute('aria-label') !== null) {
+        throw new Error('Home brand link must derive its accessible name from visible text rather than an overriding aria-label');
+      }
+      const labelledHome = page.getByRole('link', { name: /Gapless\s+PTO Optimizer\s+home/i });
+      if (await labelledHome.count() !== 1) throw new Error('Visible wordmark and home accessible name mismatch');
+      entry.checks.push('Home accessible name includes visible Gapless PTO Optimizer wordmark');
       const target = width >= 1024
         ? page.getByRole('link', { name: 'Plan PTO' }).first()
         : page.getByRole('button', { name: 'Menu' });

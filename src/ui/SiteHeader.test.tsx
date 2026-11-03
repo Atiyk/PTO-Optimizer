@@ -3,7 +3,6 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { render, fireEvent, cleanup } from '@testing-library/react';
 import { SiteHeader } from './SiteHeader';
 import { Footer } from './Footer';
-import { PRODUCT_NAME } from '../brand';
 
 afterEach(cleanup);
 
@@ -11,9 +10,17 @@ describe('SiteHeader (redesign Phase 1)', () => {
   const html = renderToStaticMarkup(<SiteHeader active="pto" />);
 
   it('uses one strong Gapless wordmark with an accessible full product name', () => {
-    expect(html).toContain(PRODUCT_NAME);
+    expect(html).not.toContain('aria-label="Gapless PTO Optimizer, home"');
     expect(html).toContain('>Gapless<');
     expect(html).toContain('>PTO Optimizer<');
+  });
+
+  it('derives the home link name from visible brand text and an unobtrusive home cue', () => {
+    const { getByRole } = render(<SiteHeader active="pto" />);
+    const home = getByRole('link', { name: /Gapless\s+PTO Optimizer\s+home/i });
+    expect(home.getAttribute('href')).toBe('/');
+    expect(home.hasAttribute('aria-label')).toBe(false);
+    expect(home.querySelector('.sr-only')?.textContent?.trim()).toBe('home');
   });
 
   it('uses three flat destinations and one primary PTO action without nested categories', () => {
