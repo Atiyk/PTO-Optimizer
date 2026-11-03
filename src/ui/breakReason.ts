@@ -22,7 +22,7 @@ export function breakReason(brk: Break, holidayNameFor: (iso: string) => string 
   // styling - a 1.0x-or-worse swap gets the honest "no extra days off" explanation instead
   // of a reason that would read as a sales pitch for a break that isn't actually a bargain.
   if (brk.multiplier <= 1) {
-    if (brk.tags.includes('Low travel demand')) return 'No extra days off — chosen for low travel demand.';
+    if (brk.tags.includes('Low travel demand')) return `No extra days off — ${swap}; lower travel demand is tagged for these dates.`;
     return `No extra days off — ${swap}.`;
   }
 
