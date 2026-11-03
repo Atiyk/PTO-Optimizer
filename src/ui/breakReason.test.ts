@@ -68,6 +68,21 @@ describe('breakReason', () => {
     );
   });
 
+  it('qualifies estimated demand even for low-value recommendations', () => {
+    for (const demandTag of ['Low travel demand', 'Peak travel']) {
+      const lowValue: Break = {
+        ...BASE,
+        multiplier: 1,
+        ptoCost: 1,
+        totalDaysOff: 1,
+        tags: [demandTag, 'Estimated'],
+      };
+      const explanation = breakReason(lowValue, noHoliday);
+      expect(explanation).toBe('No extra days off — 1 PTO day for 1 day off; travel demand here is an estimate for this country.');
+      expect(explanation).not.toMatch(/lower travel demand is tagged|quiet travel week|busier travel week/i);
+    }
+  });
+
   it('does not invent an optimization motive when a low-value break has no travel tag', () => {
     const lowValue: Break = { ...BASE, multiplier: 0.5, ptoCost: 2, totalDaysOff: 1, tags: [] };
     const explanation = breakReason(lowValue, noHoliday);
