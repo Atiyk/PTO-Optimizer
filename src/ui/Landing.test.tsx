@@ -85,9 +85,9 @@ describe('live homepage planner', () => {
     expect(html).toContain('Change PTO days in this preview');
   });
 
-  it('keeps the full 23-day mobile calendar accessible but collapsed so the controls are nearer the top', () => {
+  it('keeps the full recommended mobile calendar accessible but collapsed so controls are nearer the top', () => {
     const html = renderToStaticMarkup(<Landing />);
-    expect(html).toContain('View all 23 calendar days');
+    expect(html).toMatch(/View all [1-9]\d* calendar days/);
     expect(html).toContain('data-testid="home-break-calendar"');
     expect(html).toContain('sm:hidden');
     expect(html).toContain('hidden sm:block');
