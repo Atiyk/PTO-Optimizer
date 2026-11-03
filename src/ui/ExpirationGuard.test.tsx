@@ -51,8 +51,10 @@ describe('expiration guard interactions', () => {
     expect(screen.getByText('2027-01-01')).toBeTruthy();
     expect(screen.getByText('Estimated carryover')).toBeTruthy();
     expect(screen.getByText('Potentially forfeited at reset')).toBeTruthy();
-    expect(screen.getByText('7 days')).toBeTruthy();
-    expect(screen.getByText('5 days')).toBeTruthy();
+    // Both the carried amount and after-reset balance may correctly equal five.
+    // Tie the assertions to their labels rather than assuming display values are unique.
+    expect(screen.getByText('Potentially forfeited at reset').nextElementSibling?.textContent).toBe('7 days');
+    expect(screen.getByText('Estimated carryover').nextElementSibling?.textContent).toBe('5 days');
     fireEvent.click(screen.getByRole('button', { name: 'Hide next policy reset' }));
     expect(screen.queryByText('Potentially forfeited at reset')).toBeNull();
   });
@@ -60,7 +62,7 @@ describe('expiration guard interactions', () => {
     const view = render(<ExpirationGuard policy={{ ...policy, carryover: { mode: 'all' } }} country="US" today="2026-11-02" />);
     fireEvent.click(screen.getByRole('button', { name: 'Review next policy reset' }));
     expect(screen.getByText('Potentially forfeited at reset')).toBeTruthy();
-    expect(screen.getByText('0 days')).toBeTruthy();
+    expect(screen.getByText('Potentially forfeited at reset').nextElementSibling?.textContent).toBe('0 days');
     view.rerender(<ExpirationGuard policy={{ ...policy, accrual: { kind: 'unlimited', expectedDaysPerYear: 20 } }} country="US" today="2026-11-02" />);
     expect(screen.getByText(/Unlimited PTO has no banked carryover/)).toBeTruthy();
   });
