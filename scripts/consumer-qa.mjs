@@ -182,6 +182,9 @@ try {
           if (width <= 375) {
             const countryBox = await page.locator('#landing-country').boundingBox();
             result.homeCountryNotCramped = (countryBox?.width ?? 0) >= width - 66;
+            const gridColumns = await page.locator('.landing-input-pair').evaluate(element => getComputedStyle(element).gridTemplateColumns);
+            result.homeCountryGridSingleColumn = gridColumns.trim().split(/\s+/).length === 1;
+            result.homeCountryAccessibleName = await page.getByRole('combobox', { name: 'Country', exact: true }).count() === 1;
           }
           if (width < 640) {
             const adjust = page.getByRole('link', { name: 'Change PTO days in this preview' });
@@ -285,7 +288,7 @@ try {
           || result.homeResultBeforeControls === false || result.homeReadingOrder === false
           || result.homeCompactCalendarCollapsed === false || result.homeCompactCalendarExpandable === false
           || result.homeMobileAdjustLink === false || result.homeMobileAdjustJump === false
-          || result.homeCountryNotCramped === false
+          || result.homeCountryNotCramped === false || result.homeCountryGridSingleColumn === false || result.homeCountryAccessibleName === false
           || result.homeSliderVisible === false || result.homeDatesDirectlyVisible === false
           || result.homeSliderKeyboardAndNumberSync === false || result.homeSliderURLParity === false
           || result.homeMainValueAndActVisible === false || result.mainLandmarkTargeted === false

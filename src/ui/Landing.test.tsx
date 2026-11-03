@@ -107,9 +107,11 @@ describe('live homepage planner', () => {
     expect(screen.getByText(/Preview: November 2, 2026 – November 1, 2027\./)).toBeTruthy();
   });
 
-  it('stacks the country and budget fields on narrow screens to avoid clipped country names', () => {
+  it('stacks country and PTO fields at phone widths and provides clear accessible names', () => {
     const html = renderToStaticMarkup(<Landing />);
-    expect(html).toContain('grid-cols-1 gap-3 sm:grid-cols-2');
+    expect(html).toContain('landing-input-pair grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2');
+    expect(html).toContain('id="landing-country" aria-label="Country"');
+    expect(html).toContain('id="landing-budget" aria-label="PTO days available"');
   });
 
   it('keeps planning dates visible and accessible without a hidden disclosure', async () => {

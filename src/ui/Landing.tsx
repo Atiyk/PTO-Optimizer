@@ -142,12 +142,12 @@ export function Landing() {
             <p className="mt-1 text-sm text-muted">Change your PTO days, country or dates. Your recommendation updates automatically.</p>
           </div>
           <div className="grid min-w-0 gap-4 lg:grid-cols-2 lg:items-start">
-            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="landing-input-pair grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
             <label htmlFor="landing-country" className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-muted">Country
-              <select id="landing-country" className={FIELD} value={country} onChange={(event) => update({ country: event.target.value })}>{COUNTRIES.map((entry) => <option key={entry.code} value={entry.code}>{entry.name}</option>)}</select>
+              <select id="landing-country" aria-label="Country" className={FIELD} value={country} onChange={(event) => update({ country: event.target.value })}>{COUNTRIES.map((entry) => <option key={entry.code} value={entry.code}>{entry.name}</option>)}</select>
             </label>
             <label htmlFor="landing-budget" className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-muted">PTO days available
-              <input id="landing-budget" type="number" inputMode="numeric" min={0} max={60} step={1} className={`${FIELD} font-semibold tabular-nums`} value={budget} onChange={(event) => update({ budget: Math.max(0, Math.min(60, Math.round(Number(event.target.value) || 0))) })} />
+              <input id="landing-budget" aria-label="PTO days available" type="number" inputMode="numeric" min={0} max={60} step={1} className={`${FIELD} font-semibold tabular-nums`} value={budget} onChange={(event) => update({ budget: Math.max(0, Math.min(60, Math.round(Number(event.target.value) || 0))) })} />
             </label>
             <div className="col-span-2 rounded-xl border border-line bg-surface p-3 sm:p-4">
               <div className="flex items-center justify-between gap-3">
