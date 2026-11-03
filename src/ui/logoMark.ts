@@ -9,7 +9,7 @@
  */
 export const LOGO_COLORS = {
   ink: '#1c1917',
-  accent: '#c2410c',
+  accent: '#17675d',
   paper: '#ffffff',
   page: '#fbf8f3',
 } as const;

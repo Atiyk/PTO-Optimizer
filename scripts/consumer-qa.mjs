@@ -179,6 +179,10 @@ try {
           const from = page.getByLabel('From', { exact: true });
           const through = page.getByLabel('Through', { exact: true });
           result.homeSliderVisible = await slider.isVisible() && (sliderBox?.height ?? 0) >= 44;
+          if (width <= 375) {
+            const countryBox = await page.getByLabel('Country', { exact: true }).boundingBox();
+            result.homeCountryNotCramped = (countryBox?.width ?? 0) >= width - 66;
+          }
           if (width < 640) {
             const adjust = page.getByRole('link', { name: 'Change PTO days in this preview' });
             result.homeMobileAdjustLink = await adjust.isVisible();
@@ -281,6 +285,7 @@ try {
           || result.homeResultBeforeControls === false || result.homeReadingOrder === false
           || result.homeCompactCalendarCollapsed === false || result.homeCompactCalendarExpandable === false
           || result.homeMobileAdjustLink === false || result.homeMobileAdjustJump === false
+          || result.homeCountryNotCramped === false
           || result.homeSliderVisible === false || result.homeDatesDirectlyVisible === false
           || result.homeSliderKeyboardAndNumberSync === false || result.homeSliderURLParity === false
           || result.homeMainValueAndActVisible === false || result.mainLandmarkTargeted === false

@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { FORMER_NAME, PRODUCT_NAME, PRODUCT_SHORT_NAME } from './brand';
+import { PRODUCT_NAME, PRODUCT_SHORT_NAME } from './brand';
 
-// Redesign Phase 0: the product was renamed. Its former name may appear only in a
-// "formerly Days Off" mention (and via FORMER_NAME in the one FAQ entry about the rename);
-// everything else that names the product reads src/brand.ts. This scans the sources that
-// produce user-facing output - the per-route HTML shells, public/, src/, the build scripts -
-// so a stray literal is caught before the build. (The gate also greps dist/ after the build.)
-// import.meta.glob (not node:fs) so the file type-checks under the browser tsconfig.
+// Scan consumer-facing sources for references to legacy branding. Plain descriptive text
+// such as lowercase 'days off' is not a brand mention. Internal package names remain intact.
+// import.meta.glob avoids Node-only filesystem imports in the browser tsconfig.
 const SOURCES: Record<string, string> = import.meta.glob(
   [
     '../index.html',
@@ -34,17 +31,27 @@ describe('brand', () => {
   it('defines the product name and its short form', () => {
     expect(PRODUCT_NAME).toBe('Gapless PTO Optimizer');
     expect(PRODUCT_SHORT_NAME).toBe('Gapless PTO');
-    expect(FORMER_NAME).toBe('Days Off');
   });
 
-  it('never names the product by its former name outside a "formerly" mention', () => {
+  it('does not display the legacy product name anywhere in consumer sources', () => {
     const offenders: string[] = [];
     for (const [file, text] of Object.entries(SOURCES)) {
-      for (const m of text.matchAll(/(formerly )?Days Off\b/g)) {
-        if (!m[1]) offenders.push(`${file}: …${text.slice(Math.max(0, m.index - 30), m.index + 20)}…`);
+      for (const m of text.matchAll(/Days Off\b/g)) {
+        offenders.push(`${file}: …${text.slice(Math.max(0, m.index - 30), m.index + 20)}…`);
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it('publishes an accessible privacy page and a real email support action', () => {
+    const privacy = SOURCES['../public/privacy.html'];
+    expect(privacy).toContain('Privacy at Gapless');
+    expect(privacy).toContain('What stays in your browser');
+    expect(privacy).toContain('What happens when you share a plan');
+    expect(privacy).toContain('Vercel Web Analytics');
+    expect(privacy).toContain('Plausible');
+    expect(privacy).toContain('mailto:atiykahmeed6310@gmail.com?subject=Gapless%20feedback');
+    expect(privacy).toContain('id="main-content"');
   });
 
   it('has no link or mention of the separate teams product', () => {

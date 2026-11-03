@@ -11,5 +11,3 @@ export const PRODUCT_NAME = 'Gapless PTO Optimizer';
 /** For tight spaces: the header wordmark under 400px, the PWA icon label. */
 export const PRODUCT_SHORT_NAME = 'Gapless PTO';
 export const TAGLINE = 'Your year, planned around the time that’s yours.';
-/** The name this product shipped under before the rename - only for "formerly" mentions. */
-export const FORMER_NAME = 'Days Off';

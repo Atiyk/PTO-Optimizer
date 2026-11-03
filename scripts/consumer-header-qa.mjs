@@ -70,12 +70,16 @@ try {
         await menu.click();
         if ((await menu.getAttribute('aria-expanded')) !== 'true') throw new Error('Menu did not expand');
         const links = page.locator('header nav a:visible');
-        if ((await links.count()) !== 4) throw new Error('Mobile menu must show four nav links');
+        if ((await links.count()) !== 3) throw new Error('Mobile menu must have three secondary navigation links');
+        if (width < 640) {
+          const mobileAction = page.locator('header > div[id] a[href="/pto"]:visible');
+          if ((await mobileAction.count()) !== 1) throw new Error('Mobile primary PTO action not visible');
+        }
         for (const link of await links.all()) {
           const box = await link.boundingBox();
           if (!box || box.height < 44) throw new Error(`Mobile nav target below 44px: ${await link.textContent()}`);
         }
-        entry.checks.push('Menu and all four nav links meet 44px touch height');
+        entry.checks.push('Menu and three secondary links meet 44px touch height');
         await page.screenshot({ path: resolve(output, `header-menu-open-${width}.png`), fullPage: false });
         await page.keyboard.press('Escape');
         if ((await menu.getAttribute('aria-expanded')) !== 'false') throw new Error('Escape did not close Menu');

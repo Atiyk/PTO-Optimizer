@@ -4,7 +4,7 @@ import { COUNTRIES } from '@daysoff/engine/data/countries';
 import { getPreloadedHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { DEFAULT_WORK_WEEK, type Break } from '@daysoff/engine/solver/types';
-import { formatLong, formatShort } from '@daysoff/engine/calendar/dateFormat';
+import { formatLong } from '@daysoff/engine/calendar/dateFormat';
 import { weekdayName } from '@daysoff/engine/calendar/requestDeadline';
 import { SiteHeader } from './SiteHeader';
 import { Footer } from './Footer';
@@ -142,7 +142,7 @@ export function Landing() {
             <p className="mt-1 text-sm text-muted">Change your PTO days, country or dates. Your recommendation updates automatically.</p>
           </div>
           <div className="grid min-w-0 gap-4 lg:grid-cols-2 lg:items-start">
-            <div className="grid min-w-0 grid-cols-2 gap-3">
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
             <label htmlFor="landing-country" className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-muted">Country
               <select id="landing-country" className={FIELD} value={country} onChange={(event) => update({ country: event.target.value })}>{COUNTRIES.map((entry) => <option key={entry.code} value={entry.code}>{entry.name}</option>)}</select>
             </label>
@@ -167,7 +167,7 @@ export function Landing() {
           </div>
           <fieldset className="min-w-0 rounded-xl border border-line bg-surface p-3 sm:p-4">
             <legend className="px-1 text-sm font-semibold text-ink">Planning dates</legend>
-            <p className="mt-1 text-xs text-muted">{validRange ? `Preview: ${formatShort(rangeStart)}–${formatShort(rangeEnd)}.` : 'Choose a valid range.'} Edit either date to update your plan live.</p>
+            <p className="mt-1 text-xs text-muted">{validRange ? `Preview: ${formatLong(rangeStart)} – ${formatLong(rangeEnd)}.` : 'Choose a valid range.'} Edit either date to update your plan live.</p>
             <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2">
               <label className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-ink">From
                 <input type="date" className={FIELD} value={rangeStart} onChange={(event) => update({ rangeStart: event.target.value })} />

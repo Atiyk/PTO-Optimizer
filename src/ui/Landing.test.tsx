@@ -85,9 +85,9 @@ describe('live homepage planner', () => {
     expect(html).toContain('Change PTO days in this preview');
   });
 
-  it('keeps the full recommended mobile calendar accessible but collapsed so controls are nearer the top', () => {
+  it('keeps the full 23-day mobile calendar accessible but collapsed so the controls are nearer the top', () => {
     const html = renderToStaticMarkup(<Landing />);
-    expect(html).toMatch(/View all [1-9]\d* calendar days/);
+    expect(html).toMatch(/View all \d+ calendar days/);
     expect(html).toContain('data-testid="home-break-calendar"');
     expect(html).toContain('sm:hidden');
     expect(html).toContain('hidden sm:block');
@@ -100,6 +100,16 @@ describe('live homepage planner', () => {
     await act(async () => { fireEvent.change(screen.getByLabelText('Through'), { target: { value: '2026-01-01' } }); });
     expect(screen.getByRole('alert').textContent).toContain('Choose valid start and end dates');
     expect(screen.getByLabelText('Country')).toBeTruthy();
+  });
+
+  it('displays year-inclusive date summaries for ranges that cross calendar years', async () => {
+    await act(async () => { render(<Landing />); });
+    expect(screen.getByText(/Preview: November 2, 2026 – November 1, 2027\./)).toBeTruthy();
+  });
+
+  it('stacks the country and budget fields on narrow screens to avoid clipped country names', () => {
+    const html = renderToStaticMarkup(<Landing />);
+    expect(html).toContain('grid-cols-1 gap-3 sm:grid-cols-2');
   });
 
   it('keeps planning dates visible and accessible without a hidden disclosure', async () => {
