@@ -28,3 +28,8 @@ Last updated: 2026-11-02. Scope: consumer root Vite application only; never `app
 ## Known platform constraints
 
 This scheduled run can edit GitHub files through the connector, but this sandbox cannot clone GitHub over the network. Use GitHub Actions for full npm tests, production builds and real browser evidence. Never claim local execution or an unobserved reviewer approval. Keep draft PRs unmerged until quality gates pass. Work in focused feature branches; do not touch the B2B subtree.
+
+## 2026-11-02: FAQ keyboard disclosure polish (draft, unshipped)
+- Branch `gapless/ux-faq-keyboard-disclosure-20261102` (based on production main `3187596230768e4818720d1907475c9a3341a54c`): improve native FAQ disclosure affordances, focus visibility and 44px touch targets; wrap `/faq` anchor links at 320px.
+- Added FAQ-specific SSR regression tests and an isolated Chromium workflow for `/faq` and inline `/pto` FAQ at 1440/768/375/320, with real screenshots and keyboard/overflow checks. See `docs/runs/ux/FAQ-DISCLOSURE-20261102.md`.
+- **Not shipped**: exact-head GitHub checks, independent critic review and exact-head Vercel preview must all pass before normal merge. Existing UX drafts remain in the integration queue; expansion PRs remain held.
