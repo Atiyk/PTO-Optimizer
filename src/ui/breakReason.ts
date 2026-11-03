@@ -35,13 +35,15 @@ export function breakReason(brk: Break, holidayNameFor: (iso: string) => string 
   if (brk.tags.includes('Estimated')) {
     return `${swap} — travel demand here is an estimate for this country.`;
   }
-  if (brk.tags.includes('Low travel demand')) {
+  if (brk.tags.includes('Low travel demand') && Number.isFinite(brk.meanDemand) && brk.meanDemand >= 0 && brk.meanDemand < 1) {
     const pct = Math.round((1 - brk.meanDemand) * 100);
     return `Quiet travel week — about ${pct}% less demand than an average day.`;
   }
-  if (brk.tags.includes('Peak travel')) {
+  if (brk.tags.includes('Peak travel') && Number.isFinite(brk.meanDemand) && brk.meanDemand > 1) {
     const pct = Math.round((brk.meanDemand - 1) * 100);
     return `Busier travel week (about ${pct}% above average) — ${swap} regardless.`;
   }
+  // Invalid or contradictory demand metadata must not produce NaN%, negative percentages,
+  // or a claim about demand that the underlying numeric field does not support.
   return `Efficient swap — ${swap} (${brk.multiplier.toFixed(2)}x).`;
 }
