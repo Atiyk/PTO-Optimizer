@@ -92,12 +92,13 @@ describe('Footer (redesign Phase 1)', () => {
   const html = renderToStaticMarkup(<Footer />);
   it('has Product / Resources / About columns and the D2 tool names', () => {
     for (const h of ['Explore', 'Resources', 'Help &amp; privacy']) expect(html).toContain(`>${h}</h2>`);
-    for (const l of ['Plan PTO', 'Sabbatical', 'My PTO', 'Learn', 'FAQ', 'Privacy']) expect(html).toContain(`>${l}<`);
+    for (const l of ['Plan PTO', 'Sabbatical', 'My PTO', 'Learn', 'FAQ', 'Privacy', 'Terms of use']) expect(html).toContain(`>${l}<`);
   });
   it('links directly to the configured feedback address', () => {
     expect(html).toContain('mailto:atiykahmeed6310@gmail.com?subject=Gapless%20feedback');
     expect(html).toContain('Contact &amp; feedback');
     expect(html).not.toContain('formerly');
+    expect(html).toContain('href="/terms.html"');
   });
 
   it('links to no external product', () => {

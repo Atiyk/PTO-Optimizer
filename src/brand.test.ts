@@ -54,6 +54,15 @@ describe('brand', () => {
     expect(privacy).toContain('id="main-content"');
   });
 
+  it('publishes plain-language terms with an accurate privacy link', () => {
+    const terms = SOURCES['../public/terms.html'];
+    expect(terms).toContain('<h1>Terms of use</h1>');
+    expect(terms).toContain('Gapless does not provide legal, tax, financial, HR or employment advice.');
+    expect(terms).toContain('href="/privacy.html"');
+    expect(terms).toContain('mailto:atiykahmeed6310@gmail.com?subject=Gapless%20terms');
+    expect(SOURCES['../public/privacy.html']).toContain('href="/terms.html"');
+  });
+
   it('has no link or mention of the separate teams product', () => {
     const offenders = Object.entries(SOURCES)
       .filter(([, text]) => /apps\/teams|Days Off for Teams|for Teams\b/.test(text))

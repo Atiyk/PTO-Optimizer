@@ -42,6 +42,18 @@ try {
         && result.mobileCTAHeight >= 44 && result.font.includes('Figtree')
         && result.skipTarget && errors.length === 0 ? 'passed' : 'failed';
       await page.screenshot({ path: resolve(out, 'privacy-' + width + '.png'), fullPage: true });
+      // Terms is a second static page, not a subscription form or a client route.
+      const termsResponse = await page.goto(new URL('/terms.html', base).href, { waitUntil: 'networkidle', timeout: 30000 });
+      result.termsStatusOK = termsResponse?.ok() ?? false;
+      result.termsHeading = await page.getByRole('heading', { name: 'Terms of use', level: 1 }).count() === 1;
+      result.termsLimitsVisible = await page.getByRole('heading', { name: 'Estimates, not professional advice' }).count() === 1;
+      result.termsLinksPrivacy = await page.getByRole('link', { name: 'Privacy information' }).getAttribute('href') === '/privacy.html';
+      result.termsEmail = await page.getByRole('link', { name: 'Email Gapless' }).getAttribute('href') === 'mailto:atiykahmeed6310@gmail.com?subject=Gapless%20terms';
+      result.termsNoOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
+      result.status = result.status === 'passed' && result.termsStatusOK && result.termsHeading &&
+        result.termsLimitsVisible && result.termsLinksPrivacy && result.termsEmail && result.termsNoOverflow
+        ? 'passed' : 'failed';
+      await page.screenshot({ path: resolve(out, 'terms-' + width + '.png'), fullPage: true });
     } catch (error) {
       result.error = error instanceof Error ? error.message : String(error);
     } finally {

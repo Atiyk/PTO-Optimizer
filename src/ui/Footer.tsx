@@ -72,6 +72,11 @@ export function Footer({ onShowShortcuts }: FooterProps) {
               Privacy
             </a>
           </li>
+          <li>
+            <a href="/terms.html" className={LINK_CLASS}>
+              Terms of use
+            </a>
+          </li>
         </Column>
         <Column title="Help & privacy">
           <li>
