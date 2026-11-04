@@ -163,6 +163,10 @@ describe('BalanceFromImage errors and cleanup', () => {
 
   it('revokes the preview object URL on replace, remove and unmount, and stores nothing', async () => {
     ocr.text = 'Vacation remaining 3 days';
+    // Earlier tests in the shared jsdom window may have left keys behind; this test is
+    // about what the reader itself stores, so start from an empty store.
+    window.localStorage.clear();
+    window.sessionStorage.clear();
     const { view } = await setup();
     await choose(png());
     await choose(png());
