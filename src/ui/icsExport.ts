@@ -15,13 +15,21 @@ export function escapeText(s: string): string {
  * unusually long holiday names or break spans, not something normal plans will trigger. */
 export function foldLine(line: string): string {
   const CRLF = '\r\n';
-  if (line.length <= 75) return line;
-  let out = line.slice(0, 75);
-  let rest = line.slice(75);
-  while (rest.length > 0) {
-    const chunk = rest.slice(0, 74); // 74, since the continuation's leading space counts too
-    out += CRLF + ' ' + chunk;
-    rest = rest.slice(74);
+  // Counted in UTF-8 octets, per the RFC, and never splitting a character: an en dash
+  // or an accented holiday name is 2-3 octets, so counting UTF-16 units overran 75.
+  // Identical output to the old character count for plain ASCII lines.
+  let out = '';
+  let lineOctets = 0;
+  let limit = 75;
+  for (const ch of line) {
+    const octets = ch.codePointAt(0)! < 0x80 ? 1 : ch.codePointAt(0)! < 0x800 ? 2 : ch.codePointAt(0)! < 0x10000 ? 3 : 4;
+    if (lineOctets + octets > limit) {
+      out += CRLF + ' ';
+      lineOctets = 0;
+      limit = 74; // the continuation's leading space counts too
+    }
+    out += ch;
+    lineOctets += octets;
   }
   return out;
 }

@@ -47,7 +47,7 @@ export function SubscribeFeed({ planSearch, origin }: { planSearch: string; orig
         <>
           <p className="max-w-prose text-sm text-muted">
             Subscribe once. Your calendar shows your PTO days, public holidays and a “book by” reminder before each break, and the
-            holidays and book-by dates stay current. Editing the plan here gives a new link, so subscribe again after a change.
+            holidays and book-by dates stay current. Editing the plan here gives a new link, so subscribe again after a change. Like the plan link, anyone with this link can see the plan.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" href={links.webcal}>Apple Calendar</Button>
