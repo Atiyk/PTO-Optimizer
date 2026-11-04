@@ -200,7 +200,7 @@ function scan(text: string, patterns: RegExp[], mask: { value: string }): Hit[] 
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(mask.value)) !== null) {
       if (match[0].length === 0) { pattern.lastIndex++; continue; }
-      hits.push({ phrase: match[0], index: match.index });
+      hits.push({ phrase: text.slice(match.index, match.index + match[0].length), index: match.index });
       mask.value = mask.value.slice(0, match.index) + ' '.repeat(match[0].length) + mask.value.slice(match.index + match[0].length);
     }
   }
@@ -250,7 +250,7 @@ const WEEKDAYS: Record<string, number> = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 
 
 // No regex lookbehind anywhere (older Safari cannot even parse it, which would break the
 // page): collectAtoms checks the character before each match instead.
-const RE_RANGE_MD_BARE = new RegExp(`${WD}${MON}\\s+${DAY}${YEAR}${CONN}${DAY}(?![\\d/.:])(?!\\s*(?:of\\s+)?${MON_NC}\\b)${NOT_UNIT}${YEAR}\\b`, 'gi');
+const RE_RANGE_MD_BARE = new RegExp(`${WD}${MON}\\s+${DAY}${YEAR}${CONN}${DAY}(?![\\d/:]|\\.\\d)(?!\\s*(?:of\\s+)?${MON_NC}\\b)${NOT_UNIT}${YEAR}\\b`, 'gi');
 const RE_RANGE_DM_BARE = new RegExp(`${WD}${DAY}${CONN}${DAY}\\s+(?:of\\s+)?${MON}\\b${YEAR}\\b`, 'gi');
 const RE_MD = new RegExp(`${WD}${MON}\\s+${DAY}(?![\\d:])\\b${YEAR}\\b`, 'gi');
 const RE_DM = new RegExp(`${WD}${DAY}\\s+(?:of\\s+)?${MON}\\b${YEAR}\\b`, 'gi');

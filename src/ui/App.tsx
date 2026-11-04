@@ -523,7 +523,7 @@ export function App() {
               </section>
 
               <div id="requests" className="flex min-w-0 scroll-mt-16 flex-col gap-3">
-                <PtoTracker today={today} ledger={ledger} calendar={requestCalendar} calendarReady={state.holidaysReady && !state.holidaysDegraded} calendarNotice={!state.holidaysReady ? 'Loading your employer calendar…' : state.holidaysDegraded ? 'Holiday data is incomplete. Check your employer calendar before adding or changing request dates.' : undefined} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
+                <PtoTracker today={today} ledger={ledger} calendar={requestCalendar} noticePeriodDays={state.noticePeriodDays}calendarReady={state.holidaysReady && !state.holidaysDegraded} calendarNotice={!state.holidaysReady ? 'Loading your employer calendar…' : state.holidaysDegraded ? 'Holiday data is incomplete. Check your employer calendar before adding or changing request dates.' : undefined} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
                 <p className="text-sm text-muted"><a href="/policy#balance" className="link-mark font-semibold">Forecast my balance and check expiration</a></p>
               </div>
 

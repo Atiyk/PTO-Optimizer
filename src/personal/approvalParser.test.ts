@@ -66,6 +66,7 @@ const CASES: Case[] = [
   { name: 'ambiguous numeric resolved by an en-US locale', text: 'Approved: 07/05/2027 - 07/09/2027', locale: 'en-US', decision: 'approved', ranges: [['2027-07-05', '2027-07-09']], match: 'july' },
   { name: 'one unambiguous numeric date settles the order for the rest', text: 'Approved: 05/07/2027 - 09/07/2027 (week of 13/07/2027 is busy)', decision: 'approved', ranges: [['2027-07-05', '2027-07-09'], ['2027-07-13', '2027-07-13']], match: 'july' },
   { name: 'dotted European dates', text: 'Genehmigt / approved: 22.12.2026 - 24.12.2026', decision: 'approved', ranges: [['2026-12-22', '2026-12-24']], match: 'winter', reason: 'exact' },
+  { name: 'bare-day range at the end of a sentence', text: "Sorry, we can't approve July 5-9.", decision: 'rejected', ranges: [['2027-07-05', '2027-07-09']], match: 'july', reason: 'exact' },
   { name: 'yearless numeric range', text: '12/22 - 12/24 approved', decision: 'approved', ranges: [['2026-12-22', '2026-12-24']], match: 'winter' },
   { name: 'day-first month range', text: 'Approved for 22–24 December 2026.', decision: 'approved', ranges: [['2026-12-22', '2026-12-24']], match: 'winter', reason: 'exact' },
   { name: 'ordinals and "until"', text: 'Approved from December 22nd until December 24th.', decision: 'approved', ranges: [['2026-12-22', '2026-12-24']], match: 'winter' },
