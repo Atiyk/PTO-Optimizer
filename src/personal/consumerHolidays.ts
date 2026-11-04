@@ -28,7 +28,7 @@ export function consumerHolidayLookupEnd(country: string, rangeStart: string, ra
 
 /** Keep distinct holiday names for employer controls; repeated copies of the same
  * named day merge their regional coverage instead of counting or losing a date twice. */
-function observedEntries(holidays: Holiday[], country: string, start: string, end: string): Holiday[] {
+export function observedEntries(holidays: Holiday[], country: string, start: string, end: string): Holiday[] {
   if (!Array.isArray(holidays)) throw new Error('Holiday data must be a list.');
   const entries = new Map<string, Holiday>();
   for (const holiday of holidays) {
@@ -50,7 +50,7 @@ function observedEntries(holidays: Holiday[], country: string, start: string, en
   return [...entries.values()].sort((a, b) => `${a.date}|${a.name}`.localeCompare(`${b.date}|${b.name}`));
 }
 
-function validScope(country: string, start: string, end: string, subdivision?: string): boolean {
+export function validScope(country: string, start: string, end: string, subdivision?: string): boolean {
   return COUNTRY_CODES.has(country) && validRange(start, end)
     && (!subdivision || (/^[A-Z0-9-]{1,16}$/.test(subdivision)
       && subdivision.startsWith(`${country}-`) && subdivision.length > country.length + 1));

@@ -1,6 +1,6 @@
 import type { Break } from '@daysoff/engine/solver/types';
 import { parseISO, addDays } from '@daysoff/engine/solver/dateUtils';
-import { formatDateRange, formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
+import { formatDateRange, formatCardDateRange, formatShort } from '@daysoff/engine/calendar/dateFormat';
 import type { Holiday } from '@daysoff/engine/data/holidays';
 import { PRODUCT_NAME } from '../brand';
 import { isValidISODate } from './urlState';
@@ -15,13 +15,21 @@ export function escapeText(s: string): string {
  * unusually long holiday names or break spans, not something normal plans will trigger. */
 export function foldLine(line: string): string {
   const CRLF = '\r\n';
-  if (line.length <= 75) return line;
-  let out = line.slice(0, 75);
-  let rest = line.slice(75);
-  while (rest.length > 0) {
-    const chunk = rest.slice(0, 74); // 74, since the continuation's leading space counts too
-    out += CRLF + ' ' + chunk;
-    rest = rest.slice(74);
+  // Counted in UTF-8 octets, per the RFC, and never splitting a character: an en dash
+  // or an accented holiday name is 2-3 octets, so counting UTF-16 units overran 75.
+  // Identical output to the old character count for plain ASCII lines.
+  let out = '';
+  let lineOctets = 0;
+  let limit = 75;
+  for (const ch of line) {
+    const octets = ch.codePointAt(0)! < 0x80 ? 1 : ch.codePointAt(0)! < 0x800 ? 2 : ch.codePointAt(0)! < 0x10000 ? 3 : 4;
+    if (lineOctets + octets > limit) {
+      out += CRLF + ' ';
+      lineOctets = 0;
+      limit = 74; // the continuation's leading space counts too
+    }
+    out += ch;
+    lineOctets += octets;
   }
   return out;
 }
@@ -45,7 +53,7 @@ export function dtstampNow(now: Date): string {
 
 /** `now` as a UTC calendar-date ISO string, same convention as the rest of the date
  * arithmetic in this file (never the viewer's local date). */
-function nowToISO(now: Date): string {
+export function nowToISO(now: Date): string {
   return `${String(now.getUTCFullYear()).padStart(4, '0')}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
 }
 
@@ -63,6 +71,79 @@ export interface ReminderOptions {
  * assume. Every existing call site that omits this argument keeps exporting PTO-day events
  * only, unchanged. */
 const DEFAULT_REMINDER_OPTIONS: ReminderOptions = { enabled: false, leadDays: 14 };
+
+/** The per-PTO-day VEVENTs, shared by the downloaded .ics and the live feed (F1) so a
+ * subscribed calendar and a downloaded one carry byte-identical events for the same day. */
+export function ptoDayEventLines(breaks: Break[], isPtoDay: (iso: string) => boolean, dtstamp: string): string[] {
+  const lines: string[] = [];
+  for (const brk of breaks) {
+    const title = `PTO (${formatDateRange(brk.start, brk.end)})`;
+    for (const day of brk.days) {
+      if (!isPtoDay(day)) continue;
+      const dateStart = isoToICSDate(day);
+      const dateEnd = addOneDayICS(dateStart);
+      lines.push('BEGIN:VEVENT');
+      lines.push(foldLine(`UID:pto-${dateStart}@pto-optimizer.app`));
+      lines.push(`DTSTAMP:${dtstamp}`);
+      lines.push(`DTSTART;VALUE=DATE:${dateStart}`);
+      lines.push(`DTEND;VALUE=DATE:${dateEnd}`);
+      lines.push(foldLine(`SUMMARY:${escapeText(title)}`));
+      lines.push('TRANSP:TRANSPARENT');
+      lines.push('END:VEVENT');
+    }
+  }
+  return lines;
+}
+
+/** 7 days before an all-day event at 09:00 local: the trigger is relative to the event's
+ * floating midnight start, so -7 days + 9 hours. Same form Apple Calendar writes. */
+const ALARM_WEEK_BEFORE_9AM = '-P6DT15H';
+/** 09:00 local on the day of an all-day event. */
+const ALARM_ON_DAY_9AM = 'PT9H';
+
+function displayAlarm(trigger: string, text: string): string[] {
+  return ['BEGIN:VALARM', 'ACTION:DISPLAY', foldLine(`DESCRIPTION:${escapeText(text)}`), `TRIGGER:${trigger}`, 'END:VALARM'];
+}
+
+/**
+ * F2 book-by nudges, shared by the download and the feed: one all-day event per future
+ * break on its book-by date (break start minus the notice period, the same subtraction as
+ * before), with display alarms 7 days before (only while that is still ahead of today) and
+ * at 9:00 on the day. A break that hasn't started but whose book-by date has passed gets
+ * its event on today, titled "book now". The title keeps the "Request time off: <range>"
+ * lead so month views, which truncate, still say what to do.
+ */
+export function bookByEventLines(breaks: Break[], todayIso: string, leadDays: number, dtstamp: string): string[] {
+  const lines: string[] = [];
+  for (const brk of breaks) {
+    if (brk.start <= todayIso) continue; // already underway or past - nothing left to request
+    const bookBy = addDays(brk.start, -leadDays);
+    const late = bookBy < todayIso;
+    const eventIso = late ? todayIso : bookBy; // never place a reminder in the past
+    const dateStart = isoToICSDate(eventIso);
+    const dateEnd = addOneDayICS(dateStart);
+    const title = `Request time off: ${formatCardDateRange(brk.start, brk.end)} (${late ? 'book now' : `book by ${formatShort(bookBy)}`})`;
+    const dayWord = brk.totalDaysOff === 1 ? 'day' : 'days';
+    const ptoWord = brk.ptoCost === 1 ? 'day' : 'days';
+    const noticeWord = leadDays === 1 ? 'day' : 'days';
+    const timing = late
+      ? `Your ${leadDays}-day notice window has started. Book it now.`
+      : `Book by ${formatShort(bookBy)} to give ${leadDays} ${noticeWord} of notice.`;
+    const description = `${brk.ptoCost} PTO ${ptoWord} -> ${brk.totalDaysOff} ${dayWord} off (${brk.multiplier.toFixed(2)}x). ${timing}`;
+    lines.push('BEGIN:VEVENT');
+    lines.push(foldLine(`UID:pto-reminder-${dateStart}-${isoToICSDate(brk.start)}@pto-optimizer.app`));
+    lines.push(`DTSTAMP:${dtstamp}`);
+    lines.push(`DTSTART;VALUE=DATE:${dateStart}`);
+    lines.push(`DTEND;VALUE=DATE:${dateEnd}`);
+    lines.push(foldLine(`SUMMARY:${escapeText(title)}`));
+    lines.push(foldLine(`DESCRIPTION:${escapeText(description)}`));
+    lines.push('TRANSP:TRANSPARENT');
+    if (addDays(eventIso, -7) >= todayIso) lines.push(...displayAlarm(ALARM_WEEK_BEFORE_9AM, title));
+    lines.push(...displayAlarm(ALARM_ON_DAY_9AM, title));
+    lines.push('END:VEVENT');
+  }
+  return lines;
+}
 
 /**
  * One all-day VEVENT per suggested-PTO day (not per break - a break's weekends/holidays
@@ -90,52 +171,8 @@ export function generateICS(
   lines.push(foldLine(`X-WR-CALNAME:${PRODUCT_NAME} - PTO plan`));
 
   const dtstamp = dtstampNow(now);
-
-  for (const brk of breaks) {
-    const title = `PTO (${formatDateRange(brk.start, brk.end)})`;
-    for (const day of brk.days) {
-      if (!isPtoDay(day)) continue;
-      const dateStart = isoToICSDate(day);
-      const dateEnd = addOneDayICS(dateStart);
-      lines.push('BEGIN:VEVENT');
-      lines.push(foldLine(`UID:pto-${dateStart}@pto-optimizer.app`));
-      lines.push(`DTSTAMP:${dtstamp}`);
-      lines.push(`DTSTART;VALUE=DATE:${dateStart}`);
-      lines.push(`DTEND;VALUE=DATE:${dateEnd}`);
-      lines.push(foldLine(`SUMMARY:${escapeText(title)}`));
-      lines.push('TRANSP:TRANSPARENT');
-      lines.push('END:VEVENT');
-    }
-  }
-
-  if (reminderOptions.enabled) {
-    const todayIso = nowToISO(now);
-    for (const brk of breaks) {
-      if (brk.start <= todayIso) continue; // already underway or past - nothing left to request
-      let reminderIso = addDays(brk.start, -reminderOptions.leadDays);
-      if (reminderIso < todayIso) reminderIso = todayIso; // never place a reminder in the past
-      const dateStart = isoToICSDate(reminderIso);
-      const dateEnd = addOneDayICS(dateStart);
-      const title = `Request time off: ${formatCardDateRange(brk.start, brk.end)}`;
-      const dayWord = brk.totalDaysOff === 1 ? 'day' : 'days';
-      const ptoWord = brk.ptoCost === 1 ? 'day' : 'days';
-      const description = `${brk.ptoCost} PTO ${ptoWord} -> ${brk.totalDaysOff} ${dayWord} off (${brk.multiplier.toFixed(2)}x).`;
-      lines.push('BEGIN:VEVENT');
-      lines.push(foldLine(`UID:pto-reminder-${dateStart}-${isoToICSDate(brk.start)}@pto-optimizer.app`));
-      lines.push(`DTSTAMP:${dtstamp}`);
-      lines.push(`DTSTART;VALUE=DATE:${dateStart}`);
-      lines.push(`DTEND;VALUE=DATE:${dateEnd}`);
-      lines.push(foldLine(`SUMMARY:${escapeText(title)}`));
-      lines.push(foldLine(`DESCRIPTION:${escapeText(description)}`));
-      lines.push('TRANSP:TRANSPARENT');
-      lines.push('BEGIN:VALARM');
-      lines.push('ACTION:DISPLAY');
-      lines.push(foldLine(`DESCRIPTION:${escapeText(title)}`));
-      lines.push('TRIGGER:PT0S');
-      lines.push('END:VALARM');
-      lines.push('END:VEVENT');
-    }
-  }
+  lines.push(...ptoDayEventLines(breaks, isPtoDay, dtstamp));
+  if (reminderOptions.enabled) lines.push(...bookByEventLines(breaks, nowToISO(now), reminderOptions.leadDays, dtstamp));
 
   lines.push('END:VCALENDAR');
   return lines.join('\r\n') + '\r\n';
