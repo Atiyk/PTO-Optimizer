@@ -418,7 +418,8 @@ export function analyzeBalanceText(input: string, options: ExtractOptions): Bala
   const lines = text.split('\n');
   for (const original of lines) {
     const sourceLine = original.trim().replace(/\s+/g, ' ');
-    if (!sourceLine) { if (header) header.rowsLeft = Math.min(header.rowsLeft, 1); continue; }
+    // OCR puts blank lines between table rows, so a blank line does not end a table.
+    if (!sourceLine) continue;
     const cleaned = cleanOcrNumbers(original.replace(/\t/g, '  ').replace(/(?<!\d):|:(?!\d)/g, ' : ').replace(/[|¦]/g, '  '));
     const { text: line, asOf: lineAsOf } = stripDates(cleaned, today, dayFirst);
     const numbers = findNumbers(line);
@@ -437,7 +438,8 @@ export function analyzeBalanceText(input: string, options: ExtractOptions): Bala
       const roles = findRoles(line).filter((r) => r.role !== 'money');
       // Only a short label line ("Available", "Balance remaining") carries its role down.
       if (roles.length && line.trim().split(/\s+/).length <= 3) pendingRole = { role: roles[roles.length - 1].role, word: roles[roles.length - 1].word, ttl: 2 };
-      if (header && --header.rowsLeft <= 0) header = null;
+      // A sentence or a new section title ends the table above it.
+      if (header && (--header.rowsLeft <= 0 || (kinds.length === 0 && line.trim().split(/\s+/).length >= 3))) header = null;
       continue;
     }
 

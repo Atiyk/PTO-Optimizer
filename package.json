@@ -22,7 +22,6 @@
   "dependencies": {
     "@daysoff/engine": "*",
     "@fontsource-variable/figtree": "^5.3.0",
-    "@tesseract.js-data/eng": "1.0.0",
     "@vercel/analytics": "^2.0.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

@@ -11,16 +11,20 @@
  *   - worker:  tesseract.js/dist/worker.min.js                     (~110 KB)
  *   - core:    tesseract.js-core tesseract-core-simd-lstm.wasm.js   (~3.9 MB, wasm embedded;
  *              the non-SIMD build is the fallback for old browsers)
- *   - model:   @tesseract.js-data/eng 4.0.0_best_int eng.traineddata.gz (~2.9 MB, MIT; the
- *              same LSTM-only model tesseract.js downloads by default)
+ *   - model:   public/ocr/eng.traineddata.gz (2.95 MB), byte-identical to
+ *              @tesseract.js-data/eng@1.0.0 4.0.0_best_int/eng.traineddata.gz, the LSTM-only
+ *              English model tesseract.js downloads by default (tessdata_best, Apache-2.0;
+ *              package MIT). It lives in public/ at a fixed path because the worker fetches
+ *              `${langPath}/eng.traineddata.gz` by name: tesseract.js 7.0.0's other route,
+ *              passing { code, data } directly, is broken (initialize() joins l.data, not
+ *              l.code, into the language name), so it can't be a hashed Vite asset.
  * The image is read straight from the File in memory and never uploaded. The engine's own
  * IndexedDB model cache is switched off (cacheMethod 'none'); the browser's HTTP cache keeps
- * the hashed files, so the download happens once.
+ * the files, so the download normally happens once.
  */
 import workerUrl from 'tesseract.js/dist/worker.min.js?url';
 import coreSimdUrl from 'tesseract.js-core/tesseract-core-simd-lstm.wasm.js?url';
 import coreUrl from 'tesseract.js-core/tesseract-core-lstm.wasm.js?url';
-import engModelUrl from '@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz?url';
 
 export interface OcrProgress {
   /** Plain-language phase for the status line. */
@@ -43,22 +47,18 @@ const absolute = (url: string) => new URL(url, window.location.href).href;
 /** Recognise the text in an image entirely in this browser. */
 export async function recognizeImageText(image: Blob, onProgress?: (p: OcrProgress) => void): Promise<string> {
   onProgress?.({ phase: 'loading', progress: 0.02 });
-  const [{ createWorker, OEM }, modelResponse] = await Promise.all([
-    import('tesseract.js'),
-    fetch(engModelUrl),
-  ]);
-  if (!modelResponse.ok) throw new Error(`The reading engine could not load (${modelResponse.status}).`);
-  const model = new Uint8Array(await modelResponse.arrayBuffer());
-  onProgress?.({ phase: 'loading', progress: 0.3 });
+  const { createWorker, OEM } = await import('tesseract.js');
+  onProgress?.({ phase: 'loading', progress: 0.1 });
 
-  const worker = await createWorker([{ code: 'eng', data: model }], OEM.LSTM_ONLY, {
+  const worker = await createWorker('eng', OEM.LSTM_ONLY, {
     workerPath: absolute(workerUrl),
+    langPath: absolute(`${import.meta.env.BASE_URL}ocr`),
     corePath: absolute(hasWasmSimd() ? coreSimdUrl : coreUrl),
     workerBlobURL: false,
     cacheMethod: 'none',
     logger: (m: { status: string; progress: number }) => {
       if (m.status === 'recognizing text') onProgress?.({ phase: 'reading', progress: 0.4 + 0.6 * (m.progress || 0) });
-      else onProgress?.({ phase: 'loading', progress: 0.3 + 0.1 * (m.progress || 0) });
+      else onProgress?.({ phase: 'loading', progress: 0.1 + 0.3 * (m.progress || 0) });
     },
   });
   try {

@@ -208,7 +208,7 @@ export default function BalanceReader({ id, unit, hoursPerDay, today, onUse, rec
                       {converted !== null && <> ({fmtNumber(converted)} {unitWord(converted, unit)} at {fmtNumber(hoursPerDay)} h/day)</>}
                       {asOf}
                     </span>
-                    <span className="mt-0.5 max-w-full truncate text-xs text-muted">From: “{c.sourceLine}”{c.unitStated ? '' : ' · unit guessed'}</span>
+                    <span className="mt-0.5 block w-full min-w-0 truncate text-xs text-muted">From: “{c.sourceLine}”{c.unitStated ? '' : ' · unit guessed'}</span>
                   </button>
                 </li>
               );

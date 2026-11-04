@@ -15,7 +15,7 @@ export function BalanceFromImage(props: BalanceFromImageProps) {
   const id = useId();
   const [open, setOpen] = useState(false);
   return (
-    <div className="sm:col-span-2">
+    <div className="min-w-0 sm:col-span-2">
       <button
         type="button"
         aria-expanded={open}
