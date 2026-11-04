@@ -151,17 +151,19 @@ try {
           result.tabBarDestinations = (await tabs.getByRole('link').allTextContents()).map((t) => t.trim());
         }
         if (route.name === 'home') {
-          // The first meaningful result must precede editable controls visually AND
-          // in DOM reading order, even on the narrowest 320px viewport.
-          const previewHeading = page.getByRole('heading', { name: 'Your recommended break' });
-          const budgetField = page.getByRole('spinbutton', { name: 'PTO days available' });
-          const previewBox = await previewHeading.boundingBox();
-          const budgetBox = await budgetField.boundingBox();
-          result.homeResultBeforeControls = Boolean(previewBox && budgetBox && previewBox.y < budgetBox.y);
+          // 2026-11 redesign: the hero is one live sentence ("I have [15] PTO days in
+          // [country]") directly followed by the engine result. The guarantee kept from the
+          // result-first decision: the real result is inside the first screen at every width,
+          // including 320px, and the slider/date controls come after it in reading order.
+          const resultHeading = page.locator('#landing-result');
+          const resultBox = await resultHeading.boundingBox();
+          const viewport = page.viewportSize();
+          result.homeResultBeforeControls = Boolean(resultBox && viewport && resultBox.y + resultBox.height <= viewport.height);
           result.homeReadingOrder = await page.evaluate(() => {
-            const preview = [...document.querySelectorAll('h2')].find((node) => node.textContent?.trim() === 'Your recommended break');
-            const budget = document.getElementById('landing-budget');
-            return Boolean(preview && budget && (preview.compareDocumentPosition(budget) & Node.DOCUMENT_POSITION_FOLLOWING));
+            const preview = document.getElementById('landing-result');
+            const slider = document.getElementById('landing-budget-slider');
+            return Boolean(preview && slider && /days off/.test(preview.textContent ?? '')
+              && (preview.compareDocumentPosition(slider) & Node.DOCUMENT_POSITION_FOLLOWING));
           });
         }
         if (label === 'after' && route.name === 'home') {
@@ -175,25 +177,9 @@ try {
           result.homeSliderVisible = await slider.isVisible() && (sliderBox?.height ?? 0) >= 44;
           if (width <= 375) {
             const countryBox = await page.locator('#landing-country').boundingBox();
-            result.homeCountryNotCramped = (countryBox?.width ?? 0) >= width - 66;
-            const gridColumns = await page.locator('.landing-input-pair').evaluate(element => getComputedStyle(element).gridTemplateColumns);
-            result.homeCountryComputedColumns = gridColumns;
-            result.homeCountryGridSingleColumn = gridColumns.trim().split(/\s+/).length === 1;
+            result.homeCountryNotCramped = (countryBox?.width ?? 0) >= 120 && (countryBox?.height ?? 0) >= 44
+              && (countryBox?.x ?? -1) >= 0 && (countryBox?.x ?? 0) + (countryBox?.width ?? 0) <= width;
             result.homeCountryAccessibleName = await page.getByRole('combobox', { name: 'Country', exact: true }).count() === 1;
-          }
-          if (width < 640) {
-            const adjust = page.getByRole('link', { name: 'Change PTO days in this preview' });
-            result.homeMobileAdjustLink = await adjust.isVisible();
-            await adjust.click();
-            result.homeMobileAdjustJump = new URL(page.url()).hash === '#landing-budget-slider';
-          }
-          if (width < 640) {
-            const compactCalendar = page.locator('[data-testid="home-break-calendar"]');
-            result.homeCompactCalendarCollapsed = await compactCalendar.evaluate((element) => element.open === false);
-            const summary = compactCalendar.locator('summary');
-            await summary.click();
-            result.homeCompactCalendarExpandable = await compactCalendar.evaluate((element) => element.open === true);
-            await summary.click();
           }
           result.homeDatesDirectlyVisible = await from.isVisible() && await through.isVisible()
             && await from.evaluate(element => !element.closest('details'))
@@ -204,8 +190,8 @@ try {
           const selected = await slider.inputValue();
           result.homeSliderKeyboardAndNumberSync = selected === '1' && await numberInput.inputValue() === selected;
           result.homeSliderURLParity = new URL(page.url()).searchParams.get('b') === selected;
-          result.homeMainValueAndActVisible = await page.getByRole('heading', { name: 'Make your PTO worth more time away.' }).isVisible()
-            && await page.getByRole('heading', { name: 'Take the next step with your plan.' }).isVisible();
+          result.homeMainValueAndActVisible = await page.getByRole('heading', { name: /^Holidays ahead/ }).isVisible()
+            && await page.getByRole('link', { name: /See the full plan/ }).first().isVisible();
           await page.screenshot({ path: resolve(outputDirectory, `home-controls-${width}.png`), fullPage: true });
         }
         if (route.name === 'pto') {

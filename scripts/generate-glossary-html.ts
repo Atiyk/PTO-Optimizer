@@ -49,7 +49,7 @@ function page(termTitle: string, description: string, canonicalPath: string): st
     <meta property="og:title" content="${title}" />
     <meta property="og:description" content="${desc}" />
     <meta property="og:url" content="%SITE_URL%${canonicalPath}" />
-    <meta property="og:image" content="%SITE_URL%/og-image.png" />
+    <meta property="og:image" content="%SITE_URL%/og-images/learn.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="A plain-English glossary definition." />
@@ -57,7 +57,7 @@ function page(termTitle: string, description: string, canonicalPath: string): st
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${title}" />
     <meta name="twitter:description" content="${desc}" />
-    <meta name="twitter:image" content="%SITE_URL%/og-image.png" />
+    <meta name="twitter:image" content="%SITE_URL%/og-images/learn.png" />
 
     <script defer data-domain="%SITE_HOST%" src="https://plausible.io/js/script.manual.js"></script>
   </head>

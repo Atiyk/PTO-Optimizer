@@ -286,6 +286,6 @@
    last content and the footer are never covered. */
 @media (max-width: 1023.98px) {
   body {
-    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(3.5rem + 1px + env(safe-area-inset-bottom));
   }
 }

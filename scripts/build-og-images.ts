@@ -96,8 +96,8 @@ async function main(): Promise<void> {
     browser,
     'landing',
     template(
-      'Make every PTO day count.',
-      'See every day off coming, then turn your PTO into longer breaks.',
+      'More days off from the same PTO.',
+      'Gapless finds where your PTO joins weekends and public holidays into the longest breaks.',
       nextHol ? `Next: ${nextHol.holiday.name}, ${nextHol.daysAway} days away` : '',
     ),
   );
@@ -117,11 +117,24 @@ async function main(): Promise<void> {
   await renderOgImage(
     browser,
     'sabbatical',
-    template('Sabbatical Planning', 'Place a longer break where it buys the most time.', top ? placementNote(top) : ''),
+    template('Plan a sabbatical', 'Place a longer break where it buys the most time.', top ? placementNote(top) : ''),
+  );
+
+  // 2026-11 redesign: every other route family gets its own image in the same system, so no
+  // shared page still shows the retired og-image.png.
+  await renderOgImage(
+    browser,
+    'policy',
+    template('How much PTO will you have?', 'Forecast your balance, see what is about to expire, and track your requests.', 'Free, and nothing leaves your browser'),
+  );
+  await renderOgImage(
+    browser,
+    'learn',
+    template('PTO, in plain words', 'Accrual, carryover, payout and requests explained, with worked examples.', 'Glossary, guides and answers'),
   );
 
   await browser.close();
-  console.log(`OG images written to ${outDir}: landing.png, pto.png, sabbatical.png`);
+  console.log(`OG images written to ${outDir}: landing.png, pto.png, sabbatical.png, policy.png, learn.png`);
 }
 
 main();
