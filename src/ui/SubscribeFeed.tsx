@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from './Button';
 import { copyText } from './requestText';
-import { DEFAULT_SITE_HOST } from './siteUrl';
 import { FEED_CALENDAR_NAME, MAX_FEED_QUERY_LENGTH } from '../autopilot/feed';
 
 export interface FeedLinks {
@@ -31,8 +30,13 @@ export function feedLinks(origin: string, planSearch: string): FeedLinks {
  * the current plan's, and the feed re-solves from the same link on every refresh.
  */
 export function SubscribeFeed({ planSearch, origin }: { planSearch: string; origin?: string }) {
-  const resolvedOrigin = origin ?? (typeof window !== 'undefined' ? window.location.origin : `https://${DEFAULT_SITE_HOST}`);
-  const links = feedLinks(resolvedOrigin, planSearch);
+  // The links name this deployment's origin and the visitor's current plan, neither of
+  // which the prerendered HTML knows, and React keeps server attributes on hydration - so
+  // they render only after mount, never with a build-time host or plan baked in.
+  const [mountedOrigin, setMountedOrigin] = useState<string | null>(null);
+  useEffect(() => setMountedOrigin(window.location.origin), []);
+  const resolvedOrigin = origin ?? mountedOrigin;
+  const links = resolvedOrigin ? feedLinks(resolvedOrigin, planSearch) : null;
   const tooLong = planSearch.replace(/^\?/, '').length > MAX_FEED_QUERY_LENGTH;
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -43,7 +47,7 @@ export function SubscribeFeed({ planSearch, origin }: { planSearch: string; orig
       <h3 id="subscribe-feed-heading" className="text-xl font-bold leading-6 text-ink type-condensed">Keep this plan in your calendar</h3>
       {tooLong ? (
         <p className="max-w-prose text-sm text-muted">This plan’s link is too long for a calendar subscription. Use “Add to calendar (.ics)” above instead.</p>
-      ) : (
+      ) : !links ? null : (
         <>
           <p className="max-w-prose text-sm text-muted">
             Subscribe once. Your calendar shows your PTO days, public holidays and a “book by” reminder before each break, and the

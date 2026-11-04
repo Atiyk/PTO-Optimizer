@@ -1,17 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { addDays } from '@daysoff/engine/solver/dateUtils';
 import { buildPlanFeedICS, holidayEventLines, MAX_FEED_QUERY_LENGTH } from './feed';
 import type { HolidaySource } from './planFromSearch';
+import { diskHolidays } from './feedTestHolidays';
 import { generateICS } from '../ui/icsExport';
 import { encodeEmployerCalendar } from '../personal/employerCalendar';
 
-const HOLIDAY_DIR = resolve(__dirname, '../../public/holidays');
-const disk: HolidaySource = (country, year) => {
-  const file = resolve(HOLIDAY_DIR, `${country}-${year}.json`);
-  return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
-};
+const disk: HolidaySource = diskHolidays;
 const TODAY = '2026-11-04';
 const SEARCH = '?c=US&s=2026-11-04&e=2027-12-31&b=20&rv=0';
 

@@ -39,6 +39,11 @@ describe('SubscribeFeed', () => {
     expect(screen.getByText(/Editing the plan here gives a new link/)).toBeTruthy();
   });
 
+  it('uses this page origin once mounted (never a build-time host)', () => {
+    render(<SubscribeFeed planSearch={SEARCH} />);
+    expect(screen.getByRole('link', { name: 'Apple Calendar' }).getAttribute('href')).toBe(`webcal://${window.location.host}/api/feed?${SEARCH}`);
+  });
+
   it('says to download instead when the link is too long for a feed', () => {
     render(<SubscribeFeed planSearch={`${SEARCH}&x=${'a'.repeat(4100)}`} origin={ORIGIN} />);
     expect(screen.queryByRole('link', { name: 'Apple Calendar' })).toBeNull();

@@ -1,13 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { holidayFile } from './feedTestHolidays';
 import { FEED_CACHE_CONTROL, handleFeedRequest, type HolidayReader } from './feedHandler';
 
-const HOLIDAY_DIR = resolve(__dirname, '../../public/holidays');
-const reader: HolidayReader = async (country, year) => {
-  const file = resolve(HOLIDAY_DIR, `${country}-${year}.json`);
-  return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
-};
+const reader: HolidayReader = async (country, year) => holidayFile(country, year);
 const NOW = new Date('2026-11-04T15:30:00Z');
 const URL_OK = 'https://example.test/api/feed?c=US&s=2026-11-04&e=2027-12-31&b=20&rv=0';
 

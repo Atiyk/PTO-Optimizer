@@ -1,28 +1,21 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, renderHook, waitFor } from '@testing-library/react';
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { useAppState } from '../ui/useAppState';
 import { encodeEmployerCalendar } from '../personal/employerCalendar';
 import { rangeISO } from '@daysoff/engine/solver/dateUtils';
-import { defaultRangeEnd, planFromSearch, planStateFromSearch, type HolidaySource } from './planFromSearch';
+import { defaultRangeEnd, planFromSearch, planStateFromSearch } from './planFromSearch';
+import { diskHolidays, holidayFile } from './feedTestHolidays';
 
-const HOLIDAY_DIR = resolve(__dirname, '../../public/holidays');
 const TODAY = '2026-11-04';
 
-function readHolidayFile(country: string, year: number): unknown {
-  const file = resolve(HOLIDAY_DIR, `${country}-${year}.json`);
-  return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
-}
-export const diskHolidays: HolidaySource = readHolidayFile;
 
 /** The browser path: the engine fetches /holidays/<CC>-<YEAR>.json, then Nager. */
 function stubFetchFromDisk() {
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     const match = /\/holidays\/([A-Z]{2})-(\d{4})\.json$/.exec(url);
-    const data = match ? readHolidayFile(match[1], Number(match[2])) : null;
+    const data = match ? holidayFile(match[1], Number(match[2])) : null;
     return data ? new Response(JSON.stringify(data), { status: 200 }) : new Response('not found', { status: 404 });
   }));
 }
