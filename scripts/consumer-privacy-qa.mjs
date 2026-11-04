@@ -39,7 +39,7 @@ try {
       result.skipTarget = await page.evaluate(() => document.activeElement?.id === 'main-content' || location.hash === '#main-content');
       result.status = result.ok && result.singleMain && result.singleHeading && result.sections
         && result.mailto && result.noFormerBrand && result.noOverflow
-        && result.mobileCTAHeight >= 44 && result.font.includes('Figtree')
+        && result.mobileCTAHeight >= 44 && result.font.includes('Archivo')
         && result.skipTarget && errors.length === 0 ? 'passed' : 'failed';
       await page.screenshot({ path: resolve(out, 'privacy-' + width + '.png'), fullPage: true });
       // Terms is a second static page, not a subscription form or a client route.

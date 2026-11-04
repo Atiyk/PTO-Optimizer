@@ -43,7 +43,7 @@ export function buildPortraitText(data: PortraitPlanData, includeBalance = false
   const pto = data.breaks.reduce((sum, brk) => sum + brk.ptoCost, 0);
   const days = data.breaks.reduce((sum, brk) => sum + brk.totalDaysOff, 0);
   return {
-    title: sameYear ? `My ${year} Time-Off Plan` : 'My Time-Off Plan',
+    title: sameYear ? `My ${year} time-off plan` : 'My time-off plan',
     range: formatDateRange(data.rangeStart, data.rangeEnd),
     summary: `${pto} PTO days → ${days} calendar days off`,
     breaks: data.breaks.slice(0, PORTRAIT_MAX_BREAKS).map(brk => ({
