@@ -73,7 +73,7 @@ export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, 
             from {budgetSpent} {unlimitedPto ? 'target' : 'PTO'} {spentWord}
           </span>
         </h1>
-        <Button variant="secondary" size="sm" onClick={onPin} disabled={!canPin} title={pinTitle} className="mt-1 shrink-0">
+        <Button variant="secondary" size="md" onClick={onPin} disabled={!canPin} title={pinTitle} className="mt-1 shrink-0">
           Pin this plan
         </Button>
       </div>
@@ -101,7 +101,7 @@ export function CompactResultBar({ watch, totalDaysOff, budgetSpent, breakCountA
     <div
       aria-hidden="true"
       inert
-      className={`fixed inset-x-0 top-0 z-30 border-b border-line bg-page/95 backdrop-blur transition-transform duration-150 ease-[var(--ease-out)] lg:hidden ${visible ? 'translate-y-0' : '-translate-y-full'}`}
+      className={`fixed inset-x-0 top-0 z-30 border-b border-line bg-page/95 backdrop-blur transition-transform duration-150 ease-[var(--ease-out)] lg:hidden [@media(max-height:500px)]:hidden ${visible ? 'translate-y-0' : '-translate-y-full'}`}
     >
       <div className="mx-auto flex h-11 max-w-7xl items-center gap-3 px-4 text-sm tabular-nums text-ink sm:px-6">
         <span className="text-lg font-extrabold type-display"><span className="mark">{totalDaysOff} days off</span></span>

@@ -54,7 +54,7 @@ export function FAQ() {
               <h3 className="text-[15px] font-semibold text-ink">
                 {item.question}
               </h3>
-              <span aria-hidden="true" className="shrink-0 text-xl leading-none text-ink transition-transform duration-150 group-open:rotate-45">+</span>
+              <span aria-hidden="true" className="inline-flex shrink-0 text-ink transition-transform duration-150 group-open:rotate-180"><svg viewBox="0 0 12 12" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 4.5 6 8l3.5-3.5" /></svg></span>
             </summary>
             <p className="max-w-prose pb-4 text-[15px] leading-6 text-muted">{item.answer}</p>
           </details>

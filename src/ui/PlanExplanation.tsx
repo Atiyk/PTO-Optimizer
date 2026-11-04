@@ -1,3 +1,4 @@
+import { Chevron } from './Chevron';
 import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
 import { mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 
@@ -79,7 +80,7 @@ export function PlanExplanation({
   return (
     <details className="group border-y border-line" data-testid="plan-explanation">
       <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 py-2 text-[15px] font-semibold text-ink [&::-webkit-details-marker]:hidden">
-        <span aria-hidden="true" className="inline-block w-3 text-center transition-transform duration-150 group-open:rotate-90">›</span>
+        <span aria-hidden="true" className="inline-flex w-3 transition-transform duration-150 group-open:rotate-90"><Chevron direction="right" /></span>
         <span>Why this plan? <span className="ml-1 font-normal text-muted">See how the days add up</span></span>
       </summary>
       <div className="border-t border-line pb-4 pt-3 text-sm text-muted">

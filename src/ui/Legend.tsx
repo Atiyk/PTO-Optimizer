@@ -31,7 +31,7 @@ export function Legend() {
         Alternative
       </li>
       <li className="flex items-center gap-2">
-        <span aria-hidden className={`h-5 w-9 rounded-[6px] ${COLORS.bandBg}`} />
+        <span aria-hidden className={`h-5 w-9 rounded-[4px] border-b border-[var(--text-primary)] ${COLORS.bandBg}`} />
         Days off
       </li>
       <li className="flex items-center gap-2">

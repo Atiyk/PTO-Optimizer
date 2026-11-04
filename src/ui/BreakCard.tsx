@@ -4,10 +4,14 @@ import { formatWorkingDaysList, formatManagerEmailShort, formatManagerEmailDetai
 import { formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
 import { requestByText, isContested } from '@daysoff/engine/calendar/requestDeadline';
 import { buttonClasses } from './Button';
+import { Chevron } from './Chevron';
 
 interface BreakCardProps {
   brk: Break;
-  onTrack?: (brk: Break) => void;
+  /** Returns false when the request could not be added (the card then says so). */
+  onTrack?: (brk: Break) => boolean | void;
+  /** Lets the compact summary above the calendar link straight to this card. */
+  anchorId?: string;
   /** 1-based, chronological - the same number its calendar badge shows (see
    * useAppState's `orderedBreaks`, the one shared source for both). */
   index: number;
@@ -121,7 +125,7 @@ function CopyRequestDropdown({ options }: { options: CopyOption[] }) {
         aria-controls={open ? menuId : undefined}
         className={buttonClasses('secondary', 'md', 'min-h-11 px-4')}
       >
-        {feedback === 'copied' ? 'Copied' : feedback === 'failed' ? 'Copy unavailable' : 'Copy request ▾'}
+        {feedback === 'copied' ? 'Copied' : feedback === 'failed' ? 'Copy unavailable' : <>Copy request <Chevron direction={open ? 'up' : 'down'} /></>}
       </button>
       {open && (
         <div
@@ -143,7 +147,7 @@ function CopyRequestDropdown({ options }: { options: CopyOption[] }) {
                 const ok = await copyText(option.text);
                 setFeedback(ok ? 'copied' : 'failed');
               }}
-              className="flex min-h-11 w-full items-center px-3 py-2 text-left text-sm text-ink hover:bg-accent-soft focus-visible:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]"
+              className="flex min-h-11 w-full items-center px-3 py-2 text-left text-sm text-ink hover:bg-surface-alt focus-visible:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]"
             >
               {option.label}
             </button>
@@ -182,7 +186,10 @@ export function BreakCard({
   workWeek,
   defaultExpanded = false,
   onTrack,
+  anchorId,
 }: BreakCardProps) {
+  // Tracking confirms in place; the page no longer jumps to the tracker.
+  const [tracked, setTracked] = useState<'yes' | 'no' | null>(null);
   // BUG FOUND: a plain `useState(defaultExpanded)` captures its initial value once, at
   // mount, and never again - but holidays load asynchronously (see useAppState.ts), so the
   // very first render solves without them, producing a different/smaller break set than
@@ -206,14 +213,15 @@ export function BreakCard({
 
   return (
     <div
+      id={anchorId}
       onMouseEnter={() => onHover(brk.id)}
       onMouseLeave={() => onHover(null)}
       onFocus={() => onHover(brk.id)}
       onBlur={() => onHover(null)}
       className={`grid grid-cols-1 gap-x-3 rounded-[4px] px-3 py-4 sm:grid-cols-[auto_minmax(0,1fr)] transition-colors duration-150 ease-[var(--ease-out)] sm:gap-x-4 sm:px-4 ${
-        // The hovered break gets a pale marker pass, matching the stronger pass its days get
-        // on the calendar at the same moment.
-        highlighted ? 'bg-accent-soft' : 'bg-transparent'
+        // The hovered break gets one tone step (chrome never takes the marker; its days get
+        // the stronger marker pass on the calendar at the same moment).
+        highlighted ? 'bg-surface-alt' : 'bg-transparent'
       }`}
     >
       {/* The same number its calendar badge shows: one shared, chronological index. */}
@@ -256,16 +264,29 @@ export function BreakCard({
         )}
 
         <div className="mt-1 flex flex-wrap items-center gap-2">
-          {onTrack && (
-            <button type="button" onClick={() => onTrack(brk)} className={buttonClasses('secondary', 'md', 'min-h-11 px-4')}>
+          {onTrack && tracked !== 'yes' && (
+            <button
+              type="button"
+              onClick={() => setTracked(onTrack(brk) === false ? 'no' : 'yes')}
+              className={buttonClasses('secondary', 'md', 'min-h-11 px-4')}
+            >
               Track this PTO request
             </button>
           )}
+          {tracked === 'yes' && (
+            <p className="flex min-h-11 items-center gap-2 text-sm text-ink">
+              <svg aria-hidden="true" viewBox="0 0 12 12" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 6.2 5 8.5l4.5-5" /></svg>
+              <span className="font-semibold">Tracked</span>
+              <a href="#requests" className="link-mark">See My PTO requests</a>
+            </p>
+          )}
+          {tracked !== null && <span role="status" className="sr-only">{tracked === 'yes' ? 'Request tracked in My PTO requests.' : 'This request could not be added. See My PTO requests.'}</span>}
+          {tracked === 'no' && <a href="#requests" className="link-mark flex min-h-11 items-center text-sm">Not added: see My PTO requests</a>}
           {/* The request tools (request-by date and the copy menu) open per break, so a
               ten-break plan does not repeat ten menus. */}
           {!expanded && (
-            <button type="button" onClick={() => setUserExpanded(true)} className={buttonClasses('quiet', 'md', 'min-h-11')}>
-              Request this time off ↓
+            <button type="button" aria-expanded="false" onClick={() => setUserExpanded(true)} className={buttonClasses('quiet', 'md', 'min-h-11')}>
+              Request this time off <Chevron />
             </button>
           )}
         </div>
@@ -280,8 +301,8 @@ export function BreakCard({
                   { label: 'Copy detailed email draft', text: formatManagerEmailDetailed(brk, isPtoDay, noticePeriodDays, workWeek) },
                 ]}
               />
-              <button type="button" onClick={() => setUserExpanded(false)} className={buttonClasses('quiet', 'md', 'min-h-11')}>
-                Hide ↑
+              <button type="button" aria-expanded="true" onClick={() => setUserExpanded(false)} className={buttonClasses('quiet', 'md', 'min-h-11')}>
+                Hide request tools <Chevron direction="up" />
               </button>
             </div>
           </div>

@@ -244,7 +244,7 @@ export function MoreOptions(props: MoreOptionsProps) {
             const v = e.target.value;
             props.onChangeWeekStartOverride(v === 'auto' ? 'auto' : (Number(v) as WeekStart));
           }}
-          className={FIELD_CLASS}
+          className="select-ink min-w-0 max-w-full text-[15px] font-normal"
         >
           <option value="auto">Follow country</option>
           <option value={1}>Monday</option>
@@ -339,7 +339,7 @@ export function MoreOptions(props: MoreOptionsProps) {
       <section className="@min-[36rem]:col-span-2">
         <h3 className={H4_CLASS}>My employer&apos;s holidays</h3>
         <p className="mb-3 max-w-prose text-sm text-muted">We&apos;ve assumed your employer observes public holidays. Adjust these dates if your company follows a different calendar. Changes update your plan immediately.</p>
-        <div className="flex max-h-64 flex-col overflow-auto rounded-[3px] border border-line px-2">
+        <div className="flex max-h-64 flex-col overflow-auto border-y border-line">
           {props.holidayEntries.map((h) => (
             <div key={`${h.date}-${h.name}`} className="flex min-h-11 items-center justify-between gap-2 border-b border-line text-sm text-ink last:border-b-0">
               <label className="flex min-w-0 cursor-pointer items-center gap-2">

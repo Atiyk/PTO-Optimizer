@@ -19,7 +19,7 @@ interface PeakCapBannerProps {
 export function PeakCapBanner({ applied, maxDays, startDate, endDate }: PeakCapBannerProps) {
   if (!applied) return null;
   return (
-    <div role="status" className="flex gap-2 rounded-[4px] bg-accent-soft p-4 text-sm tabular-nums text-ink">
+    <div role="status" className="flex gap-2 rounded-[4px] border border-line bg-surface p-4 text-sm tabular-nums text-ink">
       <span aria-hidden="true" className="mt-1.5 inline-block h-2.5 w-2.5 shrink-0 bg-ink" />
       <p>{peakCapMessage(maxDays, startDate, endDate)}</p>
     </div>

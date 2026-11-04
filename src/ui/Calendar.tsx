@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { buildMonths, type OffRun, type WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import { MonthGrid } from './MonthGrid';
 import type { MarginalValue } from '@daysoff/engine/solver/marginalValue';
@@ -25,6 +26,11 @@ interface CalendarProps {
   alternativeForDate: (iso: string) => Alternative | undefined;
   onSwapAlternative: (alt: Alternative) => void;
   onHoverAlternative: (id: string | null) => void;
+  /** Optional planner extras: explicit per-day choices on touch, and the verified outcome
+   * of pinning a day (see DayCell). The sabbatical page omits them. */
+  forcedStateOf?: (iso: string) => 'include' | 'exclude' | undefined;
+  onSetDayState?: (date: string, state: 'include' | 'exclude' | null) => void;
+  pinPreview?: (date: string) => string | null;
 }
 
 export function Calendar({
@@ -47,8 +53,29 @@ export function Calendar({
   alternativeForDate,
   onSwapAlternative,
   onHoverAlternative,
+  forcedStateOf,
+  onSetDayState,
+  pinPreview,
 }: CalendarProps) {
   const months = useMemo(() => buildMonths(rangeStart, rangeEnd, weekStart), [rangeStart, rangeEnd, weekStart]);
+
+  // Roving tabindex: the whole calendar is one tab stop (a year would otherwise be ~365
+  // stops). It lands on the last day focused, else today, else the first day of the range;
+  // arrows move by day and week across month boundaries, Home/End to the week's ends.
+  const [focused, setFocused] = useState<string | null>(null);
+  const inRange = (iso: string) => iso >= rangeStart && iso <= rangeEnd;
+  const activeDate = focused && inRange(focused) ? focused : inRange(today) ? today : rangeStart;
+  const onArrow = (from: string, direction: 'left' | 'right' | 'up' | 'down' | 'home' | 'end') => {
+    const column = (mondayIndexedDow(from) + (weekStart === 0 ? 1 : 0)) % 7;
+    const delta =
+      direction === 'left' ? -1 : direction === 'right' ? 1 : direction === 'up' ? -7 : direction === 'down' ? 7 : direction === 'home' ? -column : 6 - column;
+    let target = addDays(from, delta);
+    if (target < rangeStart) target = direction === 'home' ? rangeStart : from;
+    if (target > rangeEnd) target = direction === 'end' ? rangeEnd : from;
+    if (target === from) return;
+    setFocused(target);
+    document.getElementById(`day-${target}`)?.focus();
+  };
 
   return (
     // Two months, not three: the calendar now shares its container with the recommendations
@@ -83,6 +110,12 @@ export function Calendar({
           alternativeForDate={alternativeForDate}
           onSwapAlternative={onSwapAlternative}
           onHoverAlternative={onHoverAlternative}
+          activeDate={activeDate}
+          onFocusDay={setFocused}
+          onArrow={onArrow}
+          forcedStateOf={forcedStateOf}
+          onSetDayState={onSetDayState}
+          pinPreview={pinPreview}
         />
       ))}
     </div>

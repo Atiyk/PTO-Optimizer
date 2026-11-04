@@ -60,7 +60,7 @@ export function DateListEditor({ dates, onAdd, onRemove, label = 'Date to add' }
           type="button"
           disabled={!canAdd}
           onClick={addDate}
-          className="min-h-11 shrink-0 rounded-[3px] border border-ink bg-surface px-4 text-sm font-semibold text-ink hover:bg-accent-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface"
+          className="min-h-11 shrink-0 rounded-[3px] border border-ink bg-surface px-4 text-sm font-semibold text-ink hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface"
         >
           Add
         </button>
@@ -77,7 +77,7 @@ export function DateListEditor({ dates, onAdd, onRemove, label = 'Date to add' }
                 type="button"
                 aria-label={'Remove ' + date}
                 onClick={() => removeDate(date)}
-                className="flex h-11 min-w-11 items-center justify-center rounded-[3px] text-muted hover:bg-mark hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+                className="flex h-11 min-w-11 items-center justify-center rounded-[3px] text-muted hover:bg-surface hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
               >
                 <span aria-hidden="true">&times;</span>
               </button>

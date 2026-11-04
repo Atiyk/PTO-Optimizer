@@ -11,7 +11,12 @@ import { CompactResultBar, Headline } from './Headline';
 import { buttonClasses } from './Button';
 import { SummaryMetrics } from './SummaryMetrics';
 import { PlanExplanation } from './PlanExplanation';
-import { PrimaryControls } from './PrimaryControls';
+import { PrimaryControls, ReserveControls } from './PrimaryControls';
+import { Chevron, PlusMinus } from './Chevron';
+import { pinPreviewText } from './pinPreview';
+import { planningStyleSettings } from '../planning/optimizer';
+import { formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
+import { RelaxedMinimumNotice } from './PlanRecoveryNotice';
 import { PlanSliders } from './PlanSliders';
 import { SubdivisionSelect } from './CountrySelect';
 import { MoreOptions } from './MoreOptions';
@@ -52,11 +57,36 @@ export function App() {
     return rangeISO(state.rangeStart, state.rangeEnd).filter(date => !unavailable.has(date) && (off.has(date) || !state.workWeek[mondayIndexedDow(date)]));
   }, [state.validationIssues, state.effectiveOffDays, state.solveInput.blackouts, state.rangeStart, state.rangeEnd, state.workWeek]);
   const requestCalendar = { workWeek: state.workWeek, offDays: state.effectiveOffDays, rangeStart: state.rangeStart, rangeEnd: state.rangeEnd };
+  // Tracking confirms on the break itself ("Tracked"), without jumping down the page.
   const trackBreak = (brk: typeof state.breaks[number]) => {
-    if (!state.holidaysReady || state.holidaysDegraded) return;
+    if (!state.holidaysReady || state.holidaysDegraded) return false;
     const action = ledger.addRequest({ start: brk.start, end: brk.end }, requestCalendar);
     if (action.ok) track('request_tracking_started');
-    requestAnimationFrame(() => document.getElementById('requests')?.scrollIntoView?.({ block: 'start' }));
+    return action.ok;
+  };
+  // The touch day sheet sets a day's state directly (take / never / let the planner
+  // decide); the planner stores it as the same three-step pin cycle a click walks through.
+  const setDayState = (date: string, target: 'include' | 'exclude' | null) => {
+    const cycle: (string | undefined)[] = [undefined, 'include', 'exclude'];
+    let steps = (cycle.indexOf(target ?? undefined) - cycle.indexOf(state.forced[date]) + 3) % 3;
+    while (steps-- > 0) state.toggleDay(date);
+  };
+  const pinPreview = (date: string) => {
+    const preview = state.previewPin(date);
+    return preview ? pinPreviewText(preview, { totalDaysOff: state.totalDaysOff, budgetSpent: state.budgetSpent }) : null;
+  };
+  // Opening More options from the rail scrolls the panel into view (it can open below the
+  // fold inside the sticky rail).
+  const optionsRef = useRef<HTMLDivElement>(null);
+  const toggleOptions = () => {
+    const next = !optionsOpen;
+    setOptionsOpen(next);
+    if (next) requestAnimationFrame(() => optionsRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }));
+  };
+  const [partnerOpenKey, setPartnerOpenKey] = useState(0);
+  const openPartnerPlanner = () => {
+    setPartnerOpenKey((k) => k + 1);
+    requestAnimationFrame(() => document.getElementById('partner-planner')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }));
   };
   const hasHover = useHasHover();
   const today = todayISO();
@@ -80,7 +110,9 @@ export function App() {
 
   const plannable = !state.validationIssues.length && !state.solverIssue;
   const fieldLabel = 'text-sm font-semibold text-ink';
-  const selectClass = 'h-11 w-full min-w-0 rounded-[3px] border border-line-strong bg-surface px-3 text-[15px] font-normal text-ink';
+  const selectClass = 'select-ink w-full min-w-0 text-[15px] font-normal';
+  const stylePreset = planningStyleSettings(state.planningStyle);
+  const sliderLabel = (count: number) => count >= 7 ? 'as many breaks as possible' : count === 1 ? '1 break (all in one)' : `${count} breaks`;
 
   return (
     <div className="min-h-screen bg-page">
@@ -137,7 +169,7 @@ export function App() {
                 <section aria-labelledby="plan-inputs-heading" className="flex min-w-0 flex-col gap-3.5">
                   <h2 id="plan-inputs-heading" className="text-xl font-bold leading-6 text-ink type-condensed">Your time off</h2>
                   <PrimaryControls
-                    advanced={optionsOpen}
+                    advanced={false}
                     country={state.country}
                     onChangeCountry={state.setCountry}
                     rangeStart={state.rangeStart}
@@ -175,12 +207,19 @@ export function App() {
                   />
                   <label className="flex flex-col gap-1.5">
                     <span className={fieldLabel}>Planning style</span>
-                    <select aria-label="Planning style" className={selectClass} value={state.planningStyle} onChange={event => state.setPlanningStyle(event.target.value as typeof state.planningStyle)}>
+                    <select aria-label="Planning style" aria-describedby="planning-style-note" className={selectClass} value={state.planningStyle} onChange={event => state.setPlanningStyle(event.target.value as typeof state.planningStyle)}>
                       <option value="balanced">Balanced</option>
                       <option value="long-breaks">Long breaks</option>
                       <option value="more-breaks">More breaks</option>
                       <option value="custom">Custom</option>
                     </select>
+                    {/* A style is a preset for the two sliders above; say what it sets, so a
+                        change never moves the sliders without explanation. */}
+                    <span id="planning-style-note" className="text-sm font-normal text-muted">
+                      {stylePreset
+                        ? `Sets What matters more to ${stylePreset.w} and How many breaks to ${sliderLabel(stylePreset.breakCount)}. Moving a slider switches to Custom.`
+                        : 'Custom: the sliders keep your own settings.'}
+                    </span>
                   </label>
                 </section>
 
@@ -190,11 +229,11 @@ export function App() {
                     type="button"
                     aria-expanded={optionsOpen}
                     aria-controls="planning-options"
-                    onClick={() => setOptionsOpen((v) => !v)}
+                    onClick={toggleOptions}
                     className={buttonClasses('secondary', 'md', 'w-full justify-between!')}
                   >
                     <span>{optionsOpen ? 'Hide options' : 'More options'}</span>
-                    <span aria-hidden="true" className="text-lg leading-none">{optionsOpen ? '−' : '+'}</span>
+                    <PlusMinus open={optionsOpen} />
                   </button>
                   {!optionsOpen && (
                     <p className="mt-2 text-sm text-muted">
@@ -202,7 +241,14 @@ export function App() {
                     </p>
                   )}
                   {optionsOpen && (
-                    <div id="planning-options" className="mt-5 flex scroll-mt-16 flex-col gap-5">
+                    <div id="planning-options" ref={optionsRef} className="mt-5 flex scroll-mt-16 flex-col gap-5">
+                      <ReserveControls
+                        budget={state.budget}
+                        reserveDays={state.reserveDays}
+                        onChangeReserveDays={state.setReserveDays}
+                        unlimitedPto={state.unlimitedPto}
+                        onToggleUnlimitedPto={state.setUnlimitedPto}
+                      />
                       <SubdivisionSelect
                         subdivisions={state.discoveredSubdivisions}
                         subdivision={state.subdivision}
@@ -280,14 +326,21 @@ export function App() {
                 desktop the calendar is lifted above the breaks with `order` as the dominant
                 visual. The two are independent regions, so focus order stays meaningful. */}
             <div className="flex min-w-0 flex-col gap-12 lg:col-start-2 lg:row-start-2 lg:gap-16">
-              {(state.partnerOverlapReceived || partnerReceived.invalid || partnerReceived.availability || state.validationIssues.length > 0 || state.solverIssue || state.peakCapApplied || state.holidaysDegraded) && (
+              {(state.partnerOverlapReceived || partnerReceived.invalid || partnerReceived.availability || state.validationIssues.length > 0 || state.solverIssue || state.relaxedMinimum !== undefined || state.peakCapApplied || state.holidaysDegraded) && (
                 <div className="flex flex-col gap-3">
                   {state.partnerOverlapReceived && (
                     <PartnerOverlapBanner overlapDayCount={state.overlapDays.length} onDismiss={state.dismissPartnerOverlapBanner} />
                   )}
                   {partnerReceived.invalid && <p role="alert" className="rounded-[4px] border border-ink bg-surface p-4 text-sm text-ink">This partner availability link is invalid or too large. Ask for a new link with fewer dates.</p>}
-                  {partnerReceived.availability && <p role="status" className="rounded-[4px] bg-accent-soft p-4 text-sm text-ink">Someone shared {partnerReceived.availability.days.length} {partnerReceived.availability.status} available dates. Your own PTO budget and calendar apply. <a className="link-mark font-semibold" href="#partner-planner">See dates you can both take off</a></p>}
+                  {partnerReceived.availability && <p role="status" className="rounded-[4px] bg-surface-alt p-4 text-sm text-ink">Someone shared {partnerReceived.availability.days.length} {partnerReceived.availability.status} available dates. Your own PTO budget and calendar apply. <a className="link-mark font-semibold" href="#partner-planner">See dates you can both take off</a></p>}
                   <ValidationBanner issues={state.validationIssues} />
+                  {state.relaxedMinimum !== undefined && (
+                    <RelaxedMinimumNotice
+                      minimum={state.relaxedMinimum}
+                      onClearPins={() => state.clearForcedDays()}
+                      onNoMinimum={() => state.setMinimumBreakDays(0)}
+                    />
+                  )}
                   {state.solverIssue && (
                     <PlanRecoveryNotice
                       issue={state.solverIssue}
@@ -317,50 +370,60 @@ export function App() {
                 </div>
               )}
 
-              <section aria-labelledby="breaks-heading" className="order-1 min-w-0 lg:order-2">
-                <h2 id="breaks-heading" className="text-h2 font-bold text-ink type-condensed">
+              {/* The plan at a glance, above the calendar at every width: one line per break,
+                  each linked to its full card below. DOM order is the visual order. */}
+              <section aria-labelledby="summary-heading" className="min-w-0">
+                <h2 id="summary-heading" className="text-h2 font-bold text-ink type-condensed">
                   {state.breaks.length === 1 ? 'Your break' : 'Your breaks'}
                 </h2>
-                <p className="mt-1 max-w-prose text-sm text-muted">
-                  {state.breaks.length > 0
-                    ? 'In date order, numbered as on the calendar. They belong to one plan and fit together. Public holidays are assumed observed; customize your employer calendar in More options.'
-                    : state.solverIssue
+                {state.breaks.length === 0 ? (
+                  <p className="mt-1 max-w-prose text-sm text-muted">
+                    {state.solverIssue
                       ? 'Your current constraints prevent a valid plan. Adjust your selected dates or review the settings.'
                       : 'No PTO-worthy breaks fit this range and budget yet — try widening the date range or increasing PTO days.'}
-                </p>
-                {state.breaks.length > 1 && mostContestedIndex !== undefined && (
-                  <p className="mt-2 max-w-prose text-sm text-muted">
-                    Break {mostContestedIndex} falls in an estimated popular vacation period. This reflects public demand, not coworkers&apos; plans.
                   </p>
-                )}
-                {state.breaks.length > 0 && (
-                  <ul className="m-0 mt-4 flex list-none flex-col divide-y divide-line border-y border-line p-0">
-                    {state.orderedBreaks.map(({ index, brk }) => (
-                      <li key={brk.id} className="py-1">
-                        <BreakCard
-                          onTrack={state.holidaysReady && !state.holidaysDegraded ? trackBreak : undefined}
-                          brk={brk}
-                          index={index}
-                          highlighted={state.highlightedBreakIds.has(brk.id) || state.hoveredBreakId === brk.id}
-                          isPtoDay={state.isSuggestedPto}
-                          onHover={state.setHoveredBreakId}
-                          isMostContested={brk.id === mostContestedId}
-                          reason={breakReason(brk, state.holidayNameFor)}
-                          today={today}
-                          noticePeriodDays={state.noticePeriodDays}
-                          workWeek={state.workWeek}
-                          defaultExpanded={index === 1}
-                        />
-                      </li>
-                    ))}
-                  </ul>
+                ) : (
+                  <>
+                    <ol className="m-0 mt-3 list-none divide-y divide-line border-y border-line p-0">
+                      {state.orderedBreaks.map(({ index, brk }) => (
+                        <li key={brk.id}>
+                          <a
+                            href={`#break-${index}`}
+                            onMouseEnter={() => state.setHoveredBreakId(brk.id)}
+                            onMouseLeave={() => state.setHoveredBreakId(null)}
+                            onFocus={() => state.setHoveredBreakId(brk.id)}
+                            onBlur={() => state.setHoveredBreakId(null)}
+                            className="group grid min-h-11 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 py-2 text-ink hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+                          >
+                            <span aria-hidden="true" className="flex h-6 min-w-6 items-center justify-center rounded-[3px] bg-ink px-1 text-xs font-bold tabular-nums text-white">{index}</span>
+                            <span className="min-w-0 tabular-nums">
+                              <span className="sr-only">Break {index}: </span>
+                              <span className="font-bold type-condensed text-lg leading-6">{formatCardDateRange(brk.start, brk.end)}</span>
+                              <span className="ml-3 text-sm"><span className="mark font-semibold">{brk.totalDaysOff} days off</span> for {brk.ptoCost} PTO {brk.ptoCost === 1 ? 'day' : 'days'}</span>
+                            </span>
+                            <span className="flex items-center gap-1 text-sm text-muted group-hover:text-ink">
+                              <span className="hidden sm:inline">Details</span>
+                              <Chevron direction="right" />
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ol>
+                    {state.breaks.length > 1 && mostContestedIndex !== undefined && (
+                      <p className="mt-2 max-w-prose text-sm text-muted">
+                        Break {mostContestedIndex} falls in an estimated popular vacation period. This reflects public demand, not coworkers&apos; plans.
+                      </p>
+                    )}
+                  </>
                 )}
               </section>
 
-              <section aria-labelledby="complete-plan-heading" className="order-2 min-w-0 lg:order-1">
+              <section aria-labelledby="complete-plan-heading" className="min-w-0">
                 <h2 id="complete-plan-heading" tabIndex={-1} className="text-h2 font-bold text-ink type-condensed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Your complete plan</h2>
                 <p className="mt-1 max-w-prose text-sm text-muted">
-                  Click any day to pin it in or rule it out. Hover or focus a day to see what it would gain.
+                  {hasHover
+                    ? 'Click a day to take it, click again to rule it out, a third time to let the planner decide. Hover or focus a day to see what pinning it would do. Arrow keys move between days.'
+                    : 'Tap a day to take it, rule it out, or let the planner decide.'}
                 </p>
                 <div className="mt-4 rounded-[4px] border border-line bg-surface p-3 sm:p-5">
                   {!state.validationIssues.length ? <CalendarErrorBoundary>
@@ -384,6 +447,9 @@ export function App() {
                       alternativeForDate={state.alternativeForDate}
                       onSwapAlternative={state.swapAlternative}
                       onHoverAlternative={state.setHoveredAlternativeId}
+                      forcedStateOf={(iso) => state.forced[iso]}
+                      onSetDayState={setDayState}
+                      pinPreview={pinPreview}
                     />
                   </CalendarErrorBoundary> : <p role="status" className="text-sm text-muted">Choose valid dates and a PTO balance to display the calendar.</p>}
                   <div className="mt-5 border-t border-line pt-4">
@@ -392,7 +458,37 @@ export function App() {
                 </div>
               </section>
 
-              <section aria-labelledby="take-it-heading" className="order-3 flex min-w-0 flex-col gap-5">
+              <section aria-labelledby="breaks-heading" className="min-w-0">
+                <h2 id="breaks-heading" className="text-h2 font-bold text-ink type-condensed">Requesting each break</h2>
+                <p className="mt-1 max-w-prose text-sm text-muted">
+                  Why each break was chosen, when to ask for it, and a ready-made request. Public holidays are assumed observed; customize your employer calendar in More options.
+                </p>
+                {state.breaks.length > 0 ? (
+                  <ul className="m-0 mt-4 flex list-none flex-col divide-y divide-line border-y border-line p-0">
+                    {state.orderedBreaks.map(({ index, brk }) => (
+                      <li key={brk.id} className="py-1">
+                        <BreakCard
+                          onTrack={state.holidaysReady && !state.holidaysDegraded ? trackBreak : undefined}
+                          brk={brk}
+                          index={index}
+                          highlighted={state.highlightedBreakIds.has(brk.id) || state.hoveredBreakId === brk.id}
+                          isPtoDay={state.isSuggestedPto}
+                          onHover={state.setHoveredBreakId}
+                          isMostContested={brk.id === mostContestedId}
+                          reason={breakReason(brk, state.holidayNameFor)}
+                          today={today}
+                          noticePeriodDays={state.noticePeriodDays}
+                          workWeek={state.workWeek}
+                          defaultExpanded={index === 1}
+                          anchorId={`break-${index}`}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p className="mt-4 text-sm text-muted">Breaks appear here once the plan has some.</p>}
+              </section>
+
+              <section aria-labelledby="take-it-heading" className="flex min-w-0 flex-col gap-5">
                 <div>
                   <h2 id="take-it-heading" className="text-h2 font-bold text-ink type-condensed">Take it with you</h2>
                   <p className="mt-1 text-sm text-muted">Free, no sign-up, no email. Everything stays in this browser until you share it.</p>
@@ -409,23 +505,23 @@ export function App() {
                   travelPercentile={state.scores?.travel.percentile ?? null}
                   efficiencyPercentile={state.scores?.efficiency.percentile ?? null}
                   noticePeriodDays={state.noticePeriodDays}
-                  buildOverlapLink={state.buildOverlapLink}
+                  onPlanWithPartner={openPartnerPlanner}
                 /> : <p role="status" className="text-sm text-muted">Check your planning inputs before exporting.</p>}
 
                 {plannable && state.holidaysReady && !state.holidaysDegraded && (
                   <PortraitShare breaks={state.breaks} rangeStart={state.rangeStart} rangeEnd={state.rangeEnd} holidayAssumption={state.employerCalendar.custom.length ? 'company' : state.employerCalendar.excluded.length ? 'customized' : 'public'} remainingBalance={state.unlimitedPto ? undefined : Math.max(0, state.budget - state.budgetSpent)} holidayNamesOf={brk => [...new Set(state.holidayEntries.filter(holiday => holiday.checked && holiday.date >= brk.start && holiday.date <= brk.end).map(holiday => holiday.source === 'custom' ? 'Company holiday' : holiday.name))]} />
                 )}
                 <div id="partner-planner" className="scroll-mt-16">
-                  {state.holidaysReady && !state.holidaysDegraded && !state.validationIssues.length ? <PartnerPlanner breaks={state.breaks} freeDays={freeDays} input={state.solveInput} minimumBreakLength={state.minimumBreakDays} /> : <p role="status" className="text-sm text-muted">Partner planning will be available after your calendar loads with valid dates and holiday data.</p>}
+                  {state.holidaysReady && !state.holidaysDegraded && !state.validationIssues.length ? <PartnerPlanner openKey={partnerOpenKey} breaks={state.breaks} freeDays={freeDays} input={state.solveInput} minimumBreakLength={state.minimumBreakDays} /> : <p role="status" className="text-sm text-muted">Partner planning will be available after your calendar loads with valid dates and holiday data.</p>}
                 </div>
               </section>
 
-              <div id="requests" className="order-4 flex min-w-0 scroll-mt-16 flex-col gap-3">
+              <div id="requests" className="flex min-w-0 scroll-mt-16 flex-col gap-3">
                 <PtoTracker today={today} ledger={ledger} calendar={requestCalendar} calendarReady={state.holidaysReady && !state.holidaysDegraded} calendarNotice={!state.holidaysReady ? 'Loading your employer calendar…' : state.holidaysDegraded ? 'Holiday data is incomplete. Check your employer calendar before adding or changing request dates.' : undefined} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
                 <p className="text-sm text-muted"><a href="/policy#balance" className="link-mark font-semibold">Forecast my balance and check expiration</a></p>
               </div>
 
-              <div className="order-5 min-w-0">
+              <div className="min-w-0">
                 <FAQ />
               </div>
             </div>
@@ -433,7 +529,8 @@ export function App() {
         </Container>
       </main>
 
-      <Footer onShowShortcuts={() => setShowHelp(true)} />
+      {/* Keyboard shortcuts are offered only where a keyboard is likely (a hover pointer). */}
+      <Footer onShowShortcuts={hasHover ? () => setShowHelp(true) : undefined} />
       <KeyboardShortcutsHelp open={showHelp} onClose={() => setShowHelp(false)} />
     </div>
   );

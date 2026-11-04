@@ -108,7 +108,7 @@ export function CountrySelect({ country, onChangeCountry, widthClass = 'w-56 max
                 key={c.code}
                 role="option"
                 aria-selected={c.code === country}
-                className={`block min-h-11 cursor-pointer px-3 py-2.5 text-left text-sm text-ink ${index === activeIndex ? 'bg-accent-soft outline outline-1 -outline-offset-1 outline-[var(--text-primary)]' : 'hover:bg-surface-alt'}`}
+                className={`block min-h-11 cursor-pointer px-3 py-2.5 text-left text-sm text-ink ${index === activeIndex ? 'bg-surface-alt outline outline-1 -outline-offset-1 outline-[var(--text-primary)]' : 'hover:bg-surface-alt'}`}
                 onMouseDown={(event) => event.preventDefault()}
                 onMouseMove={() => setActiveIndex(index)}
                 onClick={() => selectCountry(c.code)}
@@ -146,8 +146,7 @@ export function SubdivisionSelect({ subdivisions, subdivision, onChangeSubdivisi
       <select
         value={subdivision ?? ''}
         onChange={(e) => onChangeSubdivision(e.target.value || undefined)}
-        className={`${FIELD_CLASS} max-w-xs font-normal`}
-        style={CHEVRON_BG}
+        className="select-ink w-full max-w-xs text-[15px] font-normal"
       >
         <option value="">All regions</option>
         {subdivisions.map((code) => (

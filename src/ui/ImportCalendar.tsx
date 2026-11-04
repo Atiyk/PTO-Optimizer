@@ -88,7 +88,7 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
           const file = e.target.files?.[0];
           if (file) handleFile(file);
         }}
-        className="block w-full max-w-full text-sm text-muted file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-[3px] file:border file:border-solid file:border-ink file:bg-surface file:px-4 file:text-sm file:font-semibold file:text-ink hover:file:bg-accent-soft"
+        className="block w-full max-w-full text-sm text-muted file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-[3px] file:border file:border-solid file:border-ink file:bg-surface file:px-4 file:text-sm file:font-semibold file:text-ink hover:file:bg-surface-alt"
       />
       {state.kind === 'error' && (
         <p role="alert" className="mt-2 text-sm font-semibold text-ink">
@@ -96,7 +96,7 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
         </p>
       )}
       {state.kind === 'preview' && (
-        <div className="mt-2 flex flex-col gap-1.5 rounded-[4px] bg-surface-alt p-3 text-sm text-ink">
+        <div className="mt-2 flex flex-col gap-1.5 border-l-2 border-ink pl-3 text-sm text-ink">
           <p>
             Found {state.result.busyDays.length} busy day{state.result.busyDays.length === 1 ? '' : 's'} between{' '}
             {summarizeMonths(state.result.busyDays)} &mdash; add them?

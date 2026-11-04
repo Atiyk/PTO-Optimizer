@@ -35,7 +35,7 @@ describe('tracker employer calendar coverage', () => {
     expect(end.value).toBe('2027-01-01');
     expect(start.min).toBe('2027-01-01'); expect(start.max).toBe('2027-01-31');
     expect(end.min).toBe('2027-01-01'); expect(end.max).toBe('2027-01-31');
-    expect(screen.getByText(/This calendar covers 2027-01-01 through 2027-01-31/)).toBeTruthy();
+    expect(screen.getByText(/This calendar covers Jan 1, 2027 through Jan 31, 2027/)).toBeTruthy();
     expect(screen.getByText(/Choose a later forecast date or open the optimizer/)).toBeTruthy();
   });
   it('refuses out-of-coverage additions in both the UI and the ledger action', () => {

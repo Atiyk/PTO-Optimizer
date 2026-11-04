@@ -47,7 +47,7 @@ export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlans
           <button
             type="button"
             onClick={() => onRestore(i)}
-            className="flex min-h-11 items-center px-2 font-semibold underline underline-offset-[0.22em] hover:bg-mark"
+            className="flex min-h-11 items-center px-2 font-semibold underline underline-offset-[0.22em] hover:bg-surface-alt"
           >
             restore
           </button>

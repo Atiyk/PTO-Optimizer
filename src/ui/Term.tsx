@@ -35,7 +35,7 @@ export function Term({ id, children }: { id: string; children?: React.ReactNode 
         // inline flow (MoreOptions.tsx's "Accrual" heading etc.) - still short of the ideal
         // 44px touch target for a one-character glyph without turning it into a visible
         // button, which is a real design tradeoff, not fully resolved - see PROGRESS.md.
-        className="cursor-help border-b border-dotted border-line-strong px-0.5 py-1 text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]"
+        className={`cursor-help border-b border-dotted border-line-strong px-0.5 py-1 text-ink ${children === '?' ? 'inline-flex min-h-11 min-w-11 items-center justify-center border-b-0 font-semibold underline decoration-dotted underline-offset-4' : ''} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]`}
         onMouseEnter={openPopover}
         onMouseLeave={() => setOpen(false)}
         onFocus={openPopover}

@@ -6,7 +6,6 @@ import { downloadICS } from './icsExport';
 import { copyShareImage, buildShareImageMonths } from './imageExport';
 import { copyText } from './requestText';
 import { track } from './analytics';
-import { PartnerShareButton } from './PartnerShareButton';
 import { DEFAULT_SITE_HOST } from './siteUrl';
 import { buttonClasses } from './Button';
 
@@ -25,10 +24,9 @@ interface ExportBarProps {
    * "Request by" date on every break card (see requestDeadline.ts), so this panel no
    * longer owns an independent 7/14/30 choice that could silently disagree with it. */
   noticePeriodDays: number;
-  /** Layout fix: "Share with a partner" is the same kind of action as the three export
-   * buttons - previously split out into its own standalone row elsewhere on the page, now
-   * the fourth button in this one row (see the row's own comment below). */
-  buildOverlapLink: () => string;
+  /** Opens the "Plan with someone" panel, where the person chooses which dates to share
+   * and confirms them before any link is made (no link is copied from here). */
+  onPlanWithPartner: () => void;
 }
 
 export interface ActionResult {
@@ -169,7 +167,9 @@ export function ExportBar(props: ExportBarProps) {
             return ok ? { ok: true, message: 'Link copied' } : { ok: false, message: "Couldn't copy — try again" };
           }}
         />
-        <PartnerShareButton buildOverlapLink={props.buildOverlapLink} />
+        <button type="button" onClick={props.onPlanWithPartner} className={buttonClasses('secondary', 'md')}>
+          Plan with a partner
+        </button>
       </div>
       <label className="flex min-h-11 cursor-pointer flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-ink">
         <input

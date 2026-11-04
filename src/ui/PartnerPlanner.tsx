@@ -5,6 +5,7 @@ import { buildPartnerShareURL, findJointOpportunities, readPartnerAvailability, 
 import { copyText } from './requestText';
 import { downloadICS } from './icsExport';
 import { Button } from './Button';
+import { PlusMinus } from './Chevron';
 import { track } from './analytics';
 
 export interface PartnerPlannerProps {
@@ -14,9 +15,11 @@ export interface PartnerPlannerProps {
   /** Recipient's own inputs, including reserve-adjusted budget, blackouts and policy rules. */
   input: SolveInput;
   minimumBreakLength?: number;
+  /** Bumped by "Plan with a partner" in the export row: opens this panel and moves focus to it. */
+  openKey?: number;
 }
 
-export function PartnerPlanner({ breaks, freeDays, input, minimumBreakLength = 3 }: PartnerPlannerProps) {
+export function PartnerPlanner({ breaks, freeDays, input, minimumBreakLength = 3, openKey = 0 }: PartnerPlannerProps) {
   const [received] = useState(() => readPartnerAvailability(typeof window === 'undefined' ? '' : window.location.search));
   const [open, setOpen] = useState(!!received.availability || received.invalid);
   const [selected, setSelected] = useState<string[] | null>(null);
@@ -26,6 +29,15 @@ export function PartnerPlanner({ breaks, freeDays, input, minimumBreakLength = 3
   const [message, setMessage] = useState('');
   const id = useId();
   const opened = useRef(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const [seenOpenKey, setSeenOpenKey] = useState(openKey);
+  if (openKey !== seenOpenKey) {
+    setSeenOpenKey(openKey);
+    if (openKey) setOpen(true);
+  }
+  useEffect(() => {
+    if (openKey) toggleRef.current?.focus({ preventScroll: true });
+  }, [openKey]);
   useEffect(() => {
     if (received.availability && !opened.current) { opened.current = true; track('partner_share_opened'); }
   }, [received.availability]);
@@ -51,14 +63,14 @@ export function PartnerPlanner({ breaks, freeDays, input, minimumBreakLength = 3
 
   return (
     <section className="rounded-[4px] border border-line bg-surface px-4 py-2 sm:px-5" aria-label="Partner vacation planner">
-      <h2><button type="button" className="flex min-h-12 w-full items-center justify-between gap-3 text-left text-xl font-bold text-ink type-condensed" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}>
-        <span>Plan with someone</span><span aria-hidden="true" className="text-2xl font-normal leading-none">{open ? '−' : '+'}</span>
+      <h2><button ref={toggleRef} type="button" className="flex min-h-12 w-full items-center justify-between gap-3 text-left text-xl font-bold text-ink type-condensed" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}>
+        <span>Plan with someone</span><PlusMinus open={open} className="h-4 w-4" />
       </button></h2>
       {!open && <p className="pb-2 text-sm text-muted">Find dates you can both take off, without sharing your balance.</p>}
       {open && <div id={id} className="mt-2 space-y-5 pb-3">
         <p className="max-w-2xl text-sm text-muted">Choose which dates to share. Your partner uses their own country, work schedule, employer holidays, and PTO budget in the controls above.</p>
         {received.invalid && <p role="alert" className="rounded-[4px] border border-ink p-3 text-sm text-ink">This shared availability link is invalid or too large. Ask for a new link with fewer dates.</p>}
-        {received.availability && <div className="rounded-[4px] bg-surface-alt p-4">
+        {received.availability && <div className="border-t border-line pt-4">
           <h3 className="font-semibold text-ink">Here are the dates you can both take off.</h3>
           <p className="mt-1 text-sm text-muted">Your partner shared {received.availability.days.length} dates as {received.availability.status} availability, from {formatDateRange(received.availability.days[0], received.availability.days[received.availability.days.length - 1])}. Dates outside that selection are undisclosed.</p>
           <p className="mt-1 text-sm text-muted">Proposed dates may still need employer approval. Gapless does not contact either employer.</p>

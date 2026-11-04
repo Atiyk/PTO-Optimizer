@@ -42,3 +42,28 @@ export function PlanRecoveryNotice({
     </section>
   );
 }
+
+/**
+ * Shown when the plan exists only because the minimum break length was set aside for the
+ * person's pinned dates (a lone pinned workday is placed as its own short break). Says so
+ * plainly and offers the two ways back, rather than collapsing the plan to "0 days off".
+ */
+export function RelaxedMinimumNotice({ minimum, onClearPins, onNoMinimum }: { minimum: number; onClearPins: () => void; onNoMinimum: () => void }) {
+  return (
+    <section role="status" aria-label="Minimum break set aside" className="rounded-[4px] border border-ink bg-surface p-4 text-ink">
+      <h2 className="text-[15px] font-semibold">Your pinned days don&apos;t fit a {minimum}-day minimum break.</h2>
+      <p className="mt-1 max-w-prose text-sm text-muted">
+        So this plan keeps your pins and sets the minimum aside. Remove the pins to get a plan that respects the
+        minimum, or keep the pins and drop the minimum.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" onClick={onClearPins} className={buttonClasses('secondary', 'md', 'min-h-11')}>
+          Remove pinned and excluded dates
+        </button>
+        <button type="button" onClick={onNoMinimum} className={buttonClasses('quiet', 'md', 'min-h-11')}>
+          Use no minimum break
+        </button>
+      </div>
+    </section>
+  );
+}

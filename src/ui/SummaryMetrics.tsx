@@ -24,21 +24,24 @@ function useChangeFlash(value: string): boolean {
   return flashing;
 }
 
-function Fact({ figure, label, children }: { figure: string; label: string; children: ReactNode }) {
+function Fact({ figure, label, short, children }: { figure: string; label: string; short: string; children: ReactNode }) {
   const flashing = useChangeFlash(figure);
   return (
-    <div className="grid min-w-0 grid-cols-[4.5rem_minmax(0,1fr)] items-baseline gap-x-3 sm:block">
+    <div className="min-w-0">
       <dt className="sr-only">{label}</dt>
-      <dd className="m-0 contents sm:block">
+      <dd className="m-0">
         <span
           data-figure
-          className={`-mx-1 inline-block w-fit rounded-[3px] px-1 text-[1.75rem] leading-8 tabular-nums text-ink type-display transition-colors duration-150 ${
+          className={`-mx-1 inline-block w-fit rounded-[3px] px-1 text-2xl leading-7 sm:text-[1.75rem] sm:leading-8 tabular-nums text-ink type-display transition-colors duration-150 ${
             flashing ? 'bg-accent-soft' : 'bg-transparent'
           }`}
         >
           {figure}
         </span>
-        <span className="block text-sm leading-5 text-muted sm:mt-1">{children}</span>
+        {/* Phones: the three figures share one row with a short label each; the full
+            plain-language reading appears from sm up. */}
+        <span aria-hidden="true" className="block text-xs leading-4 text-muted sm:hidden">{short}</span>
+        <span className="sr-only sm:not-sr-only sm:mt-1 sm:block sm:text-sm sm:leading-5 sm:text-muted">{children}</span>
       </dd>
     </div>
   );
@@ -64,16 +67,16 @@ export function SummaryMetrics({ budgetSpent, totalDaysOff, breakCountActual, sc
   const ptoWord = budgetSpent === 1 ? 'day' : 'days';
   const breakWord = breakCountActual === 1 ? 'break' : 'breaks';
   return (
-    <dl className="m-0 grid grid-cols-1 gap-x-8 gap-y-3 border-t border-line pt-4 sm:grid-cols-3">
-      <Fact figure={ratio ? `${ratio}×` : '—'} label="Days off per PTO day">
+    <dl className="m-0 grid grid-cols-3 gap-x-3 border-t border-line pt-4 sm:gap-x-8">
+      <Fact figure={ratio ? `${ratio}×` : '—'} label="Days off per PTO day" short="days off per PTO day">
         {ratio
           ? <>{totalDaysOff} {offWord} off for {budgetSpent} PTO {ptoWord} in {breakCountActual} {breakWord}. Each PTO day buys {ratio} days off, weekends and holidays included.</>
           : <>No PTO placed yet, so there is no return to show.</>}
       </Fact>
-      <Fact figure={scores ? ordinal(scores.efficiency.percentile) : '—'} label="Efficiency percentile">
+      <Fact figure={scores ? ordinal(scores.efficiency.percentile) : '—'} label="Efficiency percentile" short="efficiency percentile">
         {scores ? <>Efficiency percentile (higher is better): {gloss(efficiencyLine(scores))}.</> : <>Efficiency percentile appears once the plan is solved.</>}
       </Fact>
-      <Fact figure={scores ? ordinal(scores.travel.percentile) : '—'} label="Travel percentile">
+      <Fact figure={scores ? ordinal(scores.travel.percentile) : '—'} label="Travel percentile" short="travel percentile">
         {scores ? <>Travel percentile (higher is quieter): {gloss(travelLine(scores))}.</> : <>Travel percentile appears once the plan is solved.</>}
       </Fact>
     </dl>
