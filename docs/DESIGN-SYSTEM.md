@@ -16,7 +16,7 @@ marked run of days. Source of truth for values is `src/index.css`; this file exp
 | `--text-primary` / `text-ink` | `#141414` | All running text, headings, primary numerals. |
 | `--text-muted` / `text-muted` | `#56564f` | Secondary text (≥4.5:1 on every surface). |
 | `--accent` / `bg-accent` | `#141414` | **Ink is the action colour.** Primary buttons, PTO days. |
-| `--mark` / `bg-mark` | `#dcf763` | **The marker.** Days-off runs, the plan result, active nav, selection, hover on primary. |
+| `--mark` / `bg-mark` | `#dcf763` | **The marker.** Days-off runs, the plan result, active nav, selection. Never a hover on chrome. |
 | `--mark-strong` | `#c9e83d` | A second marker pass (hover on something already marked). |
 | `--accent-soft` | `#f1fbc4` | A pale marker pass: selected chips, plan findings. |
 | `--pto-bg` | `#141414` | Suggested PTO day: solid ink block, white numeral. |
@@ -26,7 +26,8 @@ Rules
 - No other hue. No teal, no orange, no blue links, no red except a genuine error (use ink plus
   an icon and words; if a red is truly needed, `#b42318` on white, 6.1:1).
 - The marker never carries text that is lighter than ink, and never sits on ink except in the
-  footer close and the logo.
+  logo. The marker is for data (your time, your results); chrome (buttons, links, footer) never
+  uses it, including on hover.
 - State is never colour alone: PTO = solid ink block; days off = marker run; holiday = ring/dot
   plus label; pinned = pin glyph; alternative = dashed ink outline.
 
@@ -53,34 +54,42 @@ Headings at most two lines (`text-wrap: balance` is global).
   Never `rounded-full` pills for buttons, never 12-24px soft cards.
 - Depth: tone steps and hairlines. No shadow at rest; only floating things (menus, popovers,
   dialogs, the phone tab bar's top edge) may have one.
-- Layout: `Container` max 1280px, gutters 16px (phone) / 24px (sm+). Section gap ≥ 64px on
-  desktop app screens, 96-160px on the landing page. More space above a heading than below.
+- Layout: `Container` max 1280px, gutters 16px (phone) / 24px (sm+). App screens use a 32px
+  section rhythm (`SECTION_GAP`) with hairline rules; the landing page uses 80px (phone) / 112px
+  (desktop) between sections. More space above a heading than below.
 - Touch targets ≥ 44px (`min-h-11`).
 
 ## Components (src/ui)
 
-- `Button`: primary = solid ink, hover = marker with ink text, press scale .97; secondary =
-  1px ink outline on white; quiet = underlined text, marker on hover. One primary per view.
+- `Button`: primary = solid ink, hover lifts to `#3a3a35`, press scale .97; secondary = 1px ink
+  outline on white, hover one tone step; quiet = underlined text, underline thickens on hover.
+  One primary per view in page content (the header's Plan PTO is navigation chrome).
 - `Card`: white sheet, 1px `border-line`, 4px corners, no shadow. Do not nest cards; inside a
   card use tone steps or rules.
 - `Chip`: square label; `tone="accent"` = marker fill.
 - `Callout`: tone-step note; plan findings get `accent-soft` and a small ink square.
 - `StatNumber`: condensed heavy figure + small label.
 - `.mark` (CSS): marker swipe behind inline text, e.g. `<span className="mark">27 days off</span>`.
-- `.link-mark` (CSS): underlined link whose marker fills on hover - use for inline text links.
+- `.link-mark` (CSS): underlined inline text link; the underline thickens 1px → 2px on hover.
+- `.select-ink` (CSS): native select with a drawn chevron, 44px tall, 1px control edge.
 - `SiteHeader`: lg+ plain bar (wordmark, Sabbatical / My PTO / Learn, primary Plan PTO; active =
   marker stroke under label). Below lg: wordmark only on top, **fixed bottom tab bar** with four
   destinations (56px + safe area). `body` reserves its height below lg; anything sticky at the
   bottom of a page must sit above `bottom: calc(3.5rem + env(safe-area-inset-bottom))` below lg.
-- `Footer`: the one drenched ink field; name at full width over a marker stroke.
+- `Footer`: the one drenched ink field; name at full width in white; links hover with a white
+  underline; focus ring is white on ink.
 
 ## Calendar (the signature)
 
 - PTO day: solid ink cell, white numeral, square.
-- Days-off run: marker fill on the cells; adjacent cells in one run should read as one
-  continuous stroke (no gaps between them in the run, rounded only at the run's ends).
+- Days-off run: marker fill on the cells plus a 1px ink line along the run's bottom (the marker
+  alone is 1.2:1 on white, so the line is the non-colour cue); adjacent cells read as one
+  continuous stroke, 4px corners only at the run's ends. Day labels say "part of break N".
 - Holiday: small ink ring/dot under the numeral, plus its name in the tooltip/label.
-- Pinned: ink cell with pin glyph. Alternative: 1px dashed ink outline. Today: 2px ink outline.
+- Pinned: ink cell with pin glyph. Alternative: 1px dashed ink outline. Today: 2px ink ring.
+- Week start follows the country (`weekStartForCountry`) on every calendar: landing, /pto,
+  /sabbatical and the exported images.
+- Keyboard: the grid is one tab stop (roving tabindex); arrows, Home and End move between days.
 
 ## Motion
 
