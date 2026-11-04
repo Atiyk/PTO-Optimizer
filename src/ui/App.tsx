@@ -129,7 +129,7 @@ export function App() {
         <Container className="px-4 pb-16 pt-6 sm:px-6 lg:pb-24 lg:pt-10">
           <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)] xl:gap-x-14">
 
-            <section ref={resultRef} aria-label="Your plan" className="flex min-w-0 flex-col gap-5 lg:col-start-2 lg:row-start-1">
+            <section ref={resultRef} aria-label="Your plan" className="flex min-w-0 flex-col gap-5 lg:col-span-2 lg:col-start-1 lg:row-start-1">
               <Headline
                 budgetSpent={state.budgetSpent}
                 totalDaysOff={state.totalDaysOff}
@@ -164,7 +164,7 @@ export function App() {
               )}
             </section>
 
-            <aside id="plan-controls" aria-label="Plan settings" className="min-w-0 scroll-mt-16 lg:sticky lg:top-4 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto lg:overscroll-auto">
+            <aside id="plan-controls" aria-label="Plan settings" className="min-w-0 scroll-mt-16 lg:sticky lg:top-4 lg:col-start-1 lg:row-start-2 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto lg:overscroll-auto">
               <div className="rounded-[4px] border border-line bg-surface p-4 sm:p-5 md:grid md:grid-cols-2 md:gap-x-10 lg:block">
                 <section aria-labelledby="plan-inputs-heading" className="flex min-w-0 flex-col gap-3.5">
                   <h2 id="plan-inputs-heading" className="text-xl font-bold leading-6 text-ink type-condensed">Your time off</h2>
@@ -337,8 +337,14 @@ export function App() {
                   {state.relaxedMinimum !== undefined && (
                     <RelaxedMinimumNotice
                       minimum={state.relaxedMinimum}
-                      onClearPins={() => state.clearForcedDays()}
-                      onNoMinimum={() => state.setMinimumBreakDays(0)}
+                      onClearPins={() => {
+                        state.clearForcedDays();
+                        requestAnimationFrame(() => document.getElementById('complete-plan-heading')?.focus());
+                      }}
+                      onNoMinimum={() => {
+                        state.setMinimumBreakDays(0);
+                        requestAnimationFrame(() => document.getElementById('complete-plan-heading')?.focus());
+                      }}
                     />
                   )}
                   {state.solverIssue && (
@@ -399,7 +405,7 @@ export function App() {
                             <span className="min-w-0 tabular-nums">
                               <span className="sr-only">Break {index}: </span>
                               <span className="font-bold type-condensed text-lg leading-6">{formatCardDateRange(brk.start, brk.end)}</span>
-                              <span className="ml-3 text-sm"><span className="mark font-semibold">{brk.totalDaysOff} days off</span> for {brk.ptoCost} PTO {brk.ptoCost === 1 ? 'day' : 'days'}</span>
+                              <span className="ml-3 text-sm"><span className="mark font-semibold">{brk.totalDaysOff} {brk.totalDaysOff === 1 ? 'day' : 'days'} off</span> for {brk.ptoCost} PTO {brk.ptoCost === 1 ? 'day' : 'days'}</span>
                             </span>
                             <span className="flex items-center gap-1 text-sm text-muted group-hover:text-ink">
                               <span className="hidden sm:inline">Details</span>

@@ -66,7 +66,7 @@ export function QuickForecast({ policy, requests = [], forecastDate, onForecastD
               key={preset.key}
               type="button"
               aria-pressed={forecastDate === preset.date}
-              className="min-h-11 min-w-0 rounded-[3px] border border-line-strong bg-surface px-1 text-sm font-semibold text-ink transition-colors duration-150 hover:border-ink hover:bg-accent-soft aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-white"
+              className="min-h-11 min-w-0 rounded-[3px] border border-line-strong bg-surface px-1 text-sm font-semibold text-ink transition-colors duration-150 hover:border-ink hover:bg-surface-alt aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-white"
               onClick={() => { onForecastDateChange(preset.date); onForecastUsed?.(); }}
             >
               {preset.label}
@@ -131,7 +131,7 @@ export function QuickForecast({ policy, requests = [], forecastDate, onForecastD
             type="button"
             aria-expanded={showExplanation}
             aria-controls={showExplanation ? `${dateId}-policy-explanation` : undefined}
-            className="inline-flex min-h-11 items-center text-sm font-semibold text-ink underline decoration-1 underline-offset-[0.22em] transition-colors duration-150 hover:bg-mark"
+            className="inline-flex min-h-11 items-center text-sm font-semibold text-ink underline decoration-1 underline-offset-[0.22em] transition-colors duration-150 hover:decoration-2"
             onClick={() => setShowExplanation((open) => !open)}
           >
             {showExplanation ? 'Hide policy explanation' : 'Explain this forecast using my policy'}

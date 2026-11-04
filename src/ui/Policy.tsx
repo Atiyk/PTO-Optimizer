@@ -258,8 +258,8 @@ export function Policy() {
 
   const saveButtons = (
     <div className="mt-5 flex flex-wrap gap-x-2 gap-y-1 border-t border-line pt-3 text-sm">
-      <button type="button" className="inline-flex min-h-11 items-center px-1 font-semibold text-ink underline decoration-1 underline-offset-[0.22em] transition-colors duration-150 hover:bg-mark" onClick={() => { const params = new URLSearchParams(); writePolicyStateToURL(params, currentPolicyURLState); setSaveMessage(savePolicyPreferences(params.toString()) ? 'Policy saved in this browser.' : 'Browser storage is unavailable. Your forecast still works from this link.'); }}>Save policy in this browser</button>
-      <button type="button" className="inline-flex min-h-11 items-center px-1 text-muted underline decoration-1 underline-offset-[0.22em] transition-colors duration-150 hover:bg-mark hover:text-ink" onClick={() => setSaveMessage(deletePolicyPreferences() ? 'Saved policy deleted. Your current inputs stay on this page.' : 'Browser storage is unavailable.')}>Delete saved policy</button>
+      <button type="button" className="inline-flex min-h-11 items-center px-1 font-semibold text-ink underline decoration-1 underline-offset-[0.22em] transition-colors duration-150 hover:decoration-2" onClick={() => { const params = new URLSearchParams(); writePolicyStateToURL(params, currentPolicyURLState); setSaveMessage(savePolicyPreferences(params.toString()) ? 'Policy saved in this browser.' : 'Browser storage is unavailable. Your forecast still works from this link.'); }}>Save policy in this browser</button>
+      <button type="button" className="inline-flex min-h-11 items-center px-1 text-muted underline decoration-1 underline-offset-[0.22em] transition-colors duration-150 hover:decoration-2 hover:text-ink" onClick={() => setSaveMessage(deletePolicyPreferences() ? 'Saved policy deleted. Your current inputs stay on this page.' : 'Browser storage is unavailable.')}>Delete saved policy</button>
     </div>
   );
 
@@ -316,7 +316,7 @@ export function Policy() {
                       type="button"
                       onClick={() => setPasteOpen((o) => !o)}
                       aria-expanded={pasteOpen}
-                      className="inline-flex min-h-11 items-center text-sm font-semibold text-ink underline decoration-1 underline-offset-[0.22em] hover:bg-mark"
+                      className="inline-flex min-h-11 items-center text-sm font-semibold text-ink underline decoration-1 underline-offset-[0.22em] hover:decoration-2"
                     >
                       {pasteOpen ? 'Hide' : 'Paste your handbook text'}
                     </button>

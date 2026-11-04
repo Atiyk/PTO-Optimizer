@@ -128,7 +128,7 @@ export function Sabbatical() {
   );
 
 
-  const stepBtn = 'flex h-11 w-11 shrink-0 items-center justify-center text-lg font-semibold text-ink transition-colors duration-150 hover:bg-accent-soft disabled:opacity-40';
+  const stepBtn = 'flex h-11 w-11 shrink-0 items-center justify-center text-lg font-semibold text-ink transition-colors duration-150 hover:bg-surface-alt disabled:opacity-40';
   const numberInput = 'h-11 w-14 min-w-0 border-x border-line-strong bg-surface text-center text-base font-semibold text-ink [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
   const fieldLabel = 'block text-sm font-semibold text-ink';
 
