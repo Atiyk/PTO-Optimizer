@@ -71,6 +71,48 @@ temporary folders. The evidence that persists is in the commits listed below.
   main action surface.
 - **Country combobox drops focus on Tab:** the baseline does the same. Logged as a follow-up.
 
-## Round 2
+## Round 2 (independent re-inspection of the rendered build)
 
-See the "Round 2" section appended below after re-inspection.
+Re-checked all ten round-1 high and critical items, plus a scan for regressions. axe-core
+(wcag2a, 2aa, 21a, 21aa, 22aa) found **0 violations** on /, /pto/ (also with options open and
+a pin), /policy/, /sabbatical/ and /glossary/ at 1440 and 375. No overflow on any route at
+1440, 768, 375 or 320, and no console errors other than the blocked analytics.
+
+| Item | Round-2 status | Action |
+|---|---|---|
+| 1 Pin Dec 7 | Resolved: no collapse; preview = result; notice with recovery | — |
+| 2 Tab order at 1440 | Not resolved: focus went right column → left rail → right column | The result header now spans both columns at lg, so focus runs header → rail → plan (measured: no jump except the column change). de30405 |
+| 3 Calendar tab stops | Resolved: 1 of 395 day buttons is tabbable | — |
+| 4 Breaks from the home CTA | Resolved: "Your breaks" at y≈507 at 1440 | — |
+| 5 Partner consent | Resolved | — |
+| 6 Policy loss warning | Resolved; no "−0" | — |
+| 7 Non-colour run cue | Resolved: ink bottom rule and "part of break N" | — |
+| 8 Phone layout and targets | Resolved | — |
+| 9 Marker on chrome | Partial: 3 policy text buttons hovered to the marker | Replaced with an underline thickening; the stepper and forecast chips use a tone step. de30405 |
+| 10 Live, URL round-trip, legacy links | Resolved | — |
+
+New in round 2:
+- **High, pre-existing engine behaviour (not fixed, owner decision):** when a lone weekday next to
+  a weekend is pinned (Dec 7, Dec 4 or Dec 11 on the default plan), the engine returns that break
+  as "1 day off" and doesn't count the adjacent weekend. The calendar draws the weekend as
+  part of the run, so the headline (25) and the calendar (27 marked days) disagree. This happens
+  on `main` too, even with no minimum break, so it predates the redesign. Fixing it means changing how
+  the engine computes a break's extent, and this run was told not to change the solver. See
+  "Questions for Atiyk" in docs/DESIGN-EXECUTION-STATE.json.
+- **Medium:** focus was lost after the pin notice buttons. Fixed: focus moves to "Your complete
+  plan". de30405
+- **Medium, open:** Tab out of the Country combobox drops to `<body>` for one step. The baseline does the same.
+- **Medium, open:** at 375 the 18×18 "i" info buttons sit 2px from the nearest target (2.5.8 spacing).
+- **Low, fixed:** "1 days off" became "1 day off". **Low, open:** after a pin, "3 breaks isn't possible…
+  showing 4" names the budget instead of the pin as the cause, and the policy warning says 11.3 where the
+  forecast says 11.25.
+
+After the round-2 fixes, every CI check was re-run locally on the production build: 1116 unit
+tests, `tsc --noEmit`, `tsc -b`, lint (0 errors), `npm run build`, consumer QA (34 checks),
+header QA, privacy QA, the consumer journey (6 of 6 pass; the hosted-analytics check is
+"unavailable" offline), date-editor QA, and touch-calendar QA. Lighthouse was not run locally;
+CI runs it on the PR.
+
+**Verdict after round 2:** no high-severity finding introduced by the redesign remains open. One
+high, pre-existing engine accounting issue is documented for the owner rather than patched
+around in the UI.

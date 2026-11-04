@@ -36,3 +36,41 @@ Where skills conflicted: see `docs/DESIGN-SYSTEM.md` ("Skill sources and where t
 
 Workers share one branch with disjoint file ownership (worktrees were unnecessary because no two
 workers touch the same file); the orchestrator alone builds, commits and pushes.
+
+## Stages as run (2026-11-04)
+
+| Stage | What happened | Evidence |
+|---|---|---|
+| A. Audit | Product truth inferred into `PRODUCT.md`; every shipped capability listed as must-survive; engine and URL state marked frozen | `PRODUCT.md` |
+| B. Exploration | Impeccable direction roll (seed `d9bad511168518bc`); "highlighted schedule" chosen over the cream/teal AI default | `.impeccable/surfaces/src-ui-landing-tsx.md`, `docs/DESIGN-DECISIONS.md` |
+| C. System + IA | Tokens, Archivo, primitives, desktop bar + phone tab bar | `docs/DESIGN-SYSTEM.md`, `DESIGN.md`, `.impeccable/design.json` |
+| D. Implementation | Four page agents in parallel on disjoint files | branch commits |
+| E. Visual review | Screenshots at 1440/768/375/320 for every route, before and after | `/mnt/project-files/consumer-redesign/` |
+| F. Critique + revision | Two critic rounds; all high findings introduced by the redesign fixed | `docs/DESIGN-CRITIQUE.md` |
+| G. Integration + release | One push, one draft release PR; merge and production deploy wait for the owner | `docs/DESIGN-EXECUTION-STATE.json` |
+
+## Scheduled resume: decided against, not configured
+
+The brief asked for a ~5-hour recurring resume "if supported". It was **not configured**. By the
+time it could have been set up, no autonomous work was left. Everything remaining is the owner's:
+review the draft PR and its Vercel preview, decide the engine question, then approve the merge and
+the single production deploy. A timer that wakes every 5 hours to find "still waiting for the
+owner" would only burn preview builds and tokens, and it risks the overlapping sessions the brief
+forbids. PR activity (CI results, review comments) wakes the session that owns the PR instead.
+
+If a future run does need one, here is the design:
+- **Trigger.** A single recurring trigger every 5h runs: "read `docs/DESIGN-EXECUTION-STATE.json`; if
+  `status` is `released` or `lock.holder` is a live session other than you, exit; otherwise set
+  `lock` {holder, acquired_at, expires_at = +90m}, commit, do `next_actions[0]`, update the state
+  file, release the lock".
+- **Lock.** The lock is a committed field on the branch, so a push race fails fast. A lock older
+  than `expires_at` may be taken over.
+- **Stopping.** The trigger deletes itself when `status` becomes `released`.
+
+## Release boundary
+
+- **Merge.** The repo's CLAUDE.md requires the owner's approval of the Vercel preview before
+  merging to `main`.
+- **Deploy.** The owner asked for exactly one production deployment.
+- **Where this run stops.** It stops at the draft PR. It does not merge, does not deploy
+  to production, and does not claim a deployment.
