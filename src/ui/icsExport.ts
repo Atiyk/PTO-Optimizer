@@ -263,3 +263,40 @@ function downloadICSContent(content: string, filename: string): void {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+export interface OutOfOfficeBlock {
+  /** Stable per tracked request, so downloading again updates the same event. */
+  requestId: string;
+  start: string;
+  end: string;
+  /** Plain text for the event's notes; never the user's private request note. */
+  description?: string;
+}
+
+/**
+ * F4: one all-day "Out of office" event over an approved request (DTEND exclusive), shown
+ * as busy (TRANSP:OPAQUE) and as Outlook's "Out of office" status
+ * (X-MICROSOFT-CDO-BUSYSTATUS:OOF), unlike the plan's transparent PTO-day events. The UID
+ * comes from the request id and dates, so it is unique per request and stable across
+ * downloads. Reuses this file's RFC 5545 helpers; carriage returns become newlines before
+ * escaping so text can never start a new content line.
+ */
+export function generateOutOfOfficeICS(block: OutOfOfficeBlock, now: Date = new Date()): string {
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:-//${PRODUCT_NAME}//EN`, 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    foldLine(`X-WR-CALNAME:${PRODUCT_NAME} - Out of office`)];
+  if (isValidISODate(block.start) && isValidISODate(block.end) && block.end >= block.start) {
+    const start = isoToICSDate(block.start);
+    const end = isoToICSDate(block.end);
+    const id = block.requestId.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 100) || 'request';
+    const description = (block.description ?? '').replace(/\r\n?/g, '\n').slice(0, 2000);
+    lines.push('BEGIN:VEVENT', foldLine(`UID:ooo-${id}-${start}-${end}@pto-optimizer.app`), `DTSTAMP:${dtstampNow(now)}`,
+      `DTSTART;VALUE=DATE:${start}`, `DTEND;VALUE=DATE:${addOneDayICS(end)}`, 'SUMMARY:Out of office');
+    if (description) lines.push(foldLine(`DESCRIPTION:${escapeText(description)}`));
+    lines.push('TRANSP:OPAQUE', 'X-MICROSOFT-CDO-BUSYSTATUS:OOF', 'X-MICROSOFT-CDO-INTENDEDSTATUS:OOF', 'X-MICROSOFT-CDO-ALLDAYEVENT:TRUE', 'END:VEVENT');
+  }
+  return [...lines, 'END:VCALENDAR', ''].join('\r\n');
+}
+
+export function downloadOutOfOfficeICS(block: OutOfOfficeBlock, filename = 'out-of-office.ics'): void {
+  downloadICSContent(generateOutOfOfficeICS(block), filename);
+}
