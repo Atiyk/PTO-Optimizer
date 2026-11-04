@@ -4,6 +4,7 @@ import { forecastWithRequests } from '../personal/forecast';
 import { explainConnectedPolicy } from '../personal/policyExplanation';
 import type { PtoRequest } from '../personal/requestLedger';
 import { forecastPresets } from './forecastPresets';
+import { compactDate, compactDatesIn } from './compactDate';
 
 export interface QuickForecastProps {
   policy: TimeOffPolicy;
@@ -11,9 +12,17 @@ export interface QuickForecastProps {
   forecastDate: string;
   onForecastDateChange: (date: string) => void;
   onForecastUsed?: () => void;
+  /** The soonest loss the policy causes (from the same expiration check as the guard), so
+   * the answer can say it beside the figure instead of only further down the page. */
+  upcomingLoss?: { text: string; deadline: string; expirationDate: string };
 }
 
 const number = (value: number) => new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(value);
+/** A signed amount that never reads "−0" or "+0": a zero is just 0. */
+const signed = (sign: '+' | '−', value: number) => {
+  const text = number(Math.abs(value));
+  return text === '0' ? '0' : `${sign}${text}`;
+};
 
 /** One line of the balance equation: an operator, a label and a signed amount. */
 function EquationRow({ op, label, value, strong = false }: { op: string; label: string; value: ReactNode; strong?: boolean }) {
@@ -31,7 +40,7 @@ function EquationRow({ op, label, value, strong = false }: { op: string; label: 
  * balance is the marked hero figure; under it the same forecast is written out as an
  * equation (current + accrual - scheduled - expiration) so the number can be checked.
  */
-export function QuickForecast({ policy, requests = [], forecastDate, onForecastDateChange, onForecastUsed }: QuickForecastProps) {
+export function QuickForecast({ policy, requests = [], forecastDate, onForecastDateChange, onForecastUsed, upcomingLoss }: QuickForecastProps) {
   const dateId = useId();
   const [showExplanation, setShowExplanation] = useState(false);
   const forecast = forecastWithRequests(policy, forecastDate, requests);
@@ -57,7 +66,7 @@ export function QuickForecast({ policy, requests = [], forecastDate, onForecastD
               key={preset.key}
               type="button"
               aria-pressed={forecastDate === preset.date}
-              className="min-h-11 min-w-0 rounded-[3px] border border-line-strong bg-surface px-1 text-sm font-semibold text-ink transition-colors duration-150 hover:border-ink hover:bg-accent-soft aria-pressed:border-ink aria-pressed:bg-mark"
+              className="min-h-11 min-w-0 rounded-[3px] border border-line-strong bg-surface px-1 text-sm font-semibold text-ink transition-colors duration-150 hover:border-ink hover:bg-accent-soft aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-white"
               onClick={() => { onForecastDateChange(preset.date); onForecastUsed?.(); }}
             >
               {preset.label}
@@ -65,26 +74,41 @@ export function QuickForecast({ policy, requests = [], forecastDate, onForecastD
           ))}
         </div>
       )}
-      <p className="mt-1.5 text-xs leading-5 text-muted">Shortcuts count from your balance as-of date ({policy.balanceAsOf}).</p>
+      <p className="mt-1.5 text-xs leading-5 text-muted">Shortcuts count from your balance date, {compactDate(policy.balanceAsOf)}.</p>
       {!forecast ? (
         <p role="status" className="mt-5 border-t border-line pt-4 text-sm text-ink">{validateCurrentCarriedBalance(policy) ?? 'Enter a valid date on or after your balance as-of date, within ten years, and valid policy amounts.'}</p>
       ) : policy.accrual.kind === 'unlimited' ? (
         <p className="mt-5 border-t border-line pt-4 text-base text-ink">Unlimited PTO has no banked balance to forecast. Track your planned time off and check your employer&apos;s approval rules.</p>
       ) : confirmed && tentative ? (
         <div className="mt-4 border-t border-line pt-3">
-          <p className="text-sm text-muted">Estimated available PTO on {forecastDate}</p>
+          <p className="text-sm text-muted">Estimated available PTO on {compactDate(forecastDate)}</p>
           <p className="mt-1 flex items-baseline gap-2 text-ink" aria-live="polite">
             <span className="mark text-display-sm type-display tabular-nums">{number(confirmed.balance ?? 0)}</span>{' '}
             <span className="text-lg font-semibold">{unit}</span>
           </p>
+          {upcomingLoss && (
+            <p role="status" className="mt-3 flex gap-2 text-sm font-semibold text-ink">
+              <span aria-hidden="true" className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center bg-ink text-xs font-bold text-white">!</span>
+              <span>
+                {compactDatesIn(upcomingLoss.text)}{' '}
+                <span className="font-normal">
+                  {upcomingLoss.expirationDate > forecastDate
+                    ? `That happens after ${compactDate(forecastDate)}, so it is not in this number. `
+                    : ''}
+                  Last day to use it: {compactDate(upcomingLoss.deadline)}.{' '}
+                  <a href="#expiration" className="link-mark font-semibold">What you could lose</a>
+                </span>
+              </span>
+            </p>
+          )}
           <dl className="mt-3 text-sm" aria-label="How the projected balance adds up">
-            <EquationRow op="" label="Current balance" value={`${number(policy.currentBalance)} ${unit}`} />
-            <EquationRow op="+" label="Expected accrual" value={`+${number(confirmed.accrued)} ${unit}`} />
-            <EquationRow op="−" label="Scheduled PTO" value={`−${number(confirmed.scheduled)} ${unit}`} />
-            <EquationRow op="−" label="Expected expiration" value={`−${number(confirmed.expired)} ${unit}`} />
+            <EquationRow op="" label={policy.currentBalance === 0 ? 'Current balance (not entered yet)' : `Current balance on ${compactDate(policy.balanceAsOf)}`} value={`${number(policy.currentBalance)} ${unit}`} />
+            <EquationRow op="+" label="Expected accrual" value={`${signed('+', confirmed.accrued)} ${unit}`} />
+            <EquationRow op="−" label="Scheduled PTO" value={`${signed('−', confirmed.scheduled)} ${unit}`} />
+            <EquationRow op="−" label="Expected expiration" value={`${signed('−', confirmed.expired)} ${unit}`} />
             <EquationRow op="=" label="Projected balance" value={`${number(confirmed.balance ?? 0)} ${unit}`} strong />
           </dl>
-          <p className="mt-3 text-xs leading-5 text-muted">Subject to your cap, resets and borrowing allowance. Scheduled PTO includes approved requests and the planned days entered in your policy. Days on or before {policy.balanceAsOf} are already covered by your current balance.</p>
+          <p className="mt-3 text-xs leading-5 text-muted">Subject to your cap, resets and borrowing limit. Scheduled PTO counts approved requests and planned days in your policy; days on or before {compactDate(policy.balanceAsOf)} are already in your balance.</p>
           {confirmed.unfunded > 0.000001 && (
             <p role="status" className="mt-4 flex gap-2 rounded-[4px] border border-ink bg-accent-soft p-3 text-sm text-ink">
               <span aria-hidden="true" className="mt-1.5 inline-block h-2.5 w-2.5 shrink-0 bg-ink" />
@@ -92,7 +116,7 @@ export function QuickForecast({ policy, requests = [], forecastDate, onForecastD
             </p>
           )}
           {tentative.scheduled > confirmed.scheduled && (
-            <div className="mt-4 rounded-[4px] bg-surface-alt p-3 text-sm text-ink">
+            <div className="mt-3 border-t border-line pt-3 text-sm text-ink">
               Including planned and requested leave: <strong>{number(tentative.balance ?? 0)} {unit}</strong> projected.
               {tentative.unfunded > 0.000001 && <p className="mt-1">This scenario has an estimated shortfall of {number(tentative.unfunded)} {unit}.</p>}
               <p className="mt-1 text-xs text-muted">Tentative requests do not reduce the confirmed projection.</p>

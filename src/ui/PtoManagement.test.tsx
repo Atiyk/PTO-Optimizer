@@ -28,7 +28,7 @@ function Harness() {
   </>;
 }
 
-const forecastBalance = () => screen.getByText('Estimated available PTO on 2027-01-14').nextElementSibling?.textContent;
+const forecastBalance = () => screen.getByText('Estimated available PTO on Jan 14, 2027').nextElementSibling?.textContent;
 
 describe('personal tracker and forecast workflow', () => {
   it('tracks a break, updates manual status, and changes confirmed forecast exactly once', () => {

@@ -15,6 +15,8 @@ import { Term } from './Term';
 import { track } from './analytics';
 import { geolocateCountry } from './geo';
 import { forecastWithRequests } from '../personal/forecast';
+import { expirationRisks } from '../personal/expiration';
+import { compactDate, compactDatesIn } from './compactDate';
 import { initialPolicyPreferences, savePolicyPreferences, deletePolicyPreferences } from '../personal/policyPreferences';
 import { QuickForecast } from './QuickForecast';
 import { useRequestLedger } from './useRequestLedger';
@@ -70,6 +72,7 @@ function Field({ label, termId, children }: { label: string; termId?: string; ch
 }
 
 const inputClass = 'h-11 w-full min-w-0 rounded-[3px] border border-line-strong bg-surface px-3 text-base text-ink';
+const selectClass = 'select-ink h-11 w-full min-w-0 text-base';
 const checkRow = 'flex min-h-11 items-center gap-2 text-sm text-ink';
 
 /** A small SVG line+area chart of the projected balance - greyscale-legible, no colour-only
@@ -233,12 +236,18 @@ export function Policy() {
   const projection = useMemo(() => forecastWithRequests(policy, horizonEnd, ledger.requests), [policy, horizonEnd, ledger.requests]);
   const selectedForecast = useMemo(() => forecastWithRequests(policy, forecastDate, ledger.requests), [policy, forecastDate, ledger.requests]);
   const series = projection?.confirmed.series ?? [];
-  const events = projection?.confirmed.events ?? [];
   const summary = useMemo(() => generatePolicySummary(policy), [policy]);
-  const alerts = useMemo(() => generateAlerts(policy, events, balanceAsOf, country), [policy, events, balanceAsOf, country]);
+  const alerts = useMemo(() => generateAlerts(policy, projection?.confirmed.events ?? [], balanceAsOf, country), [policy, projection, balanceAsOf, country]);
   const hrQuestions = useMemo(() => generateHRQuestions(policy), [policy]);
 
   const [visitDate] = useState(todayISO);
+  // The soonest PTO the policy will take away (forfeiture or expiring carryover; a cap is
+  // a separate kind of loss). Shown beside the forecast figure itself, so a date picked just
+  // before a reset can never read as "nothing expires" while the loss is a day away.
+  const upcomingLoss = useMemo(() => {
+    const risks = expirationRisks(policy, country, ledger.requests, visitDate);
+    return risks.filter((risk) => risk.kind !== 'cap').sort((a, b) => a.deadline.localeCompare(b.deadline))[0] ?? risks[0];
+  }, [policy, country, ledger.requests, visitDate]);
   const visitYear = Number(visitDate.slice(0, 4));
   const calendarStart = Number(forecastDate.slice(0, 4)) - visitYear >= 10 ? visitDate : `${visitYear}-01-01`;
   const calendarEnd = forecastDate > `${visitYear + 2}-12-31` ? forecastDate : `${visitYear + 2}-12-31`;
@@ -258,7 +267,7 @@ export function Policy() {
     <div className="min-h-screen bg-page">
       <SiteHeader active="policy" />
       <main id="main-content" tabIndex={-1}>
-        <Container className="px-4 pb-16 pt-8 sm:px-6 lg:pt-12">
+        <Container className="px-4 pb-12 pt-6 sm:px-6 lg:pt-10">
           <h1 className="max-w-3xl text-h1 type-display text-ink">How much PTO will I have, and what am I about to lose?</h1>
           <p className="mt-3 max-w-2xl text-base text-muted">
             Enter your balance and how you earn PTO. The forecast and the expiry check update as you type; the rest of your policy lives in Advanced options.
@@ -267,22 +276,25 @@ export function Policy() {
           {/* Inputs left, the answer right (sticky on desktop). Below lg the answer column
               dissolves (display: contents) so its two parts can be ordered answer, inputs,
               risk: the number first, then what drives it, then what could be lost. */}
-          <div id="balance" className="mt-8 flex scroll-mt-24 flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,27rem)]">
-            <div className="order-2 flex min-w-0 flex-col gap-6 lg:order-none">
+          <div id="balance" className="mt-6 flex scroll-mt-24 flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,27rem)]">
+            <div className="order-2 flex min-w-0 flex-col gap-6 lg:order-none lg:col-start-1 lg:row-start-1">
               <section aria-label="Quick balance forecast" className="min-w-0 rounded-[4px] border border-line bg-surface p-4 sm:p-6">
                 <h2 className="text-h2 font-bold type-condensed text-ink">Your balance and how you earn it</h2>
                 <p className="mt-1 text-sm text-muted">Use your real balance and employer rules. Full carryover at reset is assumed until you choose another rule.</p>
                 <div className="mt-5 grid gap-x-4 gap-y-4 sm:grid-cols-2">
-                  <Field label={`Current PTO balance (${unit})`}><input type="number" step="any" value={currentBalance} onChange={event => setCurrentBalance(Number(event.target.value))} className={inputClass} /></Field>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <Field label={`Current PTO balance (${unit})`}><input type="number" step="any" value={currentBalance} aria-describedby="current-balance-hint" onChange={event => setCurrentBalance(Number(event.target.value))} className={inputClass} /></Field>
+                    <p id="current-balance-hint" className="text-xs leading-5 text-muted">{currentBalance === 0 ? 'Starts at 0 until you enter yours: the number on your payslip or HR portal.' : 'From your payslip or HR portal, on the date beside it.'}</p>
+                  </div>
                   <Field label="Balance as-of date"><input type="date" value={balanceAsOf} onChange={event => setBalanceAsOf(event.target.value)} className={inputClass} /></Field>
-                  <Field label="How PTO accrues"><select value={accrualKind} onChange={event => setAccrualKind(event.target.value as AccrualMethod['kind'])} className={inputClass}><option value="front-loaded">Granted all at once</option><option value="per-pay-period">Each pay period</option><option value="per-hour-worked">For each hour worked</option><option value="unlimited">Unlimited PTO</option></select></Field>
-                  <Field label="Balance unit"><select value={unit} onChange={event => setUnit(event.target.value as 'days' | 'hours')} className={inputClass}><option value="days">Days</option><option value="hours">Hours</option></select></Field>
+                  <Field label="How PTO accrues"><select value={accrualKind} onChange={event => setAccrualKind(event.target.value as AccrualMethod['kind'])} className={selectClass}><option value="front-loaded">Granted all at once</option><option value="per-pay-period">Each pay period</option><option value="per-hour-worked">For each hour worked</option><option value="unlimited">Unlimited PTO</option></select></Field>
+                  <Field label="Balance unit"><select value={unit} onChange={event => setUnit(event.target.value as 'days' | 'hours')} className={selectClass}><option value="days">Days</option><option value="hours">Hours</option></select></Field>
                   {(accrualKind === 'per-pay-period' || accrualKind === 'front-loaded') && <Field label={`${unit === 'hours' ? 'Hours' : 'Days'} earned each ${accrualKind === 'front-loaded' ? 'grant' : 'pay period'}`}><input type="number" min={0} step="any" value={amount} onChange={event => setAmount(Number(event.target.value))} className={inputClass} /></Field>}
-                  {accrualKind === 'per-pay-period' && <><Field label="Pay frequency"><select value={frequency} onChange={event => setFrequency(event.target.value as typeof frequency)} className={inputClass}><option value="weekly">Weekly</option><option value="biweekly">Every two weeks</option><option value="semi-monthly">Twice a month</option><option value="monthly">Monthly</option></select></Field><Field label="Known pay date"><input type="date" value={payDateAnchor} onChange={event => setPayDateAnchor(event.target.value)} className={inputClass} /></Field></>}
+                  {accrualKind === 'per-pay-period' && <><Field label="Pay frequency"><select value={frequency} onChange={event => setFrequency(event.target.value as typeof frequency)} className={selectClass}><option value="weekly">Weekly</option><option value="biweekly">Every two weeks</option><option value="semi-monthly">Twice a month</option><option value="monthly">Monthly</option></select></Field><Field label="Known pay date"><input type="date" value={payDateAnchor} onChange={event => setPayDateAnchor(event.target.value)} className={inputClass} /></Field></>}
                   {accrualKind === 'front-loaded' && <Field label="Annual grant date"><input type="date" value={grantDate} onChange={event => setGrantDate(event.target.value)} className={inputClass} /></Field>}
                   {accrualKind === 'per-hour-worked' && <><Field label="Hours earned per hour worked"><input type="number" min={0} step="any" value={hourlyRate} onChange={event => setHourlyRate(Number(event.target.value))} className={inputClass} /></Field><Field label="Typical hours worked each week"><input type="number" min={0} step="any" value={typicalWeeklyHours} onChange={event => setTypicalWeeklyHours(Number(event.target.value))} className={inputClass} /></Field></>}
                   {(unit === 'hours' || accrualKind === 'per-hour-worked') && <Field label="Hours per working day for conversion"><input type="number" min={0.25} step="any" value={hoursPerDay} onChange={event => setHoursPerDay(Number(event.target.value))} className={inputClass} /></Field>}
-                  {accrualKind !== 'unlimited' && <Field label="Expiry and carryover"><select value={carryoverMode} onChange={event => setCarryoverMode(event.target.value as CarryoverRule['mode'])} className={inputClass}><option value="all">Full carryover at reset</option><option value="none">Use it or lose it at reset</option><option value="capped">Limited carryover at reset</option></select></Field>}
+                  {accrualKind !== 'unlimited' && <Field label="Expiry and carryover"><select value={carryoverMode} onChange={event => setCarryoverMode(event.target.value as CarryoverRule['mode'])} className={selectClass}><option value="all">Full carryover at reset</option><option value="none">Use it or lose it at reset</option><option value="capped">Limited carryover at reset</option></select></Field>}
                   {accrualKind !== 'unlimited' && carryoverMode !== 'all' && <Field label="Reset date (new plan year begins)"><input type="date" value={planYearKind === 'calendar' ? `${Number(balanceAsOf.slice(0, 4)) + 1}-01-01` : planYearKind === 'anniversary' ? anniversaryStart : customResetDate} onChange={event => { setPlanYearKind('custom'); setCustomResetDate(event.target.value); }} className={inputClass} /></Field>}
                   {accrualKind !== 'unlimited' && carryoverMode === 'capped' && <Field label={`Carryover limit (${unit})`}><input type="number" min={0} step="any" value={carryoverCap} onChange={event => setCarryoverCap(Number(event.target.value))} className={inputClass} /></Field>}
                 </div>
@@ -336,7 +348,7 @@ export function Policy() {
                   <h3 className="mt-6 text-base font-bold text-ink">How you earn PTO</h3>
                   <div className="mt-3 grid gap-4 sm:grid-cols-2">
                     <Field label="How you get days">
-                      <select value={accrualKind} onChange={(e) => setAccrualKind(e.target.value as AccrualMethod['kind'])} className={inputClass}>
+                      <select value={accrualKind} onChange={(e) => setAccrualKind(e.target.value as AccrualMethod['kind'])} className={selectClass}>
                         <option value="front-loaded">Front-loaded</option>
                         <option value="per-pay-period">Per pay period</option>
                         <option value="per-hour-worked">Per hour worked</option>
@@ -359,7 +371,7 @@ export function Policy() {
                           <input type="number" min={0} step={0.01} value={amount} onChange={(e) => setAmount(Number(e.target.value))} className={inputClass} />
                         </Field>
                         <Field label="Pay frequency" termId="pay-frequency">
-                          <select value={frequency} onChange={(e) => setFrequency(e.target.value as typeof frequency)} className={inputClass}>
+                          <select value={frequency} onChange={(e) => setFrequency(e.target.value as typeof frequency)} className={selectClass}>
                             <option value="weekly">Weekly</option>
                             <option value="biweekly">Biweekly</option>
                             <option value="semi-monthly">Semi-monthly</option>
@@ -387,7 +399,7 @@ export function Policy() {
                       </Field>
                     )}
                     <Field label="Unit">
-                      <select value={unit} onChange={(e) => setUnit(e.target.value as 'days' | 'hours')} className={inputClass}>
+                      <select value={unit} onChange={(e) => setUnit(e.target.value as 'days' | 'hours')} className={selectClass}>
                         <option value="days">Days</option>
                         <option value="hours">Hours</option>
                       </select>
@@ -402,7 +414,7 @@ export function Policy() {
                   <h3 className="mt-8 text-base font-bold text-ink">Plan year, caps and carryover</h3>
                   <div className="mt-3 grid gap-4 sm:grid-cols-2">
                     <Field label="Plan year" termId="plan-year">
-                      <select value={planYearKind} onChange={(e) => setPlanYearKind(e.target.value as PlanYear['kind'])} className={inputClass}>
+                      <select value={planYearKind} onChange={(e) => setPlanYearKind(e.target.value as PlanYear['kind'])} className={selectClass}>
                         <option value="calendar">Calendar year (resets Jan 1)</option>
                         <option value="anniversary">My start-date anniversary</option>
                         <option value="custom">A specific date</option>
@@ -419,7 +431,7 @@ export function Policy() {
                       </Field>
                     )}
                     <Field label="Carryover" termId="carryover">
-                      <select value={carryoverMode} onChange={(e) => setCarryoverMode(e.target.value as CarryoverRule['mode'])} className={inputClass}>
+                      <select value={carryoverMode} onChange={(e) => setCarryoverMode(e.target.value as CarryoverRule['mode'])} className={selectClass}>
                         <option value="none">None (use-it-or-lose-it)</option>
                         <option value="capped">Up to a limit</option>
                         <option value="all">Everything carries over</option>
@@ -485,7 +497,7 @@ export function Policy() {
                       <input type="number" min={0} step={0.5} value={negativeBalanceAllowance} onChange={(e) => setNegativeBalanceAllowance(Number(e.target.value))} className={inputClass} />
                     </Field>
                     <Field label="If you leave, is unused PTO paid out?" termId="payout">
-                      <select value={payoutOnLeaving} onChange={(e) => setPayoutOnLeaving(e.target.value as TimeOffPolicy['payoutOnLeaving'])} className={inputClass}>
+                      <select value={payoutOnLeaving} onChange={(e) => setPayoutOnLeaving(e.target.value as TimeOffPolicy['payoutOnLeaving'])} className={selectClass}>
                         <option value="pays">Pays it out</option>
                         <option value="doesnt">Doesn't</option>
                         <option value="not-sure">Not sure</option>
@@ -533,7 +545,7 @@ export function Policy() {
                         <BalanceChart series={series} cap={policy.accrualCap} />
                       </section>
                     ) : accrualKind === 'unlimited' ? (
-                      <section className="rounded-[4px] bg-surface-alt p-4 text-sm text-ink">
+                      <section className="text-sm text-ink">
                         No balance to chart — unlimited PTO has no cap and nothing to run out of.{' '}
                         <a
                           href={`/pto?c=${country}&b=${expectedDaysPerYear}`}
@@ -550,12 +562,12 @@ export function Policy() {
                       {!projection ? <p role="status" className="text-sm text-muted">Check the policy inputs before relying on expiration or cap warnings.</p> : alerts.length === 0 ? (
                         <p className="text-sm text-muted">Nothing to flag — no forfeiture, cap, or deadline risk in the next 18 months.</p>
                       ) : (
-                        <ul className="flex flex-col gap-2">
+                        <ul className="flex flex-col divide-y divide-line border-y border-line">
                           {alerts.map((a) => (
-                            <li key={a.id} className="flex gap-2 rounded-[4px] bg-accent-soft p-3 text-sm text-ink">
+                            <li key={a.id} className="flex gap-2 py-3 text-sm text-ink">
                               <span aria-hidden="true" className="mt-1.5 inline-block h-2.5 w-2.5 shrink-0 bg-ink" />
                               <div>
-                                <p>{a.text}</p>
+                                <p>{compactDatesIn(a.text)}</p>
                                 {a.daysAtStake > 0 && (
                                   <a
                                     href="#expiration"
@@ -606,37 +618,36 @@ export function Policy() {
               </details>
             </div>
 
-            <div className="contents lg:sticky lg:top-6 lg:col-start-2 lg:row-start-1 lg:flex lg:flex-col lg:gap-4">
+            <div className="contents lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:flex lg:flex-col lg:gap-4">
               <div className="order-1 min-w-0 lg:order-none">
-                <QuickForecast policy={policy} requests={ledger.requests} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')} />
+                <QuickForecast policy={policy} requests={ledger.requests} upcomingLoss={upcomingLoss} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')} />
               </div>
               <div id="expiration" className="order-3 min-w-0 scroll-mt-24 lg:order-none">
                 <ExpirationGuard policy={policy} country={country} requests={ledger.requests} today={visitDate} onAlertViewed={() => track('expiration_alert_viewed')} onAlertAction={() => track('expiration_alert_action_taken')} />
               </div>
             </div>
-          </div>
-
-          <div id="requests" className="mt-16 scroll-mt-24 border-t border-line pt-10 lg:mt-20">
-            <PtoTracker today={visitDate} ledger={ledger} calendar={trackerCalendar.calendar} calendarReady={!trackerCalendar.loading && !trackerCalendar.degraded} calendarNotice={trackerCalendar.loading ? 'Loading your employer calendar…' : trackerCalendar.degraded ? 'Holiday data or a calendar input is unavailable. Check the calendar settings before adding or changing request dates.' : `The remaining balance is projected for ${forecastDate}.`} remainingPto={unit === 'days' ? selectedForecast?.confirmed.balance ?? undefined : selectedForecast?.confirmed.balance === null || selectedForecast?.confirmed.balance === undefined ? undefined : selectedForecast.confirmed.balance / hoursPerDay} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
-            <details className="group mt-3 rounded-[4px] border border-line bg-surface">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 font-semibold text-ink sm:px-6 [&::-webkit-details-marker]:hidden">
-                My request calendar and workweek
-                <span aria-hidden="true" className="shrink-0 text-xl leading-none group-open:rotate-45 motion-safe:transition-transform">+</span>
-              </summary>
-              <div className="border-t border-line px-4 pb-5 pt-4 sm:px-6">
-                <div className="flex flex-wrap items-start gap-4">
-                  <CountrySelect country={country} onChangeCountry={code => { setCountry(code); setTrackerSubdivision(undefined); }} />
-                  <SubdivisionSelect subdivisions={trackerCalendar.subdivisions} subdivision={trackerSubdivision} onChangeSubdivision={setTrackerSubdivision} />
+            <div id="requests" className="order-4 mt-6 min-w-0 scroll-mt-24 lg:order-none lg:col-start-1 lg:row-start-2 lg:mt-4">
+              <PtoTracker today={visitDate} ledger={ledger} calendar={trackerCalendar.calendar} calendarReady={!trackerCalendar.loading && !trackerCalendar.degraded} calendarNotice={trackerCalendar.loading ? 'Loading your employer calendar…' : trackerCalendar.degraded ? 'Holiday data or a calendar input is unavailable. Check the calendar settings before adding or changing request dates.' : selectedForecast?.confirmed.balance === null || selectedForecast?.confirmed.balance === undefined ? undefined : `Projected balance on ${compactDate(forecastDate)}: ${new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(selectedForecast.confirmed.balance)} ${unit}. Approved requests you track here reduce it.`} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
+              <details className="group mt-3 rounded-[4px] border border-line bg-surface">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 font-semibold text-ink sm:px-6 [&::-webkit-details-marker]:hidden">
+                  My request calendar and workweek
+                  <span aria-hidden="true" className="shrink-0 text-xl leading-none group-open:rotate-45 motion-safe:transition-transform">+</span>
+                </summary>
+                <div className="border-t border-line px-4 pb-5 pt-4 sm:px-6">
+                  <div className="flex flex-wrap items-start gap-4">
+                    <CountrySelect country={country} onChangeCountry={code => { setCountry(code); setTrackerSubdivision(undefined); }} />
+                    <SubdivisionSelect subdivisions={trackerCalendar.subdivisions} subdivision={trackerSubdivision} onChangeSubdivision={setTrackerSubdivision} />
+                  </div>
+                  <fieldset className="mt-4"><legend className="text-sm font-semibold text-ink">Working days</legend><div className="mt-1 flex flex-wrap gap-x-4">{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((name, index) => <label key={name} className="flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" className="h-4 w-4" checked={trackerWorkWeek[index]} onChange={event => setTrackerWorkWeek(previous => previous.map((day, i) => i === index ? event.target.checked : day) as WorkWeek)} />{name}</label>)}</div></fieldset>
+                  <label className={`${checkRow} mt-2`}><input type="checkbox" className="h-4 w-4" checked={trackerAltFridayEnabled} onChange={event => setTrackerAltFridayEnabled(event.target.checked)} />Every other Friday off</label>
+                  {trackerAltFridayEnabled && <label className="block max-w-xs text-sm font-semibold text-ink">First non-working Friday<input type="date" value={trackerAltFridayStart} onChange={event => setTrackerAltFridayStart(event.target.value)} className={`${inputClass} mt-1.5 block`} /></label>}
+                  <p className="mt-3 text-sm text-muted">Uses your saved employer holidays for this country and region. Adjust those in <a className="link-mark" href="/pto">the PTO planner</a>. To cover a later request, move the forecast date.</p>
                 </div>
-                <fieldset className="mt-4"><legend className="text-sm font-semibold text-ink">Working days</legend><div className="mt-1 flex flex-wrap gap-x-4">{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((name, index) => <label key={name} className="flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" className="h-4 w-4" checked={trackerWorkWeek[index]} onChange={event => setTrackerWorkWeek(previous => previous.map((day, i) => i === index ? event.target.checked : day) as WorkWeek)} />{name}</label>)}</div></fieldset>
-                <label className={`${checkRow} mt-2`}><input type="checkbox" className="h-4 w-4" checked={trackerAltFridayEnabled} onChange={event => setTrackerAltFridayEnabled(event.target.checked)} />Every other Friday off</label>
-                {trackerAltFridayEnabled && <label className="block max-w-xs text-sm font-semibold text-ink">First non-working Friday<input type="date" value={trackerAltFridayStart} onChange={event => setTrackerAltFridayStart(event.target.value)} className={`${inputClass} mt-1.5 block`} /></label>}
-                <p className="mt-3 text-sm text-muted">Uses your saved employer holidays for this country and region. Adjust those in <a className="link-mark" href="/pto">the PTO planner</a>. To cover a later request, move the forecast date.</p>
-              </div>
-            </details>
+              </details>
+            </div>
           </div>
 
-          <div className="mt-16 border-t border-line pt-10 lg:mt-20">
+          <div className="mt-12 border-t border-line pt-8 lg:mt-16 lg:pt-10">
             <DeparturePayoutEstimator policy={policy} requests={ledger.requests} />
           </div>
         </Container>

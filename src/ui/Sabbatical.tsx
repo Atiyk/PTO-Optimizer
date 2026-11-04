@@ -12,7 +12,10 @@ import { todayISO } from './useAppState';
 import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { formatCardDateRange, formatLong, formatShort, formatShortWithYear } from '@daysoff/engine/calendar/dateFormat';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
-import { bestPlacements, placementNote, paddedCalendarRange, type SabbaticalPlacement } from './sabbaticalData';
+import { bestPlacements, placementNote, type SabbaticalPlacement } from './sabbaticalData';
+import { UnpaidIcon } from './DayCell';
+import { COLORS, HOLIDAY_DOT } from './colorScheme';
+import { weekStartForCountry } from './locale';
 import { readSabbaticalStateFromURL, writeSabbaticalStateToURL } from './sabbaticalUrlState';
 import { downloadSabbaticalICS } from './icsExport';
 import { copyCanvasImage, SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT } from './imageExport';
@@ -61,7 +64,7 @@ export function Sabbatical() {
     return () => {
       cancelled = true;
     };
-  }, [country, eligibleFrom]);
+  }, [country, eligibleFrom, horizonEnd]);
 
   const holidaySet = useMemo(() => new Set(holidayState.holidays.map((h) => h.date)), [holidayState.holidays]);
 
@@ -81,9 +84,15 @@ export function Sabbatical() {
   // search, or that window no longer makes the cut).
   const selected: SabbaticalPlacement | undefined = placements.find((p) => p.start === selectedStart) ?? placements[0];
 
-  useEffect(() => {
+  // A new search (start date, length or country) drops the old pick, so the top-ranked
+  // window shows. Adjusted during render rather than in an effect, so the URL's own `sel`
+  // survives the first render instead of being cleared on mount.
+  const searchKey = `${eligibleFrom}|${lengthWeeks}|${country}`;
+  const [selectionSearchKey, setSelectionSearchKey] = useState(searchKey);
+  if (selectionSearchKey !== searchKey) {
+    setSelectionSearchKey(searchKey);
     setSelectedStart(undefined);
-  }, [eligibleFrom, lengthWeeks, country]);
+  }
 
   // Sync every control into the shareable URL - the same pattern useAppState.ts uses for
   // /pto, so a /sabbatical link reproduces exactly this view for anyone.
@@ -118,13 +127,6 @@ export function Sabbatical() {
     [selected],
   );
 
-  // 3D/K3e: every month the trip (selected.extendedStart..extendedEnd, not just the core
-  // block) touches, plus one month of context either side - previously rangeStart was the
-  // core block's own start, so PTO days extending backward never rendered at all.
-  const calendarRange = useMemo(() => {
-    if (!selected) return null;
-    return paddedCalendarRange(selected.extendedStart, selected.extendedEnd);
-  }, [selected]);
 
   const stepBtn = 'flex h-11 w-11 shrink-0 items-center justify-center text-lg font-semibold text-ink transition-colors duration-150 hover:bg-accent-soft disabled:opacity-40';
   const numberInput = 'h-11 w-14 min-w-0 border-x border-line-strong bg-surface text-center text-base font-semibold text-ink [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
@@ -147,7 +149,7 @@ export function Sabbatical() {
     <div className="min-h-screen bg-page">
       <SiteHeader active="sabbatical" />
       <main id="main-content" tabIndex={-1}>
-        <Container className="px-4 pb-16 pt-8 sm:px-6 lg:pt-12">
+        <Container className="px-4 pb-12 pt-6 sm:px-6 lg:pt-10">
           {/* The answer is the hero, and it is live: the h1 is the selected placement's own
               totalAwayDays (3B: one number, computed once inside bestPlacements). */}
           {selected ? (
@@ -172,7 +174,7 @@ export function Sabbatical() {
             </header>
           )}
 
-          <div className="mt-8 grid gap-8 lg:mt-10 lg:grid-cols-[18rem_minmax(0,1fr)] lg:gap-12">
+          <div className="mt-6 grid gap-8 lg:mt-8 lg:grid-cols-[18rem_minmax(0,1fr)] lg:gap-12">
             {/* Controls, grouped by the question each answers. Every one updates live and
                 round-trips through the URL (c, s, len, pto, unpaid). */}
             <div className="min-w-0 lg:sticky lg:top-6 lg:self-start">
@@ -276,7 +278,7 @@ export function Sabbatical() {
               </div>
             </div>
 
-            <div className="flex min-w-0 flex-col gap-14">
+            <div className="flex min-w-0 flex-col gap-10 lg:gap-12">
               {/* 1. Best placements: a ranked comparison you can switch between. */}
               <section aria-labelledby="placements-heading">
                 <h2 id="placements-heading" className="text-h2 font-bold type-condensed text-ink">Best placements</h2>
@@ -300,14 +302,13 @@ export function Sabbatical() {
                 </section>
               )}
 
-              {/* 3. Calendar: every month the trip touches, plus one either side (3D). */}
-              {selected && calendarRange && (
+              {/* 3. Calendar: every month the trip touches (3D), drawn like /pto's calendar. */}
+              {selected && (
                 <section aria-labelledby="calendar-heading">
                   <h2 id="calendar-heading" className="text-h2 font-bold type-condensed text-ink">On the calendar</h2>
                   <SabbaticalLegend />
                   <SabbaticalCalendar
-                    rangeStart={calendarRange.start}
-                    rangeEnd={calendarRange.end}
+                    weekStart={weekStartForCountry(country)}
                     today={today}
                     runStart={selected.extendedStart}
                     runEnd={selected.extendedEnd}
@@ -435,7 +436,7 @@ function MarginalBars({ marginal, currentDaysUsed }: { marginal: { daysUsed: num
   const gains = marginal.slice(1).map((m, i) => ({ daysUsed: m.daysUsed, gained: m.awayDays - marginal[i].awayDays }));
   const shown = gains.slice(0, 15);
   const maxGain = Math.max(...shown.map((g) => g.gained), 1);
-  const CHART = 128;
+  const CHART = 88;
   return (
     <figure className="mt-5 max-w-2xl">
       <div className="flex items-end gap-1 border-b border-ink sm:gap-1.5" role="img" aria-label={shown.map((g) => `day ${g.daysUsed} adds ${g.gained} days away`).join(', ')}>
@@ -464,54 +465,50 @@ function MarginalBars({ marginal, currentDaysUsed }: { marginal: { daysUsed: num
   );
 }
 
-const UNPAID_PATTERN = {
-  backgroundImage: 'repeating-linear-gradient(135deg, color-mix(in srgb, var(--text-primary) 55%, transparent) 0 1.25px, transparent 1.25px 6px)',
-  backgroundColor: 'var(--bg-surface)',
-} as const;
-
-/** The legend uses the same swatches the calendar below draws, so it never describes a
- * mark the calendar doesn't have. */
+/** The legend draws the same marks the calendar below draws (and /pto's calendar uses),
+ * so it never describes a swatch the calendar doesn't have. */
 function SabbaticalLegend() {
+  const swatch = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-[3px]';
   return (
-    <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink">
-      <li className="flex items-center gap-2">
-        <span aria-hidden="true" className="h-5 w-8 rounded-[3px] bg-mark" />
-        Away: the sabbatical block and the weekends it joins
+    <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink">
+      <li className="flex min-h-7 items-center gap-2">
+        <span aria-hidden="true" className="h-6 w-9 rounded-[4px] border-b border-ink bg-mark" />
+        Time away: the sabbatical and the weekends and holidays it joins
       </li>
-      <li className="flex items-center gap-2">
-        <span aria-hidden="true" className="h-5 w-5 rounded-[2px] bg-ink" />
+      <li className="flex min-h-7 items-center gap-2">
+        <span aria-hidden="true" className={`${swatch} border ${COLORS.ptoBorder} ${COLORS.ptoBg}`} />
         PTO day
       </li>
-      <li className="flex items-center gap-2">
-        <span aria-hidden="true" className="h-5 w-5 rounded-[2px] border-[1.5px] border-ink" style={UNPAID_PATTERN} />
+      <li className="flex min-h-7 items-center gap-2">
+        <span aria-hidden="true" className={`${swatch} border ${COLORS.ptoBorder} ${COLORS.ptoBg} ${COLORS.ptoText}`}><UnpaidIcon className="h-3 w-3" /></span>
         Unpaid leave day
       </li>
-      <li className="flex items-center gap-2">
-        <span aria-hidden="true" className="flex h-5 w-5 items-center justify-center"><span className="h-1.5 w-1.5 rounded-full border border-ink bg-ink" /></span>
+      <li className="flex min-h-7 items-center gap-2">
+        <span aria-hidden="true" className={`${swatch} relative border border-line`}><span className={`absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${HOLIDAY_DOT}`} /></span>
         Public holiday
       </li>
-      <li className="flex items-center gap-2">
-        <span aria-hidden="true" className="h-5 w-5 rounded-[2px] outline outline-2 -outline-offset-2 outline-ink" />
-        Today
+      <li className="flex min-h-7 items-center gap-2">
+        <span aria-hidden="true" className={`${swatch} bg-surface-alt`} />
+        Weekend
       </li>
     </ul>
   );
 }
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const WEEKDAYS = [
-  ['Mo', 'Monday'], ['Tu', 'Tuesday'], ['We', 'Wednesday'], ['Th', 'Thursday'], ['Fr', 'Friday'], ['Sa', 'Saturday'], ['Su', 'Sunday'],
-] as const;
+const WEEKDAYS_MONDAY = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const WEEKDAYS_SUNDAY = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-/** A read-only month grid in the planner's calendar language: the whole time away is one
- * continuous marker run (no gaps between cells, square ends only where the run starts or
- * stops), PTO days are solid ink blocks inside it, unpaid days are hatched with an ink
- * edge, holidays carry a dot plus their name. Each cell also says its state in words. */
+/** A read-only month grid drawn exactly like /pto's MonthGrid and DayCell: the country's
+ * week start, the time away as a marker band behind the cells (one continuous run per week,
+ * 4px ends only where the run starts or stops), PTO and unpaid days as solid ink cells (the
+ * unpaid one with /pto's ring glyph), weekends on the tone-stepped fill, holidays with the
+ * centred dot, today with the 2px ring. Only the months the trip touches are drawn. Each
+ * marked day also says its state in words for screen readers. */
 function SabbaticalCalendar({
-  rangeStart, rangeEnd, today, runStart, runEnd, coreSet, ptoSet, unpaidSet, holidaySet, holidayNameFor,
+  weekStart, today, runStart, runEnd, coreSet, ptoSet, unpaidSet, holidaySet, holidayNameFor,
 }: {
-  rangeStart: string;
-  rangeEnd: string;
+  weekStart: 0 | 1;
   today: string;
   runStart: string;
   runEnd: string;
@@ -522,69 +519,91 @@ function SabbaticalCalendar({
   holidayNameFor: (iso: string) => string | undefined;
 }) {
   const months: string[] = [];
-  for (let m = rangeStart.slice(0, 7) + '-01'; m <= rangeEnd; ) {
+  for (let m = runStart.slice(0, 7) + '-01'; m <= runEnd; ) {
     months.push(m);
     const [y, mo] = m.split('-').map(Number);
     m = mo === 12 ? `${y + 1}-01-01` : `${y}-${String(mo + 1).padStart(2, '0')}-01`;
   }
+  const labels = weekStart === 0 ? WEEKDAYS_SUNDAY : WEEKDAYS_MONDAY;
   return (
-    <div className="mt-5 grid gap-x-8 gap-y-6 sm:grid-cols-2">
+    <div className="mt-4 grid gap-x-8 gap-y-6 sm:grid-cols-2">
       {months.map((first) => {
         const [y, mo] = first.split('-').map(Number);
         const daysInMonth = new Date(Date.UTC(y, mo, 0)).getUTCDate();
-        const lead = mondayIndexedDow(first);
+        const lead = (mondayIndexedDow(first) + (weekStart === 0 ? 1 : 0)) % 7;
         const cells: (string | null)[] = Array.from({ length: lead }, () => null);
         for (let d = 1; d <= daysInMonth; d++) cells.push(`${first.slice(0, 8)}${String(d).padStart(2, '0')}`);
         while (cells.length % 7) cells.push(null);
         const weeks: (string | null)[][] = [];
         for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+        const monthName = `${MONTH_NAMES[mo - 1]} ${y}`;
         return (
-          <table key={first} className="w-full table-fixed border-separate border-spacing-x-0 border-spacing-y-1 text-sm">
-            <caption className="mb-1 text-left text-base font-bold text-ink">{MONTH_NAMES[mo - 1]} {y}</caption>
-            <thead>
-              <tr>
-                {WEEKDAYS.map(([short, long]) => (
-                  <th key={short} scope="col" className="pb-1 text-center text-xs font-semibold text-muted"><abbr title={long} className="no-underline">{short}</abbr></th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {weeks.map((week, wi) => (
-                <tr key={wi}>
-                  {week.map((iso, di) => {
-                    if (!iso) return <td key={di} className="h-10" />;
-                    const inRun = iso >= runStart && iso <= runEnd;
-                    const isPto = ptoSet.has(iso);
-                    const isUnpaid = unpaidSet.has(iso);
-                    const isHoliday = holidaySet.has(iso);
-                    const holidayName = isHoliday ? holidayNameFor(iso) : undefined;
-                    const isWeekend = di >= 5;
-                    const roundL = inRun && (iso === runStart || di === 0);
-                    const roundR = inRun && (iso === runEnd || di === 6);
-                    const state = isPto ? 'PTO day' : isUnpaid ? 'unpaid leave day' : coreSet.has(iso) ? 'sabbatical block' : inRun ? 'day off joined to your time away' : '';
-                    const label = [state, holidayName ? `public holiday: ${holidayName}` : ''].filter(Boolean).join(', ');
-                    return (
-                      <td key={di} className={`h-10 p-0 text-center align-middle ${inRun ? 'bg-mark' : ''} ${roundL ? 'rounded-l-[3px]' : ''} ${roundR ? 'rounded-r-[3px]' : ''}`} title={holidayName}>
+          <div key={first} role="group" aria-label={monthName} className="min-w-0">
+            <p aria-hidden="true" className="mb-1 text-base font-bold text-ink">{monthName}</p>
+            <div aria-hidden="true" className="mb-1 grid grid-cols-7 gap-x-1 text-center text-xs font-medium text-muted">
+              {labels.map((label) => <span key={label}>{label}</span>)}
+            </div>
+            <div className="flex flex-col gap-1">
+              {weeks.map((week, wi) => {
+                // The band: each in-run stretch of this week as one segment behind the cells.
+                const segments: { from: number; to: number; roundL: boolean; roundR: boolean }[] = [];
+                week.forEach((iso, i) => {
+                  const inRun = !!iso && iso >= runStart && iso <= runEnd;
+                  if (!inRun) return;
+                  const last = segments[segments.length - 1];
+                  if (last && last.to === i - 1) { last.to = i; last.roundR = iso === runEnd; }
+                  else segments.push({ from: i, to: i, roundL: iso === runStart, roundR: iso === runEnd });
+                });
+                return (
+                  <div key={wi} className="relative grid grid-cols-7 gap-x-1" style={{ gridTemplateRows: '2.5rem' }}>
+                    {segments.map((seg) => (
+                      <span
+                        key={`band-${seg.from}`}
+                        aria-hidden="true"
+                        className={`border-b border-[var(--text-primary)] ${COLORS.bandBg} ${seg.roundL ? 'rounded-l-[4px]' : ''} ${seg.roundR ? 'rounded-r-[4px]' : ''}`}
+                        style={{ gridColumn: `${seg.from + 1} / ${seg.to + 2}`, gridRow: 1 }}
+                      />
+                    ))}
+                    {week.map((iso, di) => {
+                      if (!iso) return <span key={di} aria-hidden="true" style={{ gridColumn: di + 1, gridRow: 1 }} />;
+                      const inRun = iso >= runStart && iso <= runEnd;
+                      const isPto = ptoSet.has(iso);
+                      const isUnpaid = unpaidSet.has(iso);
+                      const isHoliday = holidaySet.has(iso);
+                      const holidayName = isHoliday ? holidayNameFor(iso) : undefined;
+                      const dow = mondayIndexedDow(iso);
+                      const isWeekend = dow >= 5;
+                      const state = isPto ? 'PTO day' : isUnpaid ? 'unpaid leave day' : coreSet.has(iso) ? 'sabbatical' : inRun ? 'day off joined to your time away' : '';
+                      const words = [`${MONTH_NAMES[mo - 1]} ${Number(iso.slice(8))}`, state, holidayName ? `public holiday: ${holidayName}` : '', iso === today ? 'today' : ''].filter(Boolean).join(', ');
+                      const fill = isPto || isUnpaid
+                        ? `${COLORS.ptoBg} border ${COLORS.ptoBorder} ${COLORS.ptoText} font-bold`
+                        : inRun ? 'font-semibold text-ink'
+                          : isWeekend ? 'bg-surface-alt text-muted' : 'text-ink';
+                      return (
                         <span
-                          className={`relative mx-auto flex h-10 w-full max-w-11 flex-col items-center justify-center tabular-nums ${
-                            isPto ? 'w-[calc(100%-4px)] rounded-[2px] bg-ink font-bold text-white'
-                              : isUnpaid ? 'w-[calc(100%-4px)] rounded-[2px] border-[1.5px] border-ink font-bold text-ink'
-                                : inRun ? 'font-semibold text-ink'
-                                  : isWeekend ? 'text-muted' : 'text-ink'
-                          } ${iso === today ? 'outline outline-2 -outline-offset-2 outline-ink' : ''}`}
-                          style={isUnpaid ? UNPAID_PATTERN : undefined}
+                          key={di}
+                          title={holidayName}
+                          className={`relative z-10 flex h-10 items-center justify-center rounded-[3px] text-sm font-medium tabular-nums ${fill} ${
+                            iso === today ? 'ring-2 ring-[var(--text-primary)] ring-offset-2 ring-offset-[var(--bg-surface)]' : ''
+                          }`}
+                          style={{ gridColumn: di + 1, gridRow: 1 }}
                         >
-                          <span className={isUnpaid ? 'bg-surface px-0.5 leading-tight' : ''}>{Number(iso.slice(8))}</span>
-                          {isHoliday && <span aria-hidden="true" className={`absolute bottom-0.5 h-1.5 w-1.5 rounded-full ${isPto ? 'bg-white' : 'bg-ink'}`} />}
-                          {(label || iso === today) && <span className="sr-only">{[label, iso === today ? 'today' : ''].filter(Boolean).join(', ')}</span>}
+                          <span aria-hidden="true" className="flex items-center gap-0.5">
+                            {Number(iso.slice(8))}
+                            {isUnpaid && <UnpaidIcon className="h-3 w-3" />}
+                          </span>
+                          <span className="sr-only">{words}</span>
+                          {isHoliday && !isPto && !isUnpaid && (
+                            <span aria-hidden="true" className={`absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${HOLIDAY_DOT}`} />
+                          )}
                         </span>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         );
       })}
     </div>

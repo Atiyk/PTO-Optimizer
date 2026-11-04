@@ -6,6 +6,7 @@ import { forecastWithRequests } from '../personal/forecast';
 import { carryoverSnapshot } from '../personal/carryoverSnapshot';
 import { Button } from './Button';
 import { downloadReminderICS } from './icsExport';
+import { compactDate, compactDatesIn } from './compactDate';
 
 const PREFS_KEY = 'gapless.personal.expiration.v1';
 interface GuardPreferences { enabled: boolean; leads: ExpirationReminderLead[]; dismissed: string[] }
@@ -68,7 +69,7 @@ export function ExpirationGuard({ policy, country, requests = EMPTY_REQUESTS, to
         <h2 id={`${id}-heading`} className="text-lg font-bold type-condensed text-ink">PTO expiration guard</h2>
         <label className="flex min-h-11 items-center gap-2 text-sm text-muted"><input type="checkbox" className="h-4 w-4" checked={prefs.enabled} onChange={(event) => update({ ...prefs, enabled: event.target.checked })} />Show in-app alerts</label>
       </div>
-      <p className="text-sm leading-6 text-muted">What you could lose under your current balance, approved leave and policy. Planned and requested leave is the separate scenario in the forecast.</p>
+      <p className="text-sm leading-6 text-muted">What you could lose under your balance, approved leave and policy. Requested leave is a separate scenario in the forecast.</p>
       {!prefs.enabled ? <p className="mt-3 text-sm text-muted">In-app expiration alerts are off in this browser.</p>
         : !validPolicy ? <p role="status" className="mt-3 text-sm text-ink">Enter valid policy values, including a current carried portion no greater than your balance and its future use-by date, to check expiration risk.</p>
           : visible.length === 0 ? (
@@ -77,17 +78,17 @@ export function ExpirationGuard({ policy, country, requests = EMPTY_REQUESTS, to
               <span>{risks.length ? 'All current alerts are dismissed.' : 'No upcoming forfeiture, carryover expiration, or accrual-cap risk found under these rules.'}</span>
             </p>
           )
-          : <ul className="mt-3 space-y-2">{visible.map((risk) => (
-            <li key={risk.id} className="rounded-[4px] border-2 border-ink bg-accent-soft p-3 sm:p-4">
+          : <ul className="mt-3 divide-y divide-line border-t border-ink">{visible.map((risk) => (
+            <li key={risk.id} className="py-3">
               <p className="flex items-start gap-2 font-bold text-ink">
                 <span aria-hidden="true" className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center bg-ink text-xs font-bold text-white">!</span>
-                <span>{risk.text}</span>
+                <span>{compactDatesIn(risk.text)}</span>
               </p>
-              <p className="mt-1 pl-7 text-sm text-ink">{risk.kind === 'cap' ? 'Creating space in your balance may prevent lost accrual.' : `Last day to use this PTO: ${risk.deadline}.`}</p>
+              <p className="mt-1 pl-7 text-sm text-ink">{risk.kind === 'cap' ? 'Creating space in your balance may prevent lost accrual.' : `Last day to use this PTO: ${compactDate(risk.deadline)}.`}</p>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 pl-7">
                 {risk.canPlan ? <a href={risk.ptoHref} className="link-mark inline-flex min-h-11 items-center text-sm font-semibold" onClick={onAlertAction}>Find the best way to use those days →</a>
                   : <p className="text-sm text-ink">No additional whole PTO day is safely available to plan before this deadline under the entered rules. Review your forecast and policy.</p>}
-                <Button variant="quiet" size="sm" className="min-h-11" onClick={() => update({ ...prefs, dismissed: [...prefs.dismissed, risk.id] })} aria-label={`Dismiss ${risk.text}`}>Dismiss</Button>
+                <Button variant="quiet" size="sm" className="min-h-11" onClick={() => update({ ...prefs, dismissed: [...prefs.dismissed, risk.id] })} aria-label={`Dismiss ${compactDatesIn(risk.text)}`}>Dismiss</Button>
               </div>
               {risk.canPlan && <p className="mt-1 pl-7 text-xs leading-5 text-muted">Plans up to {risk.planningBudget} whole PTO {risk.planningBudget === 1 ? 'day' : 'days'} once earned, reserving your scheduled leave. Check the optimizer&apos;s employer holidays and workweek.</p>}
             </li>
@@ -108,7 +109,7 @@ export function ExpirationGuard({ policy, country, requests = EMPTY_REQUESTS, to
           </p>
         ) : (
           <div className="space-y-3 pb-3">
-            <p className="text-sm text-muted">Based on the policy you entered, the next reset is <strong className="text-ink">{reset.resetDate}</strong>.
+            <p className="text-sm text-muted">Based on the policy you entered, the next reset is <strong className="text-ink">{compactDate(reset.resetDate)}</strong>.
               These amounts include scheduled approved leave, and are estimates rather than employer-verified forfeiture.</p>
             <dl className="grid grid-cols-2 gap-3 text-sm">
               <div><dt className="text-muted">Before reset</dt><dd className="mt-0.5 font-semibold text-ink">{fmt(reset.confirmed.beforeResetBalance)} {reset.unit}</dd></div>
@@ -129,7 +130,7 @@ export function ExpirationGuard({ policy, country, requests = EMPTY_REQUESTS, to
             )}
             {reset.carriedUseByDate && reset.carriedExpiry && (
               <p className="text-sm text-muted">
-                Separate carried-time deadline: {reset.carriedUseByDate}.
+                Separate carried-time deadline: {compactDate(reset.carriedUseByDate)}.
                 Estimated carried units expiring at that deadline: {fmt(reset.carriedExpiry.confirmed)} {reset.unit}.
               </p>
             )}

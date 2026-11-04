@@ -6,6 +6,7 @@ import { estimateDeparturePayout, type CompanyPayoutRule } from '../personal/pay
 type PayMode = 'hourly' | 'annual';
 type EmployerRule = CompanyPayoutRule['kind'];
 const input = 'mt-1.5 h-11 w-full min-w-0 rounded-[3px] border border-line-strong bg-surface px-3 text-base font-normal text-ink';
+const selectCls = 'select-ink mt-1.5 h-11 w-full min-w-0 text-base font-normal';
 const labelCls = 'block min-w-0 text-sm font-semibold text-ink';
 const money = (cents: number, currency: string) =>
   new Intl.NumberFormat('en', { style: 'currency', currency }).format(cents / 100);
@@ -67,7 +68,7 @@ export function DeparturePayoutEstimator({
             </label>
             <label className={labelCls}>
               Pay type
-              <select className={input} value={payMode} onChange={e => setPayMode(e.target.value as PayMode)}>
+              <select className={selectCls} value={payMode} onChange={e => setPayMode(e.target.value as PayMode)}>
                 <option value="hourly">Hourly pay</option>
                 <option value="annual">Annual salary</option>
               </select>
@@ -86,7 +87,7 @@ export function DeparturePayoutEstimator({
             )}
             <label className={labelCls}>
               Pay currency (no conversion)
-              <select className={input} value={currency} onChange={e => setCurrency(e.target.value)}>
+              <select className={selectCls} value={currency} onChange={e => setCurrency(e.target.value)}>
                 <option value="USD">USD</option><option value="GBP">GBP</option>
                 <option value="CAD">CAD</option><option value="AUD">AUD</option>
                 <option value="EUR">EUR</option><option value="INR">INR</option>
@@ -94,7 +95,7 @@ export function DeparturePayoutEstimator({
             </label>
             <label className={labelCls}>
               Employer payout assumption
-              <select className={input} value={companyRule} onChange={e => setCompanyRule(e.target.value as EmployerRule)}>
+              <select className={selectCls} value={companyRule} onChange={e => setCompanyRule(e.target.value as EmployerRule)}>
                 <option value="unknown">I do not know yet</option>
                 <option value="pays-all">Pays all unused vacation</option>
                 <option value="pays-up-to">Pays up to a cap</option>
@@ -118,7 +119,7 @@ export function DeparturePayoutEstimator({
             Your request tracker does not classify leave types. Without this, only the planned dates in your policy affect the estimate.
           </p>
         </div>
-        <div className="min-w-0 self-start rounded-[4px] bg-surface-alt p-4 sm:p-5">
+        <div className="min-w-0 self-start border-t-2 border-ink pt-4 lg:border-l lg:border-t-0 lg:border-line lg:pl-6 lg:pt-0">
           {!complete ? (
             <p role="status" className="text-sm text-ink">
               Enter your work jurisdiction and pay rate to see a company-policy scenario. An unknown employer rule cannot produce a payout amount.

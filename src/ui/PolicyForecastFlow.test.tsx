@@ -83,7 +83,7 @@ describe('quick policy forecast in the real consumer page', () => {
     window.history.replaceState(null, '', '/policy?c=US&cb=10&bao=2027-02-01&ak=fl&am=0&gd=2027-01-01&cm=a&ace=0&cue=1&cub=2027-03-31&car=99&fd=2027-04-01');
     render(<Policy />);
     expect(forecastOutput().getByText(/current carried PTO portion must be between zero and your current balance/)).toBeTruthy();
-    expect(forecastOutput().queryByText('Estimated available PTO on 2027-04-01')).toBeNull();
+    expect(forecastOutput().queryByText('Estimated available PTO on Apr 1, 2027')).toBeNull();
     expect(screen.queryByText(/Nothing to flag — no forfeiture/)).toBeNull();
     expect(screen.queryByText(/No balance to chart — unlimited/)).toBeNull();
   });
@@ -101,5 +101,23 @@ describe('quick policy forecast in the real consumer page', () => {
     fireEvent.change(quickInputs().getByLabelText('How PTO accrues'), { target: { value: 'per-hour-worked' } });
     expect(quickInputs().getByLabelText('Hours earned per hour worked')).toBeTruthy();
     expect(quickInputs().queryByLabelText('days earned per hour worked')).toBeNull();
+  });
+
+  it('says an upcoming forfeiture beside the forecast figure, never a reassuring "−0"', () => {
+    window.history.replaceState(null, '', '/policy?c=US&cb=12&bao=2030-10-01&ak=fl&am=0&gd=2030-01-01&cm=n&ace=0&fd=2030-12-31');
+    render(<Policy />);
+    const region = forecastOutput();
+    expect(region.getByText('Estimated available PTO on Dec 31, 2030')).toBeTruthy();
+    expect(region.getByText(/You could lose 12 days on Jan 1, 2031\./)).toBeTruthy();
+    expect(region.getByText(/not in this number/)).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'PTO balance forecast' }).textContent).not.toMatch(/[−+-]0 days/);
+    expect(screen.getByText('Expected expiration').nextElementSibling?.textContent).toBe('0 days');
+  });
+
+  it('labels the zero starting balance until the visitor enters theirs', () => {
+    window.history.replaceState(null, '', '/policy?c=US&cb=0&bao=2030-01-01&ak=pp&am=1&fq=m&pda=2030-01-15&cm=a&ace=0&fd=2030-03-15');
+    render(<Policy />);
+    expect(screen.getByText(/Starts at 0 until you enter yours/)).toBeTruthy();
+    expect(forecastOutput().getByText('Current balance (not entered yet)')).toBeTruthy();
   });
 });
