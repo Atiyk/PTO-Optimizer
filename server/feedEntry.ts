@@ -1,26 +1,20 @@
 /**
  * Server entry for the calendar feeds. scripts/build-api.mjs bundles this file into
  * api/_bundle/feed.mjs, which api/feed.ts and api/watch.ts import. Everything that isn't
- * file access lives in src/autopilot so it is unit tested with the app.
+ * holiday lookup lives in src/autopilot so it is unit tested with the app.
  */
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { rawHolidaysToHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { handleFeedRequest, FEED_CACHE_CONTROL, type HolidayReader } from '../src/autopilot/feedHandler';
 import { buildWatchFeedICS, watchFeedHolidayYears } from '../src/autopilot/watchFeed';
+import { loadHolidayFile } from './holidayData';
 
 const COUNTRY = /^[A-Z]{2}$/;
-const HOLIDAY_DIR = join(process.cwd(), 'public', 'holidays');
 
-/** Reads the committed public/holidays/<CC>-<YEAR>.json file. The country and year are
+/** Looks up the committed public/holidays/<CC>-<YEAR>.json file. The country and year are
  * shape-checked here as well, so no request can make it read any other path. */
 export const readHolidaysFromDisk: HolidayReader = async (country, year) => {
   if (!COUNTRY.test(country) || !Number.isInteger(year) || year < 2000 || year > 2100) return null;
-  try {
-    return JSON.parse(await readFile(join(HOLIDAY_DIR, `${country}-${year}.json`), 'utf8'));
-  } catch {
-    return null;
-  }
+  return loadHolidayFile(`${country}-${year}.json`);
 };
 
 function text(status: number, message: string): Response {
