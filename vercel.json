@@ -2,5 +2,13 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "functions": {
+    "api/feed.ts": {
+      "includeFiles": "public/holidays/**"
+    },
+    "api/watch.ts": {
+      "includeFiles": "public/holidays/**"
+    }
+  }
 }

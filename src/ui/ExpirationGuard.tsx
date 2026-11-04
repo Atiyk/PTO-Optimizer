@@ -9,6 +9,9 @@ import { Callout } from './Callout';
 import { forecastWithRequests } from '../personal/forecast';
 import { carryoverSnapshot } from '../personal/carryoverSnapshot';
 import { Button } from './Button';
+import { SubscribeFeed } from './SubscribeFeed';
+
+const WATCH_CALENDAR_NAME = 'Gapless PTO Optimizer - PTO expiry watch';
 import { downloadReminderICS } from './icsExport';
 import { compactDate, compactDatesIn } from './compactDate';
 
@@ -47,6 +50,9 @@ export interface ExpirationGuardProps {
    * guard loads the country's public holidays itself on a Monday to Friday week. */
   holidayCalendar?: GuardHolidayCalendar;
   subdivision?: string;
+  /** The /policy link's query string. When given, the guard offers the expiry watch feed
+   * (/api/watch), which recomputes risks and rescue dates each time the calendar refreshes. */
+  watchSearch?: string;
   onAlertViewed?: () => void;
   onAlertAction?: () => void;
 }
@@ -105,7 +111,7 @@ function RescueDetails({ plan, risk, calendarState, onAlertAction }: { plan: Res
   );
 }
 
-function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalendar, subdivision, onAlertViewed, onAlertAction }: ExpirationGuardProps & { holidayCalendar: GuardHolidayCalendar }) {
+function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalendar, subdivision, watchSearch, onAlertViewed, onAlertAction }: ExpirationGuardProps & { holidayCalendar: GuardHolidayCalendar }) {
   const id = useId();
   const [visitDate] = useState(visitDateNow);
   const effectiveToday = today ?? visitDate;
@@ -244,6 +250,18 @@ function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalen
         </div>
       </details>
       {message && <p role="status" className="mt-2 text-sm text-muted">{message}</p>}
+      {watchSearch !== undefined && validPolicy && (
+        <div className="mt-4">
+          <SubscribeFeed
+            planSearch={watchSearch}
+            path="/api/watch"
+            idPrefix={`${id}-watch`}
+            calendarName={WATCH_CALENDAR_NAME}
+            heading="Get these reminders in your calendar"
+            description="Subscribe once. Your calendar gets the 60, 30 and 7-day reminders and the suggested days to use expiring PTO, and they are recomputed against today's date each time it refreshes. Requests you track on this device aren't included. Editing your policy gives a new link, so subscribe again after a change. Anyone with this link can see the policy details in it."
+          />
+        </div>
+      )}
     </section>
   );
 }
