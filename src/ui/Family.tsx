@@ -158,8 +158,14 @@ export function Family() {
                   {plural(plan.breaks.length, 'school break')} between {formatLong(start)} and {formatLong(end)}.{' '}
                   {plan.uncoveredDays.length > 0
                     ? `${plural(plan.uncoveredDays.length, 'school day')} off still uncovered in the dates you added.`
-                    : 'No gaps found in the dates you added.'}
+                    : 'No gaps found in the dates you added.'}{' '}
+                  Day counts include the weekends that join each break.
                 </p>
+                {preset && end > preset.lastDay && (
+                  <p className="mt-1 text-sm text-muted">
+                    The {preset.shortName} preset covers the {preset.schoolYear} school year, which ends {formatLong(preset.lastDay)}. Breaks after that aren&apos;t shown until you add next year&apos;s dates.
+                  </p>
+                )}
               </>
             ) : (
               <>

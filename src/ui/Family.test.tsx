@@ -70,6 +70,13 @@ describe('Family planner', () => {
     expect(screen.queryByRole('button', { name: /generate|calculate|submit/i })).toBeNull();
   });
 
+  it('says when the planning window runs past the preset school year', () => {
+    go('c=US&s=2026-11-02&d=test-district-2026-27');
+    render(<Family />);
+    expect(screen.getByText(/preset covers the 2026-27 school year/)).toBeTruthy();
+    expect(screen.getByText(/include the weekends that join each break/)).toBeTruthy();
+  });
+
   it('switching a break off writes it to the URL and spends the PTO elsewhere', () => {
     go('c=US&s=2026-11-02&d=test-district-2026-27&pto=3');
     render(<Family />);
