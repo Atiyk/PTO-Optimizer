@@ -44,7 +44,7 @@ try {
       assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= width + 1, 'Touch action panel must fit inside the viewport');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, 'Calendar must not overflow horizontally');
       await page.screenshot({ path: resolve(out, `calendar-touch-open-${width}.png`), fullPage: false });
-      await panel.getByRole('button', { name: 'Change this day' }).tap();
+      await panel.getByRole('button', { name: 'Take this day off' }).tap();
       await panel.waitFor({ state: 'detached' });
       assert.ok(await day.count(), `Calendar day disappeared after applying an action. Status: ${JSON.stringify(await page.locator('[role="status"]').allInnerTexts())}; URL: ${page.url()}`);
       assert.equal(await day.getAttribute('aria-expanded'), 'false', 'Action should close the disclosure');

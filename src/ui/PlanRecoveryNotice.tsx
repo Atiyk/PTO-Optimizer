@@ -30,11 +30,11 @@ export function PlanRecoveryNotice({
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {hasForcedDays && (
-            <button type="button" onClick={onClearForcedDays} className={buttonClasses('secondary', 'md', 'min-h-11')}>
+            <button type="button" onClick={onClearForcedDays} className={buttonClasses('secondary', 'md', 'min-h-11 h-auto! whitespace-normal! py-2 text-left')}>
               Clear pinned and excluded dates
             </button>
           )}
-          <button type="button" onClick={onReviewSettings} className={buttonClasses('quiet', 'md', 'min-h-11')}>
+          <button type="button" onClick={onReviewSettings} className={buttonClasses('quiet', 'md', 'min-h-11 h-auto! whitespace-normal! py-2 text-left')}>
             Review advanced settings
           </button>
         </div>
@@ -57,10 +57,10 @@ export function RelaxedMinimumNotice({ minimum, onClearPins, onNoMinimum }: { mi
         minimum, or keep the pins and drop the minimum.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" onClick={onClearPins} className={buttonClasses('secondary', 'md', 'min-h-11')}>
+        <button type="button" onClick={onClearPins} className={buttonClasses('secondary', 'md', 'min-h-11 h-auto! whitespace-normal! py-2 text-left')}>
           Remove pinned and excluded dates
         </button>
-        <button type="button" onClick={onNoMinimum} className={buttonClasses('quiet', 'md', 'min-h-11')}>
+        <button type="button" onClick={onNoMinimum} className={buttonClasses('quiet', 'md', 'min-h-11 h-auto! whitespace-normal! py-2 text-left')}>
           Use no minimum break
         </button>
       </div>
