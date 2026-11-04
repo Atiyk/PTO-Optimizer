@@ -1,6 +1,6 @@
 import { useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { formatShortWithYear } from '@daysoff/engine/calendar/dateFormat';
-import { addDays } from '@daysoff/engine/solver/dateUtils';
+import { addDays, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { SCHOOL_DISTRICT_PRESETS, SCHOOL_PRESETS_AS_OF, type SchoolDistrictPreset } from '../content/schoolDistricts';
 import { extractSchoolDates } from '../personal/schoolDateText';
 import { IcsParseError, MAX_IMPORT_CHARS, MAX_IMPORT_FILE_BYTES, parseICSBusyDays } from './icsImport';
@@ -124,8 +124,14 @@ export function DistrictPicker({ districtId, onChange }: { districtId?: string; 
 
 type Pending = { source: string; heading: string; candidates: CandidateDates[] } | null;
 
+/** Longer than any school break: a term, a sports season or a "school year" event. */
+const ICS_MAX_LIKELY_RUN_DAYS = 31;
+
 function icsCandidates(busyDays: string[]): CandidateDates[] {
-  return datesToRuns(busyDays).map((r) => ({ id: `${r.start}_${r.end}`, start: r.start, end: r.end, confidence: 'likely-closure' as const }));
+  return datesToRuns(busyDays).map((r) => ({
+    id: `${r.start}_${r.end}`, start: r.start, end: r.end,
+    confidence: rangeISO(r.start, r.end).length > ICS_MAX_LIKELY_RUN_DAYS ? 'unsure' as const : 'likely-closure' as const,
+  }));
 }
 
 export function ImportSources({

@@ -39,5 +39,5 @@ export const NYC_2026_27: SchoolDistrictPreset = {
     retrieved: '2026-11-04',
   },
   notes:
-    'Election Day (Nov 3, 2026) is a remote-learning day, not a closure. Feb 1, 2027 is a PD day only for high schools and 6–12 schools (other students attend), so it is not listed. June 8, 2027 Clerical Day: high-school students still attend. Juneteenth is not on the calendar (school year ends June 28).',
+    'Election Day (Nov 3, 2026) is a remote-learning day, not a closure. Feb 1, 2027 is a PD day only for high schools and 6–12 schools (other students attend), so it is not listed. June 8, 2027 Clerical Day: high-school students still attend. Juneteenth falls on Saturday, June 19, 2027 and no weekday closure for it is listed; check with your school.',
 };

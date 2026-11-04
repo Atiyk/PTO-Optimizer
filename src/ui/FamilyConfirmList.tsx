@@ -42,7 +42,7 @@ export function FamilyConfirmList({ heading, candidates, onAdd, onDiscard }: Fam
     <div role="group" aria-labelledby={headingId} className="mt-3 border-l-2 border-ink pl-3">
       <p id={headingId} className="text-sm font-semibold text-ink">{heading}</p>
       <p className="mt-1 text-sm text-muted">
-        Check each date against the calendar you used.{unsure > 0 ? ` ${unsure} ${unsure === 1 ? 'date is' : 'dates are'} unchecked because no closure word was found next to ${unsure === 1 ? 'it' : 'them'}.` : ''}
+        Check each date against the calendar you used.{unsure > 0 ? ` ${unsure} ${unsure === 1 ? 'date is' : 'dates are'} unchecked because ${unsure === 1 ? 'it' : 'they'} may not be ${unsure === 1 ? 'a day' : 'days'} without school.` : ''}
       </p>
       <ul className="mt-2 flex max-h-96 flex-col gap-1.5 overflow-y-auto pr-1">
         {candidates.map((c) => (

@@ -100,6 +100,8 @@ describe('Family planner', () => {
     expect(link.searchParams.get('d')).toBe('test-district-2026-27');
     expect(link.searchParams.has('ask')).toBe(false);
     expect(link.searchParams.has('pto')).toBe(false);
+    // Dates only: the helper's country never rides along.
+    expect(link.searchParams.has('c')).toBe(false);
   });
 
   it('adds only confirmed pasted dates, and the family share link carries dates but no snippets', async () => {
@@ -125,7 +127,7 @@ describe('Family planner', () => {
     expect(decodeURIComponent(copied[0])).not.toMatch(/Emma|Maple|recess|picture|Winter/i);
     expect(link.searchParams.get('sd')).toBe(sd);
     expect(link.searchParams.get('pp')).toBeTruthy();
-    expect([...link.searchParams.keys()].sort()).toEqual(['c', 'pp', 'sd']);
+    expect([...link.searchParams.keys()].sort()).toEqual(['pp', 'sd']);
   });
 
   it('a received link with pp shows the other adult as childcare cover', () => {
@@ -133,6 +135,18 @@ describe('Family planner', () => {
     render(<Family />);
     expect(screen.getByRole('heading', { name: 'Another adult shared their days' })).toBeTruthy();
     expect(screen.getByText(/They cover 4 school days off/)).toBeTruthy();
+  });
+
+  it('says when the other adult only shares days you already cover', () => {
+    go('c=US&s=2026-11-02&d=test-district-2026-27&pto=60&pp=1:p:20261228~20261231:-');
+    render(<Family />);
+    expect(screen.getByText(/They don.t cover any of your remaining uncovered school days\. 4 of their days fall on school days off you already cover\./)).toBeTruthy();
+  });
+
+  it('flags unreadable school dates in a received link instead of dropping them silently', () => {
+    go('s=2026-11-02&sd=garbage');
+    render(<Family />);
+    expect(screen.getByRole('alert').textContent).toMatch(/school dates in this link couldn.t be read/);
   });
 });
 

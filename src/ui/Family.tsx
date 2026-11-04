@@ -111,10 +111,12 @@ export function Family() {
     setExcludedBreaks((cur) => (include ? cur.filter((x) => x !== id) : [...new Set([...cur, id])].sort()));
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const askLink = () => buildFamilyShareURL(origin, { customOffDays: [], country, ask: true });
-  const sendBackLink = () => buildFamilyShareURL(origin, { districtId, customOffDays, country });
+  // Shared links carry dates only, like the /pto partner link: never the sender's country,
+  // so the person who opens one plans with their own country's holidays and weekends.
+  const askLink = () => buildFamilyShareURL(origin, { customOffDays: [], ask: true });
+  const sendBackLink = () => buildFamilyShareURL(origin, { districtId, customOffDays });
   const shareLink = ({ includeSchool, availability }: { includeSchool: boolean; availability?: PartnerAvailability }) =>
-    buildFamilyShareURL(origin, { districtId: includeSchool ? districtId : undefined, customOffDays: includeSchool ? customOffDays : [], country, availability });
+    buildFamilyShareURL(origin, { districtId: includeSchool ? districtId : undefined, customOffDays: includeSchool ? customOffDays : [], availability });
 
   const stepBtn = `flex h-11 w-11 shrink-0 items-center justify-center text-lg font-semibold text-ink transition-colors duration-150 hover:bg-surface-alt disabled:opacity-40 ${FOCUS}`;
   const numberInput = 'h-11 w-14 min-w-0 border-x border-line-strong bg-surface text-center text-base font-semibold text-ink [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
@@ -245,6 +247,9 @@ export function Family() {
             <div className="flex min-w-0 flex-col gap-10 lg:gap-12">
               {received.invalid && (
                 <p role="alert" className="rounded-[4px] border border-ink p-3 text-sm text-ink">The shared availability in this link is invalid or too large. Ask for a new link.</p>
+              )}
+              {initial.invalid.includes('sd') && (
+                <p role="alert" className="rounded-[4px] border border-ink p-3 text-sm text-ink">The school dates in this link couldn&apos;t be read. Ask for a new link, or add the dates here.</p>
               )}
               {received.availability && (
                 <OtherAdultNote availability={received.availability} plan={plan} />
@@ -468,6 +473,10 @@ function ExportRow({ plan }: { plan: FamilyPlanResult }) {
 
 function OtherAdultNote({ availability, plan }: { availability: PartnerAvailability; plan: FamilyPlanResult | null }) {
   const covered = plan ? plan.gaps.filter((g) => g.cover === 'other-adult').length : 0;
+  // Their days that land on school days off you already cover (off anyway, or your PTO).
+  const shared = new Set(availability.days);
+  const overlapYours = plan ? plan.gaps.filter((g) => (g.cover === 'you-off' || g.cover === 'pto') && shared.has(g.date)).length : 0;
+  const overlapNote = overlapYours > 0 ? ` ${plural(overlapYours, 'of their days falls', 'of their days fall')} on school days off you already cover.` : '';
   const first = availability.days[0];
   const last = availability.days[availability.days.length - 1];
   return (
@@ -475,7 +484,7 @@ function OtherAdultNote({ availability, plan }: { availability: PartnerAvailabil
       <h2 id="family-other-heading" className="text-lg font-bold text-ink type-condensed">Another adult shared their days</h2>
       <p className="mt-1 text-sm text-ink">
         {plural(availability.days.length, 'date')} between {formatShortWithYear(first)} and {formatShortWithYear(last)}, {availability.status === 'confirmed' ? 'marked as confirmed' : 'proposed, not yet confirmed'}.{' '}
-        {plan ? (covered > 0 ? `They cover ${plural(covered, 'school day')} off that you'd otherwise have uncovered.` : 'They don’t cover any of your remaining uncovered school days.') : 'Add school dates to see which gaps they cover.'}
+        {plan ? (covered > 0 ? `They cover ${plural(covered, 'school day')} off that you'd otherwise have uncovered.${overlapNote}` : `They don’t cover any of your remaining uncovered school days.${overlapNote}`) : 'Add school dates to see which gaps they cover.'}
       </p>
       <p className="mt-1 text-xs text-muted">Shown here as childcare cover only. Dates outside what they shared are unknown.</p>
     </section>

@@ -35,7 +35,10 @@ const NAMED = `\\b(${MONTH_PATTERN})\\.?\\s*(\\d{1,2})${ORDINAL}\\b(?:,?\\s*(\\d
 /** "11/26", "11/26/2026", "1/1/27"; not part of a longer slash/number run, and not "1/2 day". */
 const NUMERIC = '(?<![\\d/])(\\d{1,2})/(\\d{1,2})(?:/(\\d{4}|\\d{2}))?(?![\\d/])(?!\\s*day\\b)';
 const ATOM = new RegExp(`${NAMED}|${NUMERIC}`, 'gi');
-const SEPARATOR = /^\s*(?:-|to|through|thru|until)\s*$/i;
+/** The end may carry its own weekday: "Monday, December 21 – Friday, January 1". */
+const SEPARATOR = /^\s*(?:-|to|through|thru|until)\s*(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?\s*)?$/i;
+/** A second same-month day joined by "and"/"&": "No school Nov 26 and 27" is two dates. */
+const BARE_AND = /^\s*(?:and|&)\s*(\d{1,2})(?:st|nd|rd|th)?\b(?![/\d])(?:,?\s*(\d{4})\b)?/i;
 /** Same-month end day after a dash: "Nov 26-27", "11/26-27", "Nov 26 - 27, 2026". */
 const BARE_END = /^\s*(?:-|to|through|thru|until)\s*(\d{1,2})(?:st|nd|rd|th)?\b(?![/\d])(?:,?\s*(\d{4})\b)?/i;
 
@@ -148,6 +151,14 @@ export function extractSchoolDates(text: string, opts: { schoolYearStart: number
           // A year after the end day ("Nov 26-27, 2026") also dates the start.
           const range = toRange({ ...first, year: first.year ?? year }, { ...first, day: Number(bare[1]), year }, opts.schoolYearStart);
           if (range) { add(range, first.index); continue; }
+        }
+        const pair = BARE_AND.exec(line.slice(first.end));
+        if (pair) {
+          const year = fullYear(pair[2]) ?? first.year;
+          const one = toRange({ ...first, year }, { ...first, year }, opts.schoolYearStart);
+          const two = { ...first, day: Number(pair[1]), year };
+          const second = toRange(two, two, opts.schoolYearStart);
+          if (one && second) { add(one, first.index); add(second, first.index); continue; }
         }
       }
       // Not a usable range ("January 18 - 3 day weekend"): keep the single date.

@@ -147,4 +147,11 @@ describe('extractSchoolDates rejects and caps', () => {
     expect(ranges('Dec 21, 2030 - Jan 1, 2031')).toEqual([['2030-12-21', '2031-01-01']]);
     expect(extractSchoolDates('Dec 21 - Jan 1', { schoolYearStart: 2027 }).map(item => item.id)).toEqual(['2027-12-21_2028-01-01']);
   });
+
+  it('reads ranges whose end carries its own weekday, and "and" pairs as two dates (critic)', () => {
+    expect(ranges('Winter Break: Monday, December 21 – Friday, January 1')).toEqual([['2026-12-21', '2027-01-01']]);
+    expect(ranges('Winter Break Mon 12/21 - Fri 1/1')).toEqual([['2026-12-21', '2027-01-01']]);
+    expect(ranges('No school Nov 26 and 27')).toEqual([['2026-11-26', '2026-11-26'], ['2026-11-27', '2026-11-27']]);
+    expect(ranges('No school Nov 26 & 27, 2026')).toEqual([['2026-11-26', '2026-11-26'], ['2026-11-27', '2026-11-27']]);
+  });
 });
