@@ -1,29 +1,29 @@
+import { useEffect, useState, type RefObject } from 'react';
 import type { Scores } from '@daysoff/engine/solver/types';
-import { ordinal } from './scoreFormat';
-import { Container } from './Container';
-import { ACCENT_BUTTON } from './colorScheme';
+import { Button } from './Button';
 
 interface HeadlineProps {
   budgetSpent: number;
   totalDaysOff: number;
   breakCountActual: number;
+  /** Kept for API stability; the plain-language score lines live in SummaryMetrics now. */
   scores: Scores | null;
-  /** Raw total PTO balance, before reserve is subtracted - only needed to render the
-   * reserve-aware headline (Phase 3.1); omit entirely elsewhere. */
+  /** Raw total PTO balance, before reserve is subtracted. */
   budget: number;
   reserveDays: number;
   canPin: boolean;
   onPin: () => void;
   pinnedCount: number;
+  /** "target days" instead of "PTO days" in the balance line for unlimited-PTO plans. */
+  unlimitedPto?: boolean;
 }
 
 /**
  * Phase 3.1: "12 of 15 days planned · 3 kept in reserve → 26 days off" when a reserve is
- * set - must read as a DELIBERATE choice, never as the unspent-budget warning
- * (PrimaryControls' own "add no days off at any position" message, which is a different
- * thing and compares against the post-reserve budget, not this). Falls back to the plain
- * "N PTO days → M days off" phrasing when reserveDays is 0 - a reserve of zero means the
- * user explicitly chose to plan with their whole balance, so there's nothing to call out.
+ * set - must read as a DELIBERATE choice, never as the unspent-budget warning. Falls back to
+ * "N PTO days → M days off" when reserveDays is 0. Still the one-line form of the result: the
+ * portrait/image exports and the compact phone bar use it; the page's h1 sets the same facts
+ * as a marked figure (see Headline below).
  */
 export function headlineText(budgetSpent: number, budget: number, reserveDays: number, totalDaysOff: number): string {
   const offWord = totalDaysOff === 1 ? 'day' : 'days';
@@ -35,58 +35,78 @@ export function headlineText(budgetSpent: number, budget: number, reserveDays: n
   return `${budgetSpent} PTO ${spentWord} → ${totalDaysOff} ${offWord} off`;
 }
 
+/** The supporting line under the figure: break count, then how the balance was used. */
+export function balanceLine(budgetSpent: number, budget: number, reserveDays: number, breakCountActual: number, unlimitedPto = false): string {
+  const breaks = `${breakCountActual} ${breakCountActual === 1 ? 'break' : 'breaks'}`;
+  const unit = unlimitedPto ? 'target' : 'PTO';
+  const dayWord = budget === 1 ? 'day' : 'days';
+  const parts = [breaks, `${budgetSpent} of ${budget} ${unit} ${dayWord} planned`];
+  if (reserveDays > 0) parts.push(`${Math.min(budget, reserveDays)} kept in reserve`);
+  const unplanned = Math.max(0, budget - budgetSpent - Math.min(budget, reserveDays));
+  if (unplanned > 0) parts.push(`${unplanned} not placed`);
+  return parts.join(' · ');
+}
+
 /**
- * The answer, put first: on load the user saw five inputs, two sliders, a legend and
- * three months of calendar before this line - cut off below the fold in small text. This
- * is now the first thing under the tagline, large and sticky (`top-0`, same role the full
- * control bar used to have), so it's never scrolled away while adjusting the plan below.
- *
- * UI density pass: the headline number, break count, and Travel/Efficiency percentiles now
- * sit on ONE flowing line (`items-baseline`, wrapping together as a unit rather than as
- * separate stacked rows) - the headline stays visually largest, the rest reads as normal-
- * size supporting detail beside it, not below it. The old per-score percentile bar blocks
- * (text + a width-coded bar, each its own two-line block) duplicated the exact same numbers
- * this line already states in words and cost two more rows doing it - removed, not moved;
- * the percentile itself is still right here.
+ * The answer, put first: the plan's result as a marked figure ("27 days off") with what it
+ * costs beside it ("from 12 PTO days"). This is the page's single h1 and sits inside a polite
+ * live region, so a screen reader hears the new result as the sliders move. Pin this plan is
+ * a secondary control beside it (the one primary action on the page is the calendar export).
  */
-export function Headline({ budgetSpent, totalDaysOff, breakCountActual, scores, budget, reserveDays, canPin, onPin, pinnedCount }: HeadlineProps) {
+export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, reserveDays, canPin, onPin, pinnedCount, unlimitedPto = false }: HeadlineProps) {
   const pinTitle =
     pinnedCount === 0
       ? 'Pin up to two plans to compare side by side.'
       : canPin
         ? 'Pin this plan'
         : 'Two pinned — remove one to pin another.';
+  const offWord = totalDaysOff === 1 ? 'day' : 'days';
+  const spentWord = budgetSpent === 1 ? 'day' : 'days';
+  return (
+    <div role="status" className="min-w-0">
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <h1 className="m-0 min-w-0 text-ink">
+          <span className="block text-display-sm type-display tabular-nums">
+            <span className="mark">{totalDaysOff} {offWord} off</span>
+          </span>
+          <span className="mt-2 block text-h2 font-bold tabular-nums type-condensed">
+            from {budgetSpent} {unlimitedPto ? 'target' : 'PTO'} {spentWord}
+          </span>
+        </h1>
+        <Button variant="secondary" size="sm" onClick={onPin} disabled={!canPin} title={pinTitle} className="mt-1 shrink-0">
+          Pin this plan
+        </Button>
+      </div>
+      <p className="mt-3 text-sm tabular-nums text-muted">{balanceLine(budgetSpent, budget, reserveDays, breakCountActual, unlimitedPto)}</p>
+    </div>
+  );
+}
+
+/**
+ * Phones only: once the result line has scrolled away, a slim bar pinned to the top keeps the
+ * figure in view while the person works the sliders and the calendar below. It is a visual
+ * echo of the h1 (aria-hidden, inert, no controls), so assistive tech is not told twice; the
+ * bottom tab bar stays clear because this sits at the top.
+ */
+export function CompactResultBar({ watch, totalDaysOff, budgetSpent, breakCountActual }: { watch: RefObject<HTMLElement | null>; totalDaysOff: number; budgetSpent: number; breakCountActual: number }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = watch.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(([entry]) => setVisible(!entry.isIntersecting && entry.boundingClientRect.top < 0));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [watch]);
   return (
     <div
-      className="sticky top-0 z-40 border-b border-slate-200 bg-slate-50/95 backdrop-blur"
-      role="status"
+      aria-hidden="true"
+      inert
+      className={`fixed inset-x-0 top-0 z-30 border-b border-line bg-page/95 backdrop-blur transition-transform duration-150 ease-[var(--ease-out)] lg:hidden ${visible ? 'translate-y-0' : '-translate-y-full'}`}
     >
-      <Container className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          {/* Semantic HTML pass (Phase 5): the one h1 on the page - this sentence genuinely
-              is the page's main heading ("the answer, put first"), just not previously
-              marked as one. m-0 overrides the browser's default h1 margin, which would
-              otherwise add unwanted vertical space inside this flex row. */}
-          <h1 className="m-0 text-2xl font-bold leading-tight tabular-nums text-slate-900 sm:text-3xl">
-            {headlineText(budgetSpent, budget, reserveDays, totalDaysOff)}
-          </h1>
-          <span className="text-sm tabular-nums text-slate-600">
-            {breakCountActual} break{breakCountActual === 1 ? '' : 's'}
-            {scores ? ` · Travel ${ordinal(scores.travel.percentile)} · Efficiency ${ordinal(scores.efficiency.percentile)}` : ''}
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={onPin}
-          disabled={!canPin}
-          title={pinTitle}
-          className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-            canPin ? ACCENT_BUTTON : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          Pin this plan
-        </button>
-      </Container>
+      <div className="mx-auto flex h-11 max-w-7xl items-center gap-3 px-4 text-sm tabular-nums text-ink sm:px-6">
+        <span className="text-lg font-extrabold type-display"><span className="mark">{totalDaysOff} days off</span></span>
+        <span className="text-muted">from {budgetSpent} PTO · {breakCountActual} {breakCountActual === 1 ? 'break' : 'breaks'}</span>
+      </div>
     </div>
   );
 }

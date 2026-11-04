@@ -45,26 +45,26 @@ export const ITEMS: FAQItem[] = [
 
 export function FAQ() {
   return (
-    <section id="questions" className="border-t border-slate-100 pt-6 text-sm text-slate-500">
-      <h2 className="mb-3 text-sm font-semibold text-slate-700">Questions</h2>
-      <div className="flex flex-col divide-y divide-slate-100">
+    <section id="questions" aria-labelledby="questions-heading" className="text-ink">
+      <h2 id="questions-heading" className="mb-3 text-h2 font-bold text-ink type-condensed">Questions</h2>
+      <div className="flex flex-col divide-y divide-line border-y border-line">
         {ITEMS.map((item) => (
-          <details key={item.question} className="group py-2.5">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-md px-2 py-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900">
-              <h3 className="text-sm font-medium text-slate-700 group-open:text-slate-900">
+          <details key={item.question} className="group">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-[3px] py-2 text-left hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] [&::-webkit-details-marker]:hidden">
+              <h3 className="text-[15px] font-semibold text-ink">
                 {item.question}
               </h3>
-              <span aria-hidden="true" className="shrink-0 text-base text-slate-600 transition-transform group-open:rotate-180">▾</span>
+              <span aria-hidden="true" className="shrink-0 text-xl leading-none text-ink transition-transform duration-150 group-open:rotate-45">+</span>
             </summary>
-            <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-slate-500">{item.answer}</p>
+            <p className="max-w-prose pb-4 text-[15px] leading-6 text-muted">{item.answer}</p>
           </details>
         ))}
       </div>
-      <p className="mt-4 text-xs text-slate-400">
+      <p className="mt-4 text-sm text-muted">
         TSA checkpoint travel numbers:{' '}
         <a
           href="https://www.tsa.gov/travel/passenger-volumes"
-          className="rounded-sm underline hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+          className="link-mark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
           target="_blank"
           rel="noreferrer"
         >

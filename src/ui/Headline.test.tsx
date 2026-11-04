@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { headlineText, Headline } from './Headline';
+import { headlineText, Headline, balanceLine } from './Headline';
 
 describe('headlineText (Phase 3.1: reserve days read as deliberate, never as unspent budget)', () => {
   it('leads with "N of M days planned · R kept in reserve" when a reserve is set', () => {
@@ -26,44 +26,40 @@ describe('headlineText (Phase 3.1: reserve days read as deliberate, never as uns
 });
 
 describe('Headline render', () => {
-  it('shows the reserve-aware headline live when reserveDays > 0', () => {
-    const html = renderToStaticMarkup(
-      <Headline
-        budgetSpent={12}
-        totalDaysOff={26}
-        breakCountActual={5}
-        scores={null}
-        budget={15}
-        reserveDays={3}
-        canPin={true}
-        onPin={() => {}}
-        pinnedCount={0}
-      />,
-    );
-    expect(html).toContain('12 of 15 days planned');
-    expect(html).toContain('3 kept in reserve');
+  const props = {
+    budgetSpent: 12,
+    totalDaysOff: 26,
+    breakCountActual: 5,
+    scores: { travel: { percentile: 70 }, efficiency: { percentile: 100 } },
+    budget: 15,
+    reserveDays: 3,
+    canPin: true,
+    onPin: () => {},
+    pinnedCount: 0,
+  };
+
+  it('sets the result as one h1 with the marked figure first, inside a live status region', () => {
+    const html = renderToStaticMarkup(<Headline {...props} />);
+    expect(html.match(/<h1\b/g)).toHaveLength(1);
+    expect(html).toContain('role="status"');
+    expect(html).toContain('<span class="mark">26 days off</span>');
+    expect(html).toMatch(/from 12 PTO days/);
+    // The figure comes before what it costs.
+    expect(html.indexOf('26 days off')).toBeLessThan(html.indexOf('from 12 PTO days'));
   });
 
-  it('UI density pass: the result, break count, and Travel/Efficiency percentiles render as one flowing line, no separate percentile-bar rows', () => {
-    const html = renderToStaticMarkup(
-      <Headline
-        budgetSpent={12}
-        totalDaysOff={26}
-        breakCountActual={5}
-        scores={{ travel: { percentile: 70 }, efficiency: { percentile: 100 } }}
-        budget={15}
-        reserveDays={3}
-        canPin={true}
-        onPin={() => {}}
-        pinnedCount={0}
-      />,
-    );
+  it('states the break count and the reserve as a deliberate choice, never as unspent budget', () => {
+    const html = renderToStaticMarkup(<Headline {...props} />);
     expect(html).toContain('5 breaks');
-    expect(html).toContain('Travel 70th');
-    expect(html).toContain('Efficiency 100th');
-    // The old duplicate visual (a second block with a width-coded bar per score) is gone.
-    expect(html).not.toContain('about average for this budget');
-    expect(html).not.toContain('quieter than most weeks');
+    expect(html).toContain('12 of 15 PTO days planned');
+    expect(html).toContain('3 kept in reserve');
+    expect(html).not.toContain('add no days off');
+  });
+
+  it('keeps the percentiles out of the headline: they are explained in words by SummaryMetrics', () => {
+    const html = renderToStaticMarkup(<Headline {...props} />);
+    expect(html).not.toContain('Travel 70th');
+    expect(html).not.toContain('Efficiency 100th');
   });
 
   it('renders "Pin this plan" as a small control, disabled once two plans are already pinned', () => {
@@ -98,5 +94,13 @@ describe('Headline render', () => {
     );
     expect(disabled).toContain('disabled=""');
     expect(disabled).toContain('title="Two pinned');
+  });
+});
+
+describe('balanceLine', () => {
+  it('names reserve and any unplaced days separately, with singular forms', () => {
+    expect(balanceLine(12, 15, 3, 3)).toBe('3 breaks · 12 of 15 PTO days planned · 3 kept in reserve');
+    expect(balanceLine(10, 15, 3, 1)).toBe('1 break · 10 of 15 PTO days planned · 3 kept in reserve · 2 not placed');
+    expect(balanceLine(15, 15, 0, 4, true)).toBe('4 breaks · 15 of 15 target days planned');
   });
 });

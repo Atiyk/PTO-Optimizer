@@ -50,15 +50,15 @@ export function PartnerPlanner({ breaks, freeDays, input, minimumBreakLength = 3
   const opportunities = useMemo(() => received.availability && prioritize ? findJointOpportunities(input, received.availability, minimumBreakLength) : [], [input, received.availability, minimumBreakLength, prioritize]);
 
   return (
-    <section className="rounded-xl border border-line bg-surface p-4 sm:p-5" aria-label="Partner vacation planner">
-      <h2><button type="button" className="flex min-h-11 w-full items-center justify-between gap-3 text-left font-semibold text-ink" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}>
-        <span>Plan with someone</span><span aria-hidden="true">{open ? '−' : '+'}</span>
+    <section className="rounded-[4px] border border-line bg-surface px-4 py-2 sm:px-5" aria-label="Partner vacation planner">
+      <h2><button type="button" className="flex min-h-12 w-full items-center justify-between gap-3 text-left text-xl font-bold text-ink type-condensed" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}>
+        <span>Plan with someone</span><span aria-hidden="true" className="text-2xl font-normal leading-none">{open ? '−' : '+'}</span>
       </button></h2>
-      {!open && <p className="text-sm text-muted">Find dates you can both take off, without sharing your balance.</p>}
-      {open && <div id={id} className="mt-3 space-y-5">
+      {!open && <p className="pb-2 text-sm text-muted">Find dates you can both take off, without sharing your balance.</p>}
+      {open && <div id={id} className="mt-2 space-y-5 pb-3">
         <p className="max-w-2xl text-sm text-muted">Choose which dates to share. Your partner uses their own country, work schedule, employer holidays, and PTO budget in the controls above.</p>
-        {received.invalid && <p role="alert" className="rounded-lg border border-line p-3 text-sm text-ink">This shared availability link is invalid or too large. Ask for a new link with fewer dates.</p>}
-        {received.availability && <div className="rounded-lg border border-line bg-page p-4">
+        {received.invalid && <p role="alert" className="rounded-[4px] border border-ink p-3 text-sm text-ink">This shared availability link is invalid or too large. Ask for a new link with fewer dates.</p>}
+        {received.availability && <div className="rounded-[4px] bg-surface-alt p-4">
           <h3 className="font-semibold text-ink">Here are the dates you can both take off.</h3>
           <p className="mt-1 text-sm text-muted">Your partner shared {received.availability.days.length} dates as {received.availability.status} availability, from {formatDateRange(received.availability.days[0], received.availability.days[received.availability.days.length - 1])}. Dates outside that selection are undisclosed.</p>
           <p className="mt-1 text-sm text-muted">Proposed dates may still need employer approval. Gapless does not contact either employer.</p>
@@ -70,10 +70,10 @@ export function PartnerPlanner({ breaks, freeDays, input, minimumBreakLength = 3
             <p className="mt-2 text-sm text-muted">Choose one of these alternatives. Each fits your own budget and rules; overlapping options cannot all be booked together.</p>
             {!opportunities.length && <p role="status" className="mt-3 text-sm text-ink">No shared break of at least {Math.max(3, minimumBreakLength)} days fits your disclosed dates and PTO rules. Adjust your own dates or constraints, or share different availability.</p>}
             <div className="mt-4 grid gap-3 lg:grid-cols-3">
-              {opportunities.map(opportunity => <article key={opportunity.kind} className="min-w-0 rounded-lg border border-line bg-surface p-4">
+              {opportunities.map(opportunity => <article key={opportunity.kind} className="min-w-0 rounded-[4px] border border-line bg-surface p-4">
                 <h4 className="text-sm font-semibold text-ink">{opportunity.kind === 'long-weekend' ? (opportunity.break.totalDaysOff <= 4 ? 'Best shared long weekend' : 'Best shared short break') : opportunity.kind === 'week' ? 'Best shared week-long break' : 'Best shared longer vacation'}</h4>
                 <p className="mt-2 font-semibold tabular-nums text-ink">{formatDateRange(opportunity.break.start, opportunity.break.end)}</p>
-                <p className="mt-1 text-lg font-semibold text-accent-ink">{opportunity.break.totalDaysOff} days together</p>
+                <p className="mt-1 text-lg font-bold text-ink type-condensed"><span className="mark">{opportunity.break.totalDaysOff} days together</span></p>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                   <div><span className="block text-muted">You</span><span className="font-semibold text-ink">{opportunity.yourPtoDays.length} PTO days</span></div>
                   <div><span className="block text-muted">Partner</span><span className="font-semibold text-ink">{opportunity.partnerPtoCost === null ? 'PTO cost undisclosed' : `${opportunity.partnerPtoCost} PTO days`}</span></div>
@@ -106,7 +106,7 @@ export function PartnerPlanner({ breaks, freeDays, input, minimumBreakLength = 3
           <legend className="text-sm font-semibold text-ink">Choose dates to share</legend>
           {breaks.length === 0 && <p className="mt-2 text-sm text-muted">Add PTO to your plan, or share dates you already have off.</p>}
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {breaks.map(brk => <label key={brk.id} className="flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-ink">
+            {breaks.map(brk => <label key={brk.id} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-[3px] border border-line px-3 py-2 text-sm text-ink hover:border-line-strong">
               <input type="checkbox" checked={selected === null || selected.includes(brk.id)} onChange={event => setSelected(current => {
                 const ids = current ?? breaks.map(value => value.id);
                 return event.target.checked ? [...new Set([...ids, brk.id])] : ids.filter(value => value !== brk.id);
@@ -116,7 +116,7 @@ export function PartnerPlanner({ breaks, freeDays, input, minimumBreakLength = 3
           </div>
           <label className="mt-2 flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" checked={includeFree} onChange={event => setIncludeFree(event.target.checked)} />Also share other dates I already have off.</label>
           <label className="flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" checked={confirmed} onChange={event => setConfirmedSelection(event.target.checked ? selectionKey : null)} />I have confirmed the availability I am sharing.</label>
-          <p className="mt-1 text-xs text-muted">The link contains selected dates and whether they are already free or need PTO. It includes no balance, employer, notes, or private policy details. Anyone with the link can see those dates.</p>
+          <p className="mt-1 text-sm text-muted">The link contains selected dates and whether they are already free or need PTO. It includes no balance, employer, notes, or private policy details. Anyone with the link can see those dates.</p>
           <Button className="mt-3" variant="secondary" disabled={!selectedDays.length} onClick={async () => {
             try {
               const link = buildPartnerShareURL(window.location.origin, window.location.pathname, share);

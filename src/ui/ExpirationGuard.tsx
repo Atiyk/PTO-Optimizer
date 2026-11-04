@@ -63,51 +63,60 @@ export function ExpirationGuard({ policy, country, requests = EMPTY_REQUESTS, to
   }
 
   return (
-    <section aria-labelledby={`${id}-heading`} className="min-w-0 rounded-2xl border border-line bg-surface p-5 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id={`${id}-heading`} className="text-xl font-semibold text-ink">PTO expiration guard</h2>
-        <label className="flex min-h-11 items-center gap-2 text-sm text-muted"><input type="checkbox" checked={prefs.enabled} onChange={(event) => update({ ...prefs, enabled: event.target.checked })} />Show in-app alerts</label>
+    <section aria-labelledby={`${id}-heading`} className="min-w-0 rounded-[4px] border border-line bg-surface p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-x-3">
+        <h2 id={`${id}-heading`} className="text-lg font-bold type-condensed text-ink">PTO expiration guard</h2>
+        <label className="flex min-h-11 items-center gap-2 text-sm text-muted"><input type="checkbox" className="h-4 w-4" checked={prefs.enabled} onChange={(event) => update({ ...prefs, enabled: event.target.checked })} />Show in-app alerts</label>
       </div>
-      <p className="mt-1 text-sm leading-6 text-muted">Based on your current balance, approved leave, and the policy you entered. Planned and requested leave is a separate scenario in your balance forecast.</p>
-      {!prefs.enabled ? <p className="mt-4 text-sm text-muted">In-app expiration alerts are off in this browser.</p>
-        : !validPolicy ? <p role="status" className="mt-4 text-sm text-accent-ink">Enter valid policy values, including a current carried portion no greater than your balance and its future use-by date, to check expiration risk.</p>
-          : visible.length === 0 ? <p className="mt-4 rounded-xl bg-surface-alt p-4 text-sm text-muted">{risks.length ? 'All current alerts are dismissed.' : 'No upcoming forfeiture, carryover expiration, or accrual-cap risk found under these rules.'}</p>
-          : <ul className="mt-4 space-y-3">{visible.map((risk) => (
-            <li key={risk.id} className="rounded-xl border border-accent bg-accent-soft p-4">
-              <p className="font-semibold text-accent-ink">{risk.text}</p>
-              <p className="mt-1 text-sm text-accent-ink">{risk.kind === 'cap' ? 'Creating space in your balance may prevent lost accrual.' : `Last day to use this PTO: ${risk.deadline}.`}</p>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                {risk.canPlan ? <a href={risk.ptoHref} className="min-h-11 py-2 text-sm font-semibold text-accent-ink underline underline-offset-4" onClick={onAlertAction}>Find the best way to use those days →</a>
-                  : <p className="text-sm text-accent-ink">No additional whole PTO day is safely available to plan before this deadline under the entered rules. Review your forecast and policy.</p>}
-                <Button variant="quiet" size="sm" onClick={() => update({ ...prefs, dismissed: [...prefs.dismissed, risk.id] })} aria-label={`Dismiss ${risk.text}`}>Dismiss</Button>
+      <p className="text-sm leading-6 text-muted">What you could lose under your current balance, approved leave and policy. Planned and requested leave is the separate scenario in the forecast.</p>
+      {!prefs.enabled ? <p className="mt-3 text-sm text-muted">In-app expiration alerts are off in this browser.</p>
+        : !validPolicy ? <p role="status" className="mt-3 text-sm text-ink">Enter valid policy values, including a current carried portion no greater than your balance and its future use-by date, to check expiration risk.</p>
+          : visible.length === 0 ? (
+            <p className="mt-3 flex items-start gap-2 text-sm text-ink">
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="mt-0.5 shrink-0"><path d="M3 8.4 6.4 11.5 13 4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" /></svg>
+              <span>{risks.length ? 'All current alerts are dismissed.' : 'No upcoming forfeiture, carryover expiration, or accrual-cap risk found under these rules.'}</span>
+            </p>
+          )
+          : <ul className="mt-3 space-y-2">{visible.map((risk) => (
+            <li key={risk.id} className="rounded-[4px] border-2 border-ink bg-accent-soft p-3 sm:p-4">
+              <p className="flex items-start gap-2 font-bold text-ink">
+                <span aria-hidden="true" className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center bg-ink text-xs font-bold text-white">!</span>
+                <span>{risk.text}</span>
+              </p>
+              <p className="mt-1 pl-7 text-sm text-ink">{risk.kind === 'cap' ? 'Creating space in your balance may prevent lost accrual.' : `Last day to use this PTO: ${risk.deadline}.`}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 pl-7">
+                {risk.canPlan ? <a href={risk.ptoHref} className="link-mark inline-flex min-h-11 items-center text-sm font-semibold" onClick={onAlertAction}>Find the best way to use those days →</a>
+                  : <p className="text-sm text-ink">No additional whole PTO day is safely available to plan before this deadline under the entered rules. Review your forecast and policy.</p>}
+                <Button variant="quiet" size="sm" className="min-h-11" onClick={() => update({ ...prefs, dismissed: [...prefs.dismissed, risk.id] })} aria-label={`Dismiss ${risk.text}`}>Dismiss</Button>
               </div>
-              {risk.canPlan && <p className="mt-2 text-xs leading-5 text-accent-ink">Plans up to {risk.planningBudget} whole PTO {risk.planningBudget === 1 ? 'day' : 'days'} once earned, reserving your scheduled leave. Check the optimizer&apos;s employer holidays and workweek.</p>}
+              {risk.canPlan && <p className="mt-1 pl-7 text-xs leading-5 text-muted">Plans up to {risk.planningBudget} whole PTO {risk.planningBudget === 1 ? 'day' : 'days'} once earned, reserving your scheduled leave. Check the optimizer&apos;s employer holidays and workweek.</p>}
             </li>
           ))}</ul>}
-      {prefs.dismissed.length > 0 && <Button variant="quiet" size="sm" className="mt-3" onClick={() => update({ ...prefs, dismissed: [] })}>Show dismissed alerts</Button>}
-      <div className="mt-5 rounded-xl border border-line bg-surface-alt p-4">
+      {prefs.dismissed.length > 0 && <Button variant="quiet" size="sm" className="mt-2 min-h-11" onClick={() => update({ ...prefs, dismissed: [] })}>Show dismissed alerts</Button>}
+      <div className="mt-4 border-t border-line">
         <button type="button" aria-expanded={showReset}
-          className="min-h-11 w-full text-left text-sm font-semibold text-ink underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="flex min-h-11 w-full items-center justify-between gap-2 text-left text-sm font-semibold text-ink hover:underline"
           onClick={() => setShowReset((open) => !open)}>
           {showReset ? 'Hide next policy reset' : 'Review next policy reset'}
+          <span aria-hidden="true" className="text-muted">{showReset ? '−' : '+'}</span>
         </button>
         {showReset && (!reset ? (
-          <p role="status" className="mt-3 text-sm text-muted">
+          <p role="status" className="pb-3 text-sm text-muted">
             {policy.accrual.kind === 'unlimited'
               ? 'Unlimited PTO has no banked carryover or forfeiture to project.'
               : 'A reset projection is not available. Check your dates and entered policy.'}
           </p>
         ) : (
-          <div className="mt-4 space-y-4">
+          <div className="space-y-3 pb-3">
             <p className="text-sm text-muted">Based on the policy you entered, the next reset is <strong className="text-ink">{reset.resetDate}</strong>.
               These amounts include scheduled approved leave, and are estimates rather than employer-verified forfeiture.</p>
-            <dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-              <div><dt className="text-muted">Before reset</dt><dd className="mt-1 font-semibold text-ink">{fmt(reset.confirmed.beforeResetBalance)} {reset.unit}</dd></div>
-              <div><dt className="text-muted">Estimated carryover</dt><dd className="mt-1 font-semibold text-ink">{fmt(reset.confirmed.carriedAtReset)} {reset.unit}</dd></div>
-              <div><dt className="text-muted">Potentially forfeited at reset</dt><dd className="mt-1 font-semibold text-ink">{fmt(reset.confirmed.forfeitedAtReset)} {reset.unit}</dd></div>
-              <div><dt className="text-muted">After reset, including new credits</dt><dd className="mt-1 font-semibold text-ink">{fmt(reset.confirmed.afterResetBalance)} {reset.unit}</dd></div>
+            <dl className="grid grid-cols-2 gap-3 text-sm">
+              <div><dt className="text-muted">Before reset</dt><dd className="mt-0.5 font-semibold text-ink">{fmt(reset.confirmed.beforeResetBalance)} {reset.unit}</dd></div>
+              <div><dt className="text-muted">Estimated carryover</dt><dd className="mt-0.5 font-semibold text-ink">{fmt(reset.confirmed.carriedAtReset)} {reset.unit}</dd></div>
+              <div><dt className="text-muted">Potentially forfeited at reset</dt><dd className="mt-0.5 font-semibold text-ink">{fmt(reset.confirmed.forfeitedAtReset)} {reset.unit}</dd></div>
+              <div><dt className="text-muted">After reset, including new credits</dt><dd className="mt-0.5 font-semibold text-ink">{fmt(reset.confirmed.afterResetBalance)} {reset.unit}</dd></div>
             </dl>
-            <p className="text-xs leading-relaxed text-muted">
+            <p className="text-xs leading-5 text-muted">
               New credits on reset: {fmt(reset.confirmed.creditedOnReset)} {reset.unit}.
               Accrual blocked by a cap through reset: {fmt(reset.confirmed.lostAccrualThroughReset)} {reset.unit}.
               Carried time expiring before reset: {fmt(reset.confirmed.carriedExpiredBeforeReset)} {reset.unit}.
@@ -130,26 +139,32 @@ export function ExpirationGuard({ policy, country, requests = EMPTY_REQUESTS, to
               </p>
             )}
             {planRisk && (
-              <a href={planRisk.ptoHref} onClick={onAlertAction} className="inline-flex min-h-11 items-center text-sm font-semibold text-accent-ink underline underline-offset-4">
+              <a href={planRisk.ptoHref} onClick={onAlertAction} className="link-mark inline-flex min-h-11 items-center text-sm font-semibold">
                 Find possible PTO days before the deadline
               </a>
             )}
           </div>
         ))}
       </div>
-      <details className="mt-5 rounded-xl bg-surface-alt p-4">
-        <summary className="cursor-pointer font-medium text-ink">Calendar reminders</summary>
-        <p className="mt-3 text-sm leading-6 text-muted">Download reminders before PTO expires. Import the file into your calendar to receive its alerts. Gapless does not send scheduled email or push notifications.</p>
-        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1">
-          {EXPIRATION_REMINDER_LEADS.map((lead) => <label key={lead} className="flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" checked={prefs.leads.includes(lead)} onChange={(event) => update({ ...prefs, leads: event.target.checked ? [...prefs.leads, lead] : prefs.leads.filter((value) => value !== lead) })} />{lead} days before</label>)}
+      <details className="group border-t border-line">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-ink hover:underline [&::-webkit-details-marker]:hidden">
+          Calendar reminders
+          <span aria-hidden="true" className="text-muted group-open:hidden">+</span>
+          <span aria-hidden="true" className="hidden text-muted group-open:inline">−</span>
+        </summary>
+        <div className="pb-2">
+          <p className="text-sm leading-6 text-muted">Download reminders before PTO expires. Import the file into your calendar to receive its alerts. Gapless does not send scheduled email or push notifications.</p>
+          <div className="mt-1 flex flex-wrap gap-x-5">
+            {EXPIRATION_REMINDER_LEADS.map((lead) => <label key={lead} className="flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" className="h-4 w-4" checked={prefs.leads.includes(lead)} onChange={(event) => update({ ...prefs, leads: event.target.checked ? [...prefs.leads, lead] : prefs.leads.filter((value) => value !== lead) })} />{lead} days before</label>)}
+          </div>
+          <Button variant="secondary" className="mt-2" disabled={reminders.length === 0} onClick={() => {
+            try { downloadReminderICS(reminders); setMessage('Calendar reminder download started. Import the file into your calendar.'); }
+            catch { setMessage('The calendar file could not be downloaded. Try again.'); }
+          }}>Download calendar reminders</Button>
+          {reminders.length === 0 && <p className="mt-2 text-xs text-muted">No selected reminder dates remain in the future for the visible expiration alerts.</p>}
         </div>
-        <Button variant="secondary" className="mt-3" disabled={reminders.length === 0} onClick={() => {
-          try { downloadReminderICS(reminders); setMessage('Calendar reminder download started. Import the file into your calendar.'); }
-          catch { setMessage('The calendar file could not be downloaded. Try again.'); }
-        }}>Download calendar reminders</Button>
-        {reminders.length === 0 && <p className="mt-2 text-xs text-muted">No selected reminder dates remain in the future for the visible expiration alerts.</p>}
       </details>
-      {message && <p role="status" className="mt-3 text-sm text-muted">{message}</p>}
+      {message && <p role="status" className="mt-2 text-sm text-muted">{message}</p>}
     </section>
   );
 }

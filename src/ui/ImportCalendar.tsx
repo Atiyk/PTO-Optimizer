@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { parseICSBusyDays, IcsParseError, MAX_IMPORT_FILE_BYTES, type ParsedImportResult } from './icsImport';
 import { monthShortName } from '@daysoff/engine/calendar/dateFormat';
+import { buttonClasses } from './Button';
 
 interface ImportCalendarProps {
   /** Reuses the same bulk handler "Block the next N days" already uses - an .ics import is
@@ -72,8 +73,8 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
 
   return (
     <section>
-      <h4 className="mb-2 text-sm font-semibold text-slate-700">Import my calendar (.ics)</h4>
-      <p className="mb-2 text-xs text-slate-400">
+      <h3 className="mb-2 text-[15px] font-semibold text-ink">Import my calendar (.ics)</h3>
+      <p className="mb-2 text-sm text-muted">
         Parsed in your browser. Nothing is uploaded. All-day and multi-day events become days you can&apos;t take
         off; short, timed meetings are ignored. Timed events use their stated UTC or IANA time zone;
         unsupported or ambiguous time zones are rejected rather than guessed. Check the dates before adding.
@@ -87,27 +88,27 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
           const file = e.target.files?.[0];
           if (file) handleFile(file);
         }}
-        className="block w-full text-xs text-slate-600 file:mr-2 file:rounded-md file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-200"
+        className="block w-full max-w-full text-sm text-muted file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-[3px] file:border file:border-solid file:border-ink file:bg-surface file:px-4 file:text-sm file:font-semibold file:text-ink hover:file:bg-accent-soft"
       />
       {state.kind === 'error' && (
-        <p role="alert" className="mt-2 text-xs text-red-600">
+        <p role="alert" className="mt-2 text-sm font-semibold text-ink">
           {state.message}
         </p>
       )}
       {state.kind === 'preview' && (
-        <div className="mt-2 flex flex-col gap-1.5 rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
+        <div className="mt-2 flex flex-col gap-1.5 rounded-[4px] bg-surface-alt p-3 text-sm text-ink">
           <p>
             Found {state.result.busyDays.length} busy day{state.result.busyDays.length === 1 ? '' : 's'} between{' '}
             {summarizeMonths(state.result.busyDays)} &mdash; add them?
           </p>
           {state.result.cappedAt !== null && (
-            <p className="text-amber-600">
+            <p className="font-semibold">
               This file has more than {state.result.cappedAt} events &mdash; only the first {state.result.cappedAt} were read.
             </p>
           )}
-          <details className="mt-1 rounded-md border border-slate-200 px-2 py-1">
-            <summary className="min-h-11 cursor-pointer text-xs font-semibold text-slate-700">Review individual dates</summary>
-            <p className="mt-1 break-words text-xs text-slate-600">
+          <details className="mt-1 rounded-[3px] border border-line bg-surface px-2">
+            <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-ink">Review individual dates</summary>
+            <p className="mb-2 break-words text-sm text-muted">
               {state.result.busyDays.slice(0, 30).join(', ')}
               {state.result.busyDays.length > 30
                 ? ` … and ${state.result.busyDays.length - 30} more dates; only confirm after checking your source calendar.`
@@ -124,14 +125,14 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
             <button
               type="button"
               onClick={confirm}
-              className="rounded-md bg-slate-800 px-2 py-1 text-xs font-medium text-white hover:bg-slate-700"
+              className={buttonClasses('secondary', 'md')}
             >
               Add
             </button>
             <button
               type="button"
               onClick={cancel}
-              className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              className={buttonClasses('quiet', 'md')}
             >
               Cancel
             </button>

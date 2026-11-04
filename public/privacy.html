@@ -11,57 +11,70 @@
   <link rel="preload" href="/fonts/archivo-latin-var.woff2" as="font" type="font/woff2" crossorigin>
   <title>Privacy and your data — Gapless PTO Optimizer</title>
   <style>
-    @font-face{font-family:Figtree;src:url('/fonts/archivo-latin-var.woff2') format('woff2');font-style:normal;font-weight:300 900;font-display:swap}
-    :root{color-scheme:light;--page:#fbf8f3;--paper:#fff;--ink:#292524;--muted:#57534e;--line:#e7e0d6;--accent:#17675d;--soft:#e9f3ee}
+    @font-face{font-family:'Archivo Variable';src:url('/fonts/archivo-latin-var.woff2') format('woff2-variations'),url('/fonts/archivo-latin-var.woff2') format('woff2');font-style:normal;font-weight:400 800;font-stretch:75% 100%;font-display:swap}
+    :root{color-scheme:light;--page:#f4f4f0;--paper:#fff;--alt:#eaeae4;--ink:#141414;--muted:#56564f;--line:#dcdcd5;--line-strong:#86867e;--mark:#dcf763;--ease:cubic-bezier(.23,1,.32,1)}
     *{box-sizing:border-box}
-    html{scroll-behavior:smooth}
-    body{margin:0;background:var(--page);color:var(--ink);font:16px/1.65 Figtree,system-ui,-apple-system,sans-serif}
-    a{color:var(--accent);text-underline-offset:4px}
-    a:hover{text-decoration-thickness:2px}
-    a:focus-visible{outline:3px solid var(--accent);outline-offset:4px;border-radius:4px}
+    html{background:var(--page);-webkit-text-size-adjust:100%}
+    body{margin:0;background:var(--page);color:var(--ink);font:16px/1.5 'Archivo Variable',Arial,system-ui,-apple-system,sans-serif;font-stretch:100%;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+    ::selection{background:var(--mark);color:var(--ink)}
+    h1,h2{text-wrap:balance}p,li{text-wrap:pretty}
+    a{color:var(--ink);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.22em;transition:background-color 180ms var(--ease)}
+    a:hover{background-color:var(--mark)}
+    :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
     .skip{position:absolute;left:-10000px;top:auto}
-    .skip:focus{left:16px;top:12px;z-index:10;background:var(--paper);padding:10px 14px;border:1px solid var(--line)}
-    header{border-bottom:1px solid var(--line)}
-    .shell{width:min(100% - 40px,1050px);margin-inline:auto}
-    header .shell{min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:16px}
-    .brand{display:inline-flex;flex-direction:column;line-height:1.05;color:var(--ink);text-decoration:none}
-    .brand strong{font-size:23px;letter-spacing:-.06em;font-weight:800}
-    .brand small{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:4px}
-    .nav{display:flex;align-items:center;gap:14px}
-    .nav a{display:inline-flex;min-height:44px;align-items:center;padding:0 8px;text-decoration:none;font-size:14px;font-weight:700}
-    .nav .pill{background:var(--accent);color:#fff;border-radius:100px;padding:0 17px}
-    main{padding:clamp(36px,6vw,76px) 0 80px}
-    .eyebrow{text-transform:uppercase;letter-spacing:.14em;color:var(--accent);font-size:12px;font-weight:800}
-    h1{font-size:clamp(36px,5.5vw,54px);line-height:1.07;letter-spacing:-.045em;margin:12px 0 20px;max-width:680px}
-    .lede{max-width:700px;color:var(--muted);font-size:clamp(17px,2vw,20px);line-height:1.55;margin:0}
-    .trust{margin:30px 0 45px;padding:18px 22px;border:1px solid var(--line);background:var(--soft);border-radius:12px;max-width:740px}
-    .trust strong{display:block;color:var(--ink);margin-bottom:3px}
-    .trust p{margin:0;color:var(--muted)}
-    .content{display:grid;grid-template-columns:210px minmax(0,1fr);gap:clamp(24px,5vw,60px);align-items:start}
-    .toc{position:sticky;top:24px;display:grid;gap:10px;font-size:14px}
-    .toc span{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:800;margin-bottom:4px}
-    .toc a{font-weight:600;text-decoration:none}
-    .sections{display:grid;gap:16px;min-width:0}
-    section{padding:clamp(22px,4vw,32px);background:var(--paper);border:1px solid var(--line);border-radius:16px;scroll-margin-top:20px}
-    h2{font-size:clamp(20px,3vw,25px);line-height:1.2;letter-spacing:-.035em;margin:0 0 14px}
-    p{margin:0 0 13px}p:last-child{margin-bottom:0}
-    ul{margin:0;padding-left:20px}li{margin:8px 0}
+    .skip:focus{left:16px;top:12px;z-index:10;background:var(--paper);padding:10px 14px;border:1px solid var(--ink);border-radius:3px;font-weight:600}
+    .shell{width:min(100% - 32px,1280px);margin-inline:auto}
+    header{border-bottom:1px solid var(--line);background:var(--page)}
+    header .shell{min-height:68px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+    .brand{display:inline-flex;align-items:center;gap:10px;min-height:44px;color:var(--ink);text-decoration:none}
+    .brand:hover{background:none}
+    .brand span{display:flex;flex-direction:column;line-height:1}
+    .brand strong{font-size:23px;font-weight:800;font-stretch:75%;letter-spacing:-.01em}
+    .brand small{font-size:11px;font-weight:600;color:var(--muted);margin-top:3px}
+    .nav{display:flex;align-items:center;gap:24px}
+    .nav a{display:inline-flex;min-height:44px;align-items:center;padding:0 4px;text-decoration:none;font-size:15px;font-weight:600;color:var(--muted)}
+    .nav a:hover{color:var(--ink);background:none}
+    .nav .cta{color:#fff;background:var(--ink);border-radius:3px;padding:0 14px;font-size:14px;margin-left:4px;transition:background-color 150ms var(--ease),color 150ms var(--ease)}
+    .nav .cta:hover{background:var(--mark);color:var(--ink)}
+    main{padding:clamp(40px,6vw,64px) 0 96px}
+    h1{font-size:clamp(2.25rem,1.5rem + 3vw,3.75rem);line-height:1;font-weight:800;font-stretch:75%;letter-spacing:-.02em;margin:0 0 20px;max-width:24ch}
+    .lede{max-width:62ch;font-size:18px;line-height:1.55;margin:0}
+    .trust{margin:28px 0 48px;padding:14px 18px;background:var(--alt);border-radius:4px;max-width:68ch}
+    .trust strong{display:flex;align-items:baseline;gap:8px;margin-bottom:2px}
+    .trust strong::before{content:'';flex:none;width:10px;height:10px;background:var(--ink);transform:translateY(-1px)}
+    .trust p{margin:0}
+    .content{display:grid;grid-template-columns:200px minmax(0,1fr);gap:clamp(24px,5vw,64px);align-items:start}
+    .toc{position:sticky;top:24px;display:grid;border-top:1px solid var(--ink);padding-top:6px;font-size:15px}
+    .toc span{color:var(--muted);font-size:14px;font-weight:600;padding:6px 0}
+    .toc a{display:flex;align-items:center;min-height:40px;font-weight:600;text-decoration:none}
+    .toc a:hover{text-decoration:underline}
+    .sections{min-width:0;max-width:72ch;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:0 clamp(20px,4vw,40px)}
+    section{padding:clamp(24px,4vw,36px) 0;border-top:1px solid var(--line);scroll-margin-top:16px}
+    section:first-child{border-top:0}
+    h2{font-size:24px;line-height:1.15;font-weight:700;font-stretch:82%;margin:0 0 12px}
+    p{margin:0 0 14px}p:last-child{margin-bottom:0}
+    section p,section li{line-height:1.65}
+    ul{margin:0;padding-left:20px}li{margin:8px 0}li::marker{color:var(--muted)}
     .note{font-size:14px;color:var(--muted)}
-    .contact{display:inline-flex;min-height:44px;align-items:center;justify-content:center;background:var(--accent);color:#fff;border-radius:100px;padding:10px 20px;font-weight:800;text-decoration:none;overflow-wrap:anywhere}
-    .contact:hover{background:#105349}
-    footer{border-top:1px solid var(--line);padding:26px 0 32px;font-size:14px;color:var(--muted)}
-    footer .shell{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
-    @media(max-width:720px){.content{grid-template-columns:1fr}.toc{position:static;display:flex;flex-wrap:wrap;gap:12px 18px}.toc span{width:100%}.nav{gap:4px}.nav a:not(.pill){display:none}.shell{width:min(100% - 32px,1050px)}}
+    .contact{display:inline-flex;min-height:44px;align-items:center;justify-content:center;background:var(--ink);color:#fff;border-radius:3px;padding:0 20px;font-weight:600;text-decoration:none;overflow-wrap:anywhere;transition:background-color 150ms var(--ease),color 150ms var(--ease),transform 150ms var(--ease)}
+    .contact:hover{background:var(--mark);color:var(--ink)}
+    .contact:active{transform:scale(.97)}
+    footer{background:var(--ink);color:#b5b5ad;padding:28px 0 32px;font-size:14px}
+    footer .shell{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+    footer a{color:#ececE6;display:inline-flex;min-height:44px;align-items:center;padding:0 4px;margin:0 -4px}
+    footer a:hover{background:var(--mark);color:var(--ink)}
+    footer a:focus-visible{outline-color:var(--mark)}
+    @media(max-width:760px){.content{grid-template-columns:1fr}.toc{position:static;display:flex;flex-wrap:wrap;gap:0 18px}.toc span{width:100%}.nav{gap:8px}.nav a:not(.cta){display:none}.sections{padding:0 20px}}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important}}
   </style>
 </head>
 <body>
   <a class="skip" href="#main-content">Skip to main content</a>
   <header><div class="shell">
-    <a href="/" class="brand"><strong>Gapless</strong> <small>PTO Optimizer</small></a>
-    <nav class="nav" aria-label="Quick links"><a href="/glossary">Learn</a><a href="/policy">My PTO</a><a href="/pto" class="pill">Plan PTO</a></nav>
+    <a href="/" class="brand"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect x="1" y="1" width="30" height="30" rx="5" fill="#141414"/><rect x="1" y="11" width="30" height="10" fill="#dcf763"/><rect x="10" y="13" width="5" height="6" rx="0.75" fill="#141414"/><rect x="17" y="13" width="5" height="6" rx="0.75" fill="#141414"/></svg><span><strong>Gapless</strong> <small>PTO Optimizer</small></span></a>
+    <nav class="nav" aria-label="Quick links"><a href="/sabbatical">Sabbatical</a><a href="/policy">My PTO</a><a href="/glossary">Learn</a><a href="/pto" class="cta">Plan PTO</a></nav>
   </div></header>
   <main id="main-content" class="shell" tabindex="-1">
-    <p class="eyebrow">Privacy at Gapless</p>
     <h1>Your time off is personal. Your planning should be, too.</h1>
     <p class="lede">This page explains what stays in your browser, what a shared link reveals, and how basic site analytics and holiday lookups work.</p>
     <div class="trust"><strong>Most planning runs on your device.</strong><p>No account is required. Personal PTO records are not automatically uploaded to a Gapless account or synced between devices.</p></div>

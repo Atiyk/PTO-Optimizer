@@ -3,6 +3,7 @@ import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
 import { formatWorkingDaysList, formatManagerEmailShort, formatManagerEmailDetailed, copyText } from './requestText';
 import { formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
 import { requestByText, isContested } from '@daysoff/engine/calendar/requestDeadline';
+import { buttonClasses } from './Button';
 
 interface BreakCardProps {
   brk: Break;
@@ -118,7 +119,7 @@ function CopyRequestDropdown({ options }: { options: CopyOption[] }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+        className={buttonClasses('secondary', 'md', 'min-h-11 px-4')}
       >
         {feedback === 'copied' ? 'Copied' : feedback === 'failed' ? 'Copy unavailable' : 'Copy request ▾'}
       </button>
@@ -128,7 +129,7 @@ function CopyRequestDropdown({ options }: { options: CopyOption[] }) {
           role="menu"
           aria-label="Copy request format"
           onKeyDown={onMenuKeyDown}
-          className="absolute left-0 z-20 mt-1 min-w-[12rem] max-w-[calc(100vw-2rem)] rounded-lg border border-slate-300 bg-white py-1 shadow-lg"
+          className="absolute left-0 z-20 mt-1 min-w-[13rem] max-w-[calc(100vw-2rem)] rounded-[4px] border border-line-strong bg-surface py-1 shadow-lg"
         >
           {options.map((option, index) => (
             <button
@@ -142,7 +143,7 @@ function CopyRequestDropdown({ options }: { options: CopyOption[] }) {
                 const ok = await copyText(option.text);
                 setFeedback(ok ? 'copied' : 'failed');
               }}
-              className="flex min-h-11 w-full items-center px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 focus-visible:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+              className="flex min-h-11 w-full items-center px-3 py-2 text-left text-sm text-ink hover:bg-accent-soft focus-visible:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]"
             >
               {option.label}
             </button>
@@ -209,103 +210,83 @@ export function BreakCard({
       onMouseLeave={() => onHover(null)}
       onFocus={() => onHover(brk.id)}
       onBlur={() => onHover(null)}
-      className={`flex flex-col gap-3 rounded-lg border p-4 transition-colors duration-150 ease-out ${
-        // A darker, heavier neutral than the resting border/surface - not a new hue. The
-        // accent is reserved for suggested PTO, the primary action, and focus rings only.
-        highlighted ? 'border-slate-300 bg-slate-100' : 'border-slate-200 bg-slate-50'
+      className={`grid grid-cols-1 gap-x-3 rounded-[4px] px-3 py-4 sm:grid-cols-[auto_minmax(0,1fr)] transition-colors duration-150 ease-[var(--ease-out)] sm:gap-x-4 sm:px-4 ${
+        // The hovered break gets a pale marker pass, matching the stronger pass its days get
+        // on the calendar at the same moment.
+        highlighted ? 'bg-accent-soft' : 'bg-transparent'
       }`}
     >
-      {/* Phase 2: wraps instead of truncating - this card now lives in a ~40%-width
-          recommendations column, not the full page width, so the date/badges row needs to
-          become two lines gracefully rather than clipping the date range. */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-600 text-[11px] font-semibold leading-none tabular-nums text-white">
-            {index}
+      {/* The same number its calendar badge shows: one shared, chronological index. */}
+      <span aria-hidden="true" className="mt-0.5 hidden h-7 min-w-7 items-center justify-center rounded-[3px] bg-ink px-1 text-sm font-bold tabular-nums text-white sm:flex">
+        {index}
+      </span>
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <h3 className="text-xl font-bold leading-7 text-ink type-condensed">
+          <span className="sr-only">Break {index}: </span>
+          <span aria-hidden="true" className="mr-2 inline-flex h-6 min-w-6 -translate-y-0.5 items-center justify-center rounded-[3px] bg-ink px-1 align-middle text-sm font-bold tabular-nums text-white sm:hidden">{index}</span>
+          {formatCardDateRange(brk.start, brk.end)}
+        </h3>
+        {/* What it costs and what it buys, in words; the multiplier figure is kept beside
+            its plain reading ("each PTO day buys 2.25 days off"). */}
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] tabular-nums text-ink">
+          <span>
+            <span className="mark font-semibold">{brk.totalDaysOff} {dayWord} off</span> for {brk.ptoCost} PTO {ptoWord}
           </span>
-          <span className="font-medium text-slate-900">
-            {formatCardDateRange(brk.start, brk.end)} &middot;{' '}
-            <span className="tabular-nums">{brk.totalDaysOff}</span> {dayWord} off for{' '}
-            <span className="tabular-nums">{brk.ptoCost}</span> PTO {ptoWord}
+          <span className="text-sm text-muted">
+            {brk.multiplier.toFixed(2)}× · {lowValue ? 'no extra days beyond the PTO itself' : `each PTO day buys ${brk.multiplier.toFixed(2)} days off`}
           </span>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Multiplier: weight and tone carry "this one's good," not a new colour - a
-              category tag needs the same hue every time it appears, which stops being true
-              the moment the hue also means "strong result" here. */}
-          <span
-            className={
-              lowValue
-                ? 'rounded-full bg-slate-100 px-3 py-1 text-sm font-medium tabular-nums text-slate-500'
-                : 'rounded-full bg-slate-900 px-3 py-1 text-sm font-semibold tabular-nums text-white'
-            }
-          >
-            {brk.multiplier.toFixed(2)}x
-          </span>
-          {/* Every tag - including "Popular dates" below - is the same neutral pill. These
-              are categories, not states: the design system reserves colour for suggested
-              PTO, the primary action, focus rings, and genuine warning/error states, never
-              for labelling a kind of thing. The label text alone carries the meaning. */}
           {brk.tags.map((tag) => (
-            <span key={tag} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+            <span key={tag} className="rounded-[3px] bg-surface-alt px-2 py-0.5 text-xs font-medium text-ink">
               {tag}
             </span>
           ))}
           {contested && (
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">Popular dates</span>
+            <span className="rounded-[3px] bg-surface-alt px-2 py-0.5 text-xs font-medium text-ink">Popular dates</span>
+          )}
+        </p>
+
+        {/* Every recommendation states its own reasoning, visibly, not in a tooltip. */}
+        <p className="text-sm text-muted">{reason}</p>
+
+        {/* Advice, not an error: the single most contested break in the plan. */}
+        {isMostContested && (
+          <p className="text-sm text-muted">
+            Estimated popular vacation dates based on public travel demand, not coworkers&apos; calendars.
+          </p>
+        )}
+
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          {onTrack && (
+            <button type="button" onClick={() => onTrack(brk)} className={buttonClasses('secondary', 'md', 'min-h-11 px-4')}>
+              Track this PTO request
+            </button>
+          )}
+          {/* The request tools (request-by date and the copy menu) open per break, so a
+              ten-break plan does not repeat ten menus. */}
+          {!expanded && (
+            <button type="button" onClick={() => setUserExpanded(true)} className={buttonClasses('quiet', 'md', 'min-h-11')}>
+              Request this time off ↓
+            </button>
           )}
         </div>
-      </div>
-
-      {/* Phase 3 step 4: visible on the card, not a tooltip - every recommendation states
-          its own reasoning, not just the low-value ones. */}
-      <p className="text-sm text-slate-600">{reason}</p>
-      {onTrack && <button type="button" onClick={() => onTrack(brk)} className="min-h-11 self-start rounded-md border border-line-strong bg-surface px-3 py-2 text-sm font-medium text-ink hover:bg-surface-alt">Track this PTO request</button>}
-
-      {/* Layout fix: this used to be a full-width red bar, which reads as an error - it's
-          advice, not a problem with the plan. Red is reserved for actual problems (an
-          infeasible setting, a passed deadline); this is now inline text at normal size,
-          directly beneath the card header, in the same neutral/subtle tone the low-value
-          explanation above already uses. */}
-      {isMostContested && (
-        <p className="text-sm text-slate-600">
-          Estimated popular vacation dates based on public travel demand, not coworkers&apos; calendars.
-        </p>
-      )}
-
-      {/* UI density pass: collapsed by default (every card past the first) down to just the
-          summary row and any warning above - the request-by date and the copy tools are
-          "the request tools," revealed on expand, not permanent chrome on every card. */}
-      {expanded ? (
-        <>
-          <p className="text-xs text-slate-500">{requestLine}</p>
-          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-            <span className="text-xs text-slate-400">Request this time off:</span>
-            <CopyRequestDropdown
-              options={[
-                { label: 'Copy date list', text: formatWorkingDaysList(brk, isPtoDay) },
-                { label: 'Copy email draft', text: formatManagerEmailShort(brk, isPtoDay) },
-                { label: 'Copy detailed email draft', text: formatManagerEmailDetailed(brk, isPtoDay, noticePeriodDays, workWeek) },
-              ]}
-            />
-            <button
-              type="button"
-              onClick={() => setUserExpanded(false)}
-              className="text-xs text-slate-400 hover:text-slate-600"
-            >
-              Hide ↑
-            </button>
+        {expanded && (
+          <div className="flex flex-col gap-2 border-t border-line pt-3">
+            <p className="text-sm text-muted">{requestLine}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <CopyRequestDropdown
+                options={[
+                  { label: 'Copy date list', text: formatWorkingDaysList(brk, isPtoDay) },
+                  { label: 'Copy email draft', text: formatManagerEmailShort(brk, isPtoDay) },
+                  { label: 'Copy detailed email draft', text: formatManagerEmailDetailed(brk, isPtoDay, noticePeriodDays, workWeek) },
+                ]}
+              />
+              <button type="button" onClick={() => setUserExpanded(false)} className={buttonClasses('quiet', 'md', 'min-h-11')}>
+                Hide ↑
+              </button>
+            </div>
           </div>
-        </>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setUserExpanded(true)}
-          className="self-start border-t border-slate-100 pt-3 text-xs font-medium text-slate-500 hover:text-slate-800"
-        >
-          Request this time off ↓
-        </button>
-      )}
+        )}
+      </div>
     </div>
   );
 }

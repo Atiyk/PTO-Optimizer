@@ -2,42 +2,42 @@ import { COLORS, HOLIDAY_DOT } from './colorScheme';
 import { PinIcon } from './DayCell';
 
 /**
- * Exactly the five swatches the calendar actually uses, mixed swatch types matching what
- * each thing looks like - a dot stays a dot, not forced into a box it doesn't have.
- * "Pinned by you" reuses the exact Suggested PTO fill plus the same PinIcon glyph the
- * calendar itself renders, so the legend never describes a treatment the calendar doesn't
- * have. Weekend's entry is gone - the grid's own day-of-week headers already make
- * weekends self-evident. Overlap day and the click/hover instructions live beneath the
- * calendar now, not here, so this row stays short enough to wrap naturally instead of
- * stretching edge to edge.
+ * The calendar's key, drawn with exactly the treatments the grid uses: a holiday dot, a
+ * solid ink PTO block, the same block with the pin glyph, a dashed ink outline for an
+ * alternative, the marker run for days off, and the ink ring for today. Every entry is a
+ * shape plus words, never colour alone.
  */
 export function Legend() {
   return (
-    <div className="flex flex-wrap items-center justify-start gap-4 text-sm text-slate-600">
-      <span className="flex items-center gap-2">
-        <span className="flex h-5 w-5 items-center justify-center">
-          <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${HOLIDAY_DOT}`} />
+    <ul className="m-0 flex list-none flex-wrap items-center gap-x-5 gap-y-2 p-0 text-sm text-muted">
+      <li className="flex items-center gap-2">
+        <span aria-hidden className="relative flex h-5 w-5 items-center justify-center rounded-[3px] border border-line bg-surface">
+          <span className={`absolute bottom-0.5 h-1.5 w-1.5 rounded-full ${HOLIDAY_DOT}`} />
         </span>
         Public holiday
-      </span>
-      <span className="flex items-center gap-2">
-        <span className={`h-5 w-5 rounded border ${COLORS.ptoBorder} ${COLORS.ptoBg}`} />
+      </li>
+      <li className="flex items-center gap-2">
+        <span aria-hidden className={`h-5 w-5 rounded-[3px] border ${COLORS.ptoBorder} ${COLORS.ptoBg}`} />
         Suggested PTO
-      </span>
-      <span className="flex items-center gap-2">
-        <span className={`flex h-5 w-5 items-center justify-center gap-0.5 rounded border ${COLORS.ptoBorder} ${COLORS.ptoBg} ${COLORS.ptoText}`}>
+      </li>
+      <li className="flex items-center gap-2">
+        <span aria-hidden className={`flex h-5 w-5 items-center justify-center rounded-[3px] border ${COLORS.ptoBorder} ${COLORS.ptoBg} ${COLORS.ptoText}`}>
           <PinIcon className="h-3 w-3" />
         </span>
         Pinned by you
-      </span>
-      <span className="flex items-center gap-2">
-        <span className={`h-5 w-5 rounded border border-dashed ${COLORS.altBorder}/40`} />
+      </li>
+      <li className="flex items-center gap-2">
+        <span aria-hidden className={`h-5 w-5 rounded-[3px] border border-dashed ${COLORS.altBorder}`} />
         Alternative
-      </span>
-      <span className="flex items-center gap-2">
-        <span className={`h-4 w-6 rounded-full ${COLORS.bandBg}`} />
+      </li>
+      <li className="flex items-center gap-2">
+        <span aria-hidden className={`h-5 w-9 rounded-[6px] ${COLORS.bandBg}`} />
         Days off
-      </span>
-    </div>
+      </li>
+      <li className="flex items-center gap-2">
+        <span aria-hidden className="h-4 w-4 rounded-[3px] ring-2 ring-[var(--text-primary)] ring-offset-2 ring-offset-[var(--bg-page)]" />
+        Today
+      </li>
+    </ul>
   );
 }

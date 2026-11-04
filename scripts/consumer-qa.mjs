@@ -146,15 +146,9 @@ try {
         // before independently testing the navigation menu and options disclosure.
         await page.keyboard.press('Escape');
         if (width < 1024) {
-          const menu = page.getByRole('button', { name: 'Menu', exact: true });
-          if (await menu.isVisible()) {
-            await menu.focus();
-            await page.keyboard.press('Enter');
-            result.menuOpenedWithKeyboard = await menu.getAttribute('aria-expanded') === 'true';
-            await page.keyboard.press('Escape');
-            result.menuClosedWithEscape = await menu.getAttribute('aria-expanded') === 'false';
-            result.menuFocusReturned = await menu.evaluate((element) => document.activeElement === element);
-          }
+          // 2026-11 redesign: the Menu disclosure became a bottom tab bar of real links.
+          const tabs = page.getByRole('navigation', { name: 'Tools' });
+          result.tabBarDestinations = (await tabs.getByRole('link').allTextContents()).map((t) => t.trim());
         }
         if (route.name === 'home') {
           // The first meaningful result must precede editable controls visually AND
@@ -280,7 +274,7 @@ try {
           || result.optionsHorizontalOverflow || result.h1Count !== 1 || result.unlabeledInputs.length
           || result.unnamedButtons.length || result.loadingDidNotSettle || result.formSubmitControls
           || !result.correctRoute || result.guideContentVisible === false || result.guideExampleVisible === false || result.guideQuestionsVisible === false
-          || result.menuOpenedWithKeyboard === false || result.menuClosedWithEscape === false
+          || (result.tabBarDestinations && result.tabBarDestinations.length !== 4) || result.menuOpenedWithKeyboard === false || result.menuClosedWithEscape === false
           || result.menuFocusReturned === false || result.slidersVisible === false || result.slidersOutsideAdvanced === false
           || result.weightingKeyboardResponsive === false || result.plannerResponsiveHeadings === false
           || result.searchEmptyState === false || result.searchHidesUnrelatedPaths === false

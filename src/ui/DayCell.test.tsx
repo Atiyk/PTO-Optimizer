@@ -5,7 +5,7 @@ import { DayCell } from './DayCell';
 import { COLORS, HOLIDAY_DOT } from './colorScheme';
 import type { DayCategory } from './types';
 
-function renderCell(category: DayCategory, extra: { inBand?: boolean; isAlternative?: boolean; isOutOfRange?: boolean } = {}) {
+function renderCell(category: DayCategory, extra: { inBand?: boolean; isAlternative?: boolean; isOutOfRange?: boolean; isToday?: boolean } = {}) {
   return renderToStaticMarkup(
     <DayCell
       date="2026-07-04"
@@ -13,7 +13,7 @@ function renderCell(category: DayCategory, extra: { inBand?: boolean; isAlternat
       category={category}
       hasOverlap={false}
       isAlternative={extra.isAlternative ?? false}
-      isToday={false}
+      isToday={extra.isToday ?? false}
       inBand={extra.inBand ?? false}
       isHighlighted={false}
       isBlackout={false}
@@ -87,11 +87,17 @@ describe('DayCell category rendering', () => {
     }
   });
 
-  it('an alternative outline is present but visibly fainter than a solid fill - thinner and partly transparent, not equal weight', () => {
+  it('an alternative is a 1px dashed ink outline with no fill - lighter than a solid PTO block, never equal weight', () => {
     const alt = renderCell('working', { isAlternative: true });
-    expect(alt).toContain('border-dashed');
-    expect(alt).toContain(`${COLORS.altBorder}/40`); // reduced opacity
-    expect(alt).not.toContain('border-2 border-dashed'); // not the old full-weight treatment
+    expect(alt).toContain(`border border-dashed ${COLORS.altBorder}`);
+    expect(alt).not.toContain('border-2 border-dashed'); // never the old full-weight treatment
+    expect(alt).not.toContain(COLORS.ptoBg); // outline only, no fill
+  });
+
+  it('today is a 2px ink ring set off from the cell, so it reads on an ink PTO block too', () => {
+    const today = renderCell('suggested-pto', { isToday: true });
+    expect(today).toContain('ring-2');
+    expect(today).toContain('ring-offset-2');
   });
 
   it('an out-of-range day is disabled, shows no fill/category treatment, and has no decorative markers', () => {

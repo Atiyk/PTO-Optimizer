@@ -85,9 +85,9 @@ export function MonthGrid({
   };
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-      <h3 className="mb-1.5 text-sm font-semibold text-slate-700">{monthLabel(descriptor.year, descriptor.month)}</h3>
-      <div className="mb-1 grid grid-cols-7 text-center text-xs text-slate-400">
+    <div className="min-w-0">
+      <h3 className="mb-2 border-b border-line pb-1.5 text-lg font-bold leading-6 text-ink type-condensed">{monthLabel(descriptor.year, descriptor.month)}</h3>
+      <div className="mb-1 grid grid-cols-7 gap-x-1 text-center text-xs font-medium text-muted">
         {labels.map((l) => (
           <span key={l}>{l}</span>
         ))}
@@ -121,7 +121,7 @@ export function MonthGrid({
                         onFocus={() => onHoverBreak(band.brk.id)}
                         onBlur={() => onHoverBreak(null)}
                         aria-label={`Break ${band.index}, ${formatCardDateRange(band.brk.start, band.brk.end)}`}
-                        className="flex h-6 w-6 cursor-default items-center justify-center rounded-full bg-slate-600 text-[10px] font-semibold leading-none text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]"
+                        className="flex h-5 min-w-5 cursor-default items-center justify-center rounded-[3px] bg-ink px-1 text-xs font-bold leading-none tabular-nums text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]"
                       >
                         {band.index}
                       </button>
@@ -141,8 +141,8 @@ export function MonthGrid({
                   <div
                     key={`band-${i}`}
                     style={{ gridColumn: `${seg.colStart + 1} / ${seg.colEnd + 2}`, gridRow: '1' }}
-                    className={`my-0.5 ${COLORS.bandBg} ${seg.roundedLeft ? 'rounded-l-xl' : ''} ${
-                      seg.roundedRight ? 'rounded-r-xl' : ''
+                    className={`${COLORS.bandBg} ${seg.roundedLeft ? 'rounded-l-[6px]' : ''} ${
+                      seg.roundedRight ? 'rounded-r-[6px]' : ''
                     }`}
                   />
                 ))}
@@ -150,8 +150,8 @@ export function MonthGrid({
                   <div
                     key={`preview-${i}`}
                     style={{ gridColumn: `${seg.colStart + 1} / ${seg.colEnd + 2}`, gridRow: '1' }}
-                    className={`my-0.5 ${COLORS.previewBandBg} ${seg.roundedLeft ? 'rounded-l-xl' : ''} ${
-                      seg.roundedRight ? 'rounded-r-xl' : ''
+                    className={`${COLORS.previewBandBg} ${seg.roundedLeft ? 'rounded-l-[6px]' : ''} ${
+                      seg.roundedRight ? 'rounded-r-[6px]' : ''
                     }`}
                   />
                 ))}

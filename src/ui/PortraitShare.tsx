@@ -45,18 +45,18 @@ export function PortraitShare(props: PortraitShareProps) {
 
   return (
     <div className="min-w-0">
-      <Button variant="secondary" size="sm" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}>
+      <Button variant="secondary" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}>
         {open ? 'Close portrait preview' : 'Preview portrait share card'}
       </Button>
-      {open && <section id={id} aria-label="Portrait share card" className="mt-4 rounded-xl border border-line bg-surface p-4 sm:p-5">
-        <h3 className="font-semibold text-ink">Your time off, ready to share</h3>
+      {open && <section id={id} aria-label="Portrait share card" className="mt-4 rounded-[4px] border border-line bg-surface p-4 sm:p-5">
+        <h3 className="text-xl font-bold leading-6 text-ink type-condensed">Your time off, ready to share</h3>
         <p className="mt-1 text-sm text-muted">1080 × 1350 PNG. Preview the exact image before you share.</p>
         <label className="my-4 flex min-h-11 items-center gap-2 text-sm text-ink">
           <input type="checkbox" checked={includeBalance} disabled={!Number.isFinite(props.remainingBalance)} onChange={event => setIncludeBalance(event.target.checked)} />
           Include my PTO balance.
         </label>
         <p className="sr-only">{[accessible.title, accessible.range, accessible.summary, ...accessible.breaks.flatMap(brk => [brk.dates, brk.metrics, brk.holidays]), accessible.overflow, accessible.assumption, accessible.balance].filter(Boolean).join('. ')}</p>
-        <div ref={hostRef} className="mx-auto max-w-[432px] overflow-hidden rounded-lg border border-line" />
+        <div ref={hostRef} className="mx-auto max-w-[432px] overflow-hidden rounded-[3px] border border-line" />
         <div className="mt-4 flex flex-wrap gap-2">
           <Button variant="secondary" disabled={!ready || working} onClick={async () => {
             if (!canvasRef.current) return;

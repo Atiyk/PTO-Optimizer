@@ -55,7 +55,11 @@ export function Calendar({
     // column (Phase 2's two-column workspace), so a 3-month grid no longer has the width to
     // keep day cells comfortably sized - two is what actually fits well at every width this
     // component is used at, tablet's own full-width single-column layout included.
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+    // Months flow by the width the calendar actually has (a container query), not the
+    // viewport: beside the planner's control rail it gets about 850px at 1440, full width on
+    // a tablet, and the sabbatical page's own column elsewhere.
+    <div className="@container">
+    <div className="grid grid-cols-1 gap-x-8 gap-y-6 @min-[36rem]:grid-cols-2">
       {months.map((m) => (
         <MonthGrid
           key={`${m.year}-${m.month}`}
@@ -81,6 +85,7 @@ export function Calendar({
           onHoverAlternative={onHoverAlternative}
         />
       ))}
+    </div>
     </div>
   );
 }

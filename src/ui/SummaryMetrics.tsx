@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Scores } from '@daysoff/engine/solver/types';
-import { ordinal } from './scoreFormat';
+import { efficiencyLine, ordinal, travelLine } from './scoreFormat';
 
 interface SummaryMetricsProps {
   budgetSpent: number;
@@ -9,20 +9,8 @@ interface SummaryMetricsProps {
   scores: Scores | null;
 }
 
-interface Metric {
-  label: string;
-  value: string;
-}
-
-/**
- * Motion pass: "metrics count or crossfade between values rather than snapping." A full
- * numeric count-up is more motion than this warrants (and these jump discontinuously - 12
- * to 14 PTO days isn't a smooth quantity to animate through); a brief neutral background
- * pulse on the one tile whose own value actually changed is enough to carry "something just
- * updated here" without adding a colour (the accent stays reserved for suggested PTO, the
- * primary action, and focus rings) and without exceeding the 200ms ceiling. The global
- * prefers-reduced-motion rule in index.css already collapses this to instant.
- */
+/** A changed figure gets one brief pale-marker pass (150ms), never a loop, never on load;
+ * prefers-reduced-motion collapses it (index.css). */
 function useChangeFlash(value: string): boolean {
   const prev = useRef(value);
   const [flashing, setFlashing] = useState(false);
@@ -36,42 +24,58 @@ function useChangeFlash(value: string): boolean {
   return flashing;
 }
 
-function MetricTile({ label, value }: Metric) {
-  const flashing = useChangeFlash(value);
+function Fact({ figure, label, children }: { figure: string; label: string; children: ReactNode }) {
+  const flashing = useChangeFlash(figure);
   return (
-    <div className="flex flex-col">
-      <span
-        className={`-mx-1 w-fit rounded px-1 text-lg font-semibold tabular-nums leading-tight text-slate-900 transition-colors duration-150 ${
-          flashing ? 'bg-slate-200' : 'bg-transparent'
-        }`}
-      >
-        {value}
-      </span>
-      <span className="text-xs text-slate-500">{label}</span>
+    <div className="grid min-w-0 grid-cols-[4.5rem_minmax(0,1fr)] items-baseline gap-x-3 sm:block">
+      <dt className="sr-only">{label}</dt>
+      <dd className="m-0 contents sm:block">
+        <span
+          data-figure
+          className={`-mx-1 inline-block w-fit rounded-[3px] px-1 text-[1.75rem] leading-8 tabular-nums text-ink type-display transition-colors duration-150 ${
+            flashing ? 'bg-accent-soft' : 'bg-transparent'
+          }`}
+        >
+          {figure}
+        </span>
+        <span className="block text-sm leading-5 text-muted sm:mt-1">{children}</span>
+      </dd>
     </div>
   );
 }
 
+function gloss(line: string): string {
+  return line.split(' · ')[1] ?? '';
+}
+
+function trimDecimal(n: number): string {
+  return n.toFixed(2).replace(/\.?0+$/, '');
+}
+
 /**
- * Phase 2: "a considered set... present but not dominating" - a Copilot-Money-style row of
- * labelled stat tiles, separate from Headline's plain-language sentence (which stays the
- * "answer, put first" hero per Phase 3's journey). Tabular numerals so the figures align in
- * a column when they wrap to two rows on narrow widths.
+ * The plan's quality in words, not opaque pills: what each PTO day buys, and where the two
+ * percentile scores sit, each with the plain-language reading the scoreFormat bands derive
+ * ("better than most plans at this budget"). Same engine numbers as before; the counts
+ * (PTO used, days off, breaks) are stated once, in the result line above.
  */
 export function SummaryMetrics({ budgetSpent, totalDaysOff, breakCountActual, scores }: SummaryMetricsProps) {
-  const metrics: Metric[] = [
-    { label: 'PTO days used', value: String(budgetSpent) },
-    { label: 'Days off', value: String(totalDaysOff) },
-    { label: 'Breaks', value: String(breakCountActual) },
-    { label: 'Travel', value: scores ? ordinal(scores.travel.percentile) : '—' },
-    { label: 'Efficiency', value: scores ? ordinal(scores.efficiency.percentile) : '—' },
-  ];
-
+  const ratio = budgetSpent > 0 ? trimDecimal(totalDaysOff / budgetSpent) : null;
+  const offWord = totalDaysOff === 1 ? 'day' : 'days';
+  const ptoWord = budgetSpent === 1 ? 'day' : 'days';
+  const breakWord = breakCountActual === 1 ? 'break' : 'breaks';
   return (
-    <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:flex sm:flex-wrap sm:gap-x-8 sm:gap-y-2">
-      {metrics.map((m) => (
-        <MetricTile key={m.label} label={m.label} value={m.value} />
-      ))}
-    </div>
+    <dl className="m-0 grid grid-cols-1 gap-x-8 gap-y-3 border-t border-line pt-4 sm:grid-cols-3">
+      <Fact figure={ratio ? `${ratio}×` : '—'} label="Days off per PTO day">
+        {ratio
+          ? <>{totalDaysOff} {offWord} off for {budgetSpent} PTO {ptoWord} in {breakCountActual} {breakWord}. Each PTO day buys {ratio} days off, weekends and holidays included.</>
+          : <>No PTO placed yet, so there is no return to show.</>}
+      </Fact>
+      <Fact figure={scores ? ordinal(scores.efficiency.percentile) : '—'} label="Efficiency percentile">
+        {scores ? <>Efficiency percentile (higher is better): {gloss(efficiencyLine(scores))}.</> : <>Efficiency percentile appears once the plan is solved.</>}
+      </Fact>
+      <Fact figure={scores ? ordinal(scores.travel.percentile) : '—'} label="Travel percentile">
+        {scores ? <>Travel percentile (higher is quieter): {gloss(travelLine(scores))}.</> : <>Travel percentile appears once the plan is solved.</>}
+      </Fact>
+    </dl>
   );
 }

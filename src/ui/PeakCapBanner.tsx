@@ -1,5 +1,4 @@
 import { formatShort } from '@daysoff/engine/calendar/dateFormat';
-import { Container } from './Container';
 
 /** Phase 5.1: "a message when it changes the plan" - pure and exported so the exact wording
  * is directly unit-testable, same pattern as Headline.tsx's headlineText. */
@@ -20,10 +19,9 @@ interface PeakCapBannerProps {
 export function PeakCapBanner({ applied, maxDays, startDate, endDate }: PeakCapBannerProps) {
   if (!applied) return null;
   return (
-    <div role="status" className="border-b border-slate-200 bg-slate-50">
-      <Container className="px-4 py-2">
-        <p className="text-xs tabular-nums text-slate-600">{peakCapMessage(maxDays, startDate, endDate)}</p>
-      </Container>
+    <div role="status" className="flex gap-2 rounded-[4px] bg-accent-soft p-4 text-sm tabular-nums text-ink">
+      <span aria-hidden="true" className="mt-1.5 inline-block h-2.5 w-2.5 shrink-0 bg-ink" />
+      <p>{peakCapMessage(maxDays, startDate, endDate)}</p>
     </div>
   );
 }

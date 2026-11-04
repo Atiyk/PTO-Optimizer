@@ -69,12 +69,12 @@ export function BreakCountSlider({
           slider is actually the user's own setting - when the solver decides instead, the
           slider is inert and the caption below already states the result ("Solver chose N
           breaks..."), so a second number up here would just duplicate it. */}
-      <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+      <div className="flex items-center gap-1.5 text-[15px] font-semibold text-ink">
         How many breaks
         <InfoHint text={BREAK_COUNT_HINT} />
-        {!letSolverDecide && <span className="ml-auto tabular-nums text-slate-500">{positionLabel(value)}</span>}
+        {!letSolverDecide && <span className="ml-auto tabular-nums text-muted">{positionLabel(value)}</span>}
       </div>
-      <label className="flex items-center gap-2 text-xs text-slate-600">
+      <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-sm text-ink">
         <input
           type="checkbox"
           checked={letSolverDecide}
@@ -90,7 +90,7 @@ export function BreakCountSlider({
         {/* Phase 3.3's full "more disruption/less pile-up" reasoning now lives in the
             InfoHint above - these are short axis labels (matching WeightingSlider's own
             "Most days off"/"Cheapest to travel" pattern), not the explanation itself. */}
-        <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
+        <div className="flex items-center justify-between gap-3 text-xs text-muted">
           <span>One big break</span>
           <span>Many short breaks</span>
         </div>
@@ -104,10 +104,10 @@ export function BreakCountSlider({
           onChange={(e) => onChange(Number(e.target.value))}
           aria-label="How many breaks"
           aria-valuetext={`${positionLabel(value)}${letSolverDecide ? ' (disabled — letting the solver decide)' : ''}`}
-          className={`w-full disabled:cursor-not-allowed disabled:opacity-40 ${letSolverDecide ? 'accent-slate-300' : 'accent-slate-800'}`}
+          className={`h-11 w-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${letSolverDecide ? 'accent-slate-300' : ''}`}
         />
       </div>
-      <p className="text-xs tabular-nums text-slate-600">{caption(breakCountRequested, breakCountActual, breaks, budget, letSolverDecide)}</p>
+      <p className="-mt-1 text-sm tabular-nums text-muted">{caption(breakCountRequested, breakCountActual, breaks, budget, letSolverDecide)}</p>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { copyText } from './requestText';
 import { track } from './analytics';
 import { PartnerShareButton } from './PartnerShareButton';
 import { DEFAULT_SITE_HOST } from './siteUrl';
+import { buttonClasses } from './Button';
 
 interface ExportBarProps {
   breaks: Break[];
@@ -77,6 +78,7 @@ export function ActionButton({
   const [working, setWorking] = useState(false);
 
   return (
+    <>
     <button
       type="button"
       id={id}
@@ -88,14 +90,13 @@ export function ActionButton({
         setMessage(result.message);
         setTimeout(() => setMessage(null), 2500);
       }}
-      className={
-        variant === 'primary'
-          ? 'rounded-md bg-slate-800 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-wait disabled:opacity-60'
-          : 'rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60'
-      }
+      className={buttonClasses(variant, 'md', 'disabled:cursor-wait')}
     >
       {message ?? label}
     </button>
+    {/* The button's own text changes to the result; this announces it to screen readers. */}
+    <span className="sr-only" role="status">{message ?? ''}</span>
+    </>
   );
 }
 
@@ -117,7 +118,7 @@ export function ExportBar(props: ExportBarProps) {
   const isOutOfRange = (iso: string) => iso < props.rangeStart || iso > props.rangeEnd;
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
         <ActionButton
           id="shortcut-download-ics"
@@ -170,7 +171,7 @@ export function ExportBar(props: ExportBarProps) {
         />
         <PartnerShareButton buildOverlapLink={props.buildOverlapLink} />
       </div>
-      <label className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+      <label className="flex min-h-11 cursor-pointer flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-ink">
         <input
           type="checkbox"
           checked={remindersEnabled}
@@ -178,13 +179,12 @@ export function ExportBar(props: ExportBarProps) {
         />
         Remind me to request time off
         {remindersEnabled && (
-          <span>
+          <span className="text-muted">
             &mdash; {props.noticePeriodDays} {props.noticePeriodDays === 1 ? 'day' : 'days'} before, matching your
-            notice period setting below
+            notice period in More options
           </span>
         )}
       </label>
-      <p className="text-xs text-slate-400">Free, no sign-up, no email.</p>
     </div>
   );
 }

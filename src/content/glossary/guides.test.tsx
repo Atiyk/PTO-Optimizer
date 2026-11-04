@@ -42,10 +42,10 @@ describe('Practical PTO guides', () => {
     }
   });
 
-  it('shows six editorial entry points in the Understand hub', () => {
+  it('lists every practical guide as an entry point in the Understand hub', () => {
     const html = renderToStaticMarkup(<Glossary />);
     expect(html).toContain('Practical guides');
-    for (const id of ['pto', 'accrual', 'carryover', 'company-holiday', 'notice-period', 'payout']) {
+    for (const id of PRACTICAL_GUIDES.map((guide) => guide.termId)) {
       expect(html).toContain('href="/glossary/' + id + '"');
       expect(html).toContain(findPracticalGuide(id)!.title);
     }

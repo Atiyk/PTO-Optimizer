@@ -46,7 +46,7 @@ try {
       entry.checks.push('Home accessible name includes visible Gapless PTO Optimizer wordmark');
       const target = width >= 1024
         ? page.getByRole('link', { name: 'Plan PTO' }).first()
-        : page.getByRole('button', { name: 'Menu' });
+        : page.getByRole('navigation', { name: 'Tools' }).getByRole('link', { name: 'Plan PTO' });
       if (!(await target.isVisible())) throw new Error('Expected navigation control not visible');
 
       // Real keyboard Tab navigation is necessary: programmatic focus does not
@@ -68,29 +68,29 @@ try {
       entry.checks.push('Keyboard Tab reaches navigation with visible 2px focus outline');
 
       if (width < 1024) {
-        const menu = page.getByRole('button', { name: 'Menu' });
-        const rect = await menu.boundingBox();
-        if (!rect || rect.width < 44 || rect.height < 44) {
-          throw new Error(`Mobile Menu target below 44px: ${JSON.stringify(rect)}`);
-        }
-        await menu.click();
-        if ((await menu.getAttribute('aria-expanded')) !== 'true') throw new Error('Menu did not expand');
-        const links = page.locator('header nav a:visible');
-        if ((await links.count()) !== 3) throw new Error('Mobile menu must have three secondary navigation links');
-        if (width < 640) {
-          const mobileAction = page.locator('header > div[id] a[href="/pto"]:visible');
-          if ((await mobileAction.count()) !== 1) throw new Error('Mobile primary PTO action not visible');
-        }
+        // 2026-11 redesign: phones and tablets get a fixed bottom tab bar with every
+        // destination, instead of a Menu disclosure.
+        const tabs = page.getByRole('navigation', { name: 'Tools' });
+        const links = tabs.getByRole('link');
+        const names = (await links.allTextContents()).map((t) => t.trim());
+        if (names.join('|') !== 'Plan PTO|Sabbatical|My PTO|Learn') throw new Error(`Tab bar destinations wrong: ${names.join(', ')}`);
         for (const link of await links.all()) {
           const box = await link.boundingBox();
-          if (!box || box.height < 44) throw new Error(`Mobile nav target below 44px: ${await link.textContent()}`);
+          if (!box || box.height < 44 || box.width < 44) throw new Error(`Tab target below 44px: ${await link.textContent()}`);
         }
-        entry.checks.push('Menu and three secondary links meet 44px touch height');
-        await page.screenshot({ path: resolve(output, `header-menu-open-${width}.png`), fullPage: false });
-        await page.keyboard.press('Escape');
-        if ((await menu.getAttribute('aria-expanded')) !== 'false') throw new Error('Escape did not close Menu');
-        if (!(await menu.evaluate((el) => document.activeElement === el))) throw new Error('Escape did not return focus to Menu');
-        entry.checks.push('Escape closes menu and restores focus');
+        const bar = await tabs.boundingBox();
+        if (!bar || Math.abs(bar.y + bar.height - 900) > 1) throw new Error(`Tab bar not fixed to the bottom: ${JSON.stringify(bar)}`);
+        if ((await links.first().getAttribute('aria-current')) !== 'page') throw new Error('Tab bar does not mark the current page');
+        // The last content must be reachable above the bar.
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        const covered = await page.evaluate(() => {
+          const footerLast = [...document.querySelectorAll('footer p')].pop();
+          const barTop = document.querySelector('nav[aria-label="Tools"]')?.getBoundingClientRect().top ?? 0;
+          return footerLast ? footerLast.getBoundingClientRect().bottom > barTop + 1 : true;
+        });
+        if (covered) throw new Error('Tab bar covers the end of the page');
+        entry.checks.push('Tab bar: four destinations, 44px targets, fixed to the bottom, never covers content');
+        await page.screenshot({ path: resolve(output, `header-tabbar-${width}.png`), fullPage: false });
       } else {
         const links = page.locator('header nav a:visible');
         for (const link of await links.all()) {

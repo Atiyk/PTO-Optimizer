@@ -45,4 +45,13 @@ describe('Understand glossary search', () => {
     expect(screen.getByRole('heading', { name: 'Your PTO basics' })).toBeTruthy();
     expect(screen.getByRole('status').textContent).toBe(`${GLOSSARY_TERMS.length} terms available`);
   });
+
+  it('keeps every term reachable from the A to Z index with a letter jump list', () => {
+    const html = renderToStaticMarkup(<Glossary />);
+    for (const term of GLOSSARY_TERMS) expect(html).toContain(`href="/glossary/${term.id}"`);
+    expect(html).toContain('aria-label="Jump to letter"');
+    expect(html).toContain('href="#letter-a"');
+    expect(html).toContain('id="letter-a"');
+    expect(html).not.toMatch(/uppercase tracking|rounded-full|rounded-xl/);
+  });
 });

@@ -50,16 +50,23 @@ function loadUSHolidays(): ReturnType<typeof rawHolidaysToHolidays> {
   return rawHolidaysToHolidays(raw);
 }
 
+// 2026-11 redesign: the highlighted-schedule system (docs/DESIGN-SYSTEM.md) - paper, ink, the
+// marker, and Archivo (embedded from public/fonts so the render never depends on system fonts).
+const ARCHIVO = readFileSync(resolve(projectRoot, 'public/fonts/archivo-latin-var.woff2')).toString('base64');
+
 function template(title: string, subtitle: string, detail: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><style>
+    @font-face { font-family: Archivo; src: url(data:font/woff2;base64,${ARCHIVO}) format('woff2'); font-weight: 400 800; font-stretch: 75% 100%; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { width: 1200px; height: 630px; background: #ffffff; font-family: -apple-system, system-ui, sans-serif; display: flex; flex-direction: column; justify-content: center; padding: 90px; }
-    .brand { color: #64748b; font-size: 22px; font-weight: 600; margin-bottom: 28px; }
-    h1 { color: #0f172a; font-size: 58px; font-weight: 800; line-height: 1.15; margin: 0 0 20px; }
-    p { color: #475569; font-size: 28px; line-height: 1.4; margin: 0; }
-    .detail { margin-top: 28px; color: #1e3a8a; font-size: 24px; font-weight: 600; }
+    body { width: 1200px; height: 630px; background: #f4f4f0; color: #141414; font-family: Archivo, system-ui, sans-serif; display: flex; flex-direction: column; justify-content: center; padding: 84px 90px; }
+    .brand { display: flex; align-items: center; gap: 14px; font-size: 30px; font-weight: 800; font-stretch: 75%; margin-bottom: 40px; }
+    .mark-icon { width: 40px; height: 40px; background: #141414; border-radius: 6px; position: relative; overflow: hidden; }
+    .mark-icon::before { content: ''; position: absolute; left: 0; right: 0; top: 13px; height: 14px; background: #dcf763; }
+    h1 { font-size: 76px; font-weight: 800; font-stretch: 75%; line-height: 1; letter-spacing: -0.01em; margin: 0 0 24px; max-width: 1000px; }
+    p { color: #56564f; font-size: 28px; line-height: 1.4; margin: 0; max-width: 940px; }
+    .detail { margin-top: 32px; font-size: 28px; font-weight: 700; align-self: flex-start; background: #dcf763; padding: 4px 12px; }
   </style></head><body>
-    <div class="brand">${PRODUCT_NAME}</div>
+    <div class="brand"><span class="mark-icon"></span>${PRODUCT_NAME}</div>
     <h1>${title}</h1>
     <p>${subtitle}</p>
     ${detail ? `<div class="detail">${detail}</div>` : ''}

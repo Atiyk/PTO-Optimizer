@@ -35,7 +35,7 @@ export function Term({ id, children }: { id: string; children?: React.ReactNode 
         // inline flow (MoreOptions.tsx's "Accrual" heading etc.) - still short of the ideal
         // 44px touch target for a one-character glyph without turning it into a visible
         // button, which is a real design tradeoff, not fully resolved - see PROGRESS.md.
-        className="cursor-help border-b border-dotted border-slate-400 px-0.5 py-1 text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]"
+        className="cursor-help border-b border-dotted border-line-strong px-0.5 py-1 text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]"
         onMouseEnter={openPopover}
         onMouseLeave={() => setOpen(false)}
         onFocus={openPopover}
@@ -50,11 +50,11 @@ export function Term({ id, children }: { id: string; children?: React.ReactNode 
       {open && (
         <span
           role="tooltip"
-          className="absolute left-1/2 top-full z-20 mt-1 w-max max-w-[18rem] -translate-x-1/2 rounded-md bg-slate-900 px-2.5 py-2 text-xs text-white shadow-lg"
+          className="absolute left-1/2 top-full z-20 mt-1 w-max max-w-[min(18rem,calc(100vw-2rem))] -translate-x-1/2 rounded-[3px] bg-ink px-2.5 py-2 text-sm font-normal text-white shadow-lg"
         >
           <span className="block font-semibold">{term.term}</span>
           <span className="mt-0.5 block">{term.short}</span>
-          <a href={`/glossary/${term.id}`} className="mt-1 block text-slate-300 underline">
+          <a href={`/glossary/${term.id}`} className="mt-1 block text-white underline underline-offset-2 hover:no-underline">
             More →
           </a>
         </span>

@@ -1,4 +1,4 @@
-import { Container } from './Container';
+import { buttonClasses } from './Button';
 
 interface PlanRecoveryNoticeProps {
   issue: string;
@@ -19,33 +19,26 @@ export function PlanRecoveryNotice({
   onReviewSettings,
 }: PlanRecoveryNoticeProps) {
   return (
-    <section role="alert" aria-label="Planning needs attention" className="border-b border-amber-300 bg-amber-50">
-      <Container className="px-4 py-4">
-        <h2 className="text-sm font-semibold text-amber-950">These settings don&apos;t produce a valid plan yet.</h2>
-        <p className="mt-1 max-w-prose text-sm text-amber-950">{issue}</p>
-        <p className="mt-1 max-w-prose text-sm text-amber-900">
+    <section role="alert" aria-label="Planning needs attention" className="flex gap-3 rounded-[4px] border-2 border-ink bg-surface p-4 text-ink">
+      <svg aria-hidden="true" viewBox="0 0 20 20" className="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M10 2.5 18 17H2L10 2.5Z" strokeLinejoin="round" /><path d="M10 8v4" strokeLinecap="round" /><circle cx="10" cy="14.6" r="0.9" fill="currentColor" stroke="none" /></svg>
+      <div className="min-w-0">
+        <h2 className="text-[15px] font-semibold">These settings don&apos;t produce a valid plan yet.</h2>
+        <p className="mt-1 max-w-prose text-sm">{issue}</p>
+        <p className="mt-1 max-w-prose text-sm text-muted">
           Your calendar is still available. Adjust a pinned or excluded date, or review your planning settings.
           There is no plan ready to export until the constraint is resolved.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {hasForcedDays && (
-            <button
-              type="button"
-              onClick={onClearForcedDays}
-              className="min-h-11 rounded-lg border border-amber-700 bg-white px-4 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-            >
+            <button type="button" onClick={onClearForcedDays} className={buttonClasses('secondary', 'md', 'min-h-11')}>
               Clear pinned and excluded dates
             </button>
           )}
-          <button
-            type="button"
-            onClick={onReviewSettings}
-            className="min-h-11 rounded-lg border border-amber-500 px-4 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-          >
+          <button type="button" onClick={onReviewSettings} className={buttonClasses('quiet', 'md', 'min-h-11')}>
             Review advanced settings
           </button>
         </div>
-      </Container>
+      </div>
     </section>
   );
 }
