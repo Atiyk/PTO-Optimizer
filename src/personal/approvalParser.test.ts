@@ -119,6 +119,17 @@ describe('parseApprovalMessage table', () => {
 });
 
 describe('parseApprovalMessage guards', () => {
+  it('evidence clauses never start or end mid-word', () => {
+    const result = parseApprovalMessage('Your time off request for Dec 22 - Dec 24, 2026 (3 days of Vacation) has been approved by Jordan Lee from the finance team today.', { today: TODAY, requests: REQUESTS });
+    expect(result.evidence).toHaveLength(1);
+    expect(result.evidence[0]).toMatch(/^[A-Z(]|^\w+ /);
+    expect(result.evidence[0]).toContain('has been approved');
+    const words = result.evidence[0].split(' ');
+    const source = 'Your time off request for Dec 22 - Dec 24, 2026 (3 days of Vacation) has been approved by Jordan Lee from the finance team today.'.split(' ');
+    expect(source).toContain(words[0]);
+    expect(source).toContain(words[words.length - 1]);
+  });
+
   it('reads only the first 20,000 characters', () => {
     const text = 'Approved Dec 22-24. ' + 'x'.repeat(MAX_APPROVAL_INPUT) + ' Denied.';
     const result = parseApprovalMessage(text, { today: TODAY, requests: REQUESTS });

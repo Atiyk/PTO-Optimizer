@@ -230,6 +230,12 @@ function clauseAround(text: string, hit: Hit): string {
   let end = hit.index + hit.phrase.length;
   while (end < text.length && end - hit.index < 80 && !/[.!?\n]/.test(text[end])) end++;
   if (end < text.length && /[.!?]/.test(text[end])) end++;
+  // A cut that lands inside a word moves to the next word boundary, so evidence never
+  // starts or ends on a fragment ("est for Dec 22").
+  const cutLeft = start > 0 && !/[.!?\n]/.test(text[start - 1]);
+  const cutRight = end < text.length && !/[.!?\n]/.test(text[end - 1]);
+  if (cutLeft && /\w/.test(text[start - 1])) { while (start < hit.index && /\w/.test(text[start])) start++; }
+  if (cutRight && /\w/.test(text[end])) { while (end > hit.index + hit.phrase.length && /\w/.test(text[end - 1])) end--; }
   return text.slice(start, end).replace(/\s+/g, ' ').trim();
 }
 
