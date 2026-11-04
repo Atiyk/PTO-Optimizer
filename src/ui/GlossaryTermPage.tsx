@@ -192,7 +192,7 @@ export function GlossaryTermPage({ termId }: { termId: string }) {
                 {guide ? (
                   <>
                     <p className="mt-1 text-muted">Put this into practice with your own numbers.</p>
-                    <Button href={guide.action.href} className="mt-4 w-full whitespace-normal text-center">
+                    <Button href={guide.action.href} variant="secondary" className="mt-4 w-full whitespace-normal text-center">
                       {guide.action.label} <span aria-hidden="true">→</span>
                     </Button>
                     {guide.action.href !== '/pto' && (
@@ -205,7 +205,7 @@ export function GlossaryTermPage({ termId }: { termId: string }) {
                 ) : (
                   <>
                     <p className="mt-1 text-muted">See how this term applies to your balance, then plan around it.</p>
-                    <Button href={`/policy?highlight=${term.id}`} className="mt-4 w-full whitespace-normal text-center" onClick={() => track('policy_tool_used')}>
+                    <Button href={`/policy?highlight=${term.id}`} variant="secondary" className="mt-4 w-full whitespace-normal text-center" onClick={() => track('policy_tool_used')}>
                       See this in your own policy <span aria-hidden="true">→</span>
                     </Button>
                     <p className="mt-3">

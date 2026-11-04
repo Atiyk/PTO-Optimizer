@@ -4,7 +4,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { Glossary } from './Glossary';
 import { GLOSSARY_TERMS } from '../content/glossary/terms';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.history.replaceState(null, '', '/glossary/');
+});
 
 describe('Understand glossary search', () => {
   it('prerenders learning pathways and a labelled search field without needing JavaScript', () => {
@@ -53,5 +56,19 @@ describe('Understand glossary search', () => {
     expect(html).toContain('href="#letter-a"');
     expect(html).toContain('id="letter-a"');
     expect(html).not.toMatch(/uppercase tracking|rounded-full|rounded-xl/);
+  });
+
+  it('round-trips the search query through ?q= without adding history entries', () => {
+    window.history.replaceState(null, '', '/glossary/?q=carry');
+    render(<Glossary />);
+    const input = screen.getByRole('searchbox', { name: 'Search the glossary' }) as HTMLInputElement;
+    expect(input.value).toBe('carry');
+    expect(screen.getByRole('status').textContent).toMatch(/^[1-9]\d* terms? found$/);
+    const before = window.history.length;
+    fireEvent.change(input, { target: { value: 'accrual' } });
+    expect(new URLSearchParams(window.location.search).get('q')).toBe('accrual');
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    expect(window.location.search).toBe('');
+    expect(window.history.length).toBe(before);
   });
 });

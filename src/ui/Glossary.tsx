@@ -47,7 +47,20 @@ const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outli
  * active the index steps aside so the matches sit directly under the field.
  */
 export function Glossary() {
-  const [query, setQuery] = useState('');
+  // The search query round-trips as ?q= like every other control: read once when the page
+  // mounts (glossary-main uses createRoot, not hydration, and the prerender has no window, so
+  // the static HTML stays the unfiltered hub) and written with replaceState as you type, so
+  // typing never adds history entries.
+  const [query, setQueryState] = useState(() =>
+    typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('q') ?? '',
+  );
+  const setQuery = (next: string) => {
+    setQueryState(next);
+    const url = new URL(window.location.href);
+    if (next) url.searchParams.set('q', next);
+    else url.searchParams.delete('q');
+    if (url.href !== window.location.href) window.history.replaceState(window.history.state, '', url);
+  };
   const inputRef = useRef<HTMLInputElement>(null);
   const statusId = useId();
   const searching = query.trim().length > 0;
@@ -103,12 +116,11 @@ export function Glossary() {
             <>
               <section className="mt-16 lg:mt-20" aria-labelledby="learning-paths-heading">
                 <h2 id="learning-paths-heading" className="text-h2 font-bold text-ink type-condensed">Start with a topic</h2>
-                <ol className="mt-5 grid border-t border-ink md:grid-cols-2 md:gap-x-10">
-                  {LEARNING_PATHS.map((path, i) => (
-                    <li key={path.title} className="grid grid-cols-[3rem_1fr] gap-x-3 border-b border-line py-6 sm:grid-cols-[3.5rem_1fr]">
-                      <span aria-hidden="true" className="text-h1 leading-none text-ink type-display">{i + 1}</span>
+                <ul className="mt-5 grid border-t border-ink md:grid-cols-2 md:gap-x-10">
+                  {LEARNING_PATHS.map((path) => (
+                    <li key={path.title} className="border-b border-line py-6">
                       <div className="min-w-0">
-                        <h3 className="text-lg font-bold leading-6 text-ink">{path.title}</h3>
+                        <h3 className="text-h2 font-bold text-ink type-condensed">{path.title}</h3>
                         <p className="mt-1 max-w-[52ch] text-muted">{path.detail}</p>
                         <ul className="mt-2 flex flex-wrap gap-x-4" aria-label={`Terms in ${path.title}`}>
                           {path.terms.map((id) => {
@@ -125,7 +137,7 @@ export function Glossary() {
                       </div>
                     </li>
                   ))}
-                </ol>
+                </ul>
               </section>
 
               <section className="mt-16 lg:mt-20" aria-labelledby="practical-guides-heading">
@@ -139,7 +151,7 @@ export function Glossary() {
                     <h3 className="text-h1 text-ink type-display">{featured.title}</h3>
                     <p className="mt-3 max-w-[56ch] text-ink">{featured.answer}</p>
                     <p className="mt-3 text-sm text-muted">{featured.steps.length} things to check, a worked example and three questions for HR.</p>
-                    <span className="mt-6 self-start font-semibold text-ink underline decoration-1 underline-offset-[0.22em] group-hover:bg-mark">
+                    <span className="mt-6 self-start font-semibold text-ink underline decoration-1 underline-offset-[0.22em] group-hover:decoration-2">
                       Read the guide <span aria-hidden="true">→</span>
                     </span>
                   </a>
@@ -148,7 +160,7 @@ export function Glossary() {
                       <li key={guide.termId} className="border-b border-line">
                         <a href={`/glossary/${guide.termId}`} className={`group block py-4 ${FOCUS}`}>
                           <h3 className="flex items-baseline justify-between gap-4 text-lg font-bold leading-6 text-ink">
-                            <span className="underline decoration-transparent decoration-1 underline-offset-[0.22em] transition-colors group-hover:bg-mark group-hover:decoration-ink">{guide.title}</span>
+                            <span className="underline decoration-transparent decoration-1 underline-offset-[0.22em] group-hover:decoration-ink">{guide.title}</span>
                             <span aria-hidden="true" className="shrink-0 font-normal">→</span>
                           </h3>
                           <p className="mt-1 max-w-[62ch] text-muted">{guide.answer}</p>
@@ -165,7 +177,7 @@ export function Glossary() {
                   <p className="mt-1 max-w-[60ch] text-ink">Already know how your time off works? Forecast your balance and expiry dates, then find the best days to use it.</p>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  <Button href="/policy">Understand my policy</Button>
+                  <Button href="/policy" variant="secondary">Understand my policy</Button>
                   <Button href="/pto" variant="secondary">Plan my time off</Button>
                 </div>
               </section>
@@ -179,7 +191,7 @@ export function Glossary() {
             {!searching && (
               <nav aria-label="Jump to letter" className="mt-4 flex flex-wrap border-t border-line">
                 {Array.from(groups.keys()).map((letter) => (
-                  <a key={letter} href={`#letter-${letter.toLowerCase()}`} className={`inline-flex h-11 min-w-11 items-center justify-center font-bold text-ink hover:bg-mark ${FOCUS}`}>
+                  <a key={letter} href={`#letter-${letter.toLowerCase()}`} className={`inline-flex h-11 min-w-11 items-center justify-center font-bold text-ink hover:bg-surface-alt hover:underline ${FOCUS}`}>
                     {letter}
                   </a>
                 ))}

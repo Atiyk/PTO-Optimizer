@@ -6,109 +6,65 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" content="#f4f4f0" />
     <title>URL parameter contract &mdash; Gapless PTO Optimizer</title>
     <meta
       name="description"
       content="Every query parameter PTO Optimizer and Sabbatical Planning read, with its type, default, and what it does. Both solvers are deterministic: the same URL always produces the same plan."
     />
     <link rel="canonical" href="https://pto-optimizer.app/docs" />
+    <link rel="preload" href="/fonts/archivo-latin-var.woff2" as="font" type="font/woff2" crossorigin />
     <style>
-      :root {
-        color-scheme: light;
-        --bg: #ffffff;
-        --surface: #f8fafc;
-        --text: #0f172a;
-        --muted: #64748b;
-        --border: #e2e8f0;
-        --accent: #1e3a8a;
-      }
-      body {
-        margin: 0;
-        background: var(--bg);
-        color: var(--text);
-        font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-      }
-      main {
-        max-width: 48rem;
-        margin: 0 auto;
-        padding: 3rem 1.5rem 4rem;
-      }
-      h1 {
-        font-size: 1.75rem;
-        margin-bottom: 0.25rem;
-      }
-      h2 {
-        font-size: 1.125rem;
-        margin-top: 2.5rem;
-        border-top: 1px solid var(--border);
-        padding-top: 1.5rem;
-      }
-      p.lede {
-        color: var(--muted);
-        max-width: 42rem;
-      }
-      p {
-        max-width: 42rem;
-      }
-      code {
-        font: 0.875em ui-monospace, "SF Mono", Menlo, monospace;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 0.25rem;
-        padding: 0.05rem 0.35rem;
-      }
-      a {
-        color: var(--accent);
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.875rem;
-        margin-top: 1rem;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 0.5rem 0.75rem;
-        border-bottom: 1px solid var(--border);
-        vertical-align: top;
-      }
-      th {
-        color: var(--muted);
-        font-weight: 600;
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.02em;
-      }
-      .example {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 0.5rem;
-        padding: 1rem 1.25rem;
-        margin: 1rem 0;
-      }
-      .example p {
-        margin: 0 0 0.5rem;
-        color: var(--muted);
-        font-size: 0.875rem;
-      }
-      .example code {
-        display: block;
-        white-space: pre-wrap;
-        word-break: break-all;
-        background: none;
-        border: none;
-        padding: 0;
-      }
-      .back {
-        display: inline-block;
-        margin-top: 2rem;
-      }
+      @font-face{font-family:'Archivo Variable';src:url('/fonts/archivo-latin-var.woff2') format('woff2-variations'),url('/fonts/archivo-latin-var.woff2') format('woff2');font-style:normal;font-weight:400 800;font-stretch:75% 100%;font-display:swap}
+      :root{color-scheme:light;--page:#f4f4f0;--paper:#fff;--alt:#eaeae4;--ink:#141414;--muted:#56564f;--line:#dcdcd5;--line-strong:#86867e;--hover:#3a3a35;--ease:cubic-bezier(.23,1,.32,1)}
+      *{box-sizing:border-box}
+      html{background:var(--page);-webkit-text-size-adjust:100%}
+      body{margin:0;background:var(--page);color:var(--ink);font:16px/1.5 'Archivo Variable',Arial,system-ui,-apple-system,sans-serif;font-stretch:100%;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+      ::selection{background:#dcf763;color:var(--ink)}
+      h1,h2{text-wrap:balance}p{text-wrap:pretty}
+      a{color:var(--ink);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.22em;transition:text-decoration-thickness 150ms var(--ease)}
+      a:hover{text-decoration-thickness:2px}
+      :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+      .skip{position:absolute;left:-10000px;top:auto}
+      .skip:focus{left:16px;top:12px;z-index:10;background:var(--paper);padding:10px 14px;border:1px solid var(--ink);border-radius:3px;font-weight:600}
+      .shell{width:min(100% - 32px,1280px);margin-inline:auto}
+      header{border-bottom:1px solid var(--line)}
+      header .shell{min-height:68px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+      .brand{display:inline-flex;align-items:center;gap:10px;min-height:44px;color:var(--ink);text-decoration:none}
+      .brand span{display:flex;flex-direction:column;line-height:1}
+      .brand strong{font-size:23px;font-weight:800;font-stretch:75%;letter-spacing:-.01em}
+      .brand small{font-size:11px;font-weight:600;color:var(--muted);margin-top:3px}
+      .nav{display:flex;align-items:center;gap:24px}
+      .nav a{display:inline-flex;min-height:44px;align-items:center;padding:0 4px;text-decoration:none;font-size:15px;font-weight:600;color:var(--muted)}
+      .nav a:hover{color:var(--ink)}
+      .nav .cta{color:#fff;background:var(--ink);border-radius:3px;padding:0 14px;font-size:14px;transition:background-color 150ms var(--ease)}
+      .nav .cta:hover{background:var(--hover);color:#fff}
+      main{padding:clamp(40px,6vw,64px) 0 96px}
+      h1{font-size:clamp(2.25rem,1.5rem + 3vw,3.75rem);line-height:1;font-weight:800;font-stretch:75%;letter-spacing:-.02em;margin:0 0 20px}
+      h2{font-size:24px;line-height:1.15;font-weight:700;font-stretch:82%;margin:56px 0 0;padding-top:16px;border-top:1px solid var(--ink)}
+      p{max-width:68ch;line-height:1.65;margin:0 0 14px}
+      p.lede{font-size:18px;line-height:1.55;max-width:62ch}
+      code{font:inherit;font-weight:600;font-size:.94em;background:var(--alt);border-radius:3px;padding:.05em .35em}
+      table{width:100%;border-collapse:collapse;font-size:15px;margin-top:12px;background:var(--paper);border:1px solid var(--line);border-radius:4px}
+      th,td{text-align:left;padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+      tbody tr:last-child td{border-bottom:0}
+      td:first-child{white-space:nowrap}
+      th{color:var(--muted);font-weight:600;font-size:14px;border-bottom-color:var(--ink)}
+      .example{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:16px 20px;margin:16px 0;max-width:72ch}
+      .example p{margin:0 0 8px;color:var(--muted);font-size:15px}
+      .example code{display:block;white-space:pre-wrap;word-break:break-all;background:none;padding:0;font-weight:600}
+      .back{display:inline-flex;min-height:44px;align-items:center;margin-top:24px;font-weight:600}
+      @media(max-width:760px){.nav{gap:8px}.nav a:not(.cta){display:none}table,tbody,tr,td{display:block;width:100%}thead{display:none}tr{padding:12px 16px;border-bottom:1px solid var(--line)}tbody tr:last-child{border-bottom:0}td{padding:2px 0;border:0;white-space:normal!important}td:first-child{padding-bottom:6px}td:nth-child(n+2)::before{display:block;font-size:13px;font-weight:600;color:var(--muted)}td:nth-child(2)::before{content:'Type'}td:nth-child(3)::before{content:'Default'}td:nth-child(4)::before{content:'What it does'}}
+      @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important}}
     </style>
   </head>
   <body>
-    <main>
+    <a class="skip" href="#main-content">Skip to main content</a>
+    <header><div class="shell">
+      <a href="/" class="brand"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect x="1" y="1" width="30" height="30" rx="5" fill="#141414"/><rect x="1" y="11" width="30" height="10" fill="#dcf763"/><rect x="10" y="13" width="5" height="6" rx="0.75" fill="#141414"/><rect x="17" y="13" width="5" height="6" rx="0.75" fill="#141414"/></svg><span><strong>Gapless</strong> <small>PTO Optimizer</small></span></a>
+      <nav class="nav" aria-label="Quick links"><a href="/sabbatical">Sabbatical</a><a href="/policy">My PTO</a><a href="/glossary">Learn</a><a href="/pto" class="cta">Plan PTO</a></nav>
+    </div></header>
+    <main id="main-content" class="shell" tabindex="-1">
       <h1>URL parameter contract</h1>
       <p class="lede">
         The solver behind PTO Optimizer is deterministic: every control on the page round-trips
