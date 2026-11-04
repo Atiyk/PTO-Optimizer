@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { parseICSBusyDays, IcsParseError, type ParsedImportResult } from './icsImport';
+import { parseICSBusyDays, IcsParseError, MAX_IMPORT_FILE_BYTES, type ParsedImportResult } from './icsImport';
 import { monthShortName } from '@daysoff/engine/calendar/dateFormat';
 
 interface ImportCalendarProps {
@@ -38,6 +38,11 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
 
   const handleFile = async (file: File) => {
     try {
+      // Check bytes before file.text(): parsing limits alone cannot bound read memory.
+      if (file.size > MAX_IMPORT_FILE_BYTES) {
+        setState({ kind: 'error', message: 'Calendar file is too large to import safely.' });
+        return;
+      }
       const text = await file.text();
       const result = parseICSBusyDays(text);
       if (result.busyDays.length === 0) {

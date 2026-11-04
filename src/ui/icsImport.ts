@@ -1,4 +1,5 @@
 import { addDays, rangeISO, isoToSerial } from '@daysoff/engine/solver/dateUtils';
+import { validCalendarDate } from '../personal/employerCalendar';
 
 /** A single .ics file is parsed entirely client-side (FileReader/`file.text()`, never
  * fetch/XHR) - nothing is uploaded anywhere, per the product's no-backend design. This
@@ -6,6 +7,11 @@ import { addDays, rangeISO, isoToSerial } from '@daysoff/engine/solver/dateUtils
  * the actual parsing logic directly unit-testable without any DOM/File API involved. */
 
 export const MAX_IMPORT_EVENTS = 500;
+/** Hard local-only input and expansion bounds; no network or storage access. */
+export const MAX_IMPORT_CHARS = 1_000_000;
+export const MAX_IMPORT_FILE_BYTES = 1_000_000;
+export const MAX_IMPORT_SPAN_DAYS = 3660;
+export const MAX_IMPORT_BUSY_DAYS = 4000;
 
 export class IcsParseError extends Error {}
 
@@ -34,7 +40,7 @@ interface RawProp {
  * before any other parsing - a folded SUMMARY or DTSTART otherwise reads as two garbled
  * lines instead of one. */
 function unfoldLines(raw: string): string[] {
-  const normalized = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const normalized = raw.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const rawLines = normalized.split('\n');
   const lines: string[] = [];
   for (const line of rawLines) {
@@ -68,19 +74,20 @@ interface DateTimeValue {
   minutesOfDay: number; // 0 for an all-day value
 }
 
-/** Reads only the date (and, for a DATE-TIME value, the clock time) a DTSTART/DTEND
- * property carries - deliberately ignoring TZID/UTC offset entirely. That's a real
- * simplification (no timezone database is available client-side without a dependency), but
- * a safe one for this module's one real question - "is this event at least 24 hours long,
- * and which calendar day(s) does it touch" - since no realistic UTC offset (max ~14h) can
- * turn a genuinely short meeting into a day-long block or vice versa at the thresholds this
- * module cares about. */
+/** Reads local date and wall-clock time from DTSTART/DTEND. TZID and UTC offset
+ * conversion are NOT implemented: across DST or mixed zones a timed event near
+ * the 24-hour threshold can be misclassified. Callers must disclose partial
+ * coverage; all-day VALUE=DATE spans are handled as date-only intervals. */
 function parseDateTimeValue(prop: RawProp): DateTimeValue | null {
-  const m = prop.value.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2}))?/);
+  const m = prop.value.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})Z?)?$/);
   if (!m) return null;
   const date = `${m[1]}-${m[2]}-${m[3]}`;
+  if (!validCalendarDate(date)) return null;
   const hasTime = m[4] !== undefined;
-  const isAllDay = prop.params.VALUE === 'DATE' || !hasTime;
+  if ((prop.params.VALUE === 'DATE' && hasTime)
+    || (prop.params.VALUE === 'DATE-TIME' && !hasTime)
+    || (hasTime && (Number(m[4]) > 23 || Number(m[5]) > 59 || Number(m[6]) > 59))) return null;
+  const isAllDay = !hasTime;
   const minutesOfDay = hasTime ? Number(m[4]) * 60 + Number(m[5]) : 0;
   return { date, isAllDay, minutesOfDay };
 }
@@ -102,6 +109,23 @@ function totalMinutes(date: string, minutesOfDay: number): number {
   return isoToSerial(date) * 1440 + minutesOfDay;
 }
 
+/** Guard BEFORE expanding ranges; an imported file must never freeze the browser. */
+function addBoundedDays(busy: Set<string>, first: string, last: string): void {
+  if (!validCalendarDate(first) || !validCalendarDate(last)) {
+    throw new IcsParseError('Calendar event has an invalid date.');
+  }
+  const span = isoToSerial(last) - isoToSerial(first);
+  if (!Number.isSafeInteger(span) || span < 0 || span > MAX_IMPORT_SPAN_DAYS) {
+    throw new IcsParseError('Calendar event has an invalid or excessively long date range.');
+  }
+  for (const date of rangeISO(first, last)) {
+    busy.add(date);
+    if (busy.size > MAX_IMPORT_BUSY_DAYS) {
+      throw new IcsParseError('Calendar includes too many distinct dates to import safely.');
+    }
+  }
+}
+
 /**
  * Phase 3 item 3: an .ics import, not a live OAuth calendar sync - that needs a backend for
  * token exchange and Google's calendar-scope verification, which breaks the no-backend
@@ -117,11 +141,14 @@ function totalMinutes(date: string, minutesOfDay: number): number {
  * silently dropped or wrongly expanded.
  */
 export function parseICSBusyDays(raw: string): ParsedImportResult {
-  if (!raw.includes('BEGIN:VCALENDAR')) {
-    throw new IcsParseError("This doesn't look like a calendar (.ics) file.");
+  if (typeof raw !== 'string' || raw.length > MAX_IMPORT_CHARS) {
+    throw new IcsParseError('Calendar file is too large to import safely.');
   }
 
   const lines = unfoldLines(raw);
+  if (lines[0] !== 'BEGIN:VCALENDAR' || lines[lines.length - 1] !== 'END:VCALENDAR') {
+    throw new IcsParseError("This doesn't look like a calendar (.ics) file, or it is incomplete.");
+  }
   const busy = new Set<string>();
   let eventCount = 0;
   let cappedAt: number | null = null;
@@ -140,7 +167,7 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
       return;
     }
     const start = parseDateTimeValue(dtstartProp);
-    if (!start) return;
+    if (!start) throw new IcsParseError('Calendar event has an invalid start date.');
 
     if (start.isAllDay) {
       // DTEND is EXCLUSIVE for an all-day event per RFC 5545 (the day after the last busy
@@ -148,14 +175,17 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
       let lastDay = start.date;
       if (dtendProp) {
         const end = parseDateTimeValue(dtendProp);
-        if (end) lastDay = addDays(end.date, -1);
+        if (!end || !end.isAllDay) throw new IcsParseError('Calendar event has an invalid all-day end date.');
+        lastDay = addDays(end.date, -1);
       } else if (durationValue) {
         const mins = parseDurationMinutes(durationValue);
-        if (mins !== null && mins > 0) lastDay = addDays(start.date, Math.ceil(mins / 1440) - 1);
+        if (mins === null || !Number.isFinite(mins) || mins <= 0 || mins % 1440 !== 0
+          || mins / 1440 > MAX_IMPORT_SPAN_DAYS + 1) {
+          throw new IcsParseError('Calendar event has an invalid or excessive all-day duration.');
+        }
+        lastDay = addDays(start.date, mins / 1440 - 1);
       }
-      if (lastDay >= start.date) {
-        for (const d of rangeISO(start.date, lastDay)) busy.add(d);
-      }
+      addBoundedDays(busy, start.date, lastDay);
       return;
     }
 
@@ -164,18 +194,26 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
     let endDateForSpan: string | null = null;
     if (dtendProp) {
       const end = parseDateTimeValue(dtendProp);
-      if (end) {
-        durationMinutes = totalMinutes(end.date, end.minutesOfDay) - totalMinutes(start.date, start.minutesOfDay);
-        endDateForSpan = end.date;
-      }
+      if (!end || end.isAllDay) throw new IcsParseError('Calendar event has an invalid timed end date.');
+      durationMinutes = totalMinutes(end.date, end.minutesOfDay) - totalMinutes(start.date, start.minutesOfDay);
+      endDateForSpan = end.date;
     } else if (durationValue) {
       durationMinutes = parseDurationMinutes(durationValue);
-      if (durationMinutes !== null) endDateForSpan = addDays(start.date, Math.floor(durationMinutes / 1440));
+      if (durationMinutes !== null) {
+        if (!Number.isFinite(durationMinutes) || durationMinutes < 0
+          || durationMinutes > (MAX_IMPORT_SPAN_DAYS + 1) * 1440) {
+          throw new IcsParseError('Calendar event has an invalid or excessive timed duration.');
+        }
+        endDateForSpan = addDays(start.date, Math.floor(durationMinutes / 1440));
+      }
+    }
+    if (durationMinutes !== null && (!Number.isFinite(durationMinutes) || durationMinutes < 0)) {
+      throw new IcsParseError('Calendar event has an invalid timed date range.');
     }
     if (durationMinutes === null || durationMinutes < 24 * 60) return; // unknown or short - ignore
 
     const lastDay = endDateForSpan && endDateForSpan > start.date ? endDateForSpan : start.date;
-    for (const d of rangeISO(start.date, lastDay)) busy.add(d);
+    addBoundedDays(busy, start.date, lastDay);
   }
 
   for (const line of lines) {
@@ -183,6 +221,7 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
     if (!prop) continue;
 
     if (prop.name === 'BEGIN' && prop.value === 'VEVENT') {
+      if (inEvent) throw new IcsParseError('Calendar has a nested event.');
       inEvent = true;
       dtstartProp = null;
       dtendProp = null;
@@ -196,7 +235,8 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
       continue;
     }
     if (prop.name === 'END' && prop.value === 'VEVENT') {
-      if (inEvent) flushEvent();
+      if (!inEvent) throw new IcsParseError('Calendar has an unmatched event end.');
+      flushEvent();
       inEvent = false;
       continue;
     }
@@ -206,6 +246,10 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
     else if (prop.name === 'DTEND') dtendProp = prop;
     else if (prop.name === 'DURATION') durationValue = prop.value;
     else if (prop.name === 'RRULE') hasRRule = true;
+  }
+
+  if (inEvent && cappedAt === null) {
+    throw new IcsParseError('Calendar has an unclosed event.');
   }
 
   return {

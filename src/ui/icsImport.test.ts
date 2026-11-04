@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseICSBusyDays, IcsParseError, MAX_IMPORT_EVENTS } from './icsImport';
+import { parseICSBusyDays, IcsParseError, MAX_IMPORT_EVENTS, MAX_IMPORT_CHARS, MAX_IMPORT_SPAN_DAYS, MAX_IMPORT_BUSY_DAYS } from './icsImport';
 
 function wrapCalendar(events: string): string {
   return `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\n${events}END:VCALENDAR\r\n`;
@@ -162,5 +162,86 @@ describe('parseICSBusyDays: real-world export shape (Google Calendar style)', ()
     expect(result.busyDays).toContain('2026-11-11');
     expect(result.busyDays).not.toContain('2026-11-05'); // the 1-hour standup is ignored
     expect(result.eventCount).toBe(3);
+  });
+});
+
+describe('parseICSBusyDays: bounded and fail-closed school/personal imports', () => {
+  it('rejects oversized local files before unfolding or scanning events', () => {
+    expect(() => parseICSBusyDays(wrapCalendar('X'.repeat(MAX_IMPORT_CHARS)))).toThrow(IcsParseError);
+  });
+
+  it('rejects truncated calendar wrappers instead of reporting an empty, complete import', () => {
+    expect(() => parseICSBusyDays('BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261219\r\nEND:VEVENT\r\n')).toThrow(IcsParseError);
+    expect(() => parseICSBusyDays('noise\r\n' + wrapCalendar(''))).toThrow(IcsParseError);
+  });
+
+  it('rejects nested and orphaned VEVENT boundaries instead of silently losing dates', () => {
+    const nested = wrapCalendar(
+      'BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261219\r\n'
+      + 'BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261220\r\nEND:VEVENT\r\nEND:VEVENT\r\n',
+    );
+    expect(() => parseICSBusyDays(nested)).toThrow(IcsParseError);
+    expect(() => parseICSBusyDays(wrapCalendar('END:VEVENT\r\n'))).toThrow(IcsParseError);
+    expect(() => parseICSBusyDays(wrapCalendar(
+      'BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261219\r\nEND:VEVENT\r\nEND:VEVENT\r\n',
+    ))).toThrow(IcsParseError);
+  });
+
+  it('accepts a UTF-8 BOM without loosening complete-calendar validation', () => {
+    const ics = '\uFEFF' + wrapCalendar(event('DTSTART;VALUE=DATE:20261219'));
+    expect(parseICSBusyDays(ics).busyDays).toEqual(['2026-12-19']);
+  });
+
+  it('rejects unclosed VEVENTs instead of silently dropping their dates', () => {
+    expect(() => parseICSBusyDays(wrapCalendar('BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261219\r\n'))).toThrow(IcsParseError);
+  });
+
+  it('rejects invalid calendar dates, leap dates and malformed date-time suffixes', () => {
+    for (const date of ['20270229', '20261301', '20261219T250000Z', '20261219T090000Zgarbage']) {
+      expect(() => parseICSBusyDays(wrapCalendar(event('DTSTART:' + date)))).toThrow(IcsParseError);
+    }
+    expect(parseICSBusyDays(wrapCalendar(event('DTSTART;VALUE=DATE:20280229'))).busyDays).toEqual(['2028-02-29']);
+  });
+
+  it('rejects invalid, reversed and mismatched all-day DTEND values', () => {
+    for (const end of ['20261218', '20270229', '20261220T090000Z']) {
+      expect(() => parseICSBusyDays(wrapCalendar(event('DTSTART;VALUE=DATE:20261219\r\nDTEND:' + end)))).toThrow(IcsParseError);
+    }
+  });
+
+  it('rejects excessive event spans before range expansion', () => {
+    expect(MAX_IMPORT_SPAN_DAYS).toBeLessThan(4000);
+    expect(() => parseICSBusyDays(wrapCalendar(event('DTSTART;VALUE=DATE:20260101\r\nDTEND;VALUE=DATE:20990101')))).toThrow(IcsParseError);
+    expect(() => parseICSBusyDays(wrapCalendar(event('DTSTART;VALUE=DATE:20260101\r\nDURATION:P999999D')))).toThrow(IcsParseError);
+  });
+
+  it('rejects invalid all-day durations and backwards timed ranges', () => {
+    expect(() => parseICSBusyDays(wrapCalendar(event('DTSTART;VALUE=DATE:20261219\r\nDURATION:P2DT1H')))).toThrow(IcsParseError);
+    expect(() => parseICSBusyDays(wrapCalendar(event('DTSTART:20261219T090000Z\r\nDTEND:20261218T090000Z')))).toThrow(IcsParseError);
+  });
+
+  it('caps distinct dates across multiple otherwise individually valid events', () => {
+    expect(MAX_IMPORT_BUSY_DAYS).toBe(4000);
+    const ics = wrapCalendar(
+      event('DTSTART;VALUE=DATE:20200101\r\nDTEND;VALUE=DATE:20290101')
+      + event('DTSTART;VALUE=DATE:20300101\r\nDTEND;VALUE=DATE:20330101'),
+    );
+    expect(() => parseICSBusyDays(ics)).toThrow(IcsParseError);
+  });
+
+  it('preserves ordinary school breaks spanning DST and academic-year boundaries', () => {
+    const ics = wrapCalendar(
+      event('DTSTART;VALUE=DATE:20270313\r\nDTEND;VALUE=DATE:20270316')
+      + event('DTSTART;VALUE=DATE:20261231\r\nDTEND;VALUE=DATE:20270102'),
+    );
+    expect(parseICSBusyDays(ics).busyDays).toEqual([
+      '2026-12-31', '2027-01-01', '2027-03-13', '2027-03-14', '2027-03-15',
+    ]);
+  });
+
+  it('does not reinterpret short meetings as all-day closures', () => {
+    expect(parseICSBusyDays(wrapCalendar(event(
+      'DTSTART:20270314T090000Z\r\nDTEND:20270314T100000Z',
+    ))).busyDays).toEqual([]);
   });
 });
