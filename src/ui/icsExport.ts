@@ -6,14 +6,14 @@ import { PRODUCT_NAME } from '../brand';
 import { isValidISODate } from './urlState';
 
 /** RFC 5545 TEXT escaping: backslash, comma, semicolon, and newline must be escaped. */
-function escapeText(s: string): string {
+export function escapeText(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\n/g, '\\n');
 }
 
 /** Folds a content line to at most 75 octets per RFC 5545 §3.1, continuing with CRLF + a
  * single leading space. Our fields are short in practice; this is a correctness guard for
  * unusually long holiday names or break spans, not something normal plans will trigger. */
-function foldLine(line: string): string {
+export function foldLine(line: string): string {
   const CRLF = '\r\n';
   if (line.length <= 75) return line;
   let out = line.slice(0, 75);
@@ -26,12 +26,12 @@ function foldLine(line: string): string {
   return out;
 }
 
-function isoToICSDate(iso: string): string {
+export function isoToICSDate(iso: string): string {
   const { y, m, d } = parseISO(iso);
   return `${String(y).padStart(4, '0')}${String(m).padStart(2, '0')}${String(d).padStart(2, '0')}`;
 }
 
-function addOneDayICS(icsDate: string): string {
+export function addOneDayICS(icsDate: string): string {
   const y = Number(icsDate.slice(0, 4));
   const m = Number(icsDate.slice(4, 6));
   const d = Number(icsDate.slice(6, 8));
@@ -39,7 +39,7 @@ function addOneDayICS(icsDate: string): string {
   return `${String(next.getUTCFullYear()).padStart(4, '0')}${String(next.getUTCMonth() + 1).padStart(2, '0')}${String(next.getUTCDate()).padStart(2, '0')}`;
 }
 
-function dtstampNow(now: Date): string {
+export function dtstampNow(now: Date): string {
   return now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 }
 

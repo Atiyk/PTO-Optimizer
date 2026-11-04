@@ -69,8 +69,26 @@ export function expirationRisks(policy: TimeOffPolicy, country: string, requests
   }).sort((a, b) => a.deadline.localeCompare(b.deadline) || b.daysAtStake - a.daysAtStake);
 }
 
-/** Reminders are calendar events, never promises of email or background push delivery. */
-export function expirationReminders(risks: readonly ExpirationRisk[], leads: readonly ExpirationReminderLead[], today: string): CalendarReminder[] {
+/** One suggested break from a rescue plan (see expiryRescue.ts rescueSuggestions). */
+export interface ReminderSuggestion { start: string; text: string }
+
+function suggestionText(parts: readonly ReminderSuggestion[] | undefined, reminderDate: string): string {
+  // A reminder only suggests breaks that have not started by the day it fires.
+  const texts = (parts ?? []).filter((part) => part.start >= reminderDate).map((part) => part.text);
+  if (texts.length === 0) return '';
+  const joined = texts.length === 1 ? texts[0] : `${texts.slice(0, -1).join(', ')} and ${texts.at(-1)}`;
+  return ` Suggested: take ${joined}.`;
+}
+
+const DOWNLOAD_NOTE = 'Based on your entered policy and approved leave when exported. Recheck your balance and employer policy in Gapless; this calendar file does not update automatically.';
+const FEED_NOTE = 'Based on the policy in your Gapless link, rechecked against today each time your calendar refreshes. Requests you track in Gapless on your device are not included; recheck your balance and employer policy.';
+
+/** Reminders are calendar events, never promises of email or background push delivery.
+ * `suggestions` maps a risk id to its rescue plan's breaks, so each reminder says which
+ * dates to book, e.g. "Suggested: take Dec 22-24 (3 PTO days)." `source: 'feed'` is the
+ * subscribed watch calendar, which does refresh, so it says that instead. */
+export function expirationReminders(risks: readonly ExpirationRisk[], leads: readonly ExpirationReminderLead[], today: string,
+  suggestions: Readonly<Record<string, readonly ReminderSuggestion[]>> = {}, source: 'download' | 'feed' = 'download'): CalendarReminder[] {
   const result: CalendarReminder[] = [];
   for (const risk of risks) {
     if (risk.kind === 'cap') continue;
@@ -80,7 +98,7 @@ export function expirationReminders(risks: readonly ExpirationRisk[], leads: rea
       result.push({
         id: `expiration-${risk.id}-${lead}`, date,
         title: `Use PTO by ${risk.deadline}: ${lead}-day reminder`,
-        description: `${risk.text} Last day to use it: ${risk.deadline}. Based on your entered policy and approved leave when exported. Recheck your balance and employer policy in Gapless; this calendar file does not update automatically.`,
+        description: `${risk.text} Last day to use it: ${risk.deadline}.${suggestionText(Object.hasOwn(suggestions, risk.id) ? suggestions[risk.id] : undefined, date)} ${source === 'feed' ? FEED_NOTE : DOWNLOAD_NOTE}`,
       });
     }
   }

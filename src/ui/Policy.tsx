@@ -623,7 +623,7 @@ export function Policy() {
                 <QuickForecast policy={policy} requests={ledger.requests} upcomingLoss={upcomingLoss} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')} />
               </div>
               <div id="expiration" className="order-3 min-w-0 scroll-mt-24 lg:order-none">
-                <ExpirationGuard policy={policy} country={country} requests={ledger.requests} today={visitDate} onAlertViewed={() => track('expiration_alert_viewed')} onAlertAction={() => track('expiration_alert_action_taken')} />
+                <ExpirationGuard policy={policy} country={country} requests={ledger.requests} today={visitDate} holidayCalendar={trackerCalendar} subdivision={trackerSubdivision} onAlertViewed={() => track('expiration_alert_viewed')} onAlertAction={() => track('expiration_alert_action_taken')} />
               </div>
             </div>
             <div id="requests" className="order-4 mt-6 min-w-0 scroll-mt-24 lg:order-none lg:col-start-1 lg:row-start-2 lg:mt-4">
