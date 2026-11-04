@@ -2,7 +2,6 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Container } from './Container';
 import { Logo } from './Logo';
 import { buttonClasses } from './Button';
-import { PRODUCT_NAME } from '../brand';
 
 export type SiteRoute = 'landing' | 'pto' | 'sabbatical' | 'policy' | 'glossary' | 'other';
 
@@ -18,25 +17,17 @@ interface NavItem {
 
 /** D2 nav labels (the product name now contains "PTO Optimizer", so the tools are named by
  * what you do there). Routes are unchanged. */
-export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
-  {
-    label: 'Plan',
-    items: [
-      { route: 'pto', href: '/pto', label: 'Plan PTO' },
-      { route: 'sabbatical', href: '/sabbatical', label: 'Sabbatical' },
-    ],
-  },
-  {
-    label: 'Understand',
-    items: [
-      { route: 'policy', href: '/policy', label: 'Your policy' },
-      { route: 'glossary', href: '/glossary', label: 'Glossary' },
-    ],
-  },
-];
+export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [{
+  label: 'Browse',
+  items: [
+    { route: 'policy', href: '/policy', label: 'My PTO' },
+    { route: 'glossary', href: '/glossary', label: 'Learn' },
+    { route: 'sabbatical', href: '/sabbatical', label: 'Sabbatical' },
+  ],
+}];
 
 /** The header's one primary action: a link into the tool, never a submit. */
-export const HEADER_CTA = { href: '/pto', label: 'Plan my time off' };
+export const HEADER_CTA = { href: '/pto', label: 'Plan PTO' };
 
 /**
  * Redesign Phase 1: logo + wordmark, two labelled nav groups, one primary link, and a
@@ -68,7 +59,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
   }, [open]);
 
   const linkClass = (route: SiteRoute) =>
-    `relative inline-flex min-h-11 items-center whitespace-nowrap rounded-md px-1 py-1 text-[15px] transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+    `relative inline-flex min-h-11 items-center whitespace-nowrap rounded-md px-1 py-1 text-[15px] font-semibold tracking-[-0.01em] transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
       active === route
         ? 'font-semibold text-ink after:absolute after:inset-x-1 after:-bottom-[13px] after:h-[3px] after:rounded-full after:bg-accent'
         : 'text-muted hover:text-ink'
@@ -76,17 +67,17 @@ export function SiteHeader({ active }: SiteHeaderProps) {
 
   return (
     <header className="border-b border-line bg-page">
-      <Container className="flex h-16 items-center gap-4 px-4">
-        <a href="/" aria-label={`${PRODUCT_NAME}, home`} className="-ml-1 inline-flex min-h-11 items-center rounded-md px-1 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" aria-current={active === 'landing' ? 'page' : undefined}>
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:inline-flex focus:min-h-11 focus:items-center focus:rounded-lg focus:border focus:border-line-strong focus:bg-surface focus:px-4 focus:text-sm focus:font-semibold focus:text-ink focus:shadow-lg">Skip to main content</a>
+      <Container className="flex min-h-[72px] items-center gap-4 px-4">
+        <a href="/" className="-ml-1 inline-flex min-h-11 items-center rounded-md px-1 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" aria-current={active === 'landing' ? 'page' : undefined}>
           <Logo />
+          <span className="sr-only"> home</span>
         </a>
 
         <div className="ml-auto hidden items-center gap-6 lg:flex xl:gap-7">
           {NAV_GROUPS.map((group, i) => (
-            <nav key={group.label} aria-label={group.label} className={`flex items-center gap-4 ${i > 0 ? 'border-l border-line pl-6 xl:pl-7' : ''}`}>
-              <span className="hidden text-xs font-semibold uppercase tracking-[0.08em] text-muted xl:inline" aria-hidden="true">
-                {group.label}
-              </span>
+            <nav key={group.label} aria-label="Explore" className={`flex items-center gap-4 ${i > 0 ? 'border-l border-line pl-6 xl:pl-7' : ''}`}>
+              <span className="sr-only" aria-hidden="true">{group.label}</span>
               {group.items.map((item) => (
                 <a key={item.route} href={item.href} className={linkClass(item.route)} aria-current={active === item.route ? 'page' : undefined}>
                   {item.label}
@@ -97,12 +88,9 @@ export function SiteHeader({ active }: SiteHeaderProps) {
         </div>
 
         <div className="ml-auto flex items-center gap-2 lg:ml-0">
-          {/* Reserved for "Sign in" (accounts phase). Fixed width, empty and hidden from
-              assistive tech until then, so adding the button can't move anything: it sits
-              left of the primary link, which stays flush with the content's right edge. */}
-          <div className="hidden h-9 w-[76px] shrink-0 sm:block" data-slot="sign-in" aria-hidden="true" />
+
           <span className="hidden sm:inline-flex">
-            <a href={HEADER_CTA.href} className={`${buttonClasses('primary', 'sm')} min-h-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}>
+            <a href={HEADER_CTA.href} aria-current={active === 'pto' ? 'page' : undefined} className={`${buttonClasses('primary', 'sm')} min-h-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}>
               {HEADER_CTA.label}
             </a>
           </span>
@@ -130,9 +118,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
         <Container className="flex flex-col gap-5 px-4 py-5">
           {NAV_GROUPS.map((group) => (
             <nav key={group.label} aria-label={group.label}>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted" aria-hidden="true">
-                {group.label}
-              </p>
+              <p className="sr-only" aria-hidden="true">{group.label}</p>
               <ul className="flex flex-col">
                 {group.items.map((item) => (
                   <li key={item.route}>

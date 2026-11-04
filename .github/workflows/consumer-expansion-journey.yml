@@ -1,0 +1,57 @@
+name: Consumer expansion combined journey
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/consumer-expansion-journey.mjs'
+      - '.github/workflows/consumer-expansion-journey.yml'
+      - 'src/ui/QuickForecast.tsx'
+      - 'src/ui/DeparturePayoutEstimator.tsx'
+      - 'src/ui/ExpirationGuard.tsx'
+
+permissions:
+  contents: read
+
+jobs:
+  combined-browser:
+    name: Combined forecast payout carryover 1440/768/375/320
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Build consumer fixture and prerendered pages
+        run: |
+          npm --ignore-scripts run build
+          npm run postbuild
+      - run: npx playwright install --with-deps chromium
+      - name: Run combined policy and privacy interaction journey
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 --strictPort > "$RUNNER_TEMP/combined.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          node --input-type=module <<'NODE'
+          let ready = false;
+          for (let i = 0; i < 30; i++) {
+            try {
+              if ((await fetch('http://127.0.0.1:4173/policy/')).ok) { ready = true; break; }
+            } catch { /* preview is starting */ }
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          if (!ready) throw new Error('Consumer preview unavailable');
+          NODE
+          node scripts/consumer-expansion-journey.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/combined"
+      - name: Save four-viewport screenshots and JSON journey report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: consumer-expansion-combined-evidence
+          path: qa-evidence/combined
+          if-no-files-found: warn
+          retention-days: 14

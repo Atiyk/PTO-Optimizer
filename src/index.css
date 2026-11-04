@@ -8,7 +8,7 @@
 @source not '../*.md';
 
 /*
- * Redesign Phase 1: the Gapless visual system. Warm, calm, light theme only.
+ * Redesign Phase 1: the Gapless visual system. Warm neutral surfaces with restrained evergreen-teal interaction accents.
  *
  * Self-hosted Figtree (variable weight, Latin subset only: ~20 KB, the whole font payload).
  * The file is public/fonts/figtree-latin-wght-normal.woff2, copied unchanged from the
@@ -44,7 +44,7 @@
  * forking a value. tokens.test.ts parses THIS block and checks every text/background pair
  * (4.5:1, or 3:1 for UI boundaries), so the numbers below can't drift from the tests.
  *
- * One accent hue only (burnt orange): suggested PTO, the primary action, focus rings, and
+ * One accent hue only (deep evergreen teal): suggested PTO, the primary action, focus rings, and
  * the score bars as darker shades of the same hue. The day-off band is a quiet wash behind
  * it. Structured so a dark theme could later redefine these under a media query or a
  * data-theme attribute; none is defined yet.
@@ -57,27 +57,27 @@
   --border-strong: #8c8279; /* input and control boundaries: 3:1 on surface and page */
   --text-primary: #1c1917; /* ink */
   --text-muted: #57534e; /* secondary text */
-  --focus-ring: #c2410c;
+  --focus-ring: #14594f;
 
-  --accent: #c2410c;
-  --accent-hover: #9a3412;
-  --accent-soft: #ffedd5;
-  --accent-ink: #9a3412; /* accent-coloured text (links, labels) on light backgrounds */
+  --accent: #17675d;
+  --accent-hover: #105349;
+  --accent-soft: #e9f3ee;
+  --accent-ink: #14594f; /* accent-coloured text (links, labels) on light backgrounds */
 
-  --pto-bg: #c2410c; /* suggested PTO: the strongest thing on the page */
-  --pto-border: #9a3412;
+  --pto-bg: #17675d; /* suggested PTO: the strongest thing on the page */
+  --pto-border: #105349;
   --pto-text: #ffffff;
   /* The day-off run: a quiet wash behind the accent, never competing with it. */
-  --band-bg: #ffedd5;
+  --band-bg: #eef4f0;
   --band-text: #292524;
   --holiday-dot: #57534e; /* a dot, never colour alone */
   --weekend-bg: #f5f0e8;
-  --alt-border: #c2410c; /* alternative placement outline: same hue, dashed */
+  --alt-border: #17675d; /* alternative placement outline: same hue, dashed */
 
   --score-track: #e7e0d5;
-  --score-1: #c2410c;
-  --score-2: #9a3412;
-  --score-3: #7c2d12;
+  --score-1: #17675d;
+  --score-2: #105349;
+  --score-3: #083a33;
 
   color-scheme: light;
 }
@@ -189,3 +189,6 @@
     transform: none;
   }
 }
+
+/* The homepage Country/PTO pair uses a container-width-aware inline CSS grid;
+   its actual computed columns are asserted at 320 and 375 in consumer QA. */

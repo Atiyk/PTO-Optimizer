@@ -4,7 +4,7 @@ import { COUNTRIES } from '@daysoff/engine/data/countries';
 import { getPreloadedHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { DEFAULT_WORK_WEEK, type Break } from '@daysoff/engine/solver/types';
-import { formatLong, formatShort } from '@daysoff/engine/calendar/dateFormat';
+import { formatLong } from '@daysoff/engine/calendar/dateFormat';
 import { weekdayName } from '@daysoff/engine/calendar/requestDeadline';
 import { SiteHeader } from './SiteHeader';
 import { Footer } from './Footer';
@@ -98,7 +98,7 @@ export function Landing() {
 
   return <div className="min-h-screen bg-page">
     <SiteHeader active="landing" />
-    <main><Container className="space-y-12 px-4 py-9 sm:px-6 sm:py-14 lg:space-y-16">
+    <main id="main-content" tabIndex={-1}><Container className="space-y-12 px-4 py-9 sm:px-6 sm:py-14 lg:space-y-16">
       <section className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:gap-x-12 lg:gap-y-6" aria-labelledby="landing-heading">
         <div className="flex min-w-0 flex-col gap-4 lg:gap-5">
           <p className="text-sm font-semibold text-accent-ink">Your time off, working harder.</p>
@@ -114,7 +114,21 @@ export function Landing() {
               <p className="pb-0.5 text-sm text-muted">using <strong className="text-2xl font-semibold text-accent-ink">{bestBreak.ptoCost}</strong> PTO day{bestBreak.ptoCost === 1 ? '' : 's'}</p>
             </div>
             <p className="mb-3 text-base font-semibold text-ink">{formatLong(bestBreak.start)} – {formatLong(bestBreak.end)}</p>
-            <MiniBreakStrip brk={bestBreak} holidaySet={holidaySet} />
+            <a href="#landing-budget-slider"
+              className="mb-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-ink underline underline-offset-4 sm:hidden">
+              Change PTO days in this preview
+            </a>
+            <div className="hidden sm:block">
+              <MiniBreakStrip brk={bestBreak} holidaySet={holidaySet} />
+            </div>
+            <details data-testid="home-break-calendar" className="mt-3 rounded-lg border border-line bg-surface-alt sm:hidden">
+              <summary className="flex min-h-11 cursor-pointer items-center px-3 py-2 text-sm font-semibold text-ink">
+                View all {bestBreak.totalDaysOff} calendar days
+              </summary>
+              <div className="px-3 pb-3">
+                <MiniBreakStrip brk={bestBreak} holidaySet={holidaySet} />
+              </div>
+            </details>
             <p className="mt-4 text-sm leading-relaxed text-muted">{breakReason(bestBreak, (date) => holidays.find((holiday) => holiday.date === date)?.name)}</p>
             <p className="mt-4 border-t border-line pt-4 text-sm text-muted">Full plan: <strong className="text-ink">{used} of {budget} PTO days</strong> across {plan?.result.primary.length} break{plan?.result.primary.length === 1 ? '' : 's'}.</p>
           </> : <p className="py-7 text-base leading-relaxed text-muted" role="status">{!validRange ? 'Your preview will appear once the planning dates are valid.' : loading ? 'Updating your holiday calendar…' : plan?.issue ?? (budget === 0 ? 'No PTO days allocated. You can still explore the holidays below.' : 'No qualifying break fits these dates and PTO days. Try a longer range or more available PTO.')}</p>}
@@ -128,22 +142,42 @@ export function Landing() {
             <p className="mt-1 text-sm text-muted">Change your PTO days, country or dates. Your recommendation updates automatically.</p>
           </div>
           <div className="grid min-w-0 gap-4 lg:grid-cols-2 lg:items-start">
-            <div className="grid min-w-0 grid-cols-2 gap-3">
+            <div className="landing-input-pair grid min-w-0 gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 16rem), 1fr))' }}>
             <label htmlFor="landing-country" className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-muted">Country
-              <select id="landing-country" className={FIELD} value={country} onChange={(event) => update({ country: event.target.value })}>{COUNTRIES.map((entry) => <option key={entry.code} value={entry.code}>{entry.name}</option>)}</select>
+              <select id="landing-country" aria-label="Country" className={FIELD} value={country} onChange={(event) => update({ country: event.target.value })}>{COUNTRIES.map((entry) => <option key={entry.code} value={entry.code}>{entry.name}</option>)}</select>
             </label>
             <label htmlFor="landing-budget" className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-muted">PTO days available
-              <input id="landing-budget" type="number" inputMode="numeric" min={0} max={60} step={1} className={`${FIELD} font-semibold tabular-nums`} value={budget} onChange={(event) => update({ budget: Math.max(0, Math.min(60, Math.round(Number(event.target.value) || 0))) })} />
+              <input id="landing-budget" aria-label="PTO days available" type="number" inputMode="numeric" min={0} max={60} step={1} className={`${FIELD} font-semibold tabular-nums`} value={budget} onChange={(event) => update({ budget: Math.max(0, Math.min(60, Math.round(Number(event.target.value) || 0))) })} />
             </label>
-          </div>
-          <details className="rounded-lg border border-line bg-surface/60 px-4 py-3">
-            <summary className="cursor-pointer text-sm font-medium text-ink">Planning dates · {validRange ? `${formatShort(rangeStart)}–${formatShort(rangeEnd)}` : 'Choose a valid range'}</summary>
-            <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2">
-              <label className="flex min-w-0 flex-col gap-1.5 text-sm text-muted">From<input type="date" className={FIELD} value={rangeStart} onChange={(event) => update({ rangeStart: event.target.value })} /></label>
-              <label className="flex min-w-0 flex-col gap-1.5 text-sm text-muted">Through<input type="date" className={FIELD} value={rangeEnd} onChange={(event) => update({ rangeEnd: event.target.value })} /></label>
+            <div className="col-span-full rounded-xl border border-line bg-surface p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="landing-budget-slider" className="text-sm font-semibold text-ink">Adjust PTO days</label>
+                <span className="text-sm font-semibold tabular-nums text-accent-ink" aria-hidden="true">{budget} / 60</span>
+              </div>
+              <input
+                id="landing-budget-slider"
+                type="range" min={0} max={60} step={1} value={budget}
+                aria-label="Adjust PTO days available"
+                aria-valuetext={`${budget} PTO ${budget === 1 ? 'day' : 'days'} available`}
+                className="mt-3 h-11 w-full cursor-pointer accent-[var(--accent)]"
+                onChange={(event) => update({ budget: Number(event.target.value) })}
+              />
+              <p className="text-xs leading-5 text-muted">Drag or use the arrow keys to see your recommended break change live.</p>
             </div>
-            <p className="mt-2 text-xs text-muted">Choose any dates, up to two years. Your preview updates as you edit.</p>
-          </details>
+          </div>
+          <fieldset className="min-w-0 rounded-xl border border-line bg-surface p-3 sm:p-4">
+            <legend className="px-1 text-sm font-semibold text-ink">Planning dates</legend>
+            <p className="mt-1 text-xs text-muted">{validRange ? `Preview: ${formatLong(rangeStart)} – ${formatLong(rangeEnd)}.` : 'Choose a valid range.'} Edit either date to update your plan live.</p>
+            <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2">
+              <label className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-ink">From
+                <input type="date" className={FIELD} value={rangeStart} onChange={(event) => update({ rangeStart: event.target.value })} />
+              </label>
+              <label className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-ink">Through
+                <input type="date" className={FIELD} value={rangeEnd} onChange={(event) => update({ rangeEnd: event.target.value })} />
+              </label>
+            </div>
+            <p className="mt-2 text-xs text-muted">Choose any dates, up to two years. No extra steps or submission.</p>
+          </fieldset>
           </div>
           {!validRange && <p role="alert" className="text-sm text-accent-ink">Choose valid start and end dates, with the end after the start and no more than two years apart.</p>}
           <div className="hidden lg:block"><Button href={href}>See the full plan →</Button></div>
@@ -151,8 +185,15 @@ export function Landing() {
         <div className="lg:hidden"><Button href={href} className="w-full sm:w-auto">See the full plan →</Button></div>
       </section>
 
-      <section aria-labelledby="landing-capabilities">
-        <h2 id="landing-capabilities" className="mb-5 text-h2 font-semibold text-ink">A little more control over your time.</h2>
+      <section aria-label="Your PTO value and next steps" className="space-y-6">
+        <div aria-labelledby="landing-value">
+          <p className="text-xs font-semibold uppercase tracking-widest text-accent-ink">Value</p>
+          <h2 id="landing-value" className="mt-2 text-h2 font-semibold text-ink">Make your PTO worth more time away.</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">Your preview above connects the days you have with the holidays ahead. Change the inputs and see the effect immediately—no signup or guessing.</p>
+        </div>
+        <div aria-labelledby="landing-capabilities" className="border-t border-line pt-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-accent-ink">Act</p>
+          <h2 id="landing-capabilities" className="mb-5 mt-2 text-h2 font-semibold text-ink">Take the next step with your plan.</h2>
         <div className="grid gap-4 md:grid-cols-3">
           {[
             { title: 'Plan PTO', text: 'Find longer vacations and useful long weekends, around the dates that work for you.', href, action: 'Explore my plan' },
@@ -161,6 +202,7 @@ export function Landing() {
           ].map((entry) => <Card key={entry.title} as="article" className="flex flex-col"><h3 className="text-lg font-semibold text-ink">{entry.title}</h3><p className="mt-2 flex-1 text-sm leading-relaxed text-muted">{entry.text}</p><a className="mt-4 inline-block min-h-11 py-2.5 text-sm font-semibold text-accent-ink underline underline-offset-4" href={entry.href}>{entry.action} →</a></Card>)}
         </div>
         <p className="mt-4 text-sm text-muted">Planning something bigger? <a href="/sabbatical" className="font-medium text-accent-ink underline underline-offset-4">Explore sabbatical planning.</a></p>
+        </div>
       </section>
 
       <section aria-labelledby="landing-holidays">

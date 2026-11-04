@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { parseICSBusyDays, IcsParseError, type ParsedImportResult } from './icsImport';
+import { parseICSBusyDays, IcsParseError, MAX_IMPORT_FILE_BYTES, type ParsedImportResult } from './icsImport';
 import { monthShortName } from '@daysoff/engine/calendar/dateFormat';
 
 interface ImportCalendarProps {
@@ -38,6 +38,11 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
 
   const handleFile = async (file: File) => {
     try {
+      // Check bytes before file.text(): parsing limits alone cannot bound read memory.
+      if (file.size > MAX_IMPORT_FILE_BYTES) {
+        setState({ kind: 'error', message: 'Calendar file is too large to import safely.' });
+        return;
+      }
       const text = await file.text();
       const result = parseICSBusyDays(text);
       if (result.busyDays.length === 0) {
@@ -70,7 +75,8 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
       <h4 className="mb-2 text-sm font-semibold text-slate-700">Import my calendar (.ics)</h4>
       <p className="mb-2 text-xs text-slate-400">
         Parsed in your browser. Nothing is uploaded. All-day and multi-day events become days you can&apos;t take
-        off; short, timed meetings are ignored.
+        off; short, timed meetings are ignored. Timed events use their stated UTC or IANA time zone;
+        unsupported or ambiguous time zones are rejected rather than guessed. Check the dates before adding.
       </p>
       <input
         ref={inputRef}
@@ -99,6 +105,15 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
               This file has more than {state.result.cappedAt} events &mdash; only the first {state.result.cappedAt} were read.
             </p>
           )}
+          <details className="mt-1 rounded-md border border-slate-200 px-2 py-1">
+            <summary className="min-h-11 cursor-pointer text-xs font-semibold text-slate-700">Review individual dates</summary>
+            <p className="mt-1 break-words text-xs text-slate-600">
+              {state.result.busyDays.slice(0, 30).join(', ')}
+              {state.result.busyDays.length > 30
+                ? ` … and ${state.result.busyDays.length - 30} more dates; only confirm after checking your source calendar.`
+                : ''}
+            </p>
+          </details>
           {state.result.skippedRecurring > 0 && (
             <p>
               {state.result.skippedRecurring} recurring event{state.result.skippedRecurring === 1 ? '' : 's'} skipped (not

@@ -1,4 +1,3 @@
-import { PRODUCT_NAME, PRODUCT_SHORT_NAME } from '../brand';
 import { logoMarkInner } from './logoMark';
 
 /** The mark alone. Decorative by default (the wordmark or a link label names it). */
@@ -18,17 +17,14 @@ export function LogoMark({ size = 28, title }: { size?: number; title?: string }
   );
 }
 
-/**
- * Mark + wordmark. The full name from 400px up, the short name below it (D1), switched in
- * CSS so the prerendered HTML is the same at every width and nothing shifts on hydration.
- */
-export function Logo({ size = 28 }: { size?: number }) {
+/** Clear hierarchy, one Figtree font, consistent across every viewport. */
+export function Logo({ size = 30 }: { size?: number }) {
   return (
     <span className="inline-flex items-center gap-2.5">
       <LogoMark size={size} />
-      <span className="whitespace-nowrap text-[17px] font-semibold leading-none tracking-[-0.01em] text-ink">
-        <span className="max-[399px]:hidden">{PRODUCT_NAME}</span>
-        <span className="min-[400px]:hidden">{PRODUCT_SHORT_NAME}</span>
+      <span className="flex min-w-0 flex-col leading-none text-ink">
+        <span className="text-[21px] font-extrabold tracking-[-0.055em]">Gapless{' '}</span>
+        <span className="mt-1 text-[9px] font-bold uppercase tracking-[0.16em] text-muted">PTO Optimizer{' '}</span>
       </span>
     </span>
   );

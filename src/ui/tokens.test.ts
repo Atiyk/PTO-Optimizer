@@ -64,6 +64,14 @@ describe('design tokens (src/index.css)', () => {
     }
   });
 
+  it('the evergreen-teal accent stays accessible on every neutral surface', () => {
+    for (const bg of [...BACKGROUNDS, 'band-bg']) {
+      expect(contrastRatio(t('accent'), t(bg))).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(contrastRatio(t('pto-text'), t('accent'))).toBeGreaterThanOrEqual(4.5);
+    expect(t('accent')).toEqual(t('pto-bg'));
+  });
+
   it('one accent hue: the score ramp is the accent and its darker shades, matching scoreFormat.ts', () => {
     expect(SCORE_INTENSITY.rgb).toEqual([t('score-1'), t('score-2'), t('score-3')]);
     expect(t('score-1')).toEqual(t('accent'));

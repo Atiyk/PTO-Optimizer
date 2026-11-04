@@ -305,7 +305,7 @@ export function App() {
       )}
       </div>
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <Container className="p-4">
           <SummaryMetrics
             budgetSpent={state.budgetSpent}

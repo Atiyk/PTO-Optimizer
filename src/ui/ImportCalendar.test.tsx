@@ -58,6 +58,16 @@ describe('ImportCalendar', () => {
     expect(onImportBusyDays).not.toHaveBeenCalled();
   });
 
+  it('lets users inspect exact blocked dates and explains time-zone handling before Add', async () => {
+    const { onImportBusyDays } = mount();
+    await selectFile(VALID_ICS);
+    expect(container!.textContent).toContain('Review individual dates');
+    expect(container!.textContent).toContain('2026-12-19');
+    expect(container!.textContent).toContain('2026-12-27');
+    expect(container!.textContent).toContain('unsupported or ambiguous time zones are rejected');
+    expect(onImportBusyDays).not.toHaveBeenCalled();
+  });
+
   it('only applies the import once the user clicks Add', async () => {
     const { onImportBusyDays } = mount();
     await selectFile(VALID_ICS);
@@ -82,6 +92,13 @@ describe('ImportCalendar', () => {
     const { onImportBusyDays } = mount();
     await selectFile('just some random text, not a calendar', 'notes.txt');
     expect(container!.textContent).toContain("doesn't look like a calendar");
+    expect(onImportBusyDays).not.toHaveBeenCalled();
+  });
+
+  it('rejects oversized ICS files before reading them and never imports private dates', async () => {
+    const { onImportBusyDays } = mount();
+    await selectFile('X'.repeat(1_000_001));
+    expect(container!.textContent).toContain('too large to import safely');
     expect(onImportBusyDays).not.toHaveBeenCalled();
   });
 

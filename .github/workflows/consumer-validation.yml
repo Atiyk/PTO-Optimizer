@@ -123,6 +123,7 @@ jobs:
           fi
           node current/scripts/consumer-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/after" after
           node current/scripts/consumer-header-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/header"
+          node current/scripts/consumer-privacy-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/privacy"
       - name: Verify the complete consumer journey at 375 pixels
         if: ${{ !cancelled() }}
         run: |

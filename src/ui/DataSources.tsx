@@ -26,7 +26,7 @@ export function DataSources() {
   return (
     <div className="min-h-screen bg-page">
       <SiteHeader active="other" />
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <Container className="flex flex-col gap-8 px-4 py-10">
           <section>
             <h1 className="m-0 text-3xl font-bold text-slate-900">Data sources</h1>

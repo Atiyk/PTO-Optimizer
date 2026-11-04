@@ -1,4 +1,5 @@
 import { ExpirationGuard } from './ExpirationGuard';
+import { DeparturePayoutEstimator } from './DeparturePayoutEstimator';
 import { DEFAULT_WORK_WEEK, type WorkWeek } from '@daysoff/engine/solver/types';
 import { cloneElement, isValidElement, useEffect, useId, useMemo, useState, type ReactElement } from 'react';
 import { SiteHeader } from './SiteHeader';
@@ -247,7 +248,7 @@ export function Policy() {
   return (
     <div className="min-h-screen bg-page">
       <SiteHeader active="policy" />
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <Container className="px-4 py-10">
           <h1 className="text-3xl font-bold text-slate-900">Your PTO balance and policy</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
@@ -281,6 +282,7 @@ export function Policy() {
             <QuickForecast policy={policy} requests={ledger.requests} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')} />
           </section>
           <div id="expiration" className="mt-8 scroll-mt-24"><ExpirationGuard policy={policy} country={country} requests={ledger.requests} today={visitDate} onAlertViewed={() => track('expiration_alert_viewed')} onAlertAction={() => track('expiration_alert_action_taken')} /></div>
+          <DeparturePayoutEstimator policy={policy} requests={ledger.requests} />
           <div id="requests" className="mt-8 scroll-mt-24 space-y-4">
             <details className="rounded-xl border border-line bg-surface p-4">
               <summary className="cursor-pointer font-medium text-ink">My request calendar and workweek</summary>

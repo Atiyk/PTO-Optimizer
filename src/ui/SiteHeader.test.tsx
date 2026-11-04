@@ -3,36 +3,57 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { render, fireEvent, cleanup } from '@testing-library/react';
 import { SiteHeader } from './SiteHeader';
 import { Footer } from './Footer';
-import { PRODUCT_NAME, PRODUCT_SHORT_NAME } from '../brand';
 
 afterEach(cleanup);
 
 describe('SiteHeader (redesign Phase 1)', () => {
   const html = renderToStaticMarkup(<SiteHeader active="pto" />);
 
-  it('shows the full and the short product name (CSS picks one by width, no layout shift)', () => {
-    expect(html).toContain(PRODUCT_NAME);
-    expect(html).toContain(PRODUCT_SHORT_NAME);
+  it('uses one strong Gapless wordmark with an accessible full product name', () => {
+    expect(html).not.toContain('aria-label="Gapless PTO Optimizer, home"');
+    expect(html).toMatch(/>Gapless\s*<\/span>/);
+    expect(html).toMatch(/>PTO Optimizer\s*<\/span>/);
   });
 
-  it('uses the D2 nav labels in two labelled groups, with routes unchanged', () => {
+  it('derives the home link name from visible brand text and an unobtrusive home cue', () => {
+    const { getByRole } = render(<SiteHeader active="pto" />);
+    // JSDOM's accessible-name calculator concatenates nested flex spans without
+    // the whitespace supplied by real browser layout. The Playwright header QA
+    // and Lighthouse WCAG 2.5.3 gate assert the exact normalized name in Chromium.
+    const home = getByRole('link', { name: /Gapless.*PTO Optimizer.*home/i });
+    expect(home.getAttribute('href')).toBe('/');
+    expect(home.hasAttribute('aria-label')).toBe(false);
+    expect(home.querySelector('.sr-only')?.textContent?.trim()).toBe('home');
+    expect(home.textContent).toContain('Gapless');
+    expect(home.textContent).toContain('PTO Optimizer');
+  });
+
+  it('uses three flat destinations and one primary PTO action without nested categories', () => {
     for (const [label, href] of [
       ['Plan PTO', '/pto'],
       ['Sabbatical', '/sabbatical'],
-      ['Your policy', '/policy'],
-      ['Glossary', '/glossary'],
+      ['My PTO', '/policy'],
+      ['Learn', '/glossary'],
     ]) {
       expect(html).toContain(`href="${href}"`);
       expect(html).toContain(`>${label}<`);
     }
-    expect(html).toContain('aria-label="Plan"');
-    expect(html).toContain('aria-label="Understand"');
-    expect(html).not.toContain('>PTO Optimizer<');
+    expect(html).toContain('aria-label="Explore"');
+    expect(html).not.toContain('aria-label="Understand"');
+    expect(html).toMatch(/>PTO Optimizer\s*<\/span>/);
     expect(html).not.toContain('>Sabbatical Planning<');
   });
 
+  it('provides an accessible skip-to-main link before the navigation', () => {
+    const html = renderToStaticMarkup(<SiteHeader active="pto" />);
+    expect(html).toContain('href="#main-content"');
+    expect(html).toContain('Skip to main content');
+    expect(html).toContain('focus:not-sr-only');
+    expect(html.indexOf('Skip to main content')).toBeLessThan(html.indexOf('aria-label="Explore"'));
+  });
+
   it('the primary action is a link into the tool, not a submit', () => {
-    expect(html).toMatch(/<a href="\/pto"[^>]*>Plan my time off<\/a>/);
+    expect(html).toMatch(/<a href="\/pto"[^>]*>Plan PTO<\/a>/);
     expect(html).not.toMatch(/type="submit"/);
   });
 
@@ -40,8 +61,8 @@ describe('SiteHeader (redesign Phase 1)', () => {
     expect(html).toMatch(/href="\/pto"[^>]*aria-current="page"/);
   });
 
-  it('reserves a fixed slot for sign-in, empty and hidden from assistive tech', () => {
-    expect(html).toMatch(/data-slot="sign-in" aria-hidden="true"/);
+  it('does not waste header space on unavailable sign-in', () => {
+    expect(html).not.toContain('data-slot="sign-in"');
   });
 
   it('provides visible keyboard focus and 44px mobile navigation targets', () => {
@@ -51,7 +72,7 @@ describe('SiteHeader (redesign Phase 1)', () => {
     expect(menu.className).toContain('min-w-11');
     expect(menu.className).toContain('focus-visible:outline');
     fireEvent.click(menu);
-    for (const label of ['Plan PTO', 'Sabbatical', 'Your policy', 'Glossary']) {
+    for (const label of ['Sabbatical', 'My PTO', 'Learn']) {
       const links = getAllByRole('link', { name: label });
       expect(links.length).toBe(2);
       for (const link of links) {
@@ -59,7 +80,7 @@ describe('SiteHeader (redesign Phase 1)', () => {
       }
       expect(links[1].className).toContain('min-h-11');
     }
-    for (const link of getAllByRole('link', { name: 'Plan my time off' })) {
+    for (const link of getAllByRole('link', { name: 'Plan PTO' })) {
       expect(link.className).toContain('focus-visible:outline');
     }
   });
@@ -82,9 +103,16 @@ describe('SiteHeader (redesign Phase 1)', () => {
 describe('Footer (redesign Phase 1)', () => {
   const html = renderToStaticMarkup(<Footer />);
   it('has Product / Resources / About columns and the D2 tool names', () => {
-    for (const h of ['Product', 'Resources', 'About']) expect(html).toContain(`>${h}</h2>`);
-    for (const l of ['Plan PTO', 'Sabbatical', 'Your policy', 'Glossary', 'FAQ', 'Privacy']) expect(html).toContain(`>${l}<`);
+    for (const h of ['Explore', 'Resources', 'Help &amp; privacy']) expect(html).toContain(`>${h}</h2>`);
+    for (const l of ['Plan PTO', 'Sabbatical', 'My PTO', 'Learn', 'FAQ', 'Privacy', 'Terms of use']) expect(html).toContain(`>${l}<`);
   });
+  it('links directly to the configured feedback address', () => {
+    expect(html).toContain('mailto:atiykahmeed6310@gmail.com?subject=Gapless%20feedback');
+    expect(html).toContain('Contact &amp; feedback');
+    expect(html).not.toContain('formerly');
+    expect(html).toContain('href="/terms.html"');
+  });
+
   it('links to no external product', () => {
     const external = [...html.matchAll(/href="(https?:[^"]+)"/g)].map((m) => m[1]);
     expect(external).toEqual(['https://github.com/Atiyk/PTO-Optimizer/issues']);

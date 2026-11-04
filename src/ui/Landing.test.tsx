@@ -67,6 +67,32 @@ describe('live homepage planner', () => {
     expect(document.querySelector('button[type="submit"]')).toBeNull();
   });
 
+  it('shows a directly visible, keyboard-friendly PTO slider that stays synchronized with the number field', async () => {
+    await act(async () => { render(<Landing />); });
+    const slider = screen.getByRole('slider', { name: 'Adjust PTO days available' });
+    expect(slider.getAttribute('aria-valuetext')).toBe('15 PTO days available');
+    await act(async () => { fireEvent.change(slider, { target: { value: '7' } }); });
+    expect((screen.getByRole('spinbutton', { name: 'PTO days available' }) as HTMLInputElement).value).toBe('7');
+    expect(slider.getAttribute('aria-valuetext')).toBe('7 PTO days available');
+    expect(new URLSearchParams(window.location.search).get('b')).toBe('7');
+    expect(screen.getByRole('heading', { name: 'Make your PTO worth more time away.' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Take the next step with your plan.' })).toBeTruthy();
+  });
+
+  it('provides a mobile quick-edit link from the long result to the live slider', () => {
+    const html = renderToStaticMarkup(<Landing />);
+    expect(html).toContain('href="#landing-budget-slider"');
+    expect(html).toContain('Change PTO days in this preview');
+  });
+
+  it('keeps the full 23-day mobile calendar accessible but collapsed so the controls are nearer the top', () => {
+    const html = renderToStaticMarkup(<Landing />);
+    expect(html).toMatch(/View all \d+ calendar days/);
+    expect(html).toContain('data-testid="home-break-calendar"');
+    expect(html).toContain('sm:hidden');
+    expect(html).toContain('hidden sm:block');
+  });
+
   it('shows explicit empty and invalid-date states while preserving the basic controls', async () => {
     await act(async () => { render(<Landing />); });
     await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '0' } }); });
@@ -74,6 +100,29 @@ describe('live homepage planner', () => {
     await act(async () => { fireEvent.change(screen.getByLabelText('Through'), { target: { value: '2026-01-01' } }); });
     expect(screen.getByRole('alert').textContent).toContain('Choose valid start and end dates');
     expect(screen.getByLabelText('Country')).toBeTruthy();
+  });
+
+  it('displays year-inclusive date summaries for ranges that cross calendar years', async () => {
+    await act(async () => { render(<Landing />); });
+    expect(screen.getByText(/Preview: November 2, 2026 – November 1, 2027\./)).toBeTruthy();
+  });
+
+  it('stacks country and PTO fields at phone widths and provides clear accessible names', () => {
+    const html = renderToStaticMarkup(<Landing />);
+    expect(html).toContain('landing-input-pair grid min-w-0 gap-3');
+    expect(html).toContain('repeat(auto-fit, minmax(min(100%, 16rem), 1fr))');
+    expect(html).toContain('id="landing-country" aria-label="Country"');
+    expect(html).toContain('id="landing-budget" aria-label="PTO days available"');
+  });
+
+  it('keeps planning dates visible and accessible without a hidden disclosure', async () => {
+    await act(async () => { render(<Landing />); });
+    expect(screen.getByRole('group', { name: 'Planning dates' })).toBeTruthy();
+    expect(screen.getByLabelText('From').closest('details')).toBeNull();
+    expect(screen.getByLabelText('Through').closest('details')).toBeNull();
+    expect(document.getElementById('main-content')?.tagName).toBe('MAIN');
+    await act(async () => { fireEvent.change(screen.getByLabelText('Through'), { target: { value: '2027-10-31' } }); });
+    expect(new URLSearchParams(window.location.search).get('e')).toBe('2027-10-31');
   });
 
   it('restores all new homepage inputs and keeps forecasting and policy entry points', async () => {

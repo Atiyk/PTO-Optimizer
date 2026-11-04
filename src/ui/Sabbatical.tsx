@@ -279,7 +279,7 @@ export function Sabbatical() {
         )}
       </div>
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <Container className="flex flex-col gap-8 p-4">
           {/* 1. Best placements. */}
           <section>
