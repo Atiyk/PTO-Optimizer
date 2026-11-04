@@ -25,7 +25,7 @@ try {
     const result = { width, errors, status: 'failed' };
     try {
       await page.goto(new URL('/policy/', base).href, { waitUntil: 'networkidle', timeout: 30000 });
-      await page.getByRole('heading', { name: 'Your PTO balance and policy' }).waitFor();
+      await page.getByRole('heading', { level: 1, name: 'How much PTO will I have, and what am I about to lose?' }).waitFor();
       if (mode === 'before') {
         await page.screenshot({ path: resolve(output, 'policy-payout-before-' + width + '.png'), fullPage: true });
         result.status = 'captured';
