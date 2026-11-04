@@ -44,7 +44,7 @@ describe('partner planner controls', () => {
     expect(screen.getByText(/Choose one of these alternatives/)).toBeTruthy();
     expect(screen.getByText(/Gapless does not contact either employer/)).toBeTruthy();
     expect(JSON.stringify(input)).toBe(original);
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Maximize days off together.' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Prioritize days off together.' }));
     expect(new URLSearchParams(window.location.search).get('jp')).toBe('0');
     expect(new URLSearchParams(window.location.search).has('pp')).toBe(true);
   });

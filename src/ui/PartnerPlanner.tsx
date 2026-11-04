@@ -76,7 +76,7 @@ export function PartnerPlanner({ breaks, freeDays, input, minimumBreakLength = 3
           <p className="mt-1 text-sm text-muted">Proposed dates may still need employer approval. Gapless does not contact either employer.</p>
           <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-medium text-ink">
             <input type="checkbox" checked={prioritize} onChange={event => setPrioritize(event.target.checked)} />
-            Maximize days off together.
+            Prioritize days off together.
           </label>
           {prioritize && <>
             <p className="mt-2 text-sm text-muted">Choose one of these alternatives. Each fits your own budget and rules; overlapping options cannot all be booked together.</p>
