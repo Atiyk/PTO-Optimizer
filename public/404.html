@@ -19,55 +19,92 @@
         font-stretch: 75% 100%;
         src: url('/fonts/archivo-latin-var.woff2') format('woff2-variations');
       }
+      /* Arial adjusted to Archivo's metrics, as in src/index.css, so the swap barely moves. */
+      @font-face {
+        font-family: 'Archivo Fallback';
+        src: local('Arial'), local('Liberation Sans'), local('Helvetica Neue'), local('Helvetica');
+        size-adjust: 102%;
+        ascent-override: 86%;
+        descent-override: 21%;
+        line-gap-override: 0%;
+      }
       :root {
+        --font: 'Archivo Variable', 'Archivo Fallback', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
         --page: #f4f4f0;
         --surface: #ffffff;
         --ink: #141414;
         --muted: #56564f;
-        --mark: #dcf763;
       }
       body {
         margin: 0;
-        min-height: 100vh;
-        min-height: 100dvh;
-        display: flex;
-        align-items: center;
         background: var(--page);
         color: var(--ink);
-        font: 16px/1.5 'Archivo Variable', Arial, sans-serif;
+        font-family: var(--font);
+        font-size: 16px;
+        line-height: 1.5;
+        font-variant-numeric: tabular-nums;
         -webkit-font-smoothing: antialiased;
       }
-      ::selection {
-        background: var(--mark);
-        color: var(--ink);
-      }
-      main {
+      .wrap {
         box-sizing: border-box;
         width: 100%;
         max-width: 80rem;
         margin: 0 auto;
-        padding: 3rem 1rem;
+        padding: 0 1rem;
       }
       @media (min-width: 640px) {
-        main {
-          padding: 4rem 1.5rem;
+        .wrap {
+          padding: 0 1.5rem;
         }
       }
-      .code {
-        margin: 0;
-        font-size: clamp(6rem, 3rem + 16vw, 16rem);
-        line-height: 0.8;
+      header {
+        border-bottom: 1px solid #dcdcd5;
+      }
+      header .wrap {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem 1.5rem;
+        min-height: 4rem;
+      }
+      header a {
+        border: 0;
+        background: transparent;
+        padding: 0 0.25rem;
+      }
+      header a:hover {
+        background: transparent;
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+        text-underline-offset: 0.22em;
+      }
+      .home {
+        gap: 0.625rem;
+        margin-left: -0.25rem;
+      }
+      .home span {
+        font-size: 23px;
         font-weight: 800;
         font-stretch: 75%;
-        letter-spacing: -0.03em;
+        letter-spacing: -0.01em;
       }
-      .code span {
-        background: var(--mark);
-        padding: 0 0.06em;
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0 1rem;
+      }
+      nav a {
+        font-weight: 500;
+        color: #56564f;
+      }
+      main.wrap {
+        padding-top: 4rem;
+        padding-bottom: 6rem;
       }
       h1 {
-        margin: 2rem 0 0.75rem;
-        font-size: clamp(2rem, 1.4rem + 2.4vw, 3rem);
+        margin: 0 0 0.75rem;
+        font-size: clamp(2.75rem, 1.6rem + 4.6vw, 5.5rem);
         line-height: 1;
         font-weight: 800;
         font-stretch: 75%;
@@ -98,15 +135,14 @@
         transition: background-color 150ms cubic-bezier(0.23, 1, 0.32, 1), color 150ms cubic-bezier(0.23, 1, 0.32, 1);
       }
       a:hover {
-        background: var(--mark);
+        background: #eaeae4;
       }
       a.primary {
         background: var(--ink);
         color: #fff;
       }
       a.primary:hover {
-        background: var(--mark);
-        color: var(--ink);
+        background: #3a3a35;
       }
       a:focus-visible {
         outline: 2px solid var(--ink);
@@ -120,8 +156,21 @@
     </style>
   </head>
   <body>
-    <main>
-      <p class="code" aria-hidden="true"><span>404</span></p>
+    <header>
+      <div class="wrap">
+        <a class="home" href="/" aria-label="Gapless PTO Optimizer, home">
+          <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect x="1" y="1" width="30" height="30" rx="5" fill="#141414"/><rect x="1" y="11" width="30" height="10" fill="#dcf763"/><rect x="10" y="13" width="5" height="6" rx="0.75" fill="#141414"/><rect x="17" y="13" width="5" height="6" rx="0.75" fill="#141414"/></svg>
+          <span>Gapless</span>
+        </a>
+        <nav aria-label="Main">
+          <a href="/pto">Plan PTO</a>
+          <a href="/sabbatical">Sabbatical</a>
+          <a href="/policy">My PTO</a>
+          <a href="/glossary">Learn</a>
+        </nav>
+      </div>
+    </header>
+    <main class="wrap">
       <h1>Page not found</h1>
       <p>That link may be truncated or out of date. Find your way back to Gapless PTO Optimizer.</p>
       <div class="links">

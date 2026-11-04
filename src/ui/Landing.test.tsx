@@ -84,14 +84,35 @@ describe('live homepage planner', () => {
     expect(screen.getByRole('heading', { name: 'Put your days off on the calendar.' })).toBeTruthy();
   });
 
-  it('draws the recommended break as a schedule of whole weeks, with PTO days named for screen readers', async () => {
+  it('draws every break of the plan on a weekday-aligned year schedule and names each one in words', async () => {
     await act(async () => { render(<Landing />); });
-    const schedule = screen.getByRole('list', { name: /Days in the recommended break/ });
-    const days = schedule.querySelectorAll('li');
-    expect(days.length % 7).toBe(0);
-    expect(schedule.textContent).toContain('PTO day');
-    expect(schedule.className).toContain('grid-cols-7');
-    expect(screen.getByText('Day off in the break')).toBeTruthy();
+    const breaks = screen.getByRole('list', { name: 'Breaks in this plan' });
+    expect(breaks.querySelectorAll('li').length).toBe(Number(/across (\d+) break/.exec(document.body.textContent ?? '')![1]));
+    expect(breaks.textContent).toContain('(longest)');
+    expect(screen.getByText('Day off in a break')).toBeTruthy();
+  });
+
+  it('starts the schedule week on the same day as the planner for the chosen country', async () => {
+    await act(async () => { render(<Landing />); });
+    const header = () => screen.getByRole('figure').querySelector('[aria-hidden="true"].sm\\:grid')!.textContent;
+    expect(header()).toMatch(/^SMTWTFS/);
+    await act(async () => { fireEvent.change(screen.getByLabelText('Country'), { target: { value: 'GB' } }); });
+    expect(header()).toMatch(/^MTWTFSS/);
+  });
+
+  it('uses one label for the primary planner action everywhere on the page', async () => {
+    await act(async () => { render(<Landing />); });
+    const primary = screen.getAllByRole('link', { name: 'See the full plan →' });
+    expect(primary.length).toBe(2);
+    expect(new Set(primary.map((link) => link.getAttribute('href'))).size).toBe(1);
+  });
+
+  it('leaves unmarked root queries to the historic /pto redirect', async () => {
+    // Root links without home=1 are historic optimizer links (index.html redirects them),
+    // so the homepage must not claim them.
+    window.history.replaceState(null, '', '/?c=GB&b=20');
+    await act(async () => { render(<Landing />); });
+    expect((screen.getByRole('spinbutton', { name: 'PTO days available' }) as HTMLInputElement).value).toBe('15');
   });
 
   it('shows explicit empty and invalid-date states while preserving the basic controls', async () => {

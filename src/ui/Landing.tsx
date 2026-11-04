@@ -5,7 +5,6 @@ import { getPreloadedHolidays, type Holiday } from '@daysoff/engine/data/holiday
 import { addDays, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { DEFAULT_WORK_WEEK, type Break } from '@daysoff/engine/solver/types';
 import { formatCardDateRange, formatLong, formatShort, monthShortName } from '@daysoff/engine/calendar/dateFormat';
-import { weekdayName } from '@daysoff/engine/calendar/requestDeadline';
 import { SiteHeader } from './SiteHeader';
 import { Footer } from './Footer';
 import { Container } from './Container';
@@ -22,14 +21,14 @@ import { landingPlanHref, landingSearch, readLandingState, validLandingRange } f
 import { solveConsumer } from '../planning/optimizer';
 import { readEmployerCalendar } from '../personal/employerCalendar';
 import { landingObservedHolidays } from './landingCalendar';
+import { weekStartForCountry } from './locale';
+import { HOLIDAY_DOT } from './colorScheme';
+import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 
 /** A control set inside the sentence: it takes the sentence's own size and weight. */
 const INLINE_FIELD = 'h-[1.45em] min-h-11 rounded-[3px] border border-line-strong bg-surface px-[0.3em] align-baseline font-bold text-ink hover:border-ink';
 const DATE_FIELD = 'h-11 min-w-0 rounded-[3px] border border-line-strong bg-surface px-2.5 text-base font-semibold text-ink hover:border-ink';
 const LINK = 'link-mark inline-flex min-h-11 items-center font-semibold';
-const WEEKDAY_LETTER = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
-const monthName = (iso: string) => formatLong(iso).split(' ')[0];
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 function breakDates(brk: Break): string {
@@ -37,56 +36,92 @@ function breakDates(brk: Break): string {
   return brk.start.slice(0, 4) === brk.end.slice(0, 4) ? `${range}, ${brk.end.slice(0, 4)}` : range;
 }
 
+const SUNDAY_FIRST_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const MONTH_SLOTS = 37; // a month spans at most 37 weekday-aligned columns (6 offset + 31 days)
+
+function nextMonthFirst(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+}
+
+function monthsBetween(start: string, end: string): string[] {
+  const months: string[] = [];
+  let [y, m] = start.split('-').map(Number);
+  const last = end.slice(0, 7);
+  for (;;) {
+    const key = `${y}-${String(m).padStart(2, '0')}`;
+    months.push(key);
+    if (key >= last) return months;
+    m += 1;
+    if (m === 13) { m = 1; y += 1; }
+  }
+}
+
 /**
- * The recommended break as a printed schedule: whole weeks from the Monday before it to the
- * Sunday after it, the run of days off swiped with the marker and each PTO day an ink block.
- * One row on wide screens, a seven-column week grid on phones (no sideways scroll). Category
- * is carried by shape and words too (legend, per-day screen-reader text, holiday ring).
+ * The whole plan as a printed year schedule: one row per month, days aligned under the same
+ * weekday columns (week start as on /pto: Sunday for US/CA/JP, Monday elsewhere), every
+ * break of the plan swiped with the marker and each PTO day an ink block. The holiday dot is
+ * the planner's own. The grid is a picture (aria-hidden); the visible list beneath it names
+ * every break in words, so nothing depends on colour or on seeing the grid.
  */
-function BreakSchedule({ brk, holidayName }: { brk: Break; holidayName: ReadonlyMap<string, string> }) {
-  const first = addDays(brk.start, -mondayIndexedDow(brk.start));
-  const last = addDays(brk.end, 6 - mondayIndexedDow(brk.end));
-  const days = rangeISO(first, last);
-  const inBreak = new Set(brk.days);
-  const columns = days.length > 42 ? 14 : days.length;
-  const sameMonth = first.slice(0, 7) === last.slice(0, 7);
-  const title = sameMonth
-    ? `${monthName(first)} ${first.slice(0, 4)}`
-    : `${monthName(first)}${first.slice(0, 4) === last.slice(0, 4) ? '' : ` ${first.slice(0, 4)}`} – ${monthName(last)} ${last.slice(0, 4)}`;
-  const breakHolidays = brk.days.filter((date) => holidayName.has(date));
+function PlanYear({ breaks, best, rangeStart, rangeEnd, holidayName, weekStart }: {
+  breaks: Break[]; best: Break; rangeStart: string; rangeEnd: string;
+  holidayName: ReadonlyMap<string, string>; weekStart: WeekStart;
+}) {
+  const offDays = new Set<string>();
+  const ptoDays = new Set<string>();
+  for (const brk of breaks) {
+    for (const date of brk.days) {
+      offDays.add(date);
+      if (!holidayName.has(date) && mondayIndexedDow(date) < 5) ptoDays.add(date);
+    }
+  }
+  const months = monthsBetween(rangeStart, rangeEnd);
+  const half = months.length > 6 ? Math.ceil(months.length / 2) : months.length;
+  const columns = [months.slice(0, half), months.slice(half)].filter((group) => group.length > 0);
+  const chronological = breaks.slice().sort((a, b) => a.start.localeCompare(b.start));
+  const slotStyle = { gridTemplateColumns: `2.75rem repeat(${MONTH_SLOTS}, minmax(0, 1fr))` } as CSSProperties;
+
+  const block = (group: string[]) => <div key={group[0]} className="min-w-0">
+    <div aria-hidden="true" className="mb-1 hidden text-center text-xs text-muted sm:grid" style={slotStyle}>
+      <span />
+      {Array.from({ length: MONTH_SLOTS }, (_, i) => <span key={i}>{SUNDAY_FIRST_LETTERS[(weekStart + i) % 7]}</span>)}
+    </div>
+    <div aria-hidden="true" className="grid gap-y-[3px]">
+      {group.map((month) => {
+        const first = `${month}-01`;
+        const offset = (mondayIndexedDow(first) + (weekStart === 0 ? 1 : 0)) % 7;
+        const days = rangeISO(first, addDays(nextMonthFirst(month), -1));
+        return <div key={month} className="grid items-center" style={slotStyle}>
+          <span className="text-xs font-semibold text-ink">{monthShortName(first)}{month.endsWith('-01') || month === months[0] ? ` ’${month.slice(2, 4)}` : ''}</span>
+          {days.map((date, index) => {
+            const inRange = date >= rangeStart && date <= rangeEnd;
+            const tone = !inRange ? 'bg-transparent' : ptoDays.has(date) ? 'bg-ink' : offDays.has(date) ? 'bg-mark' : mondayIndexedDow(date) >= 5 ? 'bg-surface-alt' : 'bg-page';
+            return <span key={date} className={`relative h-5 lg:h-6 ${tone}`} style={index === 0 ? { gridColumnStart: offset + 2 } : undefined}>
+              {inRange && holidayName.has(date) && <span className={`absolute bottom-0.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${HOLIDAY_DOT}`} />}
+            </span>;
+          })}
+        </div>;
+      })}
+    </div>
+  </div>;
 
   return <figure className="min-w-0 rounded-[4px] bg-surface p-3 sm:p-5">
     <figcaption className="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-      <span className="text-h2 font-bold type-condensed">{title}</span>
+      <span className="text-h2 font-bold type-condensed">Every break in this plan</span>
       <span className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
         <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="size-3.5 bg-ink" />PTO day</span>
-        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-3.5 w-6 bg-mark" />Day off in the break</span>
-        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="size-2 rounded-full border-[1.5px] border-ink" />Public holiday</span>
+        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-3.5 w-6 bg-mark" />Day off in a break</span>
+        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="size-3.5 bg-surface-alt" />Weekend</span>
+        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${HOLIDAY_DOT}`} />Public holiday</span>
       </span>
     </figcaption>
-    <ol aria-label={`Days in the recommended break, ${formatLong(brk.start)} to ${formatLong(brk.end)}`}
-      className="grid list-none grid-cols-7 gap-y-1.5 p-0 lg:[grid-template-columns:var(--strip-cols)]"
-      style={{ '--strip-cols': `repeat(${columns}, minmax(0, 1fr))` } as CSSProperties}>
-      {days.map((date, index) => {
-        const off = inBreak.has(date);
-        const holiday = holidayName.has(date);
-        const pto = off && !holiday && mondayIndexedDow(date) < 5;
-        const dayNumber = Number(date.slice(8));
-        const topLabel = index > 0 && dayNumber === 1 ? monthShortName(date) : WEEKDAY_LETTER[mondayIndexedDow(date)];
-        const category = pto ? 'PTO day' : off ? (holiday ? `public holiday, ${holidayName.get(date)}` : 'weekend, day off') : holiday ? `public holiday, ${holidayName.get(date)}` : 'not in the break';
-        const tone = pto ? 'bg-ink text-white' : off ? 'bg-mark text-ink' : 'text-muted';
-        return <li key={date} title={holiday ? holidayName.get(date) : undefined}
-          className={`flex h-14 min-w-0 flex-col items-center justify-center ${tone} ${off && !inBreak.has(addDays(date, -1)) ? 'rounded-l-[3px]' : ''} ${off && !inBreak.has(addDays(date, 1)) ? 'rounded-r-[3px]' : ''}`}>
-          <span aria-hidden="true" className={`text-xs ${pto ? 'text-white/75' : off ? 'text-ink/70' : ''}`}>{topLabel}</span>
-          <span aria-hidden="true" className="text-lg leading-6 font-bold type-condensed tabular-nums">{dayNumber}</span>
-          <span aria-hidden="true" className={`size-1.5 rounded-full border-[1.5px] ${holiday ? 'border-current' : 'border-transparent'}`} />
-          <span className="sr-only">{formatLong(date)}: {category}</span>
-        </li>;
-      })}
+    <div className="grid gap-x-12 gap-y-4 lg:grid-cols-2">{columns.map(block)}</div>
+    <ol aria-label="Breaks in this plan" className="mt-5 grid list-none gap-x-8 gap-y-1 p-0 text-base text-ink sm:grid-cols-2 lg:grid-cols-3">
+      {chronological.map((brk) => <li key={brk.id}>
+        <span className="font-semibold">{breakDates(brk)}</span>: {brk.totalDaysOff} days off for {plural(brk.ptoCost, 'PTO day')}{brk.id === best.id ? ' (longest)' : ''}
+      </li>)}
     </ol>
-    {breakHolidays.length > 0 && <p className="mt-4 text-sm text-muted">
-      {breakHolidays.map((date, index) => <span key={date}>{index > 0 && '; '}<span className="font-semibold text-ink">{holidayName.get(date)}</span>, {weekdayName(date)} {formatShort(date)}</span>)}
-    </p>}
   </figure>;
 }
 
@@ -156,7 +191,7 @@ export function Landing() {
       {/* First screen: what this is, the sentence that drives it, the answer, the schedule. */}
       <Container className="px-4 pt-7 sm:px-6 sm:pt-12 lg:pt-14">
         <section aria-labelledby="landing-heading">
-          <h1 id="landing-heading" className="max-w-[17ch] text-[clamp(2.5rem,0.6rem+7.6vw,7.5rem)] leading-[0.92] type-display text-ink">More days off from the same PTO.</h1>
+          <h1 id="landing-heading" className="max-w-[17ch] text-[clamp(2.5rem,1rem+5vw,6rem)] leading-[0.92] type-display text-ink">More days off from the same PTO.</h1>
 
           <div className="mt-6 grid min-w-0 gap-x-14 gap-y-6 sm:mt-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
             <p className="min-w-0 text-[1.625rem] leading-[1.6] font-semibold type-condensed text-ink sm:text-[2.125rem] lg:col-start-1 lg:row-start-1">
@@ -165,13 +200,10 @@ export function Landing() {
                 className={`${INLINE_FIELD} w-[2.6em] text-center tabular-nums`} value={budget}
                 onChange={(event) => update({ budget: Math.max(0, Math.min(60, Math.round(Number(event.target.value) || 0))) })} />
               {' '}PTO days in{' '}
-              <span className="relative inline-block max-w-full align-baseline">
-                <select id="landing-country" aria-label="Country" className={`${INLINE_FIELD} max-w-full appearance-none pr-[1.1em] [field-sizing:content]`} value={country}
-                  onChange={(event) => update({ country: event.target.value })}>
-                  {COUNTRIES.map((entry) => <option key={entry.code} value={entry.code}>{entry.name}</option>)}
-                </select>
-                <svg aria-hidden="true" viewBox="0 0 10 6" className="pointer-events-none absolute top-1/2 right-[0.3em] w-[0.42em] -translate-y-1/2"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" /></svg>
-              </span>.
+              <select id="landing-country" aria-label="Country" className="select-ink h-[1.45em] max-w-full align-baseline font-bold [field-sizing:content]" value={country}
+                onChange={(event) => update({ country: event.target.value })}>
+                {COUNTRIES.map((entry) => <option key={entry.code} value={entry.code}>{entry.name}</option>)}
+              </select>.
             </p>
 
             <section aria-labelledby="landing-result" className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-1">
@@ -213,7 +245,7 @@ export function Landing() {
           </div>
 
           <div className="mt-8 sm:mt-10">
-            {bestBreak && <BreakSchedule brk={bestBreak} holidayName={holidayName} />}
+            {bestBreak && plan && <PlanYear breaks={plan.result.primary} best={bestBreak} rangeStart={rangeStart} rangeEnd={rangeEnd} holidayName={holidayName} weekStart={weekStartForCountry(country)} />}
             <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-8 gap-y-1">
               <p className="max-w-3xl text-sm text-muted">Preview assumes a Monday–Friday workweek. {customizedHolidays ? 'Your saved employer holiday calendar is applied' : 'National public holidays are assumed to be observed by your employer'}{employer.custom.length > 0 ? ', including additional company days off' : ''}. Calendar days off include weekends, observed holidays, and PTO days.</p>
               <a href={href} className={`${LINK} text-sm`}>Customize workweek and employer holidays →</a>
@@ -223,18 +255,12 @@ export function Landing() {
         </section>
       </Container>
 
-      {/* What the rest of Gapless does: one large tool, then the others as a reading list. */}
-      <Container className="px-4 pt-24 sm:px-6 lg:pt-36">
-        <section aria-labelledby="landing-tools" className="grid gap-x-16 gap-y-10 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]">
-          <div className="min-w-0">
+      {/* What the rest of Gapless does: the heading and the tracking tools on one side, the
+          planner set large on the other, so neither column runs out before the other. */}
+      <Container className="px-4 pt-20 sm:px-6 lg:pt-28">
+        <section aria-labelledby="landing-tools" className="grid gap-x-16 gap-y-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+          <div className="flex min-w-0 flex-col gap-8">
             <h2 id="landing-tools" className="max-w-[16ch] text-h1 type-display text-ink">Plan the breaks, then keep track of the days.</h2>
-            <div className="mt-8 rounded-[4px] bg-surface p-6 sm:p-9">
-              <h3 className="text-display-sm type-display text-ink">Plan PTO</h3>
-              <p className="mt-3 max-w-md text-lg text-ink">Find longer vacations and useful long weekends around the dates that work for you. Pin the days you want, rule out the ones you can’t, then add the plan to your calendar or copy a request.</p>
-              <a href={href} className={`${LINK} mt-4 text-lg`}>Explore my plan →</a>
-            </div>
-          </div>
-          <div className="flex min-w-0 flex-col gap-10 lg:pt-28">
             <div>
               <h3 className="text-h2 font-bold type-condensed text-ink">Track my PTO balance</h3>
               <p className="mt-2 max-w-md text-base text-ink">See what you could have available by a future date, including planned leave, and set reminders before days expire.</p>
@@ -245,9 +271,16 @@ export function Landing() {
               <p className="mt-2 max-w-md text-base text-ink">Make sense of accrual, carryover, and deadlines before your days slip away.</p>
               <a className={LINK} href="/policy">Check my policy →</a>
             </div>
-            <div className="rounded-[4px] bg-surface-alt p-5 sm:p-6">
+          </div>
+          <div className="flex min-w-0 flex-col gap-4">
+            <div className="rounded-[4px] bg-surface p-6 sm:p-9">
+              <h3 className="text-display-sm type-display text-ink">Plan PTO</h3>
+              <p className="mt-3 max-w-lg text-lg text-ink">Find longer vacations and useful long weekends around the dates that work for you. Pin the days you want, rule out the ones you can’t, then add the plan to your calendar or copy a request.</p>
+              <a href={href} className={`${LINK} mt-2 text-lg`}>Explore my plan →</a>
+            </div>
+            <div className="rounded-[4px] bg-surface-alt p-6 sm:p-9">
               <h3 className="text-h2 font-bold type-condensed text-ink">Planning something bigger?</h3>
-              <p className="mt-2 max-w-md text-base text-ink">Find where a sabbatical lands best and what each extra PTO day adds to it. New to the terms? The guides explain accrual, carryover, and payout in plain language.</p>
+              <p className="mt-2 max-w-lg text-base text-ink">Find where a sabbatical lands best and what each extra PTO day adds to it. New to the terms? The guides explain accrual, carryover, and payout in plain language.</p>
               <div className="flex flex-wrap gap-x-6">
                 <a href="/sabbatical" className={LINK}>Explore sabbatical planning →</a>
                 <a href="/glossary" className={LINK}>Read the guides →</a>
@@ -258,7 +291,7 @@ export function Landing() {
       </Container>
 
       {/* The holidays ahead, set as a timetable rather than a wall of cards. */}
-      <Container className="px-4 pt-24 sm:px-6 lg:pt-36">
+      <Container className="px-4 pt-20 sm:px-6 lg:pt-28">
         <section aria-labelledby="landing-holidays">
           <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
             <div className="min-w-0">
@@ -271,15 +304,15 @@ export function Landing() {
             {holidays.length > 0 && <Button variant="secondary" onClick={() => downloadHolidaysICS(holidays)}>Download holidays (.ics)</Button>}
           </div>
 
-          {validRange && holidays.length > 0 && <div className="mt-8 min-w-0 rounded-[4px] bg-surface p-4 sm:p-5">
+          {validRange && holidays.length > 0 && <div className="mt-6 min-w-0 rounded-[4px] bg-surface p-4 sm:p-5">
             <YearStrip today={rangeStart} stripEnd={rangeEnd} holidays={holidays} bridgeableHolidayDates={bridgeableDates} />
             <p className="mt-2 text-sm text-muted">Tall marked ticks are holidays that already make a long weekend or sit one PTO day from one. Shaded stretches run eight days or more without a holiday.</p>
           </div>}
 
-          {upcoming.length > 0 ? <ol aria-label={`All ${upcoming.length} upcoming holidays`} className="mt-8 list-none p-0">
+          {upcoming.length > 0 ? <ol aria-label={`All ${upcoming.length} upcoming holidays`} className="mt-6 list-none p-0">
             {upcoming.map((entry) => {
               const bridge = bridges.find((candidate) => candidate.combined.start === entry.run.start || candidate.combined.end === entry.run.end);
-              return <li key={entry.holiday.date} className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-baseline gap-x-4 rounded-[3px] px-3 py-4 odd:bg-surface sm:px-5 sm:grid-cols-[7rem_minmax(0,1fr)_auto] sm:gap-x-8">
+              return <li key={entry.holiday.date} className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-baseline gap-x-4 rounded-[3px] px-3 py-3 odd:bg-surface sm:px-5 sm:grid-cols-[7rem_minmax(0,1fr)_auto] sm:gap-x-8">
                 <p className="text-h2 font-bold type-condensed text-ink tabular-nums">{formatShort(entry.holiday.date)}</p>
                 <div className="min-w-0">
                   <p className="text-lg font-semibold text-ink">{entry.holiday.name}</p>
@@ -293,8 +326,8 @@ export function Landing() {
       </Container>
 
       {/* How it works: a field one tone down, a plain statement, three facts. */}
-      <section aria-labelledby="landing-how" className="mt-24 bg-surface-alt lg:mt-36">
-        <Container className="grid gap-x-16 gap-y-10 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:py-24">
+      <section aria-labelledby="landing-how" className="mt-20 bg-surface-alt lg:mt-28">
+        <Container className="grid gap-x-16 gap-y-10 px-4 py-14 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:py-20">
           <div className="min-w-0">
             <h2 id="landing-how" className="max-w-[12ch] text-display-sm type-display text-ink">Same inputs, same plan.</h2>
             <p className="mt-4 max-w-sm text-lg text-ink">Every setting lives in the link, so a plan reproduces exactly when you open it again or send it on.</p>
@@ -319,7 +352,7 @@ export function Landing() {
       </section>
 
       {/* The close: the visitor's own numbers, and the way into the full planner. */}
-      <Container className="px-4 pt-24 sm:px-6 lg:pt-32">
+      <Container className="px-4 pt-20 sm:px-6 lg:pt-24">
         <section aria-labelledby="landing-close" className="grid items-end gap-x-16 gap-y-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
           <div className="min-w-0">
             <h2 id="landing-close" className="max-w-[14ch] text-display-sm type-display text-ink">Put your days off on the calendar.</h2>
@@ -328,7 +361,7 @@ export function Landing() {
               : 'Start with a plan. Make it yours.'}</p>
           </div>
           <div className="flex min-w-0 flex-col items-start gap-3">
-            <Button href={href}>Plan my time off →</Button>
+            <Button href={href}>See the full plan →</Button>
             <div className="flex flex-wrap items-center gap-x-3">
               <Button variant="quiet" onClick={async () => { const copied = await copyText(new URL(href, window.location.origin).href); setCopyMessage(copied ? 'Link copied.' : 'Could not copy. You can copy the address from your browser.'); }}>Copy this PTO plan</Button>
               {copyMessage && <span role="status" className="text-sm text-muted">{copyMessage}</span>}
