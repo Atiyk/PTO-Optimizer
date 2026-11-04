@@ -512,6 +512,7 @@ export function App() {
                   efficiencyPercentile={state.scores?.efficiency.percentile ?? null}
                   noticePeriodDays={state.noticePeriodDays}
                   onPlanWithPartner={openPartnerPlanner}
+                  planSearch={state.planSearch}
                 /> : <p role="status" className="text-sm text-muted">Check your planning inputs before exporting.</p>}
 
                 {plannable && state.holidaysReady && !state.holidaysDegraded && (

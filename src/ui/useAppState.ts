@@ -1,7 +1,7 @@
 import { getConsumerHolidays as getHolidays, getConsumerHolidaysWithStatus as getHolidaysWithStatus, getConsumerSubdivisionCandidates as getSubdivisionCandidates } from '../personal/consumerHolidays';
 import { SUBDIVISION_NAMES } from '@daysoff/engine/data/countries';
-import { solveLegacyConsumer, planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
-import { previewPinnedDay, solveWithPinFallback, type PinPreview, type PlannerOutcome } from './pinPreview';
+import { planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
+import { previewPinnedDay, type PinPreview, type PlannerOutcome } from './pinPreview';
 import { defaultEmployerCalendar, readEmployerCalendar, saveEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { computeScores } from '@daysoff/engine/solver/solve';
@@ -9,19 +9,21 @@ import { computeMarginalValues } from '@daysoff/engine/solver/marginalValue';
 import type { Alternative, Break, Scores, SolveInput, SolveResult, WorkWeek } from '@daysoff/engine/solver/types';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { getPreloadedHolidays, type Holiday } from '@daysoff/engine/data/holidays';
-import { getStateHolidaysFallback } from '@daysoff/engine/data/usStateHolidays';
 import { geolocateCountry } from './geo';
 import { activeCountryPreset } from '@daysoff/engine/data/countryPresets';
-import { computeQualifyingRuns, isAlternatingFridayOff, type WeekStart } from '@daysoff/engine/calendar/calendarMath';
+import { computeQualifyingRuns, type WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import { weekStartForCountry } from './locale';
 import { mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
-import { readFullStateFromURL, writeFullStateToURL, readOverlapPayloadFromURL, buildOverlapShareURL } from './urlState';
+import { readFullStateFromURL, writeFullStateToURL, readOverlapPayloadFromURL, buildOverlapShareURL, type WriteStateInput } from './urlState';
 import type { DayCategory, ForcedState } from './types';
 import { classifyDay } from './dayCategory';
 import { alternativeForDate as alternativeForDateImpl } from './alternativeForDate';
 import { track } from './analytics';
 import { validateInputs, isSupportedPlanningRange } from './validation';
-import { policyFromLegacyPtoState, toLegacySolverFields } from '../policy/model';
+import { defaultRangeEnd, holidayEntriesFor, stateHolidayCandidatesFor, altFridayOffDatesFor, effectiveOffDaysFor, mustIncludeDaysFor, effectiveBlackoutsFor, effectiveBudgetFor, policyAccrualFieldsFor, buildSolveInput, solvePlan, isSuggestedPtoDay, type HolidayEntry } from '../autopilot/planFromSearch';
+
+export { defaultRangeEnd };
+export type { HolidayEntry };
 
 /** The slider's own stored position while unchecked - also what it falls back to showing
  * (disabled) when "let the solver decide" is checked. The middle of the 1-7 range, so
@@ -31,39 +33,6 @@ const DEFAULT_MANUAL_BREAK_COUNT = 4;
 export function todayISO(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-}
-
-/** Below this many days remaining in the current year, the default range rolls forward to
- * next year's Dec 31 instead - see defaultRangeEnd's own comment for why. */
-const DEFAULT_RANGE_ROLLOVER_DAYS = 21;
-
-/**
- * BUG FOUND (Phase 2): this always returned the CURRENT year's Dec 31, regardless of how
- * close "today" already is to it. Nothing in the solver, holiday fetch, or date-arithmetic
- * layer actually blocks a multi-year range - confirmed directly: a real fiscal-year range
- * (Apr 2027 - Mar 2028) solves and renders correctly today, with holidays fetched for both
- * years. The tool only APPEARED bounded to the current year because of this default: visit
- * the site on, say, December 20th, and the default range is an 11-day sliver with nowhere
- * near enough room to find a real bridge, with no hint that picking a later end date is
- * even useful. Per spec: the highest-value visitor right now has days expiring December
- * 31, so the default should stay THIS year's Dec 31 for as long as that's still a useful
- * planning window, then roll forward to next year's Dec 31 once there's too little of the
- * current year left to plan around.
- */
-export function defaultRangeEnd(todayIso: string): string {
-  const year = Number(todayIso.slice(0, 4));
-  const thisYearEnd = `${year}-12-31`;
-  const daysRemaining = rangeISO(todayIso, thisYearEnd).length - 1; // exclusive of today itself
-  return daysRemaining > DEFAULT_RANGE_ROLLOVER_DAYS ? thisYearEnd : `${year + 1}-12-31`;
-}
-
-function yearsBetween(rangeStart: string, rangeEnd: string): number[] {
-  if (!isSupportedPlanningRange(rangeStart, rangeEnd)) return [];
-  const startYear = Number(rangeStart.slice(0, 4));
-  const endYear = Number(rangeEnd.slice(0, 4));
-  const years: number[] = [];
-  for (let y = startYear; y <= endYear; y++) years.push(y);
-  return years;
 }
 
 function totalDaysOffOf(breaks: { totalDaysOff: number }[]): number {
@@ -128,13 +97,6 @@ export interface PlanSnapshot {
 }
 
 const MAX_PINNED_PLANS = 2;
-
-export interface HolidayEntry {
-  date: string;
-  name: string;
-  source: 'public' | 'custom' | 'state';
-  checked: boolean;
-}
 
 const EMPTY_RESULT: SolveResult = {
     primary: [],
@@ -379,10 +341,7 @@ export function useAppState() {
 
   // Sync the full input state into the shareable URL whenever it changes, so the address
   // bar always reflects a link that reproduces exactly this plan - not just the sliders.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const url = new URL(window.location.href);
-    writeFullStateToURL(url.searchParams, {
+  const urlWriteState: WriteStateInput = useMemo(() => ({
       country,
       subdivision,
       employerCalendar,
@@ -413,9 +372,7 @@ export function useAppState() {
       peakCapStart,
       peakCapEnd,
       peakCapMaxDays,
-    });
-    window.history.replaceState(null, '', url);
-  }, [
+  }), [
     country,
     subdivision,
     employerCalendar,
@@ -447,6 +404,19 @@ export function useAppState() {
     peakCapEnd,
     peakCapMaxDays,
   ]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    writeFullStateToURL(url.searchParams, urlWriteState);
+    window.history.replaceState(null, '', url);
+  }, [urlWriteState]);
+  // F1: just this plan's own parameters (no utm or other stray params from the address
+  // bar) - the query string the live calendar feed re-solves from.
+  const planSearch = useMemo(() => {
+    const params = new URLSearchParams();
+    writeFullStateToURL(params, urlWriteState);
+    return params.toString();
+  }, [urlWriteState]);
 
   // Graceful failure: a network/API failure degrades to cached data (if any was already
   // stored for this country-year) or an empty list - either way the app keeps working with
@@ -486,20 +456,7 @@ export function useAppState() {
     }
     (async () => {
       const withSubdivision = await getHolidays(country, rangeStart, rangeEnd, subdivision);
-      const stateOnly = withSubdivision.filter((h) => h.counties);
-
-      if (country === 'US') {
-        const seen = new Set(stateOnly.map((h) => `${h.date}|${h.name}`));
-        for (const year of yearsBetween(rangeStart, rangeEnd)) {
-          for (const fallback of getStateHolidaysFallback(subdivision, year)) {
-            const key = `${fallback.date}|${fallback.name}`;
-            if (seen.has(key)) continue;
-            if (fallback.date < rangeStart || fallback.date > rangeEnd) continue;
-            seen.add(key);
-            stateOnly.push({ date: fallback.date, nominalDate: fallback.date, name: fallback.name, countryCode: country, counties: [subdivision] });
-          }
-        }
-      }
+      const stateOnly = stateHolidayCandidatesFor(withSubdivision, country, subdivision, rangeStart, rangeEnd);
 
       if (!cancelled) { setStateHolidayCandidates(stateOnly); setRegionalHolidayScope(`${country}|${subdivision}|${rangeStart}|${rangeEnd}`); }
     })();
@@ -526,23 +483,10 @@ export function useAppState() {
   const discoveredSubdivisions = useMemo(() => [...new Set([...discoverSubdivisions(subdivisionCandidates), ...(country === 'US' ? Object.keys(SUBDIVISION_NAMES).filter(code => code.startsWith('US-')) : [])])].sort(), [subdivisionCandidates, country]);
   const holidaysReady = nationalHolidayScope === `${country}|${rangeStart}|${rangeEnd}` && (!subdivision || regionalHolidayScope === `${country}|${subdivision}|${rangeStart}|${rangeEnd}`);
 
-  const holidayEntries: HolidayEntry[] = useMemo(() => {
-    const excluded = new Set(employerCalendar.excluded);
-    const entries = new Map<string, HolidayEntry>();
-    for (const h of nationalHolidays) {
-      const key = `${h.date}|${h.name}`;
-      entries.set(key, { date: h.date, name: h.name, source: 'public', checked: !excluded.has(key) });
-    }
-    for (const h of stateHolidayCandidates) {
-      const key = `${h.date}|${h.name}`;
-      if (!entries.has(key)) entries.set(key, { date: h.date, name: h.name, source: 'state', checked: !excluded.has(key) });
-    }
-    for (const h of employerCalendar.custom) {
-      const key = `${h.date}|${h.name}`;
-      if (!entries.has(key) && h.date >= rangeStart && h.date <= rangeEnd) entries.set(key, { ...h, source: 'custom', checked: !excluded.has(key) });
-    }
-    return [...entries.values()].sort((a, b) => `${a.date}|${a.name}`.localeCompare(`${b.date}|${b.name}`));
-  }, [nationalHolidays, stateHolidayCandidates, employerCalendar, rangeStart, rangeEnd]);
+  const holidayEntries: HolidayEntry[] = useMemo(
+    () => holidayEntriesFor(nationalHolidays, stateHolidayCandidates, employerCalendar, rangeStart, rangeEnd),
+    [nationalHolidays, stateHolidayCandidates, employerCalendar, rangeStart, rangeEnd],
+  );
 
   // A pinned (forced 'include') day is NOT free - it must cost a real PTO day, unlike a
   // holiday. It used to be merged into offDays here, which made the solver treat it as
@@ -552,34 +496,21 @@ export function useAppState() {
   // The 9/80 off-Fridays within the current range - computed and merged exactly like a
   // holiday list (free, no PTO cost), not treated as a weekend via workWeek, since
   // workWeek has no notion of week parity (see calendarMath.ts's own comment).
-  const altFridayOffDates = useMemo(() => {
-    if (!altFridayEnabled || !altFridayStart || !isSupportedPlanningRange(rangeStart, rangeEnd)) return [];
-    return rangeISO(rangeStart, rangeEnd).filter((d) => isAlternatingFridayOff(d, altFridayStart));
-  }, [altFridayEnabled, altFridayStart, rangeStart, rangeEnd]);
-
-  const effectiveOffDays = useMemo(() => {
-    const set = new Set(holidayEntries.filter((h) => h.checked).map((h) => h.date));
-    for (const d of altFridayOffDates) set.add(d);
-    return Array.from(set);
-  }, [holidayEntries, altFridayOffDates]);
-
-  const mustIncludeDays = useMemo(
-    () => Object.entries(forced).filter(([, state]) => state === 'include').map(([date]) => date),
-    [forced],
+  const altFridayOffDates = useMemo(
+    () => altFridayOffDatesFor(altFridayEnabled, altFridayStart, rangeStart, rangeEnd),
+    [altFridayEnabled, altFridayStart, rangeStart, rangeEnd],
   );
 
-  const effectiveBlackouts = useMemo(() => {
-    const set = new Set(blackouts);
-    for (const [date, state] of Object.entries(forced)) {
-      if (state === 'exclude') set.add(date);
-    }
-    return Array.from(set);
-  }, [blackouts, forced]);
+  const effectiveOffDays = useMemo(() => effectiveOffDaysFor(holidayEntries, altFridayOffDates), [holidayEntries, altFridayOffDates]);
+
+  const mustIncludeDays = useMemo(() => mustIncludeDaysFor(forced), [forced]);
+
+  const effectiveBlackouts = useMemo(() => effectiveBlackoutsFor(blackouts, forced), [blackouts, forced]);
 
   // Phase 3.1: reserve days are subtracted from the budget before the solver ever sees it -
   // a plain subtraction, not new solver logic. Clamped at 0 (reserving more than the whole
   // balance just means nothing is planned, not a negative budget).
-  const effectiveBudget = Math.max(0, budget - reserveDays);
+  const effectiveBudget = effectiveBudgetFor(budget, reserveDays);
 
   // Feature 1 Stage 2A follow-through: routed through the shared policy model
   // (src/policy/model.ts) instead of this file's own parallel ternary logic, so /policy and
@@ -589,31 +520,34 @@ export function useAppState() {
   // preference. Equivalence with the old ternary logic, for every combination of these
   // fields, is locked down by src/ui/pto-policy-regression.test.ts.
   const policyAccrualFields = useMemo(
-    () => toLegacySolverFields(policyFromLegacyPtoState({ budget, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap, rangeStart }), rangeStart),
+    () => policyAccrualFieldsFor({ budget, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap, rangeStart }),
     [budget, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap, rangeStart],
   );
 
   const solveInput: SolveInput = useMemo(
-    () => ({
-      offDays: effectiveOffDays,
+    () => buildSolveInput({
+      effectiveOffDays,
+      mustIncludeDays,
+      effectiveBlackouts,
+      effectiveBudget,
       rangeStart,
       rangeEnd,
-      budget: effectiveBudget,
-      accrualPerMonth: policyAccrualFields.accrualPerMonth,
-      expiryDate: policyAccrualFields.expiryDate,
-      carryoverCap: policyAccrualFields.carryoverCap,
-      blackouts: effectiveBlackouts,
-      mustIncludeDays,
+      budget,
+      accrualEnabled,
+      accrualPerMonth,
+      expiryEnabled,
+      expiryDate,
+      carryoverCap,
       overlapDays,
       workWeek,
       country,
       w,
       breakCount,
-      peakCap:
-        peakCapEnabled && peakCapStart && peakCapEnd
-          ? { enabled: true, startDate: peakCapStart, endDate: peakCapEnd, maxDays: peakCapMaxDays }
-          : undefined,
-    }),
+      peakCapEnabled,
+      peakCapStart,
+      peakCapEnd,
+      peakCapMaxDays,
+    }, policyAccrualFields),
     [
       effectiveOffDays,
       mustIncludeDays,
@@ -658,7 +592,7 @@ export function useAppState() {
     try {
       // Pinned days that cannot sit inside the minimum break no longer collapse the whole
       // plan: the minimum is set aside for that plan and App says so (see pinPreview.ts).
-      const outcome = planningVersion === 2 ? solveWithPinFallback(solveInput, { minimumBreakDays, style: planningStyle }) : solveLegacyConsumer(solveInput);
+      const outcome = solvePlan(solveInput, planningVersion, minimumBreakDays, planningStyle);
       lastGoodResultRef.current = outcome.result;
       return outcome;
     } catch {
@@ -802,13 +736,8 @@ export function useAppState() {
   // pinned in - either is "a day you're taking," the thing that makes a run "qualify" for
   // a band, as opposed to a weekend or holiday nobody spent PTO on.
   const isSuggestedPto = useCallback(
-    (iso: string) => {
-      if (blackoutSet.has(iso)) return false;
-      if (forced[iso] === 'include') return true;
-      const wasOff = baseOffSet.has(iso) || isWeekendDay(iso);
-      return !wasOff && chosenDaySet.has(iso);
-    },
-    [blackoutSet, forced, baseOffSet, isWeekendDay, chosenDaySet],
+    (iso: string) => isSuggestedPtoDay(iso, { blackoutSet, forced, baseOffSet, workWeek, chosenDaySet }),
+    [blackoutSet, forced, baseOffSet, workWeek, chosenDaySet],
   );
 
   const offRuns = useMemo(
@@ -1022,6 +951,7 @@ export function useAppState() {
     relaxedMinimum: solved.relaxedMinimum,
     previewPin,
     solveInput,
+    planSearch,
     planningVersion,
     planningStyle,
     setPlanningStyle,

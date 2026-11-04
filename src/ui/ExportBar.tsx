@@ -8,6 +8,7 @@ import { copyText } from './requestText';
 import { track } from './analytics';
 import { DEFAULT_SITE_HOST } from './siteUrl';
 import { buttonClasses } from './Button';
+import { SubscribeFeed } from './SubscribeFeed';
 
 interface ExportBarProps {
   breaks: Break[];
@@ -27,6 +28,9 @@ interface ExportBarProps {
   /** Opens the "Plan with someone" panel, where the person chooses which dates to share
    * and confirms them before any link is made (no link is copied from here). */
   onPlanWithPartner: () => void;
+  /** F1: this plan's own query string (useAppState's planSearch); shows the live calendar
+   * feed links when given. */
+  planSearch?: string;
 }
 
 export interface ActionResult {
@@ -185,6 +189,7 @@ export function ExportBar(props: ExportBarProps) {
           </span>
         )}
       </label>
+      {props.planSearch !== undefined && <SubscribeFeed planSearch={props.planSearch} />}
     </div>
   );
 }
