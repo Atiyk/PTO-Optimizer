@@ -245,3 +245,58 @@ describe('parseICSBusyDays: bounded and fail-closed school/personal imports', ()
     ))).busyDays).toEqual([]);
   });
 });
+
+
+describe('parseICSBusyDays: time-zone aware event boundaries', () => {
+  it('does not overblock an exclusive midnight DTEND on a two-day UTC timed event', () => {
+    const ics = wrapCalendar(event('DTSTART:20261219T000000Z\r\nDTEND:20261221T000000Z'));
+    expect(parseICSBusyDays(ics).busyDays).toEqual(['2026-12-19', '2026-12-20']);
+  });
+
+  it('does not overblock midnight when a timed DURATION ends at midnight', () => {
+    const ics = wrapCalendar(event('DTSTART:20261219T000000Z\r\nDURATION:P1D'));
+    expect(parseICSBusyDays(ics).busyDays).toEqual(['2026-12-19']);
+  });
+
+  it('compares seconds precisely at the 24-hour timed-event threshold', () => {
+    const ics = wrapCalendar(event('DTSTART:20261219T090000Z\r\nDTEND:20261220T085959Z'));
+    expect(parseICSBusyDays(ics).busyDays).toEqual([]);
+  });
+
+  it('uses real IANA elapsed hours across spring-forward rather than a 24h wall-clock assumption', () => {
+    const ics = wrapCalendar(event(
+      'DTSTART;TZID=America/New_York:20270313T120000\r\nDTEND;TZID=America/New_York:20270314T120000',
+    ));
+    expect(parseICSBusyDays(ics).busyDays).toEqual([]); // 23 real hours
+  });
+
+  it('counts fall-back across 25 real hours and preserves event-local calendar days', () => {
+    const ics = wrapCalendar(event(
+      'DTSTART;TZID=America/New_York:20271106T120000\r\nDTEND;TZID=America/New_York:20271107T120000',
+    ));
+    expect(parseICSBusyDays(ics).busyDays).toEqual(['2027-11-06', '2027-11-07']);
+  });
+
+  it('fails closed for nonexistent, repeated or unknown IANA times rather than guessing busy days', () => {
+    for (const start of [
+      'DTSTART;TZID=America/New_York:20270314T023000', // spring gap
+      'DTSTART;TZID=America/New_York:20271107T013000', // fall duplicate
+      'DTSTART;TZID=Invalid/Timezone:20270313T120000',
+    ]) {
+      const ics = wrapCalendar(event(start + '\r\nDTEND;TZID=America/New_York:20270315T120000'));
+      expect(() => parseICSBusyDays(ics)).toThrow(IcsParseError);
+    }
+  });
+
+  it('fails closed for mismatched UTC and TZID endpoints', () => {
+    const ics = wrapCalendar(event(
+      'DTSTART;TZID=America/New_York:20270313T120000\r\nDTEND:20270314T160000Z',
+    ));
+    expect(() => parseICSBusyDays(ics)).toThrow(IcsParseError);
+  });
+
+  it('continues to support wall-clock floating DTSTART and DTEND without inventing a time zone', () => {
+    const ics = wrapCalendar(event('DTSTART:20261219T090000\r\nDTEND:20261220T090000'));
+    expect(parseICSBusyDays(ics).busyDays).toEqual(['2026-12-19', '2026-12-20']);
+  });
+});

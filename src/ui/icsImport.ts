@@ -69,27 +69,95 @@ function parseLine(line: string): RawProp | null {
 }
 
 interface DateTimeValue {
-  date: string; // YYYY-MM-DD
+  date: string;
   isAllDay: boolean;
-  minutesOfDay: number; // 0 for an all-day value
+  minutesOfDay: number;
+  secondsOfDay: number;
+  /** UTC for Z timestamps, IANA TZID when specified, otherwise floating time. */
+  zone: string | null;
+  instantMs: number | null;
 }
 
-/** Reads local date and wall-clock time from DTSTART/DTEND. TZID and UTC offset
- * conversion are NOT implemented: across DST or mixed zones a timed event near
- * the 24-hour threshold can be misclassified. Callers must disclose partial
- * coverage; all-day VALUE=DATE spans are handled as date-only intervals. */
+function utcWallMillis(date: string, h: number, m: number, sec: number): number {
+  const result = new Date(0);
+  result.setUTCFullYear(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)));
+  result.setUTCHours(h, m, sec, 0);
+  return result.getTime();
+}
+
+interface WallParts { date: string; hours: number; minutes: number; seconds: number }
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+function zonedWallParts(ms: number, tzid: string): WallParts {
+  let formatter = formatters.get(tzid);
+  if (!formatter) {
+    try {
+      formatter = new Intl.DateTimeFormat('en-US-u-nu-latn', {
+        timeZone: tzid, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+      });
+    } catch {
+      throw new IcsParseError('Calendar has an unsupported time zone. Use an IANA time zone or export as all-day.');
+    }
+    formatters.set(tzid, formatter);
+  }
+  const parts = Object.fromEntries(formatter.formatToParts(ms).map(p => [p.type, p.value]));
+  const date = [parts.year, parts.month, parts.day].join('-');
+  const hours = Number(parts.hour), minutes = Number(parts.minute), seconds = Number(parts.second);
+  if (!validCalendarDate(date) || !Number.isInteger(hours) || !Number.isInteger(minutes) || !Number.isInteger(seconds)) {
+    throw new IcsParseError('Calendar contains an unsupported zoned date-time.');
+  }
+  return { date, hours, minutes, seconds };
+}
+
+/** Convert civil IANA date-times to exactly one actual instant. Explicitly
+ * reject nonexistent or repeated local hours at DST boundaries, rather than
+ * silently blocking the wrong day. */
+function zonedInstantMs(date: string, hours: number, minutes: number, seconds: number, zone: string): number {
+  const nominal = utcWallMillis(date, hours, minutes, seconds);
+  const candidates = new Set<number>();
+  for (const delta of [-2, 0, 2]) {
+    const sample = nominal + delta * 86400000;
+    const p = zonedWallParts(sample, zone);
+    const offset = utcWallMillis(p.date, p.hours, p.minutes, p.seconds) - sample;
+    const instant = nominal - offset;
+    const w = zonedWallParts(instant, zone);
+    if (w.date === date && w.hours === hours && w.minutes === minutes && w.seconds === seconds) {
+      candidates.add(instant);
+    }
+  }
+  if (candidates.size !== 1) {
+    throw new IcsParseError('Calendar contains a nonexistent or ambiguous DST time. Review this event manually.');
+  }
+  return [...candidates][0];
+}
+
+function wallAtInstant(ms: number, zone: string | null): WallParts {
+  if (zone && zone !== 'UTC') return zonedWallParts(ms, zone);
+  const d = new Date(ms);
+  return { date: d.toISOString().slice(0, 10), hours: d.getUTCHours(), minutes: d.getUTCMinutes(), seconds: d.getUTCSeconds() };
+}
+
 function parseDateTimeValue(prop: RawProp): DateTimeValue | null {
-  const m = prop.value.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})Z?)?$/);
+  const m = prop.value.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$/);
   if (!m) return null;
-  const date = `${m[1]}-${m[2]}-${m[3]}`;
+  const date = [m[1], m[2], m[3]].join('-');
   if (!validCalendarDate(date)) return null;
   const hasTime = m[4] !== undefined;
+  const rawTz = prop.params.TZID?.replace(/^"|"$/g, '') ?? null;
   if ((prop.params.VALUE === 'DATE' && hasTime)
     || (prop.params.VALUE === 'DATE-TIME' && !hasTime)
+    || (!hasTime && rawTz)
+    || (rawTz && m[7])
     || (hasTime && (Number(m[4]) > 23 || Number(m[5]) > 59 || Number(m[6]) > 59))) return null;
-  const isAllDay = !hasTime;
-  const minutesOfDay = hasTime ? Number(m[4]) * 60 + Number(m[5]) : 0;
-  return { date, isAllDay, minutesOfDay };
+  const hours = hasTime ? Number(m[4]) : 0;
+  const minutes = hasTime ? Number(m[5]) : 0;
+  const seconds = hasTime ? Number(m[6]) : 0;
+  const zone = hasTime ? (m[7] ? 'UTC' : rawTz) : null;
+  const instantMs = !hasTime ? null
+    : zone && zone !== 'UTC' ? zonedInstantMs(date, hours, minutes, seconds, zone)
+      : utcWallMillis(date, hours, minutes, seconds);
+  return { date, isAllDay: !hasTime, minutesOfDay: hours * 60 + minutes, secondsOfDay: seconds, zone, instantMs };
 }
 
 /** Crude RFC 5545 DURATION parser (PnDTnHnMnS) - only the whole-days/hours/minutes this
@@ -102,11 +170,7 @@ function parseDurationMinutes(value: string): number | null {
   const days = Number(m[1] || 0);
   const hours = Number(m[2] || 0);
   const mins = Number(m[3] || 0);
-  return days * 1440 + hours * 60 + mins;
-}
-
-function totalMinutes(date: string, minutesOfDay: number): number {
-  return isoToSerial(date) * 1440 + minutesOfDay;
+  return days * 1440 + hours * 60 + mins + Number(m[4] || 0) / 60;
 }
 
 /** Guard BEFORE expanding ranges; an imported file must never freeze the browser. */
@@ -189,14 +253,20 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
       return;
     }
 
-    // Timed event: only counts once its real duration is known and is >= 24 hours.
+    // Timed spans use real elapsed time with UTC/IANA DST awareness.
+    // DTEND is exclusive: midnight on the next day does not block that day.
     let durationMinutes: number | null = null;
     let endDateForSpan: string | null = null;
+    let exclusiveMidnightEnd = false;
     if (dtendProp) {
       const end = parseDateTimeValue(dtendProp);
       if (!end || end.isAllDay) throw new IcsParseError('Calendar event has an invalid timed end date.');
-      durationMinutes = totalMinutes(end.date, end.minutesOfDay) - totalMinutes(start.date, start.minutesOfDay);
+      if (start.zone !== end.zone) {
+        throw new IcsParseError('Calendar event has mismatched time zones. Export matching start/end times or review manually.');
+      }
+      durationMinutes = (end.instantMs! - start.instantMs!) / 60000;
       endDateForSpan = end.date;
+      exclusiveMidnightEnd = end.minutesOfDay === 0 && end.secondsOfDay === 0;
     } else if (durationValue) {
       durationMinutes = parseDurationMinutes(durationValue);
       if (durationMinutes !== null) {
@@ -204,15 +274,19 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
           || durationMinutes > (MAX_IMPORT_SPAN_DAYS + 1) * 1440) {
           throw new IcsParseError('Calendar event has an invalid or excessive timed duration.');
         }
-        endDateForSpan = addDays(start.date, Math.floor(durationMinutes / 1440));
+        const localEnd = wallAtInstant(start.instantMs! + durationMinutes * 60000, start.zone);
+        endDateForSpan = localEnd.date;
+        exclusiveMidnightEnd = localEnd.hours === 0 && localEnd.minutes === 0 && localEnd.seconds === 0;
       }
     }
     if (durationMinutes !== null && (!Number.isFinite(durationMinutes) || durationMinutes < 0)) {
       throw new IcsParseError('Calendar event has an invalid timed date range.');
     }
-    if (durationMinutes === null || durationMinutes < 24 * 60) return; // unknown or short - ignore
-
-    const lastDay = endDateForSpan && endDateForSpan > start.date ? endDateForSpan : start.date;
+    if (durationMinutes === null || durationMinutes < 1440) return;
+    if (!endDateForSpan) return;
+    const lastDay = endDateForSpan > start.date
+      ? (exclusiveMidnightEnd ? addDays(endDateForSpan, -1) : endDateForSpan)
+      : start.date;
     addBoundedDays(busy, start.date, lastDay);
   }
 

@@ -58,6 +58,16 @@ describe('ImportCalendar', () => {
     expect(onImportBusyDays).not.toHaveBeenCalled();
   });
 
+  it('lets users inspect exact blocked dates and explains time-zone handling before Add', async () => {
+    const { onImportBusyDays } = mount();
+    await selectFile(VALID_ICS);
+    expect(container!.textContent).toContain('Review individual dates');
+    expect(container!.textContent).toContain('2026-12-19');
+    expect(container!.textContent).toContain('2026-12-27');
+    expect(container!.textContent).toContain('unsupported or ambiguous time zones are rejected');
+    expect(onImportBusyDays).not.toHaveBeenCalled();
+  });
+
   it('only applies the import once the user clicks Add', async () => {
     const { onImportBusyDays } = mount();
     await selectFile(VALID_ICS);
