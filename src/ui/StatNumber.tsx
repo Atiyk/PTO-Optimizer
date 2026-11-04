@@ -33,16 +33,16 @@ export function StatNumber({
 
   const numeralCls =
     size === 'display'
-      ? 'text-display-sm sm:text-display font-semibold tracking-[-0.03em]'
+      ? 'text-display-sm sm:text-display type-display'
       : size === 'lg'
-        ? 'text-h1 font-semibold tracking-[-0.02em]'
-        : 'text-h2 font-semibold tracking-[-0.01em]';
+        ? 'text-h1 type-display'
+        : 'text-h2 font-bold type-condensed';
 
   return (
     <div className={`flex flex-col ${className}`}>
       <span className="flex items-baseline gap-2 text-ink">
         {prefix && <span className="text-lg font-medium text-muted">{prefix}</span>}
-        <span key={changed} className={`${numeralCls} tabular-nums ${changed ? 'animate-[stat-in_150ms_ease-out]' : ''}`}>
+        <span key={changed} className={`${numeralCls} tabular-nums ${changed ? 'animate-[stat-in_160ms_var(--ease-out)]' : ''}`}>
           {value}
         </span>
         {suffix && <span className="text-lg font-medium text-ink">{suffix}</span>}

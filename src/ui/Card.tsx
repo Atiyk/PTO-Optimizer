@@ -1,9 +1,10 @@
 import type { ElementType, ReactNode } from 'react';
 
 /**
- * Redesign Phase 1: the white surface everything glanceable sits on (Apple Weather-style
- * stack). `eyebrow` is a small label above the content; `as` lets a card be a section or
- * an article for document structure.
+ * 2026-11 redesign: the sheet everything glanceable sits on - white paper one tone above the
+ * page, a hairline edge and no shadow at rest (only things that float get a shadow). `eyebrow`
+ * is kept for API compatibility and now renders as a plain sentence-case caption, not a tracked
+ * uppercase label. `as` lets a card be a section or an article for document structure.
  */
 export function Card({
   children,
@@ -19,8 +20,8 @@ export function Card({
   padded?: boolean;
 }) {
   return (
-    <Tag className={`rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,25,23,0.04)] ${padded ? 'p-5 sm:p-6' : ''} ${className}`}>
-      {eyebrow && <p className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted">{eyebrow}</p>}
+    <Tag className={`rounded-[4px] border border-line bg-surface ${padded ? 'p-5 sm:p-6' : ''} ${className}`}>
+      {eyebrow && <p className="mb-2 text-sm font-semibold text-muted">{eyebrow}</p>}
       {children}
     </Tag>
   );

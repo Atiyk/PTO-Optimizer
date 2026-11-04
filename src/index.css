@@ -7,90 +7,91 @@
 @source not '../packages';
 @source not '../*.md';
 
+
 /*
- * Redesign Phase 1: the Gapless visual system. Warm neutral surfaces with restrained evergreen-teal interaction accents.
+ * Gapless visual system, 2026-11 redesign: "the highlighted schedule".
  *
- * Self-hosted Figtree (variable weight, Latin subset only: ~20 KB, the whole font payload).
- * The file is public/fonts/figtree-latin-wght-normal.woff2, copied unchanged from the
- * @fontsource-variable/figtree package (OFL, licence alongside it) so it has a stable URL
- * every HTML shell can preload - a hashed asset URL can't be preloaded from a static shell.
- * Declared here rather than via the package's own CSS, which would also ship latin-ext.
+ * The world is a printed schedule that someone has gone over with a highlighter: crisp ink on
+ * paper-white, one fluorescent marker for the time that is yours. Ink carries every action and
+ * every PTO day; the marker carries the days-off runs, the result, and text selection. No other
+ * hue exists. Full rationale: docs/DESIGN-SYSTEM.md.
  *
- * 'Figtree Fallback' is Arial resized to Figtree's metrics, so the swap moves nothing
- * (Figtree's advance widths are within 0.2% of Arial's; the overrides match its vertical
- * metrics, 950/250 per 1000 em).
+ * Type: Archivo (Omnibus-Type, OFL), one variable family with a width axis. Condensed heavy
+ * cuts set display lines and figures, the normal width sets UI and reading text. The shipped
+ * file is a Latin subset instanced to wdth 75-100 and wght 400-800 (~47 KB):
+ * public/fonts/archivo-latin-var.woff2, licence alongside it.
+ *
+ * 'Archivo Fallback' is Arial adjusted to Archivo's vertical metrics so the swap barely moves.
  */
 @font-face {
-  font-family: 'Figtree Variable';
+  font-family: 'Archivo Variable';
   font-style: normal;
   font-display: swap;
-  font-weight: 300 900;
-  src: url('/fonts/figtree-latin-wght-normal.woff2') format('woff2-variations');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
-    U+2000-206F, U+20AC, U+2122, U+2190-2199, U+2212, U+2215, U+FEFF, U+FFFD;
+  font-weight: 400 800;
+  font-stretch: 75% 100%;
+  src: url('/fonts/archivo-latin-var.woff2') format('woff2-variations');
+  unicode-range: U+0020-007E, U+00A0-00FF, U+2010-2027, U+2030-203A, U+2190-2193, U+2212, U+20AC, U+2122;
 }
 @font-face {
-  font-family: 'Figtree Fallback';
+  font-family: 'Archivo Fallback';
   src: local('Arial'), local('Liberation Sans'), local('Helvetica Neue'), local('Helvetica');
-  size-adjust: 99.8%;
-  ascent-override: 95.2%;
-  descent-override: 25.05%;
+  size-adjust: 102%;
+  ascent-override: 86%;
+  descent-override: 21%;
   line-gap-override: 0%;
 }
 
 /*
  * Tokens. Every colour used by more than one component is a custom property on :root, so
- * colorScheme.ts and scoreFormat.ts stay the single source of truth without a component
- * forking a value. tokens.test.ts parses THIS block and checks every text/background pair
- * (4.5:1, or 3:1 for UI boundaries), so the numbers below can't drift from the tests.
+ * colorScheme.ts and scoreFormat.ts stay the single source of truth. tokens.test.ts parses
+ * THIS block and checks every text/background pair (4.5:1, or 3:1 for UI boundaries).
  *
- * One accent hue only (deep evergreen teal): suggested PTO, the primary action, focus rings, and
- * the score bars as darker shades of the same hue. The day-off band is a quiet wash behind
- * it. Structured so a dark theme could later redefine these under a media query or a
- * data-theme attribute; none is defined yet.
+ * Token names are kept from the previous system so every component keeps resolving; their
+ * roles changed: --accent is now ink (the action and PTO colour), and the marker lives in
+ * --band-bg / --mark.
  */
 :root {
-  --bg-page: #fbf8f3; /* warm off-white page */
-  --bg-surface: #ffffff; /* cards */
-  --bg-surface-alt: #f5f0e8; /* hover fills, chips */
-  --border-default: #e7e0d5;
-  --border-strong: #8c8279; /* input and control boundaries: 3:1 on surface and page */
-  --text-primary: #1c1917; /* ink */
-  --text-muted: #57534e; /* secondary text */
-  --focus-ring: #14594f;
+  --bg-page: #f4f4f0; /* paper: a neutral off-white, not cream */
+  --bg-surface: #ffffff; /* the sheet */
+  --bg-surface-alt: #eaeae4; /* one tone step down: chips, hover fills, quiet panels */
+  --border-default: #dcdcd5;
+  --border-strong: #86867e; /* control boundaries: 3:1 on page, surface and alt */
+  --text-primary: #141414; /* ink */
+  --text-muted: #56564f; /* pencil */
+  --focus-ring: #141414;
 
-  --accent: #17675d;
-  --accent-hover: #105349;
-  --accent-soft: #e9f3ee;
-  --accent-ink: #14594f; /* accent-coloured text (links, labels) on light backgrounds */
+  --accent: #141414; /* ink is the action colour */
+  --accent-hover: #000000;
+  --accent-soft: #f1fbc4; /* a pale pass of the marker: selected chips, soft highlights */
+  --accent-ink: #141414;
 
-  --pto-bg: #17675d; /* suggested PTO: the strongest thing on the page */
-  --pto-border: #105349;
+  --mark: #dcf763; /* the highlighter */
+  --mark-strong: #c9e83d; /* a second pass of the marker: hover on marked things */
+
+  --pto-bg: #141414; /* suggested PTO: a solid ink block, the strongest thing on the page */
+  --pto-border: #000000;
   --pto-text: #ffffff;
-  /* The day-off run: a quiet wash behind the accent, never competing with it. */
-  --band-bg: #eef4f0;
-  --band-text: #292524;
-  --holiday-dot: #57534e; /* a dot, never colour alone */
-  --weekend-bg: #f5f0e8;
-  --alt-border: #17675d; /* alternative placement outline: same hue, dashed */
+  /* The day-off run: the highlighter swipe. */
+  --band-bg: #dcf763;
+  --band-text: #141414;
+  --holiday-dot: #56564f; /* a ring, never colour alone */
+  --weekend-bg: #eeeee8;
+  --alt-border: #141414; /* alternative placement: the same ink, dashed */
 
-  --score-track: #e7e0d5;
-  --score-1: #17675d;
-  --score-2: #105349;
-  --score-3: #083a33;
+  --score-track: #dcdcd5;
+  --score-1: #141414;
+  --score-2: #0a0a0a;
+  --score-3: #000000;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 
   color-scheme: light;
 }
 
 /*
- * Semantic utility names (bg-page, text-ink, border-line, bg-accent, ...) over the tokens
- * above, plus the type scale and the font.
- *
- * The slate ramp is remapped to a warm neutral ramp: every existing component was written
- * against Tailwind's cool slate greys, and this turns all of them warm in one place without
- * touching their markup (Phase 3 restyles those pages properly). 400 and up all reach 4.5:1
- * on the page, surface, surface-alt and band backgrounds (tokens.test.ts), which also fixes
- * the light-grey footnote text that used to fail contrast.
+ * Semantic utility names (bg-page, text-ink, border-line, bg-accent, bg-mark, ...) over the
+ * tokens above, plus the type scale and the font.
  */
 @theme inline {
   --color-page: var(--bg-page);
@@ -104,45 +105,53 @@
   --color-accent-hover: var(--accent-hover);
   --color-accent-soft: var(--accent-soft);
   --color-accent-ink: var(--accent-ink);
+  --color-mark: var(--mark);
+  --color-mark-strong: var(--mark-strong);
   --color-band: var(--band-bg);
   --color-holiday: var(--holiday-dot);
   --color-weekend: var(--weekend-bg);
 
-  --font-sans: 'Figtree Variable', 'Figtree Fallback', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Archivo Variable', 'Archivo Fallback', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
-  --text-display: 3.5rem;
-  --text-display--line-height: 4rem;
-  --text-display-sm: 2.75rem;
-  --text-display-sm--line-height: 3rem;
-  --text-h1: 2.5rem;
-  --text-h1--line-height: 3rem;
-  --text-h2: 1.75rem;
-  --text-h2--line-height: 2rem;
+  /* Five sizes do the visible work. Display sizes are set condensed (font-stretch 75%). */
+  --text-display: clamp(2.75rem, 1.6rem + 4.6vw, 5.5rem);
+  --text-display--line-height: 0.95;
+  --text-display-sm: clamp(2.25rem, 1.5rem + 3vw, 3.75rem);
+  --text-display-sm--line-height: 1;
+  --text-h1: clamp(1.75rem, 1.4rem + 1.4vw, 2.5rem);
+  --text-h1--line-height: 1.05;
+  --text-h2: 1.5rem;
+  --text-h2--line-height: 1.15;
   --text-body: 1rem;
   --text-body--line-height: 1.5rem;
   --text-small: 0.875rem;
   --text-small--line-height: 1.25rem;
 }
 
+/*
+ * The slate ramp, which most existing markup was written against, is remapped to the pencil
+ * neutrals of this system, so every component turns neutral in one place. 400 and up reach
+ * 4.5:1 on the page, surface, surface-alt, band and weekend backgrounds (tokens.test.ts).
+ */
 @theme {
-  --color-slate-50: #faf7f2;
-  --color-slate-100: #f5f0e8;
-  --color-slate-200: #e7e0d5;
-  --color-slate-300: #d6ccbe;
-  --color-slate-400: #736c66;
-  --color-slate-500: #6b645e;
-  --color-slate-600: #57534e;
-  --color-slate-700: #44403c;
-  --color-slate-800: #292524;
-  --color-slate-900: #1c1917;
-  --color-slate-950: #0c0a09;
+  --color-slate-50: #f7f7f4;
+  --color-slate-100: #eeeee8;
+  --color-slate-200: #dcdcd5;
+  --color-slate-300: #c4c4bc;
+  --color-slate-400: #5f5f58;
+  --color-slate-500: #56564f;
+  --color-slate-600: #4a4a44;
+  --color-slate-700: #36362f;
+  --color-slate-800: #232320;
+  --color-slate-900: #141414;
+  --color-slate-950: #0a0a0a;
 }
 
-/* In the base layer so any component's own utility classes (focus-visible:outline-none
-   with a ring, say) still win over these defaults. */
+/* In the base layer so any component's own utility classes still win over these defaults. */
 @layer base {
   html {
     background: var(--bg-page);
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
@@ -150,17 +159,103 @@
     background: var(--bg-page);
     color: var(--text-primary);
     font-family: var(--font-sans);
+    font-stretch: 100%;
     /* Every number in this app is data that changes as inputs change; tabular figures stop
        a counter or a column from jittering sideways while it does. */
     font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
-  /* Visible keyboard focus everywhere, in the accent, without a ring on mouse clicks. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Browser surfaces carry the design too: the marker for selection, ink for the caret. */
+  ::selection {
+    background: var(--mark);
+    color: var(--text-primary);
+  }
+
+  input,
+  textarea {
+    caret-color: var(--text-primary);
+  }
+
+  a {
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+  }
+
+  /* Visible keyboard focus everywhere, in ink, without a ring on mouse clicks. */
   :focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
+  }
+
+  input[type='range'] {
+    accent-color: var(--text-primary);
+  }
+
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: var(--text-primary);
+  }
+
+  * {
+    scrollbar-color: var(--border-strong) transparent;
+  }
+}
+
+@layer components {
+  /* The display voice: condensed, heavy, tight. Headlines and the big figures only. */
+  .type-display {
+    font-stretch: 75%;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .type-condensed {
+    font-stretch: 82%;
+  }
+
+  /*
+   * The marker swipe: a highlighter pass behind inline text (a result figure, a link on hover).
+   * Drawn as a background so it wraps with the text; slightly short of the cap height and
+   * dropped below the baseline like a real marker stroke.
+   */
+  .mark {
+    background-image: linear-gradient(var(--mark), var(--mark));
+    background-repeat: no-repeat;
+    background-size: 100% 78%;
+    background-position: 0 70%;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    padding-inline: 0.12em;
+    margin-inline: -0.12em;
+  }
+
+  /* Text links that mark themselves on hover: the system's signature micro-interaction. */
+  .link-mark {
+    color: var(--text-primary);
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.22em;
+    background-image: linear-gradient(var(--mark), var(--mark));
+    background-repeat: no-repeat;
+    background-size: 0% 100%;
+    background-position: 0 0;
+    transition: background-size 180ms var(--ease-out);
+  }
+  .link-mark:hover {
+    background-size: 100% 100%;
   }
 }
 
@@ -178,7 +273,7 @@
   }
 }
 
-/* StatNumber's change cue (redesign Phase 1): runs only when a value changes, never on load. */
+/* StatNumber's change cue: runs only when a value changes, never on load. */
 @keyframes stat-in {
   from {
     opacity: 0.35;
@@ -192,3 +287,11 @@
 
 /* The homepage Country/PTO pair uses a container-width-aware inline CSS grid;
    its actual computed columns are asserted at 320 and 375 in consumer QA. */
+
+/* The phone tab bar (SiteHeader, below lg) is fixed to the bottom; reserve its height so the
+   last content and the footer are never covered. */
+@media (max-width: 1023.98px) {
+  body {
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+  }
+}

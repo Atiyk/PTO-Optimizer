@@ -17,14 +17,15 @@ export function LogoMark({ size = 28, title }: { size?: number; title?: string }
   );
 }
 
-/** Clear hierarchy, one Figtree font, consistent across every viewport. */
-export function Logo({ size = 30 }: { size?: number }) {
+/** The wordmark: the mark, "Gapless" set condensed and heavy, and the product line beneath it
+ * in plain sentence case (no tracked caps). */
+export function Logo({ size = 28 }: { size?: number }) {
   return (
     <span className="inline-flex items-center gap-2.5">
       <LogoMark size={size} />
       <span className="flex min-w-0 flex-col leading-none text-ink">
-        <span className="text-[21px] font-extrabold tracking-[-0.055em]">Gapless{' '}</span>
-        <span className="mt-1 text-[9px] font-bold uppercase tracking-[0.16em] text-muted">PTO Optimizer{' '}</span>
+        <span className="type-display text-[23px] tracking-[-0.01em]">Gapless{' '}</span>
+        <span className="mt-[3px] text-[11px] font-semibold text-muted">PTO Optimizer{' '}</span>
       </span>
     </span>
   );

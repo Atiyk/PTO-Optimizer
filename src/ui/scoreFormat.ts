@@ -93,9 +93,9 @@ export const SCORE_INTENSITY = {
   thresholds: [33, 66] as const,
   barClasses: ['bg-[var(--score-1)]', 'bg-[var(--score-2)]', 'bg-[var(--score-3)]'] as const,
   rgb: [
-    [23, 103, 93], // #17675d
-    [16, 83, 73], // #105349
-    [8, 58, 51], // #083a33
+    [20, 20, 20], // #141414
+    [10, 10, 10], // #0a0a0a
+    [0, 0, 0], // #000000
   ] as [number, number, number][],
 } as const;
 

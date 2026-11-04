@@ -1,4 +1,3 @@
-import { useEffect, useId, useRef, useState } from 'react';
 import { Container } from './Container';
 import { Logo } from './Logo';
 import { buttonClasses } from './Button';
@@ -20,64 +19,88 @@ interface NavItem {
 export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [{
   label: 'Browse',
   items: [
+    { route: 'sabbatical', href: '/sabbatical', label: 'Sabbatical' },
     { route: 'policy', href: '/policy', label: 'My PTO' },
     { route: 'glossary', href: '/glossary', label: 'Learn' },
-    { route: 'sabbatical', href: '/sabbatical', label: 'Sabbatical' },
   ],
 }];
 
 /** The header's one primary action: a link into the tool, never a submit. */
 export const HEADER_CTA = { href: '/pto', label: 'Plan PTO' };
 
+/** Every destination, in the order the phone tab bar shows them: the tool first. */
+export const TAB_ITEMS: (NavItem & { icon: 'plan' | 'sabbatical' | 'policy' | 'learn' })[] = [
+  { route: 'pto', href: HEADER_CTA.href, label: HEADER_CTA.label, icon: 'plan' },
+  { route: 'sabbatical', href: '/sabbatical', label: 'Sabbatical', icon: 'sabbatical' },
+  { route: 'policy', href: '/policy', label: 'My PTO', icon: 'policy' },
+  { route: 'glossary', href: '/glossary', label: 'Learn', icon: 'learn' },
+];
+
+const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
+
+/** 20px outline icons, one stroke weight, drawn for this product (no icon font). */
+function TabIcon({ name, active }: { name: (typeof TAB_ITEMS)[number]['icon']; active: boolean }) {
+  const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true" focusable="false">
+      {active && <rect x="1" y="8" width="20" height="7" fill="var(--mark)" />}
+      {name === 'plan' && (
+        <>
+          <rect x="3" y="4" width="16" height="15" rx="1.5" {...common} />
+          <path d="M3 8.5h16M7.5 2.5v3M14.5 2.5v3" {...common} />
+          <path d="M6.5 13h9" {...common} strokeWidth={3} />
+        </>
+      )}
+      {name === 'sabbatical' && (
+        <>
+          <circle cx="11" cy="8" r="3.25" {...common} />
+          <path d="M11 2v1.2M11 12.8V14M5 8h1.2M15.8 8H17M6.8 3.8l.85.85M14.35 11.35l.85.85M15.2 3.8l-.85.85M7.65 11.35l-.85.85" {...common} />
+          <path d="M2.5 18.5c2.2-1.6 4.4-1.6 6.6 0s4.4 1.6 6.6 0c.9-.65 1.85-1 2.8-1" {...common} />
+        </>
+      )}
+      {name === 'policy' && (
+        <>
+          <path d="M4 18.5V12M9 18.5V6.5M14 18.5V9.5M19 18.5V3.5" {...common} strokeWidth={2.5} />
+        </>
+      )}
+      {name === 'learn' && (
+        <>
+          <path d="M3 5.5c2.7-1.2 5.3-1.2 8 0v13c-2.7-1.2-5.3-1.2-8 0z" {...common} />
+          <path d="M11 5.5c2.7-1.2 5.3-1.2 8 0v13c-2.7-1.2-5.3-1.2-8 0z" {...common} />
+        </>
+      )}
+    </svg>
+  );
+}
+
 /**
- * Redesign Phase 1: logo + wordmark, two labelled nav groups, one primary link, and a
- * reserved slot for "Sign in" (empty until accounts exist, so adding it later can't shift
- * anything).
- *
- * From 1024px the groups sit inline (their visible labels from 1280px; the <nav>s keep their
- * aria-labels and a divider separates them at every width). Below that (the full wordmark, four
- * links and the button don't fit at 768px without wrapping) they collapse into a
- * disclosure: one button with aria-expanded/aria-controls opening a panel - not a step,
- * nothing is hidden that the footer doesn't also link to. Prerendered closed. The primary
- * link stays in the bar from 640px and moves into the panel below that.
+ * 2026-11 redesign. Desktop (lg+): a plain paper bar - wordmark, three links, one primary
+ * action. The current page carries a marker stroke under its label. Below lg the bar keeps
+ * only the wordmark, and every destination moves into a fixed bottom tab bar (four
+ * destinations, 56px tall plus the safe area), the phone's own navigation pattern: one tap to
+ * any tool from anywhere, no menu to open first. index.css reserves the space for it so it
+ * never covers content. Every link is a real link; nothing is hidden behind a disclosure.
  */
 export function SiteHeader({ active }: SiteHeaderProps) {
-  const [open, setOpen] = useState(false);
-  const panelId = useId();
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setOpen(false);
-        buttonRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
-
   const linkClass = (route: SiteRoute) =>
-    `relative inline-flex min-h-11 items-center whitespace-nowrap rounded-md px-1 py-1 text-[15px] font-semibold tracking-[-0.01em] transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+    `relative inline-flex min-h-11 items-center whitespace-nowrap px-1 text-[15px] font-semibold transition-colors duration-150 ${FOCUS} ${
       active === route
-        ? 'font-semibold text-ink after:absolute after:inset-x-1 after:-bottom-[13px] after:h-[3px] after:rounded-full after:bg-accent'
+        ? 'text-ink after:absolute after:inset-x-0 after:bottom-[9px] after:-z-10 after:h-[9px] after:bg-mark'
         : 'text-muted hover:text-ink'
     }`;
 
   return (
     <header className="border-b border-line bg-page">
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:inline-flex focus:min-h-11 focus:items-center focus:rounded-lg focus:border focus:border-line-strong focus:bg-surface focus:px-4 focus:text-sm focus:font-semibold focus:text-ink focus:shadow-lg">Skip to main content</a>
-      <Container className="flex min-h-[72px] items-center gap-4 px-4">
-        <a href="/" className="-ml-1 inline-flex min-h-11 items-center rounded-md px-1 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" aria-current={active === 'landing' ? 'page' : undefined}>
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:inline-flex focus:min-h-11 focus:items-center focus:rounded-[3px] focus:border focus:border-ink focus:bg-surface focus:px-4 focus:text-sm focus:font-semibold focus:text-ink">Skip to main content</a>
+      <Container className="flex min-h-[60px] items-center gap-4 px-4 sm:px-6 lg:min-h-[68px]">
+        <a href="/" className={`-ml-1 inline-flex min-h-11 items-center px-1 ${FOCUS}`} aria-current={active === 'landing' ? 'page' : undefined}>
           <Logo />
           <span className="sr-only"> home</span>
         </a>
 
-        <div className="ml-auto hidden items-center gap-6 lg:flex xl:gap-7">
-          {NAV_GROUPS.map((group, i) => (
-            <nav key={group.label} aria-label="Explore" className={`flex items-center gap-4 ${i > 0 ? 'border-l border-line pl-6 xl:pl-7' : ''}`}>
-              <span className="sr-only" aria-hidden="true">{group.label}</span>
+        <div className="ml-auto hidden items-center gap-7 lg:flex">
+          {NAV_GROUPS.map((group) => (
+            <nav key={group.label} aria-label="Explore" className="isolate flex items-center gap-6">
               {group.items.map((item) => (
                 <a key={item.route} href={item.href} className={linkClass(item.route)} aria-current={active === item.route ? 'page' : undefined}>
                   {item.label}
@@ -85,61 +108,34 @@ export function SiteHeader({ active }: SiteHeaderProps) {
               ))}
             </nav>
           ))}
-        </div>
-
-        <div className="ml-auto flex items-center gap-2 lg:ml-0">
-
-          <span className="hidden sm:inline-flex">
-            <a href={HEADER_CTA.href} aria-current={active === 'pto' ? 'page' : undefined} className={`${buttonClasses('primary', 'sm')} min-h-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}>
-              {HEADER_CTA.label}
-            </a>
-          </span>
-          <button
-            ref={buttonRef}
-            type="button"
-            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-line-strong/40 bg-surface px-3.5 text-sm font-semibold text-ink hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:hidden"
-            aria-expanded={open}
-            aria-controls={panelId}
-            onClick={() => setOpen((o) => !o)}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-              {open ? (
-                <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              ) : (
-                <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              )}
-            </svg>
-            Menu
-          </button>
+          <a href={HEADER_CTA.href} aria-current={active === 'pto' ? 'page' : undefined} className={`${buttonClasses('primary', 'sm')} min-h-11 ${FOCUS}`}>
+            {HEADER_CTA.label}
+          </a>
         </div>
       </Container>
 
-      <div id={panelId} hidden={!open} className="border-t border-line bg-page lg:hidden">
-        <Container className="flex flex-col gap-5 px-4 py-5">
-          {NAV_GROUPS.map((group) => (
-            <nav key={group.label} aria-label={group.label}>
-              <p className="sr-only" aria-hidden="true">{group.label}</p>
-              <ul className="flex flex-col">
-                {group.items.map((item) => (
-                  <li key={item.route}>
-                    <a
-                      href={item.href}
-                      aria-current={active === item.route ? 'page' : undefined}
-                      className={`flex min-h-11 items-center justify-between rounded-lg text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${active === item.route ? 'font-semibold text-ink' : 'text-ink'}`}
-                    >
-                      {item.label}
-                      {active === item.route && <span className="h-2 w-2 rounded-full bg-accent" aria-hidden="true" />}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          ))}
-          <a href={HEADER_CTA.href} className={`${buttonClasses('primary', 'md', 'w-full sm:hidden')} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}>
-            {HEADER_CTA.label}
-          </a>
-        </Container>
-      </div>
+      <nav
+        aria-label="Tools"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/15 bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
+      >
+        <ul className="mx-auto grid max-w-xl grid-cols-4">
+          {TAB_ITEMS.map((item) => {
+            const isActive = active === item.route;
+            return (
+              <li key={item.route} className="min-w-0">
+                <a
+                  href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 text-[12px] leading-4 ${isActive ? 'font-bold text-ink' : 'font-medium text-muted'} ${FOCUS} focus-visible:-outline-offset-2`}
+                >
+                  <TabIcon name={item.icon} active={isActive} />
+                  <span className="truncate">{item.label}</span>
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
     </header>
   );
 }
