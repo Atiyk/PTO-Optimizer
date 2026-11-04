@@ -25,7 +25,7 @@ export function Logo({ size = 28 }: { size?: number }) {
       <LogoMark size={size} />
       <span className="flex min-w-0 flex-col leading-none text-ink">
         <span className="type-display text-[23px] tracking-[-0.01em]">Gapless{' '}</span>
-        <span className="mt-[3px] text-[11px] font-semibold text-muted">PTO Optimizer{' '}</span>
+        <span className="mt-[3px] text-[12px] font-semibold text-muted">PTO Optimizer{' '}</span>
       </span>
     </span>
   );

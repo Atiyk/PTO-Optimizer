@@ -6,9 +6,10 @@ export type ButtonSize = 'sm' | 'md';
 /**
  * 2026-11 redesign: square-cornered, flat, one decision for every button in the product.
  * - primary: solid ink. One per view - the action the page is for (usually a link into a
- *   tool, never a submit: results update live). On hover the marker passes over it.
+ *   tool, never a submit: results update live). Hover lifts the ink a step; the marker is
+ *   reserved for your time and your results, never for chrome.
  * - secondary: an ink outline on paper, for the rest (copy, download, share).
- * - quiet: text only, underlined, marking itself on hover.
+ * - quiet: text only, underlined; the underline thickens on hover.
  * Every button sinks slightly on press (scale .97) so a tap is felt. Renders an <a> when
  * `href` is given, so navigation stays a real link.
  */
@@ -16,9 +17,9 @@ const BASE =
   'inline-flex items-center justify-center gap-2 rounded-[3px] font-semibold whitespace-nowrap select-none transition-[background-color,color,border-color,transform] duration-150 ease-[var(--ease-out)] active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-50';
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-accent text-white hover:bg-mark hover:text-ink',
-  secondary: 'border border-ink bg-surface text-ink hover:bg-accent-soft',
-  quiet: 'text-ink underline decoration-1 underline-offset-[0.22em] hover:bg-mark',
+  primary: 'bg-accent text-white hover:bg-[#3a3a35]',
+  secondary: 'border border-ink bg-surface text-ink hover:bg-surface-alt',
+  quiet: 'text-ink underline decoration-1 underline-offset-[0.22em] hover:decoration-2',
 };
 
 const SIZES: Record<ButtonSize, string> = {

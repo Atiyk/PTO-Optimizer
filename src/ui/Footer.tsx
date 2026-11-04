@@ -11,7 +11,7 @@ interface FooterProps {
   onShowShortcuts?: () => void;
 }
 
-const LINK_CLASS = 'inline-flex min-h-11 items-center px-1 -mx-1 text-[#ececE6] transition-colors duration-150 hover:bg-mark hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mark)]';
+const LINK_CLASS = 'inline-flex min-h-11 items-center px-1 -mx-1 text-[#ececE6] transition-colors duration-150 hover:text-white hover:underline hover:decoration-2 underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white';
 
 /** Direct support email; no account or contact-form backend required. */
 export const CONTACT_EMAIL = 'atiykahmeed6310@gmail.com';
@@ -27,7 +27,7 @@ function Column({ title, children }: { title: string; children: ReactNode }) {
 
 /**
  * 2026-11 redesign: the footer is the page's one drenched field - an ink close with the name
- * returning at full width over a marker stroke, then three columns of plain links (the same
+ * returning at full width (no marker: the marker only ever means your time or your result), then three columns of plain links (the same
  * four tools as the header, one shared list). No external product links.
  */
 export function Footer({ onShowShortcuts }: FooterProps) {
@@ -35,9 +35,8 @@ export function Footer({ onShowShortcuts }: FooterProps) {
   return (
     <footer className="mt-24 bg-[#141414] text-white">
       <Container className="px-4 pt-14 sm:px-6 lg:pt-20">
-        <p aria-hidden="true" className="type-display relative select-none text-[clamp(4.5rem,19vw,17rem)] leading-[0.8] tracking-[-0.03em] text-white">
-          <span className="relative z-10">Gapless</span>
-          <span className="absolute inset-x-0 bottom-[0.06em] z-0 h-[0.3em] bg-mark" />
+        <p aria-hidden="true" className="type-display select-none pb-[0.12em] text-[clamp(4.5rem,19vw,17rem)] leading-[0.8] tracking-[-0.03em] text-white">
+          Gapless
         </p>
       </Container>
       <Container className="grid grid-cols-2 gap-x-8 gap-y-10 px-4 pt-12 pb-10 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
