@@ -36,6 +36,7 @@ import { renderToString } from 'react-dom/server';
 import React from 'react';
 import { ITEMS as FAQ_ITEMS } from '../src/ui/FAQ.tsx';
 import { SABBATICAL_FAQ_ITEMS } from '../src/ui/sabbaticalFaqItems.ts';
+import { FAMILY_FAQ_ITEMS } from '../src/ui/familyFaqItems.ts';
 import { ABOUT_FAQ_ITEMS } from '../src/ui/aboutFaqItems.ts';
 import { GLOSSARY_TERMS } from '../src/content/glossary/terms.ts';
 import { rawHolidaysToHolidays, type Holiday } from '@daysoff/engine/data/holidays';
@@ -152,9 +153,11 @@ function buildJsonLd(entry: Entry, meta: { title: string; description: string; c
       ? FAQ_ITEMS
       : entry.component === 'sabbatical'
         ? SABBATICAL_FAQ_ITEMS
-        : entry.component === 'faq'
-          ? [...FAQ_ITEMS, ...SABBATICAL_FAQ_ITEMS, ...ABOUT_FAQ_ITEMS]
-          : null;
+        : entry.component === 'family'
+          ? FAMILY_FAQ_ITEMS
+          : entry.component === 'faq'
+            ? [...FAQ_ITEMS, ...SABBATICAL_FAQ_ITEMS, ...FAMILY_FAQ_ITEMS, ...ABOUT_FAQ_ITEMS]
+            : null;
   if (faqItems) {
     result.push({
       '@context': 'https://schema.org',
@@ -248,6 +251,7 @@ installWindow(`${SITE_URL}${ENTRIES[0].path}`, ENTRIES[0].countryPreset);
 const { App } = await import('../src/ui/App.tsx');
 const { Landing } = await import('../src/ui/Landing.tsx');
 const { Sabbatical } = await import('../src/ui/Sabbatical.tsx');
+const { Family } = await import('../src/ui/Family.tsx');
 const { FaqPage } = await import('../src/ui/FaqPage.tsx');
 const { DataSources } = await import('../src/ui/DataSources.tsx');
 const { Policy } = await import('../src/ui/Policy.tsx');
@@ -265,6 +269,7 @@ function renderEntry(entry: Entry): string {
     app: App,
     landing: Landing,
     sabbatical: Sabbatical,
+    family: Family,
     faq: FaqPage,
     dataSources: DataSources,
     policy: Policy,

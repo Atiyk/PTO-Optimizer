@@ -7,7 +7,7 @@ import { PRODUCT_NAME, PRODUCT_SHORT_NAME } from './brand';
 const SOURCES: Record<string, string> = import.meta.glob(
   [
     '../index.html',
-    '../{pto,sabbatical,faq,data-sources,policy,uk,canada,australia,germany,ireland,india}/index.html',
+    '../{pto,sabbatical,family,faq,data-sources,policy,uk,canada,australia,germany,ireland,india}/index.html',
     '../glossary/**/index.html',
     '../public/*.{html,txt,webmanifest}',
     '../public/docs/**/*.html',

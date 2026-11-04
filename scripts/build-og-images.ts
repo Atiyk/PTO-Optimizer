@@ -73,7 +73,11 @@ function template(title: string, subtitle: string, detail: string): string {
   </body></html>`;
 }
 
+/** OG_ONLY=family renders just the named images (comma-separated), leaving the others as committed. */
+const ONLY = process.env.OG_ONLY?.split(',').map((s) => s.trim()).filter(Boolean);
+
 async function renderOgImage(browser: Awaited<ReturnType<typeof chromium.launch>>, slug: string, html: string): Promise<void> {
+  if (ONLY && !ONLY.includes(slug)) return;
   const page = await browser.newPage({ viewport: { width: 1200, height: 630 } });
   await page.setContent(html);
   mkdirSync(outDir, { recursive: true });
@@ -129,12 +133,17 @@ async function main(): Promise<void> {
   );
   await renderOgImage(
     browser,
+    'family',
+    template('Plan PTO around school breaks', 'The most days with your kids for the PTO you have, and which school days off still need cover.', 'Dates only. Nothing uploaded.'),
+  );
+  await renderOgImage(
+    browser,
     'learn',
     template('PTO, in plain words', 'Accrual, carryover, payout and requests explained, with worked examples.', 'Glossary, guides and answers'),
   );
 
   await browser.close();
-  console.log(`OG images written to ${outDir}: landing.png, pto.png, sabbatical.png, policy.png, learn.png`);
+  console.log(`OG images written to ${outDir}: landing.png, pto.png, sabbatical.png, policy.png, family.png, learn.png`);
 }
 
 main();

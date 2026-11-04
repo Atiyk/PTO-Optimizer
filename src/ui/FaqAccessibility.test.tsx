@@ -4,6 +4,7 @@ import { FAQ, ITEMS } from './FAQ';
 import { FaqPage } from './FaqPage';
 import { SABBATICAL_FAQ_ITEMS } from './sabbaticalFaqItems';
 import { ABOUT_FAQ_ITEMS } from './aboutFaqItems';
+import { FAMILY_FAQ_ITEMS } from './familyFaqItems';
 
 const escapeHtml = (text: string) => text
   .replaceAll('&', '&amp;')
@@ -25,17 +26,17 @@ describe('consumer FAQ disclosure accessibility', () => {
     }
   });
 
-  it('renders all three anchored FAQ sections, with wrapping touch-sized navigation', () => {
+  it('renders all four anchored FAQ sections, with wrapping touch-sized navigation', () => {
     const html = renderToStaticMarkup(<FaqPage />);
-    const count = ITEMS.length + SABBATICAL_FAQ_ITEMS.length + ABOUT_FAQ_ITEMS.length;
+    const count = ITEMS.length + SABBATICAL_FAQ_ITEMS.length + FAMILY_FAQ_ITEMS.length + ABOUT_FAQ_ITEMS.length;
     expect(html.match(/<details\b/g)).toHaveLength(count);
     expect(html.match(/<summary\b/g)).toHaveLength(count);
     expect(html).toContain('aria-label="FAQ sections"');
     expect(html).toContain('flex-wrap');
-    for (const id of ['pto', 'sabbatical', 'about']) {
+    for (const id of ['pto', 'sabbatical', 'family', 'about']) {
       expect(html).toContain(`href="#${id}"`);
       expect(html).toContain(`id="${id}"`);
     }
-    expect(html.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(count + 3);
+    expect(html.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(count + 4);
   });
 });

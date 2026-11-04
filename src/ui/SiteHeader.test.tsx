@@ -28,10 +28,11 @@ describe('SiteHeader (redesign Phase 1)', () => {
     expect(home.textContent).toContain('PTO Optimizer');
   });
 
-  it('uses three flat destinations and one primary PTO action without nested categories', () => {
+  it('uses four flat destinations and one primary PTO action without nested categories', () => {
     for (const [label, href] of [
       ['Plan PTO', '/pto'],
       ['Sabbatical', '/sabbatical'],
+      ['Family', '/family'],
       ['My PTO', '/policy'],
       ['Learn', '/glossary'],
     ]) {
@@ -69,8 +70,8 @@ describe('SiteHeader (redesign Phase 1)', () => {
     const { getByRole } = render(<SiteHeader active="pto" />);
     const tabs = getByRole('navigation', { name: 'Tools' });
     const links = [...tabs.querySelectorAll('a')];
-    expect(links.map((l) => l.textContent?.trim())).toEqual(['Plan PTO', 'Sabbatical', 'My PTO', 'Learn']);
-    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/pto', '/sabbatical', '/policy', '/glossary']);
+    expect(links.map((l) => l.textContent?.trim())).toEqual(['Plan PTO', 'Sabbatical', 'Family', 'My PTO', 'Learn']);
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/pto', '/sabbatical', '/family', '/policy', '/glossary']);
     for (const link of links) {
       expect(link.className).toContain('min-h-14');
       expect(link.className).toContain('focus-visible:outline');
@@ -90,7 +91,7 @@ describe('Footer (redesign Phase 1)', () => {
   const html = renderToStaticMarkup(<Footer />);
   it('has Product / Resources / About columns and the D2 tool names', () => {
     for (const h of ['Explore', 'Resources', 'Help &amp; privacy']) expect(html).toContain(`>${h}</h2>`);
-    for (const l of ['Plan PTO', 'Sabbatical', 'My PTO', 'Learn', 'FAQ', 'Privacy', 'Terms of use']) expect(html).toContain(`>${l}<`);
+    for (const l of ['Plan PTO', 'Sabbatical', 'Family', 'My PTO', 'Learn', 'FAQ', 'Privacy', 'Terms of use']) expect(html).toContain(`>${l}<`);
   });
   it('links directly to the configured feedback address', () => {
     expect(html).toContain('mailto:atiykahmeed6310@gmail.com?subject=Gapless%20feedback');
