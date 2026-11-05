@@ -1,0 +1,27 @@
+{
+  "workflow": "Gapless UX and brand overhaul",
+  "updated": "2026-11-05",
+  "phase": "release",
+  "branch": "claude/gapless-ux-brand-overhaul",
+  "supersedes": ["PR #118 (Marked wordmark)"],
+  "ownership": {
+    "this_workflow": ["SiteHeader", "Logo", "logoMark", "Footer", "index.css tokens", "Landing tool section", "DESIGN.md", "brand assets", "product copy fixes"],
+    "engine": "untouched (packages/engine, src/planning, src/policy, src/personal)"
+  },
+  "skills_used": ["impeccable (context, concept-seed, Operate mode rules)"],
+  "skills_not_used": ["taste", "emil-design-eng", "ux-ui-audit", "brand-voice", "Canva (connector available; not used for the vector logo)"],
+  "done": [
+    "IA: Plan / My PTO / Learn with Time off, Family, Sabbatical modes",
+    "Brand: the line (Line indigo), highlighter removed everywhere",
+    "Logo: bridged square G, favicons, app icons, OG images, share cards",
+    "Product truth audit (docs/PRODUCT-TRUTH-AUDIT.md) and copy fixes",
+    "Critic pass 1 (docs/UX-CRITIC-REPORT.md) and fixes"
+  ],
+  "open": [
+    "Touch day sheet covers the tapped week (minor)",
+    "Region label says State for GB (minor)",
+    "US travel data is 2025 calendar-date aligned, not weekday aligned (data owner; disclosed in copy)"
+  ],
+  "release": { "pr": null, "merged": false, "production_verified": false },
+  "schedule": { "trigger": "Gapless UX overhaul: 5-hour continuation", "delete_when": "release.production_verified" }
+}

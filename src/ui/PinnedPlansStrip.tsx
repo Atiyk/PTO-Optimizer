@@ -42,7 +42,7 @@ export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlans
           key={i}
           className="flex min-h-11 items-center gap-1 rounded-[6px] border border-line bg-surface pl-3 text-sm tabular-nums text-ink"
         >
-          <span aria-hidden="true" className="mr-1 inline-block h-2.5 w-2.5 shrink-0 bg-mark ring-1 ring-ink" />
+          <span aria-hidden="true" className="mr-1 inline-block h-2.5 w-2.5 shrink-0 rounded-[2px] bg-accent" />
           <span>{summaryText(s)}</span>
           <button
             type="button"

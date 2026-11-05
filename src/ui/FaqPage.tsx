@@ -9,7 +9,7 @@ import { FAMILY_FAQ_ITEMS } from './familyFaqItems';
 const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
 
 const SECTIONS: { id: string; title: string; items: FAQItem[] }[] = [
-  { id: 'pto', title: 'Plan PTO', items: PTO_FAQ_ITEMS },
+  { id: 'pto', title: 'Time off planner', items: PTO_FAQ_ITEMS },
   { id: 'sabbatical', title: 'Sabbatical', items: SABBATICAL_FAQ_ITEMS },
   { id: 'family', title: 'Family & school breaks', items: FAMILY_FAQ_ITEMS },
   { id: 'about', title: 'About this site', items: ABOUT_FAQ_ITEMS },
@@ -61,9 +61,9 @@ export function FaqPage() {
         <Container className="px-4 pt-10 pb-4 sm:px-6 lg:pt-16">
           <h1 className="max-w-[16ch] text-display-sm text-ink type-display">Frequently asked questions</h1>
           <p className="mt-4 max-w-[62ch] text-lg leading-7 text-ink">
-            Questions about the <a href="/pto" className={`link-mark ${FOCUS}`}>Plan PTO</a>,{' '}
-            <a href="/sabbatical" className={`link-mark ${FOCUS}`}>Sabbatical</a> and{' '}
-            <a href="/family" className={`link-mark ${FOCUS}`}>Family</a> tools, in one place. Each tool's own page has the same
+            Questions about planning <a href="/pto" className={`link-mark ${FOCUS}`}>time off</a>,{' '}
+            <a href="/family" className={`link-mark ${FOCUS}`}>around school breaks</a> and{' '}
+            <a href="/sabbatical" className={`link-mark ${FOCUS}`}>a sabbatical</a>, in one place. Each tool's own page has the same
             answers inline, right where they are relevant.
           </p>
 

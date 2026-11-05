@@ -167,7 +167,7 @@ function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalen
           : <ul className="mt-3 divide-y divide-line border-t border-ink">{visible.map((risk) => (
             <li key={risk.id} className="py-3">
               <p className="flex items-start gap-2 font-bold text-ink">
-                <span aria-hidden="true" className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center bg-ink text-xs font-bold text-white">!</span>
+                <span aria-hidden="true" className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink text-xs font-bold text-white">!</span>
                 <span>{compactDatesIn(risk.text)}</span>
               </p>
               <p className="mt-1 pl-7 text-sm text-ink">{risk.kind === 'cap' ? 'Creating space in your balance may prevent lost accrual.' : `Last day to use this PTO: ${compactDate(risk.deadline)}.`}</p>

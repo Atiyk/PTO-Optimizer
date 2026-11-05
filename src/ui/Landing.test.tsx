@@ -29,9 +29,9 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); delete wi
 describe('live homepage planner', () => {
   it('prerenders a real planning preview from embedded holiday data', () => {
     const html = renderToStaticMarkup(<Landing />);
-    expect(html).toContain('Your recommended break');
+    expect(html).toContain('Your plan: ');
     expect(html).toContain('days off');
-    expect(html).toContain('15 of 15 PTO days');
+    expect(html).toContain('from 15 PTO days across');
     expect(html).not.toContain('Calculating');
     expect(html).not.toContain('Updating your holiday calendar');
     expect((html.match(/<h1\b/g) ?? []).length).toBe(1);
@@ -61,9 +61,9 @@ describe('live homepage planner', () => {
     await act(async () => { render(<Landing />); });
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('More days off from the same PTO.');
     expect(screen.getByRole('spinbutton', { name: 'PTO days available' }).getAttribute('value')).toBe('15');
-    expect(screen.getByText(/15 of 15 PTO days/)).toBeTruthy();
+    expect(screen.getByText(/from 15 PTO days across/)).toBeTruthy();
     await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '5' } }); });
-    expect(screen.getByText(/5 of 5 PTO days/)).toBeTruthy();
+    expect(screen.getByText(/from 5 PTO days across/)).toBeTruthy();
     const link = screen.getAllByRole('link', { name: 'See the full plan →' })[0] as HTMLAnchorElement;
     expect(link.search).toContain('b=5');
     expect(link.search).toContain('pv=2');
@@ -186,7 +186,7 @@ describe('live homepage planner', () => {
   it('keeps planning available when saved preferences cannot be read', async () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('storage disabled'); });
     await act(async () => { render(<Landing />); });
-    expect(screen.getByText(/15 of 15 PTO days/)).toBeTruthy();
+    expect(screen.getByText(/from 15 PTO days across/)).toBeTruthy();
     const link = screen.getAllByRole('link', { name: 'See the full plan →' })[0] as HTMLAnchorElement;
     expect(decodeEmployerCalendar(new URL(link.href).searchParams.get('eh'))).toEqual(defaultEmployerCalendar('US'));
   });

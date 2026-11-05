@@ -27,7 +27,7 @@ export function Chip({
       type="button"
       aria-pressed={selected ?? false}
       onClick={onClick}
-      className={`${base} border transition-colors duration-150 ${selected ? 'border-ink bg-mark' : 'border-transparent hover:border-ink'} ${className}`}
+      className={`${base} border transition-colors duration-150 ${selected ? 'border-accent bg-accent-soft text-accent-ink' : 'border-transparent hover:border-ink'} ${className}`}
     >
       {selected && (
         <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">

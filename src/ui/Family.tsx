@@ -304,7 +304,7 @@ export function Family() {
               )}
 
               <p className="text-base text-muted">
-                Planning the rest of your time off too? <a href="/pto" className={`link-mark font-semibold ${FOCUS}`}>Plan PTO &rarr;</a>
+                Planning the rest of your time off too? <a href="/pto" className={`link-mark font-semibold ${FOCUS}`}>Plan time off &rarr;</a>
               </p>
 
               <FamilyFAQ />

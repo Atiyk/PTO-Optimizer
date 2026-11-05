@@ -154,6 +154,7 @@ export function Policy() {
   const [payoutOnLeaving, setPayoutOnLeaving] = useState<TimeOffPolicy['payoutOnLeaving']>(d.payoutOnLeaving);
 
   const [currentBalance, setCurrentBalance] = useState(d.currentBalance);
+  const needsBalance = currentBalance === 0;
   const [balanceAsOf, setBalanceAsOf] = useState(d.balanceAsOf);
   const [plannedDays, setPlannedDays] = useState<string[]>(d.plannedDays);
   const [currentCarriedBalance, setCurrentCarriedBalance] = useState(d.currentCarriedBalance ?? 0);
@@ -283,11 +284,13 @@ export function Policy() {
             Enter your balance and how you earn PTO. The forecast and the expiry check update as you type; the rest of your policy lives in Advanced options.
           </p>
 
+          {/* Phones: until a balance is entered, the inputs come first (a forecast from a zero
+              balance answers nothing); after that the answer leads. */}
           {/* Inputs left, the answer right (sticky on desktop). Below lg the answer column
               dissolves (display: contents) so its two parts can be ordered answer, inputs,
               risk: the number first, then what drives it, then what could be lost. */}
           <div id="balance" className="mt-6 flex scroll-mt-24 flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,27rem)]">
-            <div className="order-2 flex min-w-0 flex-col gap-6 lg:order-none lg:col-start-1 lg:row-start-1">
+            <div className={`${needsBalance ? 'order-1' : 'order-2'} flex min-w-0 flex-col gap-6 lg:order-none lg:col-start-1 lg:row-start-1`}>
               <section aria-label="Quick balance forecast" className="min-w-0 rounded-[10px] border border-line bg-surface p-4 sm:p-6">
                 <h2 className="text-h2 font-bold type-condensed text-ink">Your balance and how you earn it</h2>
                 <p className="mt-1 text-sm text-muted">Use your real balance and employer rules. Full carryover at reset is assumed until you choose another rule.</p>
@@ -576,7 +579,7 @@ export function Policy() {
                         <ul className="flex flex-col divide-y divide-line border-y border-line">
                           {alerts.map((a) => (
                             <li key={a.id} className="flex gap-2 py-3 text-sm text-ink">
-                              <span aria-hidden="true" className="mt-1.5 inline-block h-2.5 w-2.5 shrink-0 bg-ink" />
+                              <span aria-hidden="true" className="mt-1.5 inline-block h-2.5 w-2.5 shrink-0 rounded-[2px] bg-accent" />
                               <div>
                                 <p>{compactDatesIn(a.text)}</p>
                                 {a.daysAtStake > 0 && (
@@ -630,7 +633,7 @@ export function Policy() {
             </div>
 
             <div className="contents lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:flex lg:flex-col lg:gap-4">
-              <div className="order-1 min-w-0 lg:order-none">
+              <div className={`${needsBalance ? 'order-2' : 'order-1'} min-w-0 lg:order-none`}>
                 <QuickForecast policy={policy} requests={ledger.requests} upcomingLoss={upcomingLoss} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')} />
               </div>
               <div id="expiration" className="order-3 min-w-0 scroll-mt-24 lg:order-none">

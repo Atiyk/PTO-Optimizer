@@ -349,7 +349,7 @@ export function DayCell({
           aria-label={!hasHover ? `Actions for ${formatMonthDay(date)}` : undefined}
           className={hasHover
             ? 'absolute left-1/2 top-full z-20 mt-1 w-max max-w-[15rem] -translate-x-1/2 rounded-[6px] bg-ink px-2.5 py-1.5 text-sm text-white shadow-lg'
-            : 'fixed inset-x-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-sm rounded-[10px] border border-line bg-surface p-4 text-sm text-ink shadow-xl lg:bottom-4'}
+            : 'fixed inset-x-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-sm rounded-[10px] border border-line bg-surface p-4 text-sm text-ink shadow-xl md:bottom-4'}
         >
           {!hasHover && <p className="text-[15px] font-bold">{formatWeekdayMonthDay(date)}</p>}
           {hasHover ? <p>{tooltipText}</p> : (

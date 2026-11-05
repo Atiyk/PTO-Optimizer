@@ -60,7 +60,7 @@ function monthsBetween(start: string, end: string): string[] {
 /**
  * The whole plan as a printed year schedule: one row per month, days aligned under the same
  * weekday columns (week start as on /pto: Sunday for US/CA/JP, Monday elsewhere), every
- * break of the plan swiped with the marker and each PTO day an ink block. The holiday dot is
+ * break of the plan drawn as a tinted run with an indigo rule and each PTO day an indigo block. The holiday dot is
  * the planner's own. The grid is a picture (aria-hidden); the visible list beneath it names
  * every break in words, so nothing depends on colour or on seeing the grid.
  */
@@ -96,7 +96,7 @@ function PlanYear({ breaks, best, rangeStart, rangeEnd, holidayName, weekStart }
           <span className="text-xs font-semibold text-ink">{monthShortName(first)}{month.endsWith('-01') || month === months[0] ? ` ’${month.slice(2, 4)}` : ''}</span>
           {days.map((date, index) => {
             const inRange = date >= rangeStart && date <= rangeEnd;
-            const tone = !inRange ? 'bg-transparent' : ptoDays.has(date) ? 'bg-accent' : offDays.has(date) ? 'bg-mark' : mondayIndexedDow(date) >= 5 ? 'bg-surface-alt' : 'bg-page';
+            const tone = !inRange ? 'bg-transparent' : ptoDays.has(date) ? 'bg-accent' : offDays.has(date) ? 'bg-mark shadow-[inset_0_-3px_0_var(--accent)]' : mondayIndexedDow(date) >= 5 ? 'bg-surface-alt' : 'bg-page';
             return <span key={date} className={`relative h-5 lg:h-6 ${tone}`} style={index === 0 ? { gridColumnStart: offset + 2 } : undefined}>
               {inRange && holidayName.has(date) && <span className={`absolute bottom-0.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${HOLIDAY_DOT}`} />}
             </span>;
@@ -111,7 +111,7 @@ function PlanYear({ breaks, best, rangeStart, rangeEnd, holidayName, weekStart }
       <span className="text-h2 font-bold type-condensed">Every break in this plan</span>
       <span className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
         <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="size-3.5 rounded-[3px] bg-accent" />PTO day</span>
-        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-3.5 w-6 rounded-[3px] bg-mark" />Day off in a break</span>
+        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-3.5 w-6 rounded-[3px] bg-mark shadow-[inset_0_-3px_0_var(--accent)]" />Day off in a break</span>
         <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="size-3.5 bg-surface-alt" />Weekend</span>
         <span className="inline-flex items-center gap-2"><span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${HOLIDAY_DOT}`} />Public holiday</span>
       </span>
@@ -191,6 +191,7 @@ export function Landing() {
   const bestBreak = useMemo(() => plan?.result.primary.slice().sort((a, b) => b.totalDaysOff - a.totalDaysOff || b.multiplier - a.multiplier || a.start.localeCompare(b.start))[0], [plan]);
   const used = plan?.result.primary.reduce((total, brk) => total + brk.ptoCost, 0) ?? 0;
   const breakCount = plan?.result.primary.length ?? 0;
+  const planDaysOff = plan?.result.primary.reduce((total, brk) => total + brk.totalDaysOff, 0) ?? 0;
   const periodStart = rangeStart > today ? addDays(rangeStart, -1) : today;
   const upcoming = useMemo(() => validRange ? remainingHolidays(periodStart, rangeEnd, holidays) : [], [validRange, periodStart, rangeEnd, holidays]);
   const next = useMemo(() => validRange ? nextHoliday(periodStart, rangeEnd, holidays) : undefined, [validRange, periodStart, rangeEnd, holidays]);
@@ -208,7 +209,7 @@ export function Landing() {
       {/* First screen: what this is, the sentence that drives it, the answer, the schedule. */}
       <Container className="px-4 pt-7 sm:px-6 sm:pt-12 lg:pt-14">
         <section aria-labelledby="landing-heading">
-          <h1 id="landing-heading" className="max-w-[17ch] text-[clamp(2.5rem,1rem+5vw,6rem)] leading-[0.92] type-display text-ink">More days off from the same PTO.</h1>
+          <h1 id="landing-heading" className="max-w-[17ch] text-[clamp(2.25rem,1rem+5vw,6rem)] leading-[0.92] type-display text-ink">More days off from the same PTO.</h1>
 
           <div className="mt-6 grid min-w-0 gap-x-14 gap-y-6 sm:mt-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
             <p className="min-w-0 text-[1.625rem] leading-[1.6] font-semibold type-condensed text-ink sm:text-[2.125rem] lg:col-start-1 lg:row-start-1">
@@ -226,10 +227,10 @@ export function Landing() {
             <section aria-labelledby="landing-result" className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-1">
               {bestBreak ? <>
                 <h2 id="landing-result" className="text-[clamp(2.75rem,1.6rem+3.8vw,4.75rem)] leading-[0.95] type-display text-ink">
-                  <span className="sr-only">Your recommended break: </span><span className="mark">{bestBreak.totalDaysOff} days off</span>
+                  <span className="sr-only">Your plan: </span><span className="mark">{planDaysOff} days off</span>
                 </h2>
-                <p className="mt-3 text-xl font-semibold text-ink">for {plural(bestBreak.ptoCost, 'PTO day')}, <span className="whitespace-nowrap">{breakDates(bestBreak)}</span></p>
-                <p className="mt-2 text-base text-muted">{breakReason(bestBreak, (date) => holidayName.get(date))} Full plan: <strong className="font-semibold text-ink">{used} of {budget} PTO days</strong> across {plural(breakCount, 'break')}.</p>
+                <p className="mt-3 text-xl font-semibold text-ink">from {plural(used, 'PTO day')} across {plural(breakCount, 'break')}</p>
+                <p className="mt-2 text-base text-muted">Longest: <strong className="font-semibold text-ink"><span className="whitespace-nowrap">{breakDates(bestBreak)}</span>, {bestBreak.totalDaysOff} days off for {plural(bestBreak.ptoCost, 'PTO day')}</strong>. {breakReason(bestBreak, (date) => holidayName.get(date))}</p>
               </> : <>
                 <h2 id="landing-result" className="text-h2 font-bold type-condensed text-ink">Your recommended break</h2>
                 <p className="mt-2 text-base text-muted" role="status">{emptyMessage}</p>
@@ -238,6 +239,9 @@ export function Landing() {
                 <Button href={href}>See the full plan →</Button>
                 <span className="text-sm text-muted">Free, no account needed.</span>
               </div>
+              <p className="mt-4 text-[15px] text-muted">
+                Planning around <a className="link-mark font-semibold" href={`/family?c=${encodeURIComponent(country)}`}>school breaks</a> or <a className="link-mark font-semibold" href={`/sabbatical?c=${encodeURIComponent(country)}`}>a sabbatical</a>?
+              </p>
             </section>
 
             <div className="min-w-0 lg:col-start-1 lg:row-start-2">
@@ -280,8 +284,8 @@ export function Landing() {
           <div className="mt-8 grid gap-6 lg:grid-cols-2 lg:gap-8">
             <ToolGroup title="Plan" rows={[
               { href, title: 'Time off', body: 'Longer breaks and long weekends from your PTO budget. Pin days, rule some out, export the plan.' },
-              { href: '/family', title: 'Family', body: 'Line your PTO up with your kids’ school breaks, from 12 US district calendars or your own.' },
-              { href: '/sabbatical', title: 'Sabbatical', body: 'Where a long leave lands best, and what each extra PTO day adds to it.' },
+              { href: `/family?c=${encodeURIComponent(country)}`, title: 'Family', body: 'Line your PTO up with your kids’ school breaks, from 12 US district calendars or your own.' },
+              { href: `/sabbatical?c=${encodeURIComponent(country)}`, title: 'Sabbatical', body: 'Where a long leave lands best, and what each extra PTO day adds to it.' },
             ]} />
             <ToolGroup title="Keep it on track" rows={[
               { href: '/policy#balance', title: 'Forecast my balance', body: 'What you could have by a future date, including planned leave.' },

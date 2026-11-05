@@ -78,7 +78,7 @@ export function SummaryMetrics({ budgetSpent, totalDaysOff, breakCountActual, sc
           ? <>{totalDaysOff} {offWord} off for {budgetSpent} PTO {ptoWord} in {breakCountActual} {breakWord}. Each PTO day buys {ratio} days off, weekends and holidays included.</>
           : <>No PTO placed yet, so there is no return to show.</>}
       </Fact>
-      <Fact figure={scores ? ordinal(scores.travel.percentile) : '—'} label={travelBasis === 'us' ? 'Travel quietness' : 'Travel quietness (est.)'} short={travelBasis === 'us' ? 'travel quietness' : 'travel quietness (est.)'}>
+      <Fact figure={scores ? ordinal(scores.travel.percentile) : '—'} label={travelBasis === 'us' ? 'Travel quietness' : 'Travel quietness (est.)'} short={travelBasis === 'us' ? 'travel quietness, higher is quieter' : 'travel quietness (estimate), higher is quieter'}>
         {scores
           ? <>Higher is quieter: {gloss(travelLine(scores))}. {travelBasis === 'us' ? 'Based on 2025 US airport checkpoint counts.' : 'A seasonal estimate; there is no travel data for this country.'}</>
           : <>Appears once the plan is solved.</>}

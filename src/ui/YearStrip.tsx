@@ -104,8 +104,8 @@ export function YearStrip({ today, stripEnd, holidays, bridgeableHolidayDates }:
           const tickHeight = tall ? 20 : 10;
           return (
             <g key={h.date}>
-              {/* The marker swipe behind a holiday that is already a long weekend (or one
-                  PTO day from one): height and the marker both say it, never colour alone. */}
+              {/* A tinted tick behind a holiday that is already a long weekend (or one PTO
+                  day from one): height and the tint both say it, never colour alone. */}
               {tall && <rect x={x(h.date) - 4} y={BASELINE_Y - tickHeight} width={8} height={tickHeight} fill="var(--mark)" pointerEvents="none" />}
               <line
                 x1={x(h.date)}

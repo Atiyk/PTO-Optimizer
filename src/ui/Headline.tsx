@@ -68,7 +68,7 @@ export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, 
         <h1 className="m-0 min-w-0 text-ink">
           <span className="block text-display-sm type-display tabular-nums">
             <span className="mark">{totalDaysOff} {offWord} off</span>
-          </span>
+          </span>{' '}
           <span className="mt-2 block text-h2 font-bold tabular-nums type-condensed">
             from {budgetSpent} {unlimitedPto ? 'target' : 'PTO'} {spentWord}
           </span>

@@ -1,3 +1,4 @@
+import type { MouseEvent } from 'react';
 import { Container } from './Container';
 import { Logo } from './Logo';
 
@@ -32,7 +33,7 @@ const PLAN_ROUTES: SiteRoute[] = PLAN_MODES.map((m) => m.route);
 export const PRIMARY_NAV: (NavItem & { icon: 'plan' | 'policy' | 'learn'; matches: SiteRoute[] })[] = [
   { route: 'pto', href: '/pto', label: 'Plan', icon: 'plan', matches: PLAN_ROUTES },
   { route: 'policy', href: '/policy', label: 'My PTO', icon: 'policy', matches: ['policy'] },
-  { route: 'glossary', href: '/glossary', label: 'Learn', icon: 'learn', matches: ['glossary'] },
+  { route: 'glossary', href: '/glossary', label: 'Learn', icon: 'learn', matches: ['glossary', 'other'] },
 ];
 
 /** Kept for the footer: every tool, flat, in the order the planner presents them. */
@@ -46,6 +47,24 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [{
     { route: 'glossary', href: '/glossary', label: 'Learn' },
   ],
 }];
+
+/** Inputs carried from the current URL onto the planning links, so switching mode keeps what
+ * the visitor typed. Country (c) and start date (s) mean the same thing on every planning
+ * page; the PTO budget (b) and end date (e) only on the homepage and /pto. */
+function withQuery(href: string, query: string, keys: readonly string[]): string {
+  const from = new URLSearchParams(query);
+  const to = new URLSearchParams();
+  for (const key of keys) { const v = from.get(key); if (v) to.set(key, v); }
+  const qs = to.toString();
+  return qs ? `${href}?${qs}` : href;
+}
+
+/** Which shared inputs each planning page understands. */
+const CARRY_KEYS: Record<string, readonly string[]> = {
+  '/pto': ['c', 'b', 's', 'e'],
+  '/family': ['c', 's'],
+  '/sabbatical': ['c', 's'],
+};
 
 const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
 
@@ -77,7 +96,7 @@ function TabIcon({ name }: { name: (typeof PRIMARY_NAV)[number]['icon'] }) {
 }
 
 /**
- * Desktop (lg+): logo, then the three destinations; the current one carries an indigo rule on
+ * Tablet and desktop (md+): logo, then the three destinations; the current one carries an indigo rule on
  * the header's bottom edge. Phones: the logo bar stays, and the three destinations move to a
  * fixed bottom tab bar (56px plus the safe area) within thumb reach; index.css reserves its
  * height. On the planning routes a second row switches between the three ways to plan, at
@@ -85,7 +104,15 @@ function TabIcon({ name }: { name: (typeof PRIMARY_NAV)[number]['icon'] }) {
  */
 export function SiteHeader({ active }: SiteHeaderProps) {
   const isCurrent = (item: (typeof PRIMARY_NAV)[number]) => item.matches.includes(active);
+  // 'page' only when the link points at this exact page; the section's other pages get 'true'.
+  const currentAttr = (item: (typeof PRIMARY_NAV)[number]) => !isCurrent(item) ? undefined : item.route === active ? 'page' as const : 'true' as const;
   const inPlan = PLAN_ROUTES.includes(active);
+  // Links stay plain in the HTML; at the moment of the tap they pick up the inputs in the
+  // current URL (the planners keep it updated with replaceState as you type).
+  const carry = (href: string) => (event: MouseEvent<HTMLAnchorElement>) => {
+    const keys = CARRY_KEYS[href];
+    if (keys) event.currentTarget.href = withQuery(href, window.location.search, keys);
+  };
 
   return (
     <header className="border-b border-line bg-surface">
@@ -96,7 +123,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           <span className="sr-only"> home</span>
         </a>
 
-        <nav aria-label="Main" className="ml-auto hidden self-stretch lg:flex">
+        <nav aria-label="Main" className="ml-auto hidden self-stretch md:flex">
           <ul className="flex items-stretch gap-1">
             {PRIMARY_NAV.map((item) => {
               const current = isCurrent(item);
@@ -104,7 +131,8 @@ export function SiteHeader({ active }: SiteHeaderProps) {
                 <li key={item.route} className="flex">
                   <a
                     href={item.href}
-                    aria-current={current ? 'page' : undefined}
+                    onClick={carry(item.href)}
+                    aria-current={currentAttr(item)}
                     className={`relative inline-flex items-center px-4 text-[15px] font-semibold transition-colors duration-150 ${FOCUS} focus-visible:-outline-offset-2 ${
                       current ? 'text-ink after:absolute after:inset-x-3 after:-bottom-px after:h-[3px] after:rounded-t-full after:bg-accent' : 'text-muted hover:text-ink'
                     }`}
@@ -122,16 +150,17 @@ export function SiteHeader({ active }: SiteHeaderProps) {
         <div className="border-t border-line">
           <Container className="px-4 sm:px-6">
             <nav aria-label="Ways to plan" className="-mx-1 overflow-x-auto">
-              <ul className="flex min-w-max gap-1 py-2">
+              <ul className="flex min-w-max gap-1 py-1.5">
                 {PLAN_MODES.map((mode) => {
                   const current = mode.route === active;
                   return (
                     <li key={mode.route}>
                       <a
                         href={mode.href}
+                        onClick={carry(mode.href)}
                         aria-current={current ? 'page' : undefined}
                         className={`inline-flex min-h-11 items-center rounded-full px-4 text-[15px] font-semibold transition-colors duration-150 ${FOCUS} ${
-                          current ? 'bg-ink text-white' : 'text-muted hover:bg-surface-alt hover:text-ink'
+                          current ? 'bg-accent text-white' : 'text-muted hover:bg-surface-alt hover:text-ink'
                         }`}
                       >
                         {mode.label}
@@ -147,7 +176,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
 
       <nav
         aria-label="Tools"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm md:hidden"
       >
         <ul className="mx-auto grid max-w-md grid-cols-3">
           {PRIMARY_NAV.map((item) => {
@@ -156,7 +185,8 @@ export function SiteHeader({ active }: SiteHeaderProps) {
               <li key={item.route} className="min-w-0">
                 <a
                   href={item.href}
-                  aria-current={current ? 'page' : undefined}
+                  onClick={carry(item.href)}
+                  aria-current={currentAttr(item)}
                   className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 text-[12px] leading-4 transition-colors duration-150 ${current ? 'font-bold text-ink' : 'font-medium text-muted'} ${FOCUS} focus-visible:-outline-offset-2`}
                 >
                   {current && <span aria-hidden="true" className="absolute inset-x-[30%] top-0 h-[3px] rounded-b-full bg-accent" />}

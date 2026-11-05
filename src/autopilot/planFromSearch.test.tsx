@@ -4,7 +4,7 @@ import { cleanup, renderHook, waitFor } from '@testing-library/react';
 import { useAppState } from '../ui/useAppState';
 import { encodeEmployerCalendar } from '../personal/employerCalendar';
 import { rangeISO } from '@daysoff/engine/solver/dateUtils';
-import { defaultRangeEnd, planFromSearch, planStateFromSearch } from './planFromSearch';
+import { defaultPlanRangeEnd, planFromSearch, planStateFromSearch } from './planFromSearch';
 import { diskHolidays, holidayFile } from './feedTestHolidays';
 
 const TODAY = '2026-11-04';
@@ -82,7 +82,7 @@ describe('planStateFromSearch', () => {
   it('defaults the range from today the same way the planner does', () => {
     const state = planStateFromSearch('', TODAY);
     expect(state.rangeStart).toBe(TODAY);
-    expect(state.rangeEnd).toBe(defaultRangeEnd(TODAY));
+    expect(state.rangeEnd).toBe(defaultPlanRangeEnd(TODAY));
     expect(state.country).toBe('US');
     expect(state.noticePeriodDays).toBe(14);
     expect(state.reserveDays).toBe(3);

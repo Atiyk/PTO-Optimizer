@@ -46,9 +46,9 @@
  * colorScheme.ts and scoreFormat.ts stay the single source of truth. tokens.test.ts parses
  * THIS block and checks every text/background pair (4.5:1, or 3:1 for UI boundaries).
  *
- * Token names are kept from the previous system so every component keeps resolving; their
- * roles changed: --accent is now ink (the action and PTO colour), and the marker lives in
- * --band-bg / --mark.
+ * Token names are kept from earlier systems so every component keeps resolving: --accent and
+ * --pto-bg are Line indigo (actions and PTO days); --band-bg and --mark are the soft indigo
+ * tint for days off; there is no marker or highlighter any more.
  */
 :root {
   /* "The line": a cool paper ground, ink text, and one route colour (Line indigo) that
@@ -252,7 +252,7 @@
   }
 
   /*
-   * Native selects in the system: square, 44px, ink border, one drawn chevron (the same
+   * Native selects in the system: 6px corners, 44px, control-edge border, one drawn chevron (the same
    * one CountrySelect draws), so every select in the product looks like one control.
    */
   .select-ink {
@@ -303,9 +303,9 @@
 /* The homepage Country/PTO pair uses a container-width-aware inline CSS grid;
    its actual computed columns are asserted at 320 and 375 in consumer QA. */
 
-/* The phone tab bar (SiteHeader, below lg) is fixed to the bottom; reserve its height so the
+/* The phone tab bar (SiteHeader, below md) is fixed to the bottom; reserve its height so the
    last content and the footer are never covered. */
-@media (max-width: 1023.98px) {
+@media (max-width: 767.98px) {
   body {
     padding-bottom: calc(3.5rem + 1px + env(safe-area-inset-bottom));
   }
@@ -314,5 +314,16 @@
   html {
     scroll-padding-top: 3.5rem;
     scroll-padding-bottom: calc(3.5rem + 1px + env(safe-area-inset-bottom));
+  }
+}
+
+/* iOS Safari zooms the page when a focused field is under 16px. Unlayered, so it outranks the
+   utility classes on phones only; larger inline fields (the homepage sentence) keep their size
+   because they inherit it from their parent. */
+@media (max-width: 639.98px) {
+  input:not([type='range']):not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
   }
 }

@@ -1,19 +1,21 @@
 /**
  * The Gapless mark (2026-11 brand overhaul): "the bridged G".
  *
- * A G is a ring with a gap in it. In the Gapless mark the gap is still visible, but it is
- * filled with a softer stroke of the same line: the days that join a holiday to a weekend.
- * White strokes on a Line indigo tile, so it holds on light and dark tabs alike, and the
- * strokes are heavy enough to read at 16px (the favicon).
+ * A square-cut G built like calendar cells. A G is a frame with a gap at its upper right; in
+ * this mark that gap is filled by one softer block, the day that joins a holiday to a weekend,
+ * set off by a 1-unit cut so it reads as "joined" rather than as a missing corner. Rectilinear
+ * on purpose: it does not share the round, crossbar-to-centre silhouette of other G marks.
+ * White and lavender on a Line indigo tile, so it holds on light and dark tabs; the bridge is
+ * above 3:1 against the tile so it survives at 16px (the favicon).
  *
- * One source for the in-page <Logo/>, the generated icon files (scripts/build-icons.ts) and the
- * portrait share card. Colours are CSS variables with hex fallbacks, so the same markup works
- * inside the app (tokens) and as a standalone SVG file (fallbacks).
+ * One source for the in-page <Logo/>, the generated icon files (scripts/build-icons.ts), the
+ * OG images and the portrait share card. Colours are CSS variables with hex fallbacks, so the
+ * same markup works inside the app (tokens) and as a standalone SVG file (fallbacks).
  */
 export const LOGO_COLORS = {
   tile: '#3a36d0',
   stroke: '#ffffff',
-  bridge: '#8c89f5',
+  bridge: '#bdbbf8',
   ink: '#12141c',
   paper: '#ffffff',
   page: '#f5f6f8',
@@ -25,25 +27,27 @@ export interface LogoMarkColors {
   bridge: string;
 }
 
-// Geometry for a 0 0 32 32 viewBox: a ring of radius 8.5 around (16,16); the gap runs from
-// 0 deg (the crossbar's outer end, at 3 o'clock) to 50 deg (the G's upper terminal).
-const R = 8.5;
-const GAP_END = { x: 21.46, y: 9.49 }; // 50 deg
-const BAR_OUTER = { x: 24.5, y: 16 }; // 0 deg
+/** The glyph as rectangles in a 0 0 32 32 box: [x, y, width, height, part]. */
+export const LOGO_GLYPH: readonly (readonly [number, number, number, number, 'stroke' | 'bridge'])[] = [
+  [6.5, 6.5, 13.6, 4.4, 'stroke'], // top, stopping one unit short of the bridge
+  [6.5, 6.5, 4.4, 19, 'stroke'], // left
+  [6.5, 21.1, 19, 4.4, 'stroke'], // bottom
+  [21.1, 14.1, 4.4, 11.4, 'stroke'], // right, lower half
+  [15.5, 14.1, 10, 4.4, 'stroke'], // crossbar
+  [21.1, 6.5, 4.4, 6.6, 'bridge'], // the bridge: the G's gap, filled
+];
+export const LOGO_GLYPH_RADIUS = 1.2;
+export const LOGO_TILE_RADIUS = 8;
 
 /** The mark's inner SVG markup for a 0 0 32 32 viewBox. */
 export function logoMarkInner(colors: LogoMarkColors = {
   tile: `var(--accent, ${LOGO_COLORS.tile})`,
   stroke: LOGO_COLORS.stroke,
   bridge: LOGO_COLORS.bridge,
-}): string {
-  const stroke = 'fill="none" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"';
+}, tileRadius = LOGO_TILE_RADIUS): string {
   return [
-    `<rect width="32" height="32" rx="8" fill="${colors.tile}"/>`,
-    // The bridge: the G's gap, filled in with a softer pass of the line.
-    `<path d="M${BAR_OUTER.x} ${BAR_OUTER.y}A${R} ${R} 0 0 0 ${GAP_END.x} ${GAP_END.y}" stroke="${colors.bridge}" ${stroke}/>`,
-    // The G: the ring from its upper terminal round to the crossbar, then in to the centre.
-    `<path d="M${GAP_END.x} ${GAP_END.y}A${R} ${R} 0 1 0 ${BAR_OUTER.x} ${BAR_OUTER.y}H17" stroke="${colors.stroke}" ${stroke}/>`,
+    `<rect width="32" height="32" rx="${tileRadius}" fill="${colors.tile}"/>`,
+    ...LOGO_GLYPH.map(([x, y, w, h, part]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${LOGO_GLYPH_RADIUS}" fill="${part === 'bridge' ? colors.bridge : colors.stroke}"/>`),
   ].join('');
 }
 

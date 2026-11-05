@@ -166,6 +166,13 @@ export function App() {
                   totalDaysOff={state.totalDaysOff}
                 />
               )}
+              {/* Phones: the calendar sits two screens down, below the settings, so the result
+                  carries direct links to each part of the page. */}
+              <nav aria-label="On this page" className="-mt-1 flex gap-2 overflow-x-auto md:hidden">
+                {[['#complete-plan-heading', 'Calendar'], ['#breaks-heading', 'Request each break'], ['#take-it-heading', 'Export and share']].map(([href, label]) => (
+                  <a key={href} href={href} className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-line bg-surface px-4 text-sm font-semibold text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]">{label}</a>
+                ))}
+              </nav>
             </section>
 
             <aside id="plan-controls" aria-label="Plan settings" className="min-w-0 scroll-mt-16 lg:sticky lg:top-4 lg:col-start-1 lg:row-start-2 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto lg:overscroll-auto">
@@ -431,9 +438,9 @@ export function App() {
               <section aria-labelledby="complete-plan-heading" className="min-w-0">
                 <h2 id="complete-plan-heading" tabIndex={-1} className="text-h2 font-bold text-ink type-condensed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Your complete plan</h2>
                 <p className="mt-1 max-w-prose text-sm text-muted">
-                  {hasHover
-                    ? 'Click a day to take it, click again to rule it out, a third time to let the planner decide. Hover or focus a day to see what pinning it would do. Arrow keys move between days.'
-                    : 'Tap a day to take it, rule it out, or let the planner decide.'}
+                  {/* Chosen by CSS, not JS, so the prerendered page is right on touch from the first paint. */}
+                  <span className="hidden [@media(hover:hover)]:inline">Click a day to take it, click again to rule it out, a third time to let the planner decide. Hover or focus a day to see what pinning it would do. Arrow keys move between days.</span>
+                  <span className="[@media(hover:hover)]:hidden">Tap a day to take it, rule it out, or let the planner decide.</span>
                 </p>
                 <div className="mt-4 rounded-[10px] border border-line bg-surface p-3 sm:p-5">
                   {!state.validationIssues.length ? <CalendarErrorBoundary>

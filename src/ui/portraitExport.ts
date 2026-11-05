@@ -1,6 +1,7 @@
 import type { Break } from '@daysoff/engine/solver/types';
 import { formatDateRange } from '@daysoff/engine/calendar/dateFormat';
 import { copyCanvasImage, type ShareImageResult } from './imageExport';
+import { LOGO_COLORS, LOGO_GLYPH } from './logoMark';
 
 export const PORTRAIT_IMAGE_WIDTH = 1080;
 export const PORTRAIT_IMAGE_HEIGHT = 1350;
@@ -65,7 +66,7 @@ export function buildPortraitText(data: PortraitPlanData, includeBalance = false
 }
 
 // 2026-11 redesign palette (src/index.css): paper, ink, pencil, hairline, and the marker.
-const colors = { page: '#f5f6f8', card: '#ffffff', ink: '#12141c', muted: '#535968', line: '#dde0e6', accent: '#3a36d0', tint: '#e3e2fb', bridge: '#8c89f5' };
+const colors = { page: '#f5f6f8', card: '#ffffff', ink: '#12141c', muted: '#535968', line: '#dde0e6', accent: '#3a36d0', tint: '#e3e2fb' };
 
 function fitText(ctx: CanvasRenderingContext2D, value: string, maxWidth: number): string {
   if (ctx.measureText(value).width <= maxWidth) return value;
@@ -92,29 +93,12 @@ function wrapText(ctx: CanvasRenderingContext2D, value: string, x: number, y: nu
 
 function drawLogoMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
   const k = size / 32;
-  // Path drawing is optional so a minimal 2D context (tests, odd canvases) still renders text.
-  if (typeof ctx.arc !== 'function' || typeof ctx.save !== 'function') return;
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(k, k);
-  ctx.fillStyle = colors.accent;
-  ctx.beginPath();
-  if (typeof ctx.roundRect === 'function') ctx.roundRect(0, 0, 32, 32, 8); else ctx.rect(0, 0, 32, 32);
-  ctx.fill();
-  ctx.lineWidth = 4.2;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  const start = (-50 * Math.PI) / 180;
-  ctx.strokeStyle = colors.bridge;
-  ctx.beginPath();
-  ctx.arc(16, 16, 8.5, start, 0);
-  ctx.stroke();
-  ctx.strokeStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.arc(16, 16, 8.5, start, 0, true);
-  ctx.lineTo(17, 16);
-  ctx.stroke();
-  ctx.restore();
+  ctx.fillStyle = LOGO_COLORS.tile;
+  ctx.fillRect(x, y, size, size);
+  for (const [gx, gy, w, h, part] of LOGO_GLYPH) {
+    ctx.fillStyle = part === 'bridge' ? LOGO_COLORS.bridge : LOGO_COLORS.stroke;
+    ctx.fillRect(x + gx * k, y + gy * k, w * k, h * k);
+  }
 }
 
 export function drawPortraitImage(ctx: CanvasRenderingContext2D, data: PortraitPlanData, includeBalance = false): void {
@@ -126,7 +110,7 @@ export function drawPortraitImage(ctx: CanvasRenderingContext2D, data: PortraitP
   // The mark: the bridged G (src/ui/logoMark.ts), drawn at 56px from the same geometry.
   drawLogoMark(ctx, 64, 62, 56);
   ctx.fillStyle = colors.ink;
-  ctx.font = '700 42px Archivo Variable, system-ui, sans-serif';
+  ctx.font = '760 42px Archivo Variable, system-ui, sans-serif';
   ctx.fillText('gapless', 136, 104);
   ctx.font = '700 48px Archivo Variable, system-ui, sans-serif';
   ctx.fillText(fitText(ctx, text.title, 952), 64, 209);

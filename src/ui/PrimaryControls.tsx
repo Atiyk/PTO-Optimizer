@@ -103,7 +103,7 @@ export function PrimaryControls({
           reserve), never the raw total, so a deliberate reserve never reads as a failure. */}
       {budgetSpent < effectiveBudget && (
         <p className="flex gap-2 text-sm text-ink">
-          <span aria-hidden="true" className="mt-1.5 inline-block h-2 w-2 shrink-0 bg-ink" />
+          <span aria-hidden="true" className="mt-1.5 inline-block h-2 w-2 shrink-0 rounded-[2px] bg-accent" />
           <span>
             Using {budgetSpent} of {effectiveBudget} planned day{effectiveBudget === 1 ? '' : 's'} &mdash; the remaining{' '}
             {effectiveBudget - budgetSpent} day{effectiveBudget - budgetSpent === 1 ? '' : 's'} remain unplanned under your current constraints.

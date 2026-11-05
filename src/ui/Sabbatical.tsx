@@ -325,7 +325,7 @@ export function Sabbatical() {
               {selected && <SabbaticalExportRow placement={selected} lengthWeeks={lengthWeeks} unpaidWeeksToAdd={unpaidWeeksToAdd} />}
 
               <p className="text-base text-muted">
-                Planning ordinary time off too? <a href="/pto" className="link-mark font-semibold">Plan PTO &rarr;</a>
+                Planning ordinary time off too? <a href="/pto" className="link-mark font-semibold">Plan time off &rarr;</a>
               </p>
 
               <SabbaticalFAQ />
@@ -376,7 +376,7 @@ function PlacementList({
             onClick={() => onSelect(p.start)}
             onKeyDown={(event) => onKeyDown(event, index)}
             className={`grid min-h-11 w-full grid-cols-[2rem_minmax(0,1fr)] gap-x-3 rounded-[10px] border bg-surface p-3 text-left transition-colors duration-150 sm:grid-cols-[2rem_minmax(0,13rem)_minmax(0,1fr)] sm:items-center sm:p-4 ${
-              isSelected ? 'border-2 border-ink' : 'border-line hover:border-ink'
+              isSelected ? 'border-2 border-accent' : 'border-line hover:border-ink'
             }`}
           >
             <span aria-hidden="true" className={`flex h-8 w-8 items-center justify-center rounded-[6px] text-base font-bold ${isSelected ? 'bg-accent text-white' : 'bg-surface-alt text-ink'}`}>{index + 1}</span>
@@ -443,7 +443,7 @@ function MarginalBars({ marginal, currentDaysUsed }: { marginal: { daysUsed: num
         {shown.map((g) => {
           const isCurrent = g.daysUsed === currentDaysUsed;
           return (
-            <div key={g.daysUsed} className={`flex min-w-0 max-w-12 flex-1 flex-col items-center justify-end px-0.5 pt-6 ${isCurrent ? 'bg-mark' : ''}`} style={{ height: `${CHART + 24}px` }}>
+            <div key={g.daysUsed} className={`flex min-w-0 max-w-12 flex-1 flex-col items-center justify-end px-0.5 pt-6 ${isCurrent ? 'rounded-t-[6px] bg-mark' : ''}`} style={{ height: `${CHART + 24}px` }}>
               <span className="text-sm font-bold tabular-nums text-ink">+{g.gained}</span>
               <span className="mt-1 block w-full rounded-t-[3px] bg-accent" style={{ height: `${Math.max(3, (g.gained / maxGain) * CHART)}px` }} />
             </div>
@@ -454,7 +454,7 @@ function MarginalBars({ marginal, currentDaysUsed }: { marginal: { daysUsed: num
         {shown.map((g) => {
           const isCurrent = g.daysUsed === currentDaysUsed;
           return (
-            <span key={g.daysUsed} className={`min-w-0 max-w-12 flex-1 pt-1 text-center text-xs tabular-nums ${isCurrent ? 'bg-mark font-bold text-ink' : 'text-muted'}`}>
+            <span key={g.daysUsed} className={`min-w-0 max-w-12 flex-1 pt-1 text-center text-xs tabular-nums ${isCurrent ? 'bg-accent font-bold text-white' : 'text-muted'}`}>
               {g.daysUsed}
             </span>
           );

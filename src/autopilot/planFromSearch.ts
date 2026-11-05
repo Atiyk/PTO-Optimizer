@@ -41,6 +41,13 @@ const DEFAULT_RANGE_ROLLOVER_DAYS = 21;
  * useful planning window, then rolls forward to next year's Dec 31. (Moved here from
  * useAppState.ts, which re-exports it, so the feed defaults the range the same way.)
  */
+/** The planner's default end date: the next 12 months (same as the homepage preview). */
+export function defaultPlanRangeEnd(todayIso: string): string {
+  const d = new Date(`${todayIso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 364);
+  return d.toISOString().slice(0, 10);
+}
+
 export function defaultRangeEnd(todayIso: string): string {
   const year = Number(todayIso.slice(0, 4));
   const thisYearEnd = `${year}-12-31`;
@@ -291,7 +298,7 @@ export interface PlanState {
 /** Mirrors useAppState's initial useState values for the same search string, minus the
  * browser-only defaults listed in this file's header. */
 export function planStateFromSearch(search: string, today: string, defaultCountry = 'US'): PlanState {
-  const initial = readFullStateFromURL(search, { rangeStart: today, rangeEnd: defaultRangeEnd(today), budget: 15, country: defaultCountry });
+  const initial = readFullStateFromURL(search, { rangeStart: today, rangeEnd: defaultPlanRangeEnd(today), budget: 15, country: defaultCountry });
   const country = initial.country ?? defaultCountry;
   const overlapPayload = readOverlapPayloadFromURL(search);
   const forced: Record<string, ForcedState> = {};

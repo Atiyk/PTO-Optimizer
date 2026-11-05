@@ -37,8 +37,11 @@ describe('SiteHeader (2026-11 information architecture)', () => {
       const modes = getByRole('navigation', { name: 'Ways to plan' });
       expect([...modes.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(['/pto', '/family', '/sabbatical']);
       expect(modes.querySelector('[aria-current="page"]')?.textContent).toBe(label);
-      // "Plan" stays the current destination for all three.
-      expect(getByRole('navigation', { name: 'Main' }).querySelector('[aria-current="page"]')?.textContent).toBe('Plan');
+      // "Plan" stays the current destination for all three: 'page' on /pto itself, 'true'
+      // (current section) on the other two, since its link points at /pto.
+      const plan = getByRole('navigation', { name: 'Main' }).querySelector('[aria-current]');
+      expect(plan?.textContent).toBe('Plan');
+      expect(plan?.getAttribute('aria-current')).toBe(route === 'pto' ? 'page' : 'true');
       cleanup();
     }
   });
@@ -71,8 +74,18 @@ describe('SiteHeader (2026-11 information architecture)', () => {
       expect(link.className).toContain('min-h-14');
       expect(link.className).toContain('focus-visible:outline');
     }
-    expect(links[0].getAttribute('aria-current')).toBe('page');
-    expect(tabs.className).toContain('lg:hidden');
+    expect(links[0].getAttribute('aria-current')).toBe('true');
+    expect(tabs.className).toContain('md:hidden');
+  });
+
+  it('carries country and dates onto the planning links at tap time', () => {
+    window.history.replaceState(null, '', '/pto?c=GB&b=22&s=2027-01-01&e=2027-12-31&w=40');
+    const { getByRole } = render(<SiteHeader active="pto" />);
+    const family = [...getByRole('navigation', { name: 'Ways to plan' }).querySelectorAll('a')].find((a) => a.textContent === 'Family')!;
+    family.addEventListener('click', (e) => e.preventDefault());
+    family.click();
+    expect(family.getAttribute('href')).toBe('/family?c=GB&s=2027-01-01');
+    window.history.replaceState(null, '', '/');
   });
 
   it('keeps every destination one tap away on phones, with no menu to open first', () => {
