@@ -37,13 +37,16 @@ export interface SubscribeFeedProps {
   calendarName?: string;
   heading?: string;
   description?: string;
+  /** Small print under the description: when to resubscribe, who can see the link. */
+  caveat?: string;
   /** Unique per page when more than one subscribe block renders. */
   idPrefix?: string;
 }
 
-const PLAN_DESCRIPTION = 'Subscribe once. Your calendar shows your PTO days, public holidays and a “book by” reminder before each break, and the holidays and book-by dates stay current. Editing the plan here gives a new link, so subscribe again after a change. Like the plan link, anyone with this link can see the plan.';
+const PLAN_DESCRIPTION = 'Subscribe once to see your PTO days, holidays and a “book by” reminder before each break, kept current.';
+const PLAN_CAVEAT = 'After editing the plan, subscribe again. Anyone with the link can see the plan.';
 
-export function SubscribeFeed({ planSearch, origin, path = '/api/feed', calendarName = FEED_CALENDAR_NAME, heading = 'Keep this plan in your calendar', description = PLAN_DESCRIPTION, idPrefix = 'subscribe-feed' }: SubscribeFeedProps) {
+export function SubscribeFeed({ planSearch, origin, path = '/api/feed', calendarName = FEED_CALENDAR_NAME, heading = 'Keep this plan in your calendar', description = PLAN_DESCRIPTION, caveat = PLAN_CAVEAT, idPrefix = 'subscribe-feed' }: SubscribeFeedProps) {
   // The links name this deployment's origin and the visitor's current plan, neither of
   // which the prerendered HTML knows, and React keeps server attributes on hydration - so
   // they render only after mount, never with a build-time host or plan baked in.
@@ -64,6 +67,7 @@ export function SubscribeFeed({ planSearch, origin, path = '/api/feed', calendar
       ) : !links ? null : (
         <>
           <p className="max-w-prose text-sm text-muted">{description}</p>
+          {caveat && <p className="max-w-prose text-xs leading-5 text-muted">{caveat}</p>}
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" href={links.webcal}>Apple Calendar</Button>
             <Button variant="secondary" href={links.google} target="_blank" rel="noopener noreferrer">
@@ -75,14 +79,14 @@ export function SubscribeFeed({ planSearch, origin, path = '/api/feed', calendar
           </div>
           <div className="flex min-w-0 flex-col gap-1.5">
             <label htmlFor={`${idPrefix}-url`} className="text-sm font-semibold text-ink">Or paste this link into any calendar app</label>
-            <div className="flex min-w-0 flex-wrap gap-2 sm:flex-nowrap">
+            <div className="flex min-w-0 flex-wrap gap-2">
               <input
                 id={`${idPrefix}-url`}
                 type="url"
                 readOnly
                 value={links.https}
                 onFocus={(event) => event.currentTarget.select()}
-                className="h-11 w-full min-w-0 flex-1 rounded-[3px] border border-line-strong bg-surface px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+                className="h-11 w-full min-w-0 basis-full rounded-[3px] border border-line-strong bg-surface px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
               />
               <Button
                 variant="secondary"

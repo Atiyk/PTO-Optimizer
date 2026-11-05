@@ -109,4 +109,10 @@ describe('buildWatchFeedICS', () => {
   it('lists the holiday years a server should read', () => {
     expect(watchFeedHolidayYears('2026-11-04')).toEqual([2026, 2027, 2028]);
   });
+
+  it('refuses an absurd hand-edited balance instead of printing Infinity days', () => {
+    const result = buildWatchFeedICS(SEARCH.replace('cb=8', 'cb=1e308'), '2026-11-04', holidays);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(400);
+  });
 });

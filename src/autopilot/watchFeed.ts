@@ -134,6 +134,9 @@ function round(value: number): string {
   return String(Math.round(value * 100) / 100);
 }
 
+/** Far above any real PTO bank (in days); only a hand-edited link reaches it. */
+export const WATCH_FEED_MAX_DAYS_AT_STAKE = 1000;
+
 export function buildWatchFeedICS(policySearch: string, today: string, holidays: WatchFeedHolidays): WatchFeedResult {
   if (typeof policySearch !== 'string' || policySearch.length > WATCH_FEED_MAX_QUERY) {
     return { ok: false, status: 414, message: `The policy link is too long for a calendar feed (over ${WATCH_FEED_MAX_QUERY} characters).` };
@@ -151,6 +154,11 @@ export function buildWatchFeedICS(policySearch: string, today: string, holidays:
   }
 
   const risks = expirationRisks(policy, country, [], today);
+  // A hand-edited link (cb=1e308) forecasts, but no real balance is that large; refuse it
+  // rather than print "Infinity days" into someone's calendar.
+  if (risks.some((risk) => !Number.isFinite(risk.daysAtStake) || risk.daysAtStake > WATCH_FEED_MAX_DAYS_AT_STAKE)) {
+    return { ok: false, status: 400, message: 'This policy link has values Gapless cannot forecast. Open it in Gapless to fix them.' };
+  }
   const horizon = risks.reduce((latest, risk) => (risk.deadline > latest ? risk.deadline : latest), today);
   const { calendar, missingYears } = feedCalendar(state, today, horizon, holidays);
   const plans = rescuePlans(risks, { policy, country, requests: [], calendar, today });

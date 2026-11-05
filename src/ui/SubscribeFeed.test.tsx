@@ -36,7 +36,7 @@ describe('SubscribeFeed', () => {
     expect(input.value).toBe(`${ORIGIN}/api/feed?${SEARCH}`);
     expect(screen.getByRole('button', { name: 'Copy calendar link' })).toBeTruthy();
     expect(document.querySelector('button[type="submit"], form')).toBeNull();
-    expect(screen.getByText(/Editing the plan here gives a new link/)).toBeTruthy();
+    expect(screen.getByText(/After editing the plan, subscribe again/)).toBeTruthy();
   });
 
   it('uses this page origin once mounted (never a build-time host)', () => {

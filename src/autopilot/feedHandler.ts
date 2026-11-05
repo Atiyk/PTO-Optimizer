@@ -12,6 +12,27 @@ import { isValidISODate } from '../ui/urlState';
  * the plan's own (bounded) range. */
 export type HolidayReader = (country: string, year: number) => Promise<unknown | null>;
 
+/** Feed work bounds. The browser solver happily runs long plans, but a public function
+ * must not: a 400-day budget over ten years ran out of memory in one request,
+ * and cost grows with the total days to place. Plans past
+ * these bounds still work in the app and as a downloaded .ics. */
+export const MAX_FEED_RANGE_DAYS = 3 * 366;
+/** Total PTO (balance plus accrual) a feed may plan. Solver cost grows with the total,
+ * not per year: 80 days peaked near 1.8 s and 420 MB; 180 ran out of memory. */
+export const MAX_FEED_PTO_DAYS = 80;
+
+const DAY_MS = 86_400_000;
+
+/** True when the plan is small enough to solve inside one function call. */
+export function feedWorkloadAllowed(state: { rangeStart: string; rangeEnd: string; budget: number; accrualEnabled?: boolean; accrualPerMonth?: number }): boolean {
+  const days = (Date.parse(`${state.rangeEnd}T00:00:00Z`) - Date.parse(`${state.rangeStart}T00:00:00Z`)) / DAY_MS + 1;
+  if (!Number.isFinite(days) || days < 1 || days > MAX_FEED_RANGE_DAYS) return false;
+  const months = days / 30.4375;
+  const accrued = state.accrualEnabled && Number.isFinite(state.accrualPerMonth) ? Math.max(0, state.accrualPerMonth ?? 0) * months : 0;
+  const total = (Number.isFinite(state.budget) ? Math.max(0, state.budget) : Infinity) + accrued;
+  return total <= MAX_FEED_PTO_DAYS;
+}
+
 export const FEED_CACHE_CONTROL = 'public, max-age=0, s-maxage=21600, stale-while-revalidate=86400';
 
 function utcToday(now: Date): string {
@@ -46,6 +67,9 @@ export async function handleFeedRequest(request: Request, readHolidays: HolidayR
   // pure builder.
   const state = planStateFromSearch(query, today);
   const loaded = new Map<string, unknown>();
+  if (isValidISODate(state.rangeStart) && isValidISODate(state.rangeEnd) && !feedWorkloadAllowed(state)) {
+    return textResponse(400, 'This plan is too large for a calendar feed. Download the .ics file instead.');
+  }
   if (isValidISODate(state.rangeStart) && isValidISODate(state.rangeEnd)) {
     const years = holidayYearsNeeded(state.country, state.rangeStart, state.rangeEnd);
     await Promise.all(years.map(async (year) => {

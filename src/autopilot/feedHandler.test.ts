@@ -57,4 +57,21 @@ describe('handleFeedRequest', () => {
     expect(head.status).toBe(200);
     expect(await head.text()).toBe('');
   });
+
+  it('400 before solving for a plan too large for one function call', async () => {
+    const spy = vi.fn(reader);
+    for (const q of ['c=US&s=2026-11-04&e=2036-11-03&b=400', 'c=US&s=2026-11-04&e=2027-12-31&b=81', 'c=US&s=2026-11-04&e=2029-11-03&b=50&ac=1&am=2', 'c=US&s=2026-11-04&e=2030-12-31&b=20']) {
+      const started = Date.now();
+      const res = await handleFeedRequest(new Request(`https://example.test/api/feed?${q}`), spy, NOW);
+      expect(res.status).toBe(400);
+      expect(await res.text()).toContain('Download the .ics file instead');
+      expect(Date.now() - started).toBeLessThan(500);
+    }
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('still serves a three-year plan at the PTO limit', async () => {
+    const res = await handleFeedRequest(new Request('https://example.test/api/feed?c=US&s=2026-11-04&e=2029-11-03&b=80'), reader, NOW);
+    expect(res.status).toBe(200);
+  });
 });
