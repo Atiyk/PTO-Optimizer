@@ -64,6 +64,13 @@ export const organizations = pgTable('organizations', {
    * Checked in src/ai/run.ts, the single entry point for model calls.
    */
   aiFeaturesEnabled: boolean('ai_features_enabled').notNull().default(true),
+  /**
+   * PTO payout estimates in money: managers and admins see amounts (never rates). Pay rates are
+   * stored while this or cost-aware ranking is on; turning both off deletes them.
+   */
+  payoutMoneyEstimates: boolean('payout_money_estimates').notNull().default(false),
+  /** Admin opt-in: each employee sees their OWN payout estimate in money (never anyone else's). */
+  payoutEmployeeEstimates: boolean('payout_employee_estimates').notNull().default(false),
   /** The shared, read-only sample org behind the public demo (/demo). */
   isDemo: boolean('is_demo').notNull().default(false),
   /** Minutes an auto-approval stays reversible by the manager. */
@@ -1259,4 +1266,26 @@ export const windowAllocations = pgTable(
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex('window_allocations_rule_idx').on(t.ruleId)],
+);
+
+/**
+ * PTO payout policy per leave type (Gapless Phase 4): separation, year end, voluntary cash-out,
+ * sick exclusion. Interpreted by packages/engine/src/leave/payout.ts only. `sourceQuote` is the
+ * handbook sentence it came from (user-authored text, shown as data).
+ */
+export const payoutPolicies = pgTable(
+  'payout_policies',
+  {
+    id: id(),
+    orgId: orgRef(),
+    leaveTypeId: uuid('leave_type_id')
+      .notNull()
+      .references(() => leaveTypes.id, { onDelete: 'cascade' }),
+    policy: jsonb('policy').notNull(),
+    sourceQuote: text('source_quote'),
+    updatedByMemberId: uuid('updated_by_member_id').references(() => members.id, { onDelete: 'set null' }),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('payout_policies_org_type_idx').on(t.orgId, t.leaveTypeId)],
 );

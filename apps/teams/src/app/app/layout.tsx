@@ -26,7 +26,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     if (manager) team.push(['/app/compliance', 'Compliance inbox']);
     if (regulated) team.push(['/app/coverage', 'Coverage']);
     if (manager && org.timeClockEnabled) team.push(['/app/time', 'Timesheets']);
-    if (manager) team.push(['/app/approvals', 'Approvals'], ['/app/reports', 'Reports'], ['/app/planner', 'Planner']);
+    if (manager) team.push(['/app/approvals', 'Approvals'], ['/app/reports', 'Reports'], ['/app/payout', 'PTO payout'], ['/app/planner', 'Planner']);
     groups.push({ title: 'Team', links: team });
   }
   const settings: [string, string][] = [['/app/agents', 'My agents']];
