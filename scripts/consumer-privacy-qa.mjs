@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 const base = new URL(process.argv[2] || 'http://127.0.0.1:4173');
 const out = resolve(process.argv[3] || 'qa-evidence/privacy');
 await mkdir(out, { recursive: true });
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {}) });
 const records = [];
 try {
   for (const width of [1440, 768, 375, 320]) {
