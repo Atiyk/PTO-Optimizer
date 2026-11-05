@@ -703,6 +703,15 @@ export function useAppState() {
     [holidayEntries],
   );
 
+  /** 'company' for days the employer calendar adds, 'public' for public and state holidays. */
+  const holidayKindFor = useCallback(
+    (iso: string): 'public' | 'company' | undefined => {
+      const entry = holidayEntries.find((h) => h.date === iso && h.checked);
+      return entry ? (entry.source === 'custom' ? 'company' : 'public') : undefined;
+    },
+    [holidayEntries],
+  );
+
   const baseOffSet = useMemo(() => new Set(effectiveOffDays), [effectiveOffDays]);
   const blackoutSet = useMemo(() => new Set(effectiveBlackouts), [effectiveBlackouts]);
   const chosenDaySet = useMemo(() => {
@@ -1006,6 +1015,7 @@ export function useAppState() {
     setWeekStartOverride,
     marginalValues,
     holidayNameFor,
+    holidayKindFor,
     totalDaysOff,
     scores,
     highlightedBreakIds,
@@ -1057,6 +1067,7 @@ export function useAppState() {
     swapAlternative,
     categoryOf,
     isBlackoutDay,
+    hasBlackouts: blackoutSet.size > 0,
     isSuggestedPto,
     overlapSet,
     offRuns,

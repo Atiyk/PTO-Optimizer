@@ -5,7 +5,7 @@
  * this mark that gap is filled by one softer block, the day that joins a holiday to a weekend,
  * set off by a 1-unit cut so it reads as "joined" rather than as a missing corner. Rectilinear
  * on purpose: it does not share the round, crossbar-to-centre silhouette of other G marks.
- * White and lavender on a Line indigo tile, so it holds on light and dark tabs; the bridge is
+ * White and sea glass on a Signal Blue tile, so it holds on light and dark tabs; the bridge is
  * above 3:1 against the tile so it survives at 16px (the favicon).
  *
  * One source for the in-page <Logo/>, the generated icon files (scripts/build-icons.ts), the
@@ -13,12 +13,12 @@
  * same markup works inside the app (tokens) and as a standalone SVG file (fallbacks).
  */
 export const LOGO_COLORS = {
-  tile: '#3a36d0',
+  tile: '#245da6',
   stroke: '#ffffff',
-  bridge: '#bdbbf8',
-  ink: '#12141c',
+  bridge: '#8fd6ca',
+  ink: '#1b2935',
   paper: '#ffffff',
-  page: '#f5f6f8',
+  page: '#f8fafc',
 } as const;
 
 export interface LogoMarkColors {

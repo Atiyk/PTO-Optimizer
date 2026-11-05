@@ -17,7 +17,7 @@ describe('Legend', () => {
   });
 
   it('renders the five required entries, in order', () => {
-    const labels = ['Public holiday', 'Suggested PTO', 'Pinned by you', 'Alternative', 'Days off'];
+    const labels = ['Public holiday', 'Suggested PTO', 'Pinned by you', 'Alternative', 'Recommended break'];
     let lastIndex = -1;
     for (const label of labels) {
       const idx = html.indexOf(label);
@@ -49,5 +49,15 @@ describe('Legend', () => {
     expect(html).not.toContain('holidayBg');
     expect(html).not.toContain('violet');
     expect(html).not.toContain('indigo'); // the summary strip's score ramp must never appear here
+  });
+
+  it('adds employer days off and blackouts only when the plan has them, as shapes plus words', () => {
+    expect(html).not.toContain('Employer day off');
+    expect(html).not.toContain('Blackout');
+    const full = renderToStaticMarkup(<Legend showCompany showBlackout />);
+    expect(full).toContain('Employer day off');
+    expect(full).toContain('rounded-[1px]'); // the square marker, not the round holiday dot
+    expect(full).toContain('Blackout, no PTO');
+    expect(full).toContain('repeating-linear-gradient'); // hatching, not a hue
   });
 });

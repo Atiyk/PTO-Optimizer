@@ -3,6 +3,7 @@ import { Container } from './Container';
 import { Logo } from './Logo';
 import { NAV_GROUPS } from './SiteHeader';
 import { PRODUCT_NAME, TAGLINE } from '../brand';
+import { BUG_REPORT_MAILTO, CONTACT_MAILTO } from './contact';
 
 interface FooterProps {
   /** Only the /pto route has a keyboard-shortcuts modal to open - omitted on the landing
@@ -11,15 +12,13 @@ interface FooterProps {
   onShowShortcuts?: () => void;
 }
 
-const LINK_CLASS = 'inline-flex min-h-11 items-center px-1 -mx-1 text-[#e6e8ee] transition-colors duration-150 hover:text-white hover:underline hover:decoration-2 underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white';
+const LINK_CLASS = 'inline-flex min-h-11 items-center px-1 -mx-1 text-[#e4e9ee] transition-colors duration-150 hover:text-white hover:underline hover:decoration-2 underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white';
 
-/** Direct support email; no account or contact-form backend required. */
-export const CONTACT_EMAIL = 'atiykahmeed6310@gmail.com';
 
 function Column({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      <h2 className="mb-2 text-sm font-semibold text-[#b4b9c6]">{title}</h2>
+      <h2 className="mb-2 text-sm font-semibold text-[#b3bfca]">{title}</h2>
       <ul className="flex flex-col text-[15px]">{children}</ul>
     </div>
   );
@@ -33,15 +32,15 @@ function Column({ title, children }: { title: string; children: ReactNode }) {
 export function Footer({ onShowShortcuts }: FooterProps) {
   const tools = NAV_GROUPS.flatMap((g) => g.items);
   return (
-    <footer className="mt-24 bg-[#12141c] text-white">
+    <footer className="mt-24 bg-[#1b2935] text-white">
       <Container className="grid grid-cols-2 gap-x-8 gap-y-10 px-4 pt-14 pb-10 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div className="col-span-2 md:col-span-1 md:pr-8">
           <p className="text-white">
             <Logo size={28} tone="dark" />
             <span className="sr-only">{PRODUCT_NAME}</span>
           </p>
-          <p className="mt-3 max-w-xs text-[15px] leading-6 text-[#e6e8ee]">{TAGLINE}</p>
-          <p className="mt-2 text-sm text-[#b4b9c6]">Free, and every plan works without an account.</p>
+          <p className="mt-3 max-w-xs text-[15px] leading-6 text-[#e4e9ee]">{TAGLINE}</p>
+          <p className="mt-2 text-sm text-[#b3bfca]">Free, and every plan works without an account.</p>
         </div>
         <Column title="Explore">
           {tools.map((t) => (
@@ -81,12 +80,12 @@ export function Footer({ onShowShortcuts }: FooterProps) {
         </Column>
         <Column title="Help & privacy">
           <li>
-              <a href={`mailto:${CONTACT_EMAIL}?subject=Gapless%20feedback`} className={LINK_CLASS}>
-                Contact &amp; feedback
-              </a>
+            <a href={CONTACT_MAILTO} className={LINK_CLASS}>
+              Contact us
+            </a>
           </li>
           <li>
-            <a href="https://github.com/Atiyk/PTO-Optimizer/issues" className={LINK_CLASS} target="_blank" rel="noreferrer">
+            <a href={BUG_REPORT_MAILTO} className={LINK_CLASS}>
               Report a bug
             </a>
           </li>
@@ -100,7 +99,7 @@ export function Footer({ onShowShortcuts }: FooterProps) {
         </Column>
       </Container>
       <Container className="px-4 sm:px-6">
-        <p className="border-t border-white/15 py-5 text-sm text-[#b4b9c6]">
+        <p className="border-t border-white/15 py-5 text-sm text-[#b3bfca]">
           {PRODUCT_NAME}. Made for more confident time-off planning.
         </p>
       </Container>

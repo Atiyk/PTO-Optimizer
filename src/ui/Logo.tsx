@@ -29,7 +29,7 @@ export function Logo({ size = 28, tone = 'light', compact = false }: { size?: nu
       <LogoMark size={size} />
       <span className="flex min-w-0 items-baseline gap-1.5 leading-none">
         <span className={`type-display lowercase text-[24px] tracking-[-0.035em] ${tone === 'dark' ? 'text-white' : 'text-ink'}`}>Gapless{' '}</span>
-        <span className={`${compact ? 'hidden sm:inline' : ''} text-[13px] font-medium ${tone === 'dark' ? 'text-[#c3c7d0]' : 'text-muted'}`}>PTO Optimizer{' '}</span>
+        <span className={`${compact ? 'hidden sm:inline' : ''} text-[13px] font-medium ${tone === 'dark' ? 'text-[#c3ccd5]' : 'text-muted'}`}>PTO Optimizer{' '}</span>
       </span>
     </span>
   );

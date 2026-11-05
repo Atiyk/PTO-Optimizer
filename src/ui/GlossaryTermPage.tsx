@@ -13,7 +13,7 @@ const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outli
 /** Stage 3C's "interactive mini-example where it helps" - a tiny, static illustration for
  * the handful of terms a picture genuinely clarifies, not all 30 (most are better served by
  * the plain-English long definition alone). Drawn in the calendar's own language: PTO is a
- * solid indigo block, days off are the tinted run, and every cell also carries a word. */
+ * solid blue block, days off are the tinted run, and every cell also carries a word. */
 function MiniExample({ id }: { id: string }) {
   if (id === 'accrual-cap') {
     return (

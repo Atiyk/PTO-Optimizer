@@ -230,17 +230,17 @@ export function Family() {
                         askLink={askLink}
                       />
                       {unknownDistrict && (
-                        <p role="alert" className="mt-2 text-sm font-semibold text-ink">
+                        <p role="alert" className="mt-2 text-sm font-semibold text-error">
                           The district in this link isn&apos;t in the preset list any more. Pick one above or add the school&apos;s dates.
                         </p>
                       )}
                       {skippedParams.some((p) => p !== 'sd') && (
-                        <p role="alert" className="mt-2 text-sm font-semibold text-ink">
+                        <p role="alert" className="mt-2 text-sm font-semibold text-error">
                           Some of this plan is too large to fit in the link ({skippedParams.filter((p) => p !== 'sd').map((p) => (p === 'x' ? 'switched-off breaks' : p === 'pp' ? 'shared days' : p)).join(', ')}). The page still uses it, but a copied link won&apos;t.
                         </p>
                       )}
                       {sdTooLong && (
-                        <p role="alert" className="mt-2 text-sm font-semibold text-ink">
+                        <p role="alert" className="mt-2 text-sm font-semibold text-error">
                           That&apos;s more added dates than a link can carry. The plan here uses all of them, but a copied link may not. Remove dates you don&apos;t need.
                         </p>
                       )}
@@ -252,10 +252,10 @@ export function Family() {
 
             <div className="flex min-w-0 flex-col gap-10 lg:gap-12">
               {received.invalid && (
-                <p role="alert" className="rounded-[10px] border border-ink p-3 text-sm text-ink">The shared availability in this link is invalid or too large. Ask for a new link.</p>
+                <p role="alert" className="rounded-[10px] border border-error bg-error-soft p-3 text-sm text-ink">The shared availability in this link is invalid or too large. Ask for a new link.</p>
               )}
               {initial.invalid.includes('sd') && (
-                <p role="alert" className="rounded-[10px] border border-ink p-3 text-sm text-ink">The school dates in this link couldn&apos;t be read. Ask for a new link, or add the dates here.</p>
+                <p role="alert" className="rounded-[10px] border border-error bg-error-soft p-3 text-sm text-ink">The school dates in this link couldn&apos;t be read. Ask for a new link, or add the dates here.</p>
               )}
               {received.availability && (
                 <OtherAdultNote availability={received.availability} plan={plan} />

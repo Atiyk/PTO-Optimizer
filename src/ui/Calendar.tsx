@@ -21,6 +21,8 @@ interface CalendarProps {
   overlapSet: Set<string>;
   marginalValues: Map<string, MarginalValue>;
   holidayNameFor: (iso: string) => string | undefined;
+  /** Public holiday or an employer-added day off; undefined on ordinary days. */
+  holidayKindFor?: (iso: string) => 'public' | 'company' | undefined;
   hasHover: boolean;
   onDayClick: (date: string) => void;
   alternativeForDate: (iso: string) => Alternative | undefined;
@@ -48,6 +50,7 @@ export function Calendar({
   overlapSet,
   marginalValues,
   holidayNameFor,
+  holidayKindFor,
   hasHover,
   onDayClick,
   alternativeForDate,
@@ -105,6 +108,7 @@ export function Calendar({
           overlapSet={overlapSet}
           marginalValues={marginalValues}
           holidayNameFor={holidayNameFor}
+          holidayKindFor={holidayKindFor}
           hasHover={hasHover}
           onDayClick={onDayClick}
           alternativeForDate={alternativeForDate}

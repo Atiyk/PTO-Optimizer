@@ -59,15 +59,15 @@ function template(title: string, subtitle: string, detail: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><style>
     @font-face { font-family: Archivo; src: url(data:font/woff2;base64,${ARCHIVO}) format('woff2'); font-weight: 400 800; font-stretch: 75% 100%; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { width: 1200px; height: 630px; background: #f5f6f8; color: #12141c; font-family: Archivo, system-ui, sans-serif; display: flex; flex-direction: column; justify-content: center; padding: 84px 90px; }
+    body { width: 1200px; height: 630px; background: #f8fafc; color: #1b2935; font-family: Archivo, system-ui, sans-serif; display: flex; flex-direction: column; justify-content: center; padding: 84px 90px; }
     .brand { display: flex; align-items: center; gap: 14px; font-size: 30px; font-weight: 760; font-stretch: 88%; letter-spacing: -0.02em; margin-bottom: 40px; }
     .mark-icon { width: 44px; height: 44px; display: block; }
     .wm { font-size: 36px; letter-spacing: -0.035em; }
-    .desc { font-size: 22px; font-weight: 500; color: #535968; letter-spacing: 0; font-stretch: 100%; }
+    .desc { font-size: 22px; font-weight: 500; color: #536575; letter-spacing: 0; font-stretch: 100%; }
     .sr { display: none; }
     h1 { font-size: 72px; font-weight: 760; font-stretch: 88%; line-height: 1.02; letter-spacing: -0.025em; margin: 0 0 24px; max-width: 1000px; }
-    p { color: #535968; font-size: 28px; line-height: 1.4; margin: 0; max-width: 940px; }
-    .detail { margin-top: 32px; font-size: 26px; font-weight: 600; align-self: flex-start; color: #2c28ad; border-top: 3px solid #3a36d0; padding-top: 14px; }
+    p { color: #536575; font-size: 28px; line-height: 1.4; margin: 0; max-width: 940px; }
+    .detail { margin-top: 32px; font-size: 26px; font-weight: 600; align-self: flex-start; color: #1d4c88; border-top: 3px solid #245da6; padding-top: 14px; }
   </style></head><body>
     <div class="brand"><svg class="mark-icon" viewBox="0 0 32 32">${logoMarkInner(LOGO_COLORS)}</svg><span class="wm">gapless</span><span class="desc">PTO Optimizer</span><span class="sr">${PRODUCT_NAME}</span></div>
     <h1>${title}</h1>

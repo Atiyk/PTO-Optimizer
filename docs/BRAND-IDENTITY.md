@@ -47,7 +47,7 @@ during the run, not committed):
 6. Plain route G: strong at 16px but generic letter-in-tile. Kept as the base.
 7. **Bridged G (chosen):** a square-cut G built from straight route segments (5 white
    strokes on the indigo tile), whose gap at the top right is filled by a lavender block
-   (`#bdbbf8`) separated from the bar by a one-unit cut, so the letter still reads as G while
+   (now sea glass `#8fd6ca`) separated from the bar by a one-unit cut, so the letter still reads as G while
    its gap is visibly filled: "the gap, filled". A first round-G drawing was rejected by the
    visual critic (it read as a Google-style G and the soft bridge vanished below 32px); the
    square cut fixes both and matches the condensed Archivo wordmark. It reads at 16px, holds
@@ -77,3 +77,12 @@ brand board was produced afterwards.
   app in a browser; their findings and dispositions are in `docs/UX-CRITIC-REPORT.md`.
 - Other installed design skills (taste, Emil's design, ux-ui-audit, brand-voice) were
   available but not run in this pass; they are not credited here.
+
+## Palette update: Ink & Signal Blue (2026-11, owner request)
+
+The owner judged Line indigo too close to the generic AI-generated SaaS purple and asked for
+Ink & Signal Blue with restrained Sea Glass Teal. The structure ("the line", the bridged G,
+type, IA) is unchanged; the hues moved: the tile and actions are Signal Blue `#245da6`, the
+mark's bridge is sea glass `#8fd6ca` (teal now means time off, so the filled gap is literally
+time off), holidays are teal, and feedback colours are separate. Token values and calendar
+semantics: `DESIGN.md`.

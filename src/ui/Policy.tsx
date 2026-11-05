@@ -579,7 +579,7 @@ export function Policy() {
                         <ul className="flex flex-col divide-y divide-line border-y border-line">
                           {alerts.map((a) => (
                             <li key={a.id} className="flex gap-2 py-3 text-sm text-ink">
-                              <span aria-hidden="true" className="mt-1.5 inline-block h-2.5 w-2.5 shrink-0 rounded-[2px] bg-accent" />
+                              <span aria-hidden="true" className="mt-1.5 inline-block h-2.5 w-2.5 shrink-0 rounded-[2px] bg-warning" />
                               <div>
                                 <p>{compactDatesIn(a.text)}</p>
                                 {a.daysAtStake > 0 && (

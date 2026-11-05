@@ -88,7 +88,7 @@ export function QuickForecast({ policy, requests = [], forecastDate, onForecastD
           </p>
           {upcomingLoss && (
             <p role="status" className="mt-3 flex gap-2 text-sm font-semibold text-ink">
-              <span aria-hidden="true" className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink text-xs font-bold text-white">!</span>
+              <span aria-hidden="true" className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-warning text-xs font-bold text-white">!</span>
               <span>
                 {compactDatesIn(upcomingLoss.text)}{' '}
                 <span className="font-normal">

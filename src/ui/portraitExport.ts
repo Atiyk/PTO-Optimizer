@@ -66,7 +66,7 @@ export function buildPortraitText(data: PortraitPlanData, includeBalance = false
 }
 
 // 2026-11 redesign palette (src/index.css): paper, ink, pencil, hairline, and the marker.
-const colors = { page: '#f5f6f8', card: '#ffffff', ink: '#12141c', muted: '#535968', line: '#dde0e6', accent: '#3a36d0', tint: '#e3e2fb' };
+const colors = { page: '#f8fafc', card: '#ffffff', ink: '#1b2935', muted: '#536575', line: '#dce3ea', accent: '#245da6', tint: '#e9f1fb' };
 
 function fitText(ctx: CanvasRenderingContext2D, value: string, maxWidth: number): string {
   if (ctx.measureText(value).width <= maxWidth) return value;

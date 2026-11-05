@@ -342,7 +342,7 @@ export function App() {
                   {state.partnerOverlapReceived && (
                     <PartnerOverlapBanner overlapDayCount={state.overlapDays.length} onDismiss={state.dismissPartnerOverlapBanner} />
                   )}
-                  {partnerReceived.invalid && <p role="alert" className="rounded-[10px] border border-ink bg-surface p-4 text-sm text-ink">This partner availability link is invalid or too large. Ask for a new link with fewer dates.</p>}
+                  {partnerReceived.invalid && <p role="alert" className="rounded-[10px] border border-error bg-error-soft p-4 text-sm text-ink">This partner availability link is invalid or too large. Ask for a new link with fewer dates.</p>}
                   {partnerReceived.availability && <p role="status" className="rounded-[10px] bg-surface-alt p-4 text-sm text-ink">Someone shared {partnerReceived.availability.days.length} {partnerReceived.availability.status} available dates. Your own PTO budget and calendar apply. <a className="link-mark font-semibold" href="#partner-planner">See dates you can both take off</a></p>}
                   <ValidationBanner issues={state.validationIssues} />
                   {state.relaxedMinimum !== undefined && (
@@ -459,6 +459,7 @@ export function App() {
                       overlapSet={state.overlapSet}
                       marginalValues={state.marginalValues}
                       holidayNameFor={state.holidayNameFor}
+                      holidayKindFor={state.holidayKindFor}
                       hasHover={hasHover}
                       onDayClick={state.toggleDay}
                       alternativeForDate={state.alternativeForDate}
@@ -470,7 +471,7 @@ export function App() {
                     />
                   </CalendarErrorBoundary> : <p role="status" className="text-sm text-muted">Choose valid dates and a PTO balance to display the calendar.</p>}
                   <div className="mt-5 border-t border-line pt-4">
-                    <Legend />
+                    <Legend showCompany={state.holidayEntries.some((h) => h.checked && h.source === 'custom')} showBlackout={state.hasBlackouts} />
                   </div>
                 </div>
               </section>

@@ -5,21 +5,23 @@ export type ButtonSize = 'sm' | 'md';
 
 /**
  * 2026-11 redesign: square-cornered, flat, one decision for every button in the product.
- * - primary: solid Line indigo. One per view - the action the page is for (usually a link into a
- *   tool, never a submit: results update live). Hover deepens the indigo a step; the soft tint is
+ * - primary: solid Signal Blue. One per view - the action the page is for (usually a link into a
+ *   tool, never a submit: results update live). Hover deepens the blue a step; the soft tint is
  *   reserved for your time and your results, never for chrome.
- * - secondary: an ink outline on paper, for the rest (copy, download, share).
+ * - secondary: a neutral outline on white for the rest (copy, download, share); the edge darkens
+ *   to ink on hover. Pressed: one tone deeper. Disabled: neutral, never a faded blue.
+ *   Loading: aria-busy (progress cursor, slightly faded).
  * - quiet: text only, underlined; the underline thickens on hover.
  * Every button sinks slightly on press (scale .97) so a tap is felt. Renders an <a> when
  * `href` is given, so navigation stays a real link.
  */
 const BASE =
-  'inline-flex items-center justify-center gap-2 rounded-[6px] font-semibold whitespace-nowrap select-none transition-[background-color,color,border-color,transform] duration-150 ease-[var(--ease-out)] active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-50';
+  'inline-flex items-center justify-center gap-2 rounded-[6px] font-semibold whitespace-nowrap select-none transition-[background-color,color,border-color,transform] duration-150 ease-[var(--ease-out)] active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] disabled:cursor-not-allowed disabled:active:scale-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-60 aria-busy:cursor-progress aria-busy:opacity-80';
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-accent text-white hover:bg-accent-hover',
-  secondary: 'border border-ink bg-surface text-ink hover:bg-surface-alt',
-  quiet: 'text-ink underline decoration-1 underline-offset-[0.22em] hover:decoration-2',
+  primary: 'bg-accent text-white hover:bg-accent-hover active:bg-accent-pressed disabled:bg-surface-alt disabled:text-[var(--disabled-text)]',
+  secondary: 'border border-line-strong bg-surface text-ink hover:border-ink hover:bg-surface-alt active:bg-[var(--border-default)] disabled:border-line disabled:text-[var(--disabled-text)]',
+  quiet: 'text-ink underline decoration-1 underline-offset-[0.22em] hover:decoration-2 disabled:text-[var(--disabled-text)]',
 };
 
 const SIZES: Record<ButtonSize, string> = {

@@ -91,7 +91,7 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
         className="block w-full max-w-full text-sm text-muted file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-[6px] file:border file:border-solid file:border-ink file:bg-surface file:px-4 file:text-sm file:font-semibold file:text-ink hover:file:bg-surface-alt"
       />
       {state.kind === 'error' && (
-        <p role="alert" className="mt-2 text-sm font-semibold text-ink">
+        <p role="alert" className="mt-2 text-sm font-semibold text-error">
           {state.message}
         </p>
       )}

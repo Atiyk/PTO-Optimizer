@@ -80,8 +80,8 @@ export type IntensityBand = 0 | 1 | 2;
  * doesn't separate from either in greyscale), and "red" reads as "broken" when a
  * 30th-percentile plan is merely below average, not wrong.
  *
- * 2026-11 brand overhaul: the hue is the site's one accent (Line indigo) and its two darker
- * shades - "one accent hue only" - instead of a separate indigo. The bars always sit next to
+ * 2026-11 brand overhaul: the hue is the site's one accent (Signal Blue) and its two darker
+ * shades - "one accent hue only" - instead of a separate blue. The bars always sit next to
  * their percentile and gloss text, so sharing the accent never makes a bar read as a PTO
  * day. All three clear 4.5:1 on every background the strip can sit on (tokens.test.ts).
  *
@@ -93,9 +93,9 @@ export const SCORE_INTENSITY = {
   thresholds: [33, 66] as const,
   barClasses: ['bg-[var(--score-1)]', 'bg-[var(--score-2)]', 'bg-[var(--score-3)]'] as const,
   rgb: [
-    [58, 54, 208], // #3a36d0
-    [44, 40, 173], // #2c28ad
-    [31, 28, 134], // #1f1c86
+    [36, 93, 166], // #245da6
+    [29, 76, 136], // #1d4c88
+    [22, 58, 105], // #163a69
   ] as [number, number, number][],
 } as const;
 

@@ -101,15 +101,26 @@ describe('Footer (redesign Phase 1)', () => {
     for (const h of ['Explore', 'Resources', 'Help &amp; privacy']) expect(html).toContain(`>${h}</h2>`);
     for (const l of ['Plan time off', 'Plan around school breaks', 'Plan a sabbatical', 'My PTO', 'Learn', 'FAQ', 'Privacy', 'Terms of use']) expect(html).toContain(`>${l}<`);
   });
-  it('links directly to the configured feedback address', () => {
-    expect(html).toContain('mailto:atiykahmeed6310@gmail.com?subject=Gapless%20feedback');
-    expect(html).toContain('Contact &amp; feedback');
+  it('links contact and bug reports to the Gapless inbox', () => {
+    expect(html).toContain('href="mailto:gaplessreminders@gmail.com?subject=Gapless%20Contact"');
+    expect(html).toContain('>Contact us<');
+    expect(html).toContain('>Report a bug<');
+    const bug = /href="(mailto:[^"]*Bug%20Report[^"]*)"/.exec(html)?.[1].replace(/&amp;/g, '&');
+    expect(bug).toBeDefined();
+    const url = new URL(bug!);
+    expect(url.pathname).toBe('gaplessreminders@gmail.com');
+    expect(url.searchParams.get('subject')).toBe('Gapless Bug Report');
+    const body = url.searchParams.get('body')!;
+    for (const prompt of ['What happened?', 'What did you expect to happen?', 'Steps to reproduce', 'Device and browser']) expect(body).toContain(prompt);
+    // Nothing from the page (plan link, dates, balances) is put in the email.
+    expect(body).not.toMatch(/https?:|\d{4}-\d{2}-\d{2}|PTO remaining/);
+    expect(html).not.toContain('atiykahmeed');
     expect(html).not.toContain('formerly');
     expect(html).toContain('href="/terms.html"');
   });
 
   it('links to no external product', () => {
     const external = [...html.matchAll(/href="(https?:[^"]+)"/g)].map((m) => m[1]);
-    expect(external).toEqual(['https://github.com/Atiyk/PTO-Optimizer/issues']);
+    expect(external).toEqual([]);
   });
 });

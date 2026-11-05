@@ -89,7 +89,7 @@ describe('live homepage planner', () => {
     const breaks = screen.getByRole('list', { name: 'Breaks in this plan' });
     expect(breaks.querySelectorAll('li').length).toBe(Number(/across (\d+) break/.exec(document.body.textContent ?? '')![1]));
     expect(breaks.textContent).toContain('(longest)');
-    expect(screen.getByText('Day off in a break')).toBeTruthy();
+    expect(screen.getByText('Day off in a recommended break')).toBeTruthy();
   });
 
   it('starts the schedule week on the same day as the planner for the chosen country', async () => {

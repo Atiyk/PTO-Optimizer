@@ -160,14 +160,14 @@ function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalen
         : !validPolicy ? <p role="status" className="mt-3 text-sm text-ink">Enter valid policy values, including a current carried portion no greater than your balance and its future use-by date, to check expiration risk.</p>
           : visible.length === 0 ? (
             <p className="mt-3 flex items-start gap-2 text-sm text-ink">
-              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="mt-0.5 shrink-0"><path d="M3 8.4 6.4 11.5 13 4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" /></svg>
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="mt-0.5 shrink-0 text-success"><path d="M3 8.4 6.4 11.5 13 4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" /></svg>
               <span>{risks.length ? 'All current alerts are dismissed.' : 'No upcoming forfeiture, carryover expiration, or accrual-cap risk found under these rules.'}</span>
             </p>
           )
-          : <ul className="mt-3 divide-y divide-line border-t border-ink">{visible.map((risk) => (
+          : <ul className="mt-3 divide-y divide-line border-t-2 border-warning">{visible.map((risk) => (
             <li key={risk.id} className="py-3">
               <p className="flex items-start gap-2 font-bold text-ink">
-                <span aria-hidden="true" className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink text-xs font-bold text-white">!</span>
+                <span aria-hidden="true" className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-warning text-xs font-bold text-white">!</span>
                 <span>{compactDatesIn(risk.text)}</span>
               </p>
               <p className="mt-1 pl-7 text-sm text-ink">{risk.kind === 'cap' ? 'Creating space in your balance may prevent lost accrual.' : `Last day to use this PTO: ${compactDate(risk.deadline)}.`}</p>

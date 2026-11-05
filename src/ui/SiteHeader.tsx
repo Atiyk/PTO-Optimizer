@@ -96,7 +96,7 @@ function TabIcon({ name }: { name: (typeof PRIMARY_NAV)[number]['icon'] }) {
 }
 
 /**
- * Tablet and desktop (md+): logo, then the three destinations; the current one carries an indigo rule on
+ * Tablet and desktop (md+): logo, then the three destinations; the current one carries an blue rule on
  * the header's bottom edge. Phones: the logo bar stays, and the three destinations move to a
  * fixed bottom tab bar (56px plus the safe area) within thumb reach; index.css reserves its
  * height. On the planning routes a second row switches between the three ways to plan, at
@@ -160,7 +160,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
                         onClick={carry(mode.href)}
                         aria-current={current ? 'page' : undefined}
                         className={`inline-flex min-h-11 items-center rounded-full px-4 text-[15px] font-semibold transition-colors duration-150 ${FOCUS} ${
-                          current ? 'bg-accent text-white' : 'text-muted hover:bg-surface-alt hover:text-ink'
+                          current ? 'bg-accent-soft text-accent-ink shadow-[inset_0_0_0_1px_rgb(36_93_166/0.28)]' : 'text-muted hover:bg-surface-alt hover:text-ink'
                         }`}
                       >
                         {mode.label}
@@ -187,7 +187,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
                   href={item.href}
                   onClick={carry(item.href)}
                   aria-current={currentAttr(item)}
-                  className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 text-[12px] leading-4 transition-colors duration-150 ${current ? 'font-bold text-ink' : 'font-medium text-muted'} ${FOCUS} focus-visible:-outline-offset-2`}
+                  className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 text-[12px] leading-4 transition-colors duration-150 ${current ? 'font-bold text-accent-ink' : 'font-medium text-muted'} ${FOCUS} focus-visible:-outline-offset-2 active:bg-surface-alt`}
                 >
                   {current && <span aria-hidden="true" className="absolute inset-x-[30%] top-0 h-[3px] rounded-b-full bg-accent" />}
                   <span className={current ? 'text-accent' : ''}><TabIcon name={item.icon} /></span>

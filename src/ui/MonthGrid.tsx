@@ -23,6 +23,8 @@ interface MonthGridProps {
   overlapSet: Set<string>;
   marginalValues: Map<string, MarginalValue>;
   holidayNameFor: (iso: string) => string | undefined;
+  /** Public holiday or an employer-added day off; undefined on ordinary days. */
+  holidayKindFor?: (iso: string) => 'public' | 'company' | undefined;
   hasHover: boolean;
   onDayClick: (date: string) => void;
   alternativeForDate: (iso: string) => Alternative | undefined;
@@ -56,6 +58,7 @@ export function MonthGrid({
   overlapSet,
   marginalValues,
   holidayNameFor,
+  holidayKindFor,
   hasHover,
   onDayClick,
   alternativeForDate,
@@ -193,6 +196,7 @@ export function MonthGrid({
                           isOutOfRange={iso < rangeStart || iso > rangeEnd}
                           marginalValue={marginalValues.get(iso) ?? null}
                           holidayName={holidayNameFor(iso)}
+                          holidayKind={holidayKindFor?.(iso)}
                           hasHover={hasHover}
                           onToggle={onDayClick}
                           onSwapAlternative={alt ? () => onSwapAlternative(alt) : undefined}

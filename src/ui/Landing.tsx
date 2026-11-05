@@ -60,7 +60,7 @@ function monthsBetween(start: string, end: string): string[] {
 /**
  * The whole plan as a printed year schedule: one row per month, days aligned under the same
  * weekday columns (week start as on /pto: Sunday for US/CA/JP, Monday elsewhere), every
- * break of the plan drawn as a tinted run with an indigo rule and each PTO day an indigo block. The holiday dot is
+ * break of the plan drawn as a soft blue run with a Signal Blue rule and each PTO day a solid blue block; holidays sit on soft teal. The holiday dot is
  * the planner's own. The grid is a picture (aria-hidden); the visible list beneath it names
  * every break in words, so nothing depends on colour or on seeing the grid.
  */
@@ -96,7 +96,7 @@ function PlanYear({ breaks, best, rangeStart, rangeEnd, holidayName, weekStart }
           <span className="text-xs font-semibold text-ink">{monthShortName(first)}{month.endsWith('-01') || month === months[0] ? ` ’${month.slice(2, 4)}` : ''}</span>
           {days.map((date, index) => {
             const inRange = date >= rangeStart && date <= rangeEnd;
-            const tone = !inRange ? 'bg-transparent' : ptoDays.has(date) ? 'bg-accent' : offDays.has(date) ? 'bg-mark shadow-[inset_0_-3px_0_var(--accent)]' : mondayIndexedDow(date) >= 5 ? 'bg-surface-alt' : 'bg-page';
+            const tone = !inRange ? 'bg-transparent' : ptoDays.has(date) ? 'bg-accent' : offDays.has(date) ? 'bg-mark shadow-[inset_0_-3px_0_var(--accent)]' : holidayName.has(date) ? 'bg-holiday-soft' : mondayIndexedDow(date) >= 5 ? 'bg-surface-alt' : 'bg-page';
             return <span key={date} className={`relative h-5 lg:h-6 ${tone}`} style={index === 0 ? { gridColumnStart: offset + 2 } : undefined}>
               {inRange && holidayName.has(date) && <span className={`absolute bottom-0.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${HOLIDAY_DOT}`} />}
             </span>;
@@ -111,9 +111,9 @@ function PlanYear({ breaks, best, rangeStart, rangeEnd, holidayName, weekStart }
       <span className="text-h2 font-bold type-condensed">Every break in this plan</span>
       <span className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
         <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="size-3.5 rounded-[3px] bg-accent" />PTO day</span>
-        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-3.5 w-6 rounded-[3px] bg-mark shadow-[inset_0_-3px_0_var(--accent)]" />Day off in a break</span>
+        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-3.5 w-6 rounded-[3px] bg-mark shadow-[inset_0_-3px_0_var(--accent)]" />Day off in a recommended break</span>
         <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="size-3.5 bg-surface-alt" />Weekend</span>
-        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${HOLIDAY_DOT}`} />Public holiday</span>
+        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="relative size-3.5 bg-holiday-soft"><span className={`absolute bottom-0.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${HOLIDAY_DOT}`} /></span>Public holiday</span>
       </span>
     </figcaption>
     <div className="grid gap-x-12 gap-y-4 lg:grid-cols-2">{columns.map(block)}</div>
@@ -261,7 +261,7 @@ export function Landing() {
                 </div>
                 <p className="mt-2 text-sm text-muted">{validRange ? `Preview: ${formatLong(rangeStart)} – ${formatLong(rangeEnd)}.` : 'Choose a valid range.'} Any dates up to two years apart; the plan updates as you type.</p>
               </fieldset>
-              {!validRange && <p role="alert" className="mt-2 text-sm font-semibold text-ink">Choose valid start and end dates, with the end after the start and no more than two years apart.</p>}
+              {!validRange && <p role="alert" className="mt-2 text-sm font-semibold text-error">Choose valid start and end dates, with the end after the start and no more than two years apart.</p>}
             </div>
           </div>
 
