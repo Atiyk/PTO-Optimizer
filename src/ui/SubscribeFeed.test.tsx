@@ -47,6 +47,12 @@ describe('SubscribeFeed', () => {
   it('says to download instead when the link is too long for a feed', () => {
     render(<SubscribeFeed planSearch={`${SEARCH}&x=${'a'.repeat(4100)}`} origin={ORIGIN} />);
     expect(screen.queryByRole('link', { name: 'Apple Calendar' })).toBeNull();
-    expect(screen.getByText(/too long for a calendar subscription/)).toBeTruthy();
+    expect(screen.getByText(/too large for a calendar subscription/)).toBeTruthy();
+  });
+
+  it('offers no subscription for a plan the feed would refuse to solve', () => {
+    render(<SubscribeFeed planSearch="c=US&s=2026-11-04&e=2027-12-31&b=120" origin={ORIGIN} />);
+    expect(screen.queryByRole('link', { name: 'Apple Calendar' })).toBeNull();
+    expect(screen.getByText(/too large for a calendar subscription/)).toBeTruthy();
   });
 });

@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from './Button';
 import { copyText } from './requestText';
 import { FEED_CALENDAR_NAME, MAX_FEED_QUERY_LENGTH } from '../autopilot/feed';
+import { feedWorkloadAllowed } from '../autopilot/feedHandler';
+import { planStateFromSearch } from '../autopilot/planFromSearch';
+import { isValidISODate } from './urlState';
 
 export interface FeedLinks {
   https: string;
@@ -46,6 +49,12 @@ export interface SubscribeFeedProps {
 const PLAN_DESCRIPTION = 'Subscribe once to see your PTO days, holidays and a “book by” reminder before each break, kept current.';
 const PLAN_CAVEAT = 'After editing the plan, subscribe again. Anyone with the link can see the plan.';
 
+/** Mirrors the /api/feed bound so the page never offers a link the function will refuse. */
+function tooLargeForFeed(query: string): boolean {
+  const state = planStateFromSearch(query, new Date().toISOString().slice(0, 10));
+  return isValidISODate(state.rangeStart) && isValidISODate(state.rangeEnd) && !feedWorkloadAllowed(state);
+}
+
 export function SubscribeFeed({ planSearch, origin, path = '/api/feed', calendarName = FEED_CALENDAR_NAME, heading = 'Keep this plan in your calendar', description = PLAN_DESCRIPTION, caveat = PLAN_CAVEAT, idPrefix = 'subscribe-feed' }: SubscribeFeedProps) {
   // The links name this deployment's origin and the visitor's current plan, neither of
   // which the prerendered HTML knows, and React keeps server attributes on hydration - so
@@ -54,7 +63,8 @@ export function SubscribeFeed({ planSearch, origin, path = '/api/feed', calendar
   useEffect(() => setMountedOrigin(window.location.origin), []);
   const resolvedOrigin = origin ?? mountedOrigin;
   const links = resolvedOrigin ? feedLinks(resolvedOrigin, planSearch, path, calendarName) : null;
-  const tooLong = planSearch.replace(/^\?/, '').length > MAX_FEED_QUERY_LENGTH;
+  const query = planSearch.replace(/^\?/, '');
+  const tooLong = useMemo(() => query.length > MAX_FEED_QUERY_LENGTH || (path === '/api/feed' && tooLargeForFeed(query)), [query, path]);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -63,7 +73,7 @@ export function SubscribeFeed({ planSearch, origin, path = '/api/feed', calendar
     <section aria-labelledby={`${idPrefix}-heading`} className="flex min-w-0 flex-col gap-3 border-t border-line pt-5">
       <h3 id={`${idPrefix}-heading`} className="text-xl font-bold leading-6 text-ink type-condensed">{heading}</h3>
       {tooLong ? (
-        <p className="max-w-prose text-sm text-muted">This link is too long for a calendar subscription. Download the .ics file instead.</p>
+        <p className="max-w-prose text-sm text-muted">This plan is too large for a calendar subscription. Download the .ics file instead.</p>
       ) : !links ? null : (
         <>
           <p className="max-w-prose text-sm text-muted">{description}</p>
