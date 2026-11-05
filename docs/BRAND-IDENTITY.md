@@ -45,10 +45,14 @@ during the run, not committed):
 4. Three day cells on a rule: read as a bar chart. Rejected.
 5. Interchange station on a line: generic "commit" glyph. Rejected.
 6. Plain route G: strong at 16px but generic letter-in-tile. Kept as the base.
-7. **Bridged G (chosen):** the G's gap is drawn in a softer stroke of the same line, so the
-   letter still reads as G while its gap is visibly filled: "the gap, filled". It reads at
-   16px, holds on light and dark tabs because the tile carries its own ground, and it is
-   specific to this product rather than a stock calendar or check icon.
+7. **Bridged G (chosen):** a square-cut G built from straight route segments (5 white
+   strokes on the indigo tile), whose gap at the top right is filled by a lavender block
+   (`#bdbbf8`) separated from the bar by a one-unit cut, so the letter still reads as G while
+   its gap is visibly filled: "the gap, filled". A first round-G drawing was rejected by the
+   visual critic (it read as a Google-style G and the soft bridge vanished below 32px); the
+   square cut fixes both and matches the condensed Archivo wordmark. It reads at 16px, holds
+   on light and dark tabs because the tile carries its own ground, and it is specific to this
+   product rather than a stock calendar or check icon.
 
 Validation: rendered in the live header at 320, 375, 768 and 1440px; favicon.ico at 16/32/48;
 apple-touch-icon 180px; maskable 512px with the mark inside the 80% safe zone; OG images and

@@ -15,7 +15,7 @@ colors:
   accent-soft: "#efeefd"
   band: "#e3e2fb"
   band-strong: "#cfcdf7"
-  logo-bridge: "#8c89f5"
+  logo-bridge: "#bdbbf8"
 typography:
   display:
     fontFamily: "'Archivo Variable', 'Archivo Fallback', ui-sans-serif, system-ui, sans-serif"
@@ -116,7 +116,8 @@ on track"), so the homepage and the header describe one product.
 
 ## Logo
 
-The bridged G (`src/ui/logoMark.ts`, one source for the header, footer, favicons, app icons,
+The bridged G: a square-cut G of straight route segments whose top-right gap is filled by a
+lavender block (`src/ui/logoMark.ts`, one source for the header, footer, favicons, app icons,
 OG images and the portrait share card). Lockup: mark + "gapless" (lowercase via CSS, accessible
 name stays "Gapless PTO Optimizer") + "PTO Optimizer" in graphite. Dark tone for ink grounds.
 Static assets: `public/favicon.svg`, `public/favicon.ico`, `public/apple-touch-icon.png`,

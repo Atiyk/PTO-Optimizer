@@ -38,3 +38,11 @@ fix or a recorded reason.
 | 10 | Checkbox targets | Not changed: the labels are already 44px rows; "Let the solver decide" renamed "Let the planner choose" |
 | 11 | Day sheet covers tapped row | Open (minor) |
 | 12 | Tablet used the phone tab bar; GB region labelled "State" | Tab bar fixed (top nav from 768px). Region label open (minor) |
+
+## Impeccable detector pass (final)
+
+`impeccable detect --json src/ui src/index.css`: 45 findings, all `design-system-font-size`
+(advisory): literal Tailwind sizes such as `text-[13px]` that DESIGN.md does not list as ramp
+steps. No banned patterns (gradient text, side-stripe borders on cards, glassmorphism, fills
+behind text). Left as a follow-up: document the type ramp in DESIGN.md or fold the literals
+into named steps.
