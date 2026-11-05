@@ -37,6 +37,7 @@ export async function createCoverRequest(db: Db, orgId: string, input: CreateCov
     .insert(coverRequests)
     .values({
       orgId,
+      createdAt: now,
       locationId: input.locationId,
       roomId: input.roomId,
       date: input.date,

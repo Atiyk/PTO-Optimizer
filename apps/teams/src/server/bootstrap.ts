@@ -20,6 +20,8 @@ export interface CreateOrgInput {
   teamName?: string;
   /** Today, for the default policies' effective date. */
   today: string;
+  /** When the org was created, for its audit entry. Defaults to the real clock; tests pass their fixed clock. */
+  now?: Date;
 }
 
 /**
@@ -66,6 +68,7 @@ export async function createOrganization(db: Db, identity: Identity, input: Crea
     ]);
     await tx.insert(auditLog).values({
       orgId,
+      at: input.now ?? new Date(),
       actorType: 'human',
       actorMemberId: owner!.id,
       scopes: [],

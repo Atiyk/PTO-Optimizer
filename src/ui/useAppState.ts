@@ -572,6 +572,8 @@ export function useAppState() {
       peakCapStart,
       peakCapEnd,
       peakCapMaxDays,
+      budget,
+      policyAccrualFields,
     ],
   );
 
