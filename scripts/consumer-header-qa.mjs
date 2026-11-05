@@ -44,9 +44,11 @@ try {
       const labelledHome = page.getByRole('link', { name: /Gapless\s+PTO Optimizer\s+home/i });
       if (await labelledHome.count() !== 1) throw new Error('Visible wordmark and home accessible name mismatch');
       entry.checks.push('Home accessible name includes visible Gapless PTO Optimizer wordmark');
-      const target = width >= 1024
-        ? page.getByRole('link', { name: 'Plan PTO' }).first()
-        : page.getByRole('navigation', { name: 'Tools' }).getByRole('link', { name: 'Plan PTO' });
+      // 2026-11 IA: three destinations (Plan, My PTO, Learn); the header "Main" nav from
+      // 768px up, a fixed bottom "Tools" tab bar below.
+      const target = width >= 768
+        ? page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Plan' })
+        : page.getByRole('navigation', { name: 'Tools' }).getByRole('link', { name: 'Plan' });
       if (!(await target.isVisible())) throw new Error('Expected navigation control not visible');
 
       // Real keyboard Tab navigation is necessary: programmatic focus does not
@@ -67,13 +69,12 @@ try {
       }
       entry.checks.push('Keyboard Tab reaches navigation with visible 2px focus outline');
 
-      if (width < 1024) {
-        // 2026-11 redesign: phones and tablets get a fixed bottom tab bar with every
-        // destination, instead of a Menu disclosure.
+      if (width < 768) {
+        // Phones get a fixed bottom tab bar with every destination, instead of a Menu disclosure.
         const tabs = page.getByRole('navigation', { name: 'Tools' });
         const links = tabs.getByRole('link');
         const names = (await links.allTextContents()).map((t) => t.trim());
-        if (names.join('|') !== 'Plan PTO|Sabbatical|Family|My PTO|Learn') throw new Error(`Tab bar destinations wrong: ${names.join(', ')}`);
+        if (names.join('|') !== 'Plan|My PTO|Learn') throw new Error(`Tab bar destinations wrong: ${names.join(', ')}`);
         for (const link of await links.all()) {
           const box = await link.boundingBox();
           if (!box || box.height < 44 || box.width < 44) throw new Error(`Tab target below 44px: ${await link.textContent()}`);
@@ -89,9 +90,14 @@ try {
           return footerLast ? footerLast.getBoundingClientRect().bottom > barTop + 1 : true;
         });
         if (covered) throw new Error('Tab bar covers the end of the page');
-        entry.checks.push('Tab bar: four destinations, 44px targets, fixed to the bottom, never covers content');
+        entry.checks.push('Tab bar: three destinations, 44px targets, fixed to the bottom, never covers content');
         await page.screenshot({ path: resolve(output, `header-tabbar-${width}.png`), fullPage: false });
       } else {
+        const main = page.getByRole('navigation', { name: 'Main' });
+        const names = (await main.getByRole('link').allTextContents()).map((t) => t.trim());
+        if (names.join('|') !== 'Plan|My PTO|Learn') throw new Error(`Header destinations wrong: ${names.join(', ')}`);
+        if ((await main.getByRole('link', { name: 'Plan' }).getAttribute('aria-current')) !== 'page') throw new Error('Header does not mark the current page');
+        if (await page.getByRole('navigation', { name: 'Tools' }).isVisible()) throw new Error('Phone tab bar visible at tablet or desktop width');
         const links = page.locator('header nav a:visible');
         for (const link of await links.all()) {
           const box = await link.boundingBox();
