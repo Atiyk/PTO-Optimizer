@@ -73,7 +73,7 @@ try {
         const tabs = page.getByRole('navigation', { name: 'Tools' });
         const links = tabs.getByRole('link');
         const names = (await links.allTextContents()).map((t) => t.trim());
-        if (names.join('|') !== 'Plan PTO|Sabbatical|My PTO|Learn') throw new Error(`Tab bar destinations wrong: ${names.join(', ')}`);
+        if (names.join('|') !== 'Plan PTO|Sabbatical|Family|My PTO|Learn') throw new Error(`Tab bar destinations wrong: ${names.join(', ')}`);
         for (const link of await links.all()) {
           const box = await link.boundingBox();
           if (!box || box.height < 44 || box.width < 44) throw new Error(`Tab target below 44px: ${await link.textContent()}`);

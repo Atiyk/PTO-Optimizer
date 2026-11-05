@@ -4,6 +4,7 @@ import { configDefaults, defineConfig, type Plugin } from 'vitest/config'
 import { getSiteUrl } from './scripts/siteUrl.ts'
 import { GLOSSARY_TERMS } from './src/content/glossary/terms.ts'
 import { PRODUCT_NAME } from './src/brand.ts'
+import { ocrAssetsPlugin } from './scripts/ocrAssets.ts'
 
 // Country landing pages (Phase 2B): each is a real static HTML file at the project root
 // (uk/index.html, canada/index.html, ...), loading the same app bundle as / but with its
@@ -45,7 +46,7 @@ function siteUrlHtmlPlugin(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), siteUrlHtmlPlugin()],
+  plugins: [react(), siteUrlHtmlPlugin(), ocrAssetsPlugin(import.meta.dirname)],
   build: {
     rollupOptions: {
       input: {
@@ -55,6 +56,7 @@ export default defineConfig({
         main: resolve(import.meta.dirname, 'index.html'),
         pto: resolve(import.meta.dirname, 'pto', 'index.html'),
         sabbatical: resolve(import.meta.dirname, 'sabbatical', 'index.html'),
+        family: resolve(import.meta.dirname, 'family', 'index.html'),
         faq: resolve(import.meta.dirname, 'faq', 'index.html'),
         dataSources: resolve(import.meta.dirname, 'data-sources', 'index.html'),
         policy: resolve(import.meta.dirname, 'policy', 'index.html'),

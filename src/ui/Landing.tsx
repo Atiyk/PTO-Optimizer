@@ -280,9 +280,10 @@ export function Landing() {
             </div>
             <div className="rounded-[4px] bg-surface-alt p-6 sm:p-9">
               <h3 className="text-h2 font-bold type-condensed text-ink">Planning something bigger?</h3>
-              <p className="mt-2 max-w-lg text-base text-ink">Find where a sabbatical lands best and what each extra PTO day adds to it. New to the terms? The guides explain accrual, carryover, and payout in plain language.</p>
+              <p className="mt-2 max-w-lg text-base text-ink">Find where a sabbatical lands best and what each extra PTO day adds to it, or line your PTO up with your kids’ school breaks. New to the terms? The guides explain accrual, carryover, and payout in plain language.</p>
               <div className="flex flex-wrap gap-x-6">
                 <a href="/sabbatical" className={LINK}>Explore sabbatical planning →</a>
+                <a href="/family" className={LINK}>Plan around school breaks →</a>
                 <a href="/glossary" className={LINK}>Read the guides →</a>
               </div>
             </div>

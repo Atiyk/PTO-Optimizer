@@ -261,6 +261,41 @@ export function downloadSabbaticalICS(extendedStart: string, extendedEnd: string
   downloadICSContent(generateSabbaticalICS(extendedStart, extendedEnd, summary, description), filename);
 }
 
+/**
+ * /family export: one all-day VEVENT per chosen PTO day, titled with the school break it
+ * covers ("PTO - Winter recess (Dec 21 - Jan 1)"). Labels are public district labels only;
+ * no names or imported event text ever reach here. Same RFC 5545 helpers as every other
+ * export in this file.
+ */
+export interface FamilyPtoBreak {
+  start: string;
+  end: string;
+  label?: string;
+  ptoDays: readonly string[];
+}
+
+export function generateFamilyPtoICS(breaks: readonly FamilyPtoBreak[], now: Date = new Date()): string {
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:-//${PRODUCT_NAME}//EN`, 'CALSCALE:GREGORIAN', foldLine(`X-WR-CALNAME:${PRODUCT_NAME} - School break PTO`)];
+  const dtstamp = dtstampNow(now);
+  const seen = new Set<string>();
+  for (const brk of breaks) {
+    const title = `PTO - ${brk.label ? `${brk.label} ` : 'School break '}(${formatDateRange(brk.start, brk.end)})`;
+    for (const day of brk.ptoDays) {
+      if (!isValidISODate(day) || seen.has(day)) continue;
+      seen.add(day);
+      const start = isoToICSDate(day);
+      lines.push('BEGIN:VEVENT', foldLine(`UID:family-pto-${start}@pto-optimizer.app`), `DTSTAMP:${dtstamp}`,
+        `DTSTART;VALUE=DATE:${start}`, `DTEND;VALUE=DATE:${addOneDayICS(start)}`,
+        foldLine(`SUMMARY:${escapeText(title)}`), 'TRANSP:TRANSPARENT', 'END:VEVENT');
+    }
+  }
+  return [...lines, 'END:VCALENDAR', ''].join('\r\n');
+}
+
+export function downloadFamilyPtoICS(breaks: readonly FamilyPtoBreak[], filename = 'school-break-pto.ics'): void {
+  downloadICSContent(generateFamilyPtoICS(breaks), filename);
+}
+
 export interface CalendarReminder {
   id: string;
   date: string;

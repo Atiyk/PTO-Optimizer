@@ -2,7 +2,7 @@ import { Container } from './Container';
 import { Logo } from './Logo';
 import { buttonClasses } from './Button';
 
-export type SiteRoute = 'landing' | 'pto' | 'sabbatical' | 'policy' | 'glossary' | 'other';
+export type SiteRoute = 'landing' | 'pto' | 'sabbatical' | 'family' | 'policy' | 'glossary' | 'other';
 
 interface SiteHeaderProps {
   active: SiteRoute;
@@ -20,6 +20,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [{
   label: 'Browse',
   items: [
     { route: 'sabbatical', href: '/sabbatical', label: 'Sabbatical' },
+    { route: 'family', href: '/family', label: 'Family' },
     { route: 'policy', href: '/policy', label: 'My PTO' },
     { route: 'glossary', href: '/glossary', label: 'Learn' },
   ],
@@ -28,10 +29,13 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [{
 /** The header's one primary action: a link into the tool, never a submit. */
 export const HEADER_CTA = { href: '/pto', label: 'Plan PTO' };
 
-/** Every destination, in the order the phone tab bar shows them: the tool first. */
-export const TAB_ITEMS: (NavItem & { icon: 'plan' | 'sabbatical' | 'policy' | 'learn' })[] = [
+/** Every destination, in the order the phone tab bar shows them: the tool first. Five
+ * tabs is the most a 320px phone carries at 64px per tab with one-word labels; a sixth
+ * destination would need to replace one rather than squeeze in. */
+export const TAB_ITEMS: (NavItem & { icon: 'plan' | 'sabbatical' | 'family' | 'policy' | 'learn' })[] = [
   { route: 'pto', href: HEADER_CTA.href, label: HEADER_CTA.label, icon: 'plan' },
   { route: 'sabbatical', href: '/sabbatical', label: 'Sabbatical', icon: 'sabbatical' },
+  { route: 'family', href: '/family', label: 'Family', icon: 'family' },
   { route: 'policy', href: '/policy', label: 'My PTO', icon: 'policy' },
   { route: 'glossary', href: '/glossary', label: 'Learn', icon: 'learn' },
 ];
@@ -58,6 +62,13 @@ function TabIcon({ name, active }: { name: (typeof TAB_ITEMS)[number]['icon']; a
           <path d="M2.5 18.5c2.2-1.6 4.4-1.6 6.6 0s4.4 1.6 6.6 0c.9-.65 1.85-1 2.8-1" {...common} />
         </>
       )}
+      {name === 'family' && (
+        <>
+          <circle cx="7.5" cy="6" r="2.5" {...common} />
+          <circle cx="15.5" cy="9" r="2" {...common} />
+          <path d="M3 19v-3.5a4.5 4.5 0 0 1 9 0V19M12.5 19v-2.5a3 3 0 0 1 6 0V19" {...common} />
+        </>
+      )}
       {name === 'policy' && (
         <>
           <path d="M4 18.5V12M9 18.5V6.5M14 18.5V9.5M19 18.5V3.5" {...common} strokeWidth={2.5} />
@@ -74,9 +85,9 @@ function TabIcon({ name, active }: { name: (typeof TAB_ITEMS)[number]['icon']; a
 }
 
 /**
- * 2026-11 redesign. Desktop (lg+): a plain paper bar - wordmark, three links, one primary
+ * 2026-11 redesign. Desktop (lg+): a plain paper bar - wordmark, four links, one primary
  * action. The current page carries a marker stroke under its label. Below lg the bar keeps
- * only the wordmark, and every destination moves into a fixed bottom tab bar (four
+ * only the wordmark, and every destination moves into a fixed bottom tab bar (five
  * destinations, 56px tall plus the safe area), the phone's own navigation pattern: one tap to
  * any tool from anywhere, no menu to open first. index.css reserves the space for it so it
  * never covers content. Every link is a real link; nothing is hidden behind a disclosure.
@@ -118,7 +129,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
         aria-label="Tools"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/15 bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
-        <ul className="mx-auto grid max-w-xl grid-cols-4">
+        <ul className="mx-auto grid max-w-xl grid-cols-5">
           {TAB_ITEMS.map((item) => {
             const isActive = active === item.route;
             return (

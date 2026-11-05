@@ -5,7 +5,7 @@ import { GLOSSARY_TERMS } from '../src/content/glossary/terms.ts';
  * import from anywhere) between scripts/prerender.ts and scripts/build-seo-files.ts, so a
  * route can't exist in the sitemap but not be prerendered, or vice versa.
  */
-export type ComponentKind = 'landing' | 'app' | 'sabbatical' | 'faq' | 'dataSources' | 'policy' | 'glossary' | 'glossary-term';
+export type ComponentKind = 'landing' | 'app' | 'sabbatical' | 'family' | 'faq' | 'dataSources' | 'policy' | 'glossary' | 'glossary-term';
 
 export interface Entry {
   /** Path relative to dist/ of the built HTML file to inject into. */
@@ -35,6 +35,7 @@ export const ENTRIES: Entry[] = [
   { file: 'index.html', path: '/', component: 'landing', sitemapPriority: 1.0 },
   { file: 'pto/index.html', path: '/pto', component: 'app', sitemapPriority: 0.9 },
   { file: 'sabbatical/index.html', path: '/sabbatical', component: 'sabbatical', sitemapPriority: 0.9 },
+  { file: 'family/index.html', path: '/family', component: 'family', sitemapPriority: 0.8 },
   { file: 'faq/index.html', path: '/faq', component: 'faq', sitemapPriority: 0.6 },
   { file: 'data-sources/index.html', path: '/data-sources', component: 'dataSources', sitemapPriority: 0.5 },
   { file: 'uk/index.html', path: '/uk', component: 'app', countryPreset: 'GB', countryName: 'United Kingdom', sitemapPriority: 0.8 },
