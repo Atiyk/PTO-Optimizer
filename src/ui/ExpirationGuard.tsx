@@ -10,6 +10,7 @@ import { forecastWithRequests } from '../personal/forecast';
 import { carryoverSnapshot } from '../personal/carryoverSnapshot';
 import { Button } from './Button';
 import { SubscribeFeed } from './SubscribeFeed';
+import { EmailReminders } from './EmailReminders';
 
 const WATCH_CALENDAR_NAME = 'Gapless PTO Optimizer - PTO expiry watch';
 import { downloadReminderICS } from './icsExport';
@@ -261,6 +262,7 @@ function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalen
             description="Subscribe once to get the 60, 30 and 7-day reminders and suggested days to use expiring PTO, updated against today's date."
             caveat="Requests tracked on this device aren't included. After editing your policy, subscribe again. Anyone with the link can see the policy details in it."
           />
+          <div className="mt-4"><EmailReminders kind="policy" search={watchSearch} /></div>
         </div>
       )}
     </section>

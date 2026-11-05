@@ -4,8 +4,26 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "functions": {
-    "api/*.ts": {
+    "api/feed.ts": {
       "maxDuration": 10
+    },
+    "api/watch.ts": {
+      "maxDuration": 10
+    },
+    "api/account.ts": {
+      "maxDuration": 10
+    },
+    "api/inbound.ts": {
+      "maxDuration": 10
+    },
+    "api/remind.ts": {
+      "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/remind",
+      "schedule": "0 13 * * *"
+    }
+  ]
 }
