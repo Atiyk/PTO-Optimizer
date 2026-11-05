@@ -104,7 +104,7 @@ describe('tokens', () => {
 describe('/api/account', () => {
   it('reports accounts off and refuses actions when not configured', async () => {
     const ctx = setup({});
-    expect(await (await handleAccount(new Request('https://gapless.example/api/account'), ctx.deps)).json()).toMatchObject({ features: { accounts: false } });
+    expect(await (await handleAccount(new Request('https://gapless.example/api/account'), ctx.deps)).json()).toMatchObject({ features: { accounts: false }, missing: expect.arrayContaining(['GMAIL_USER', 'DATABASE_URL']) });
     expect((await handleAccount(post({ action: 'login', email: 'me@example.com' }), ctx.deps)).status).toBe(404);
   });
 

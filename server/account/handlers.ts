@@ -2,7 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { MAX_APPROVAL_INPUT, parseApprovalMessage } from '../../src/personal/approvalParser';
 import { outOfOfficeMessage } from '../../src/personal/outOfOffice';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
-import { featureFlags, type AccountConfig } from './config';
+import { featureFlags, missingSettings, type AccountConfig } from './config';
 import type { AccountRow, AccountStore } from './db';
 import type { SendMail } from './mailer';
 import { dueItems, reminderEmail } from './reminders';
@@ -130,7 +130,7 @@ export async function handleAccount(request: Request, deps: AccountDeps): Promis
   const nowMs = (deps.now?.() ?? new Date()).getTime();
   if (!flags.accounts) {
     return request.method === 'GET' && !url.search
-      ? json(200, { features: { accounts: false, inbound: false }, account: null })
+      ? json(200, { features: { accounts: false, inbound: false }, account: null, missing: missingSettings(config) })
       : json(404, { error: 'Accounts are not set up on this site.' });
   }
   const secret = config.appSecret!;
@@ -158,6 +158,7 @@ export async function handleAccount(request: Request, deps: AccountDeps): Promis
       features: { accounts: true, inbound: flags.inbound },
       inboundAddress: flags.inbound ? config.inboundAddress : null,
       account: row ? publicAccount(row) : null,
+      missing: missingSettings(config),
     });
   }
 

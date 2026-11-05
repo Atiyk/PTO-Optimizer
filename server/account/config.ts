@@ -63,3 +63,16 @@ export function featureFlags(config: AccountConfig): FeatureFlags {
   const inbound = accounts && Boolean(config.inboundSecret && config.inboundAddress);
   return { email, accounts, inbound };
 }
+
+/** Names (never values) of the settings still missing, so the owner can see why a feature is off. */
+export function missingSettings(config: AccountConfig): string[] {
+  const missing: string[] = [];
+  if (!config.gmailUser) missing.push('GMAIL_USER');
+  if (!config.gmailAppPassword) missing.push('GMAIL_APP_PASSWORD');
+  if (!config.databaseUrl) missing.push('DATABASE_URL');
+  if ((config.appSecret?.length ?? 0) < 32) missing.push('APP_SECRET (32+ characters)');
+  if (!config.cronSecret) missing.push('CRON_SECRET');
+  if (!config.inboundSecret) missing.push('INBOUND_SECRET');
+  if (!config.inboundAddress) missing.push('INBOUND_ADDRESS');
+  return missing;
+}

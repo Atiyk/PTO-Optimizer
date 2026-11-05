@@ -83,7 +83,10 @@ The first is `APP_SECRET`, the second is `CRON_SECRET`.
 
 ### 2d. Check it works
 
-1. Open the site. Below **Keep this plan in your calendar** there's now **Get reminders by email**.
+1. Open the planner at `/pto/`. Below **Keep this plan in your calendar** there's now **Get reminders by email**.
+   Not there? Open `/api/account` on the same site. Its `missing` list names any setting the
+   deployment doesn't have (names only, never values). Settings only reach a deployment built
+   after you saved them, so redeploy after adding one.
 2. Enter your own email and click **Email me a sign-in link**. The email arrives from the
    new Gmail address within a minute (check Spam the first time and mark it **Not spam**).
 3. Click the link. The section now says **Signed in as …**. Tick **Email me … for this plan**.
