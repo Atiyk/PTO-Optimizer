@@ -28,6 +28,9 @@ const SWATCHES: [string, string][] = [
   ['--accent', 'accent'],
   ['--accent-hover', 'accent-hover'],
   ['--accent-soft', 'accent-soft'],
+  ['--mark', 'mark'],
+  ['--mark-strong', 'mark-strong'],
+  ['--pto-bg', 'pto'],
   ['--band-bg', 'band'],
   ['--holiday-dot', 'holiday'],
   ['--weekend-bg', 'weekend'],
@@ -36,7 +39,7 @@ const SWATCHES: [string, string][] = [
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="border-t border-line py-8">
-      <h2 className="mb-5 text-h2 font-semibold text-ink">{title}</h2>
+      <h2 className="mb-5 text-h2 font-bold text-ink type-condensed">{title}</h2>
       {children}
     </section>
   );
@@ -59,13 +62,13 @@ function Bare() {
     <div className="min-h-screen bg-page">
       <SiteHeader active="pto" />
       <Container className="px-4 py-8 sm:px-6">
-        <h1 className="text-h1 font-semibold tracking-[-0.02em] text-ink">UI gallery</h1>
+        <h1 className="text-h1 text-ink type-display">UI gallery</h1>
         <p className="mt-2 text-muted">Every component in every state. Tab through the page to see focus rings.</p>
 
         <Section title="Tokens">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
             {SWATCHES.map(([v, name]) => (
-              <div key={v} className="overflow-hidden rounded-xl border border-line bg-surface">
+              <div key={v} className="overflow-hidden rounded-[4px] border border-line bg-surface">
                 <div className="h-14" style={{ background: `var(${v})` }} />
                 <div className="px-3 py-2 text-xs">
                   <div className="font-semibold text-ink">{name}</div>
@@ -77,11 +80,19 @@ function Bare() {
         </Section>
 
         <Section title="Type">
-          <p className="text-display-sm font-semibold tracking-[-0.03em] text-ink sm:text-display">38 days off</p>
-          <p className="text-h1 font-semibold tracking-[-0.02em] text-ink">Make every PTO day count.</p>
-          <p className="text-h2 font-semibold text-ink">Next long weekend</p>
-          <p className="text-body text-ink">Body 16/24. The quick brown fox takes Friday off. 0123456789</p>
+          <div className="flex flex-col gap-5">
+          <p className="text-display text-ink type-display">Make every PTO day count.</p>
+          <p className="text-display-sm text-ink type-display">
+            <span className="mark">38 days off</span>
+          </p>
+          <p className="text-h1 text-ink type-display">Page title, condensed</p>
+          <p className="text-h2 font-bold text-ink type-condensed">Section heading</p>
+          <p className="max-w-[68ch] text-body text-ink">
+            Body 16/24 at a 68ch reading measure. The quick brown fox takes Friday off and turns one PTO day into{' '}
+            <span className="mark">four days off</span>. Inline links <a href="#" className="link-mark">mark themselves on hover</a>. 0123456789
+          </p>
           <p className="text-small text-muted">Small 14/20, muted. 1111 vs 0000 (tabular figures line up)</p>
+          </div>
         </Section>
 
         <Section title="Logo">
@@ -182,10 +193,58 @@ function Bare() {
           </div>
         </Section>
 
+        <Section title="Read patterns (Learn, FAQ, data sources)">
+          <div className="grid max-w-5xl gap-10 lg:grid-cols-2">
+            <div>
+              <p className="mb-2 text-sm text-muted">Numbered reading index</p>
+              <ol className="border-t border-ink">
+                {['Your PTO basics', 'How days are earned'].map((t, i) => (
+                  <li key={t} className="grid grid-cols-[3rem_1fr] border-b border-line py-4">
+                    <span aria-hidden="true" className="text-h1 leading-none text-ink type-display">{i + 1}</span>
+                    <span>
+                      <span className="block font-bold text-ink">{t}</span>
+                      <a href="#" className="link-mark text-sm">accrual</a>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <div>
+              <p className="mb-2 text-sm text-muted">Disclosure (native details, plus turns to minus)</p>
+              {['How does it choose which days to take?', 'Will I get the same result if I come back?'].map((q, i) => (
+                <details key={q} open={i === 0} className="group border-b border-line">
+                  <summary className="flex min-h-11 cursor-pointer list-none items-start justify-between gap-4 py-4 [&::-webkit-details-marker]:hidden">
+                    <span className="font-semibold text-ink">{q}</span>
+                    <span aria-hidden="true" className="relative mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[3px] border border-ink group-open:bg-ink">
+                      <span className="absolute h-[1.5px] w-2.5 bg-ink group-open:bg-white" />
+                      <span className="absolute h-2.5 w-[1.5px] bg-ink group-open:hidden" />
+                    </span>
+                  </summary>
+                  <p className="pb-4 text-ink">Answers stay in the HTML and read at a 68ch measure.</p>
+                </details>
+              ))}
+            </div>
+            <div className="lg:col-span-2">
+              <p className="mb-2 text-sm text-muted">Worked example and day cells</p>
+              <div className="rounded-[4px] border border-line bg-surface p-5">
+                <p className="text-lg font-bold text-ink"><span className="mark">12 unused − 5 carried = 7 days above the cap.</span></p>
+                <ol className="mt-4 flex max-w-sm">
+                  {[['Thu', 'Holiday', false], ['Fri', 'PTO', true], ['Sat', 'Weekend', false], ['Sun', 'Weekend', false]].map(([d, n, pto]) => (
+                    <li key={String(d)} className={`flex flex-1 flex-col items-center py-2 text-center ${pto ? 'bg-ink text-white' : 'bg-mark text-ink'}`}>
+                      <span className="font-bold">{d}</span>
+                      <span className="text-sm">{n}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </div>
+          </div>
+        </Section>
+
         <Section title="Header (each active state)">
           <div className="flex flex-col gap-3">
             {routes.map((r) => (
-              <div key={r} className="overflow-hidden rounded-xl border border-line">
+              <div key={r} className="overflow-hidden rounded-[4px] border border-line">
                 <SiteHeader active={r} />
               </div>
             ))}
@@ -210,7 +269,7 @@ function Frame({ width }: { width: number }) {
   return (
     <div>
       <p className="mb-2 text-sm font-semibold text-ink">{width}px</p>
-      <div className="overflow-x-auto rounded-xl border border-line bg-surface">
+      <div className="overflow-x-auto rounded-[4px] border border-line bg-surface">
         <iframe ref={ref} title={`Gallery at ${width}px`} src="?bare" width={width} height={height} className="block border-0" />
       </div>
     </div>
@@ -221,9 +280,9 @@ export function UiGallery() {
   if (new URLSearchParams(window.location.search).has('bare')) return <Bare />;
   return (
     <div className="min-h-screen bg-page p-4 sm:p-6">
-      <h1 className="text-h2 font-semibold text-ink">UI gallery at 375 / 768 / 1440px</h1>
+      <h1 className="text-h1 text-ink type-display">UI gallery at 375 / 768 / 1440px</h1>
       <p className="mb-6 text-muted">
-        Dev only. Open <a className="text-accent-ink underline" href="?bare">?bare</a> for a single copy at this window's width.
+        Dev only. Open <a className="link-mark" href="?bare">?bare</a> for a single copy at this window's width.
       </p>
       <div className="flex flex-col gap-10">
         {WIDTHS.map((w) => (

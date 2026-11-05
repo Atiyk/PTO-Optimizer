@@ -43,7 +43,7 @@ export function buildPortraitText(data: PortraitPlanData, includeBalance = false
   const pto = data.breaks.reduce((sum, brk) => sum + brk.ptoCost, 0);
   const days = data.breaks.reduce((sum, brk) => sum + brk.totalDaysOff, 0);
   return {
-    title: sameYear ? `My ${year} Time-Off Plan` : 'My Time-Off Plan',
+    title: sameYear ? `My ${year} time-off plan` : 'My time-off plan',
     range: formatDateRange(data.rangeStart, data.rangeEnd),
     summary: `${pto} PTO days → ${days} calendar days off`,
     breaks: data.breaks.slice(0, PORTRAIT_MAX_BREAKS).map(brk => ({
@@ -64,7 +64,8 @@ export function buildPortraitText(data: PortraitPlanData, includeBalance = false
   };
 }
 
-const colors = { page: '#fbf8f3', card: '#ffffff', ink: '#1c1917', muted: '#57534e', line: '#e7e0d5', orange: '#c2410c', soft: '#ffedd5' };
+// 2026-11 redesign palette (src/index.css): paper, ink, pencil, hairline, and the marker.
+const colors = { page: '#f4f4f0', card: '#ffffff', ink: '#141414', muted: '#56564f', line: '#dcdcd5', mark: '#dcf763' };
 
 function fitText(ctx: CanvasRenderingContext2D, value: string, maxWidth: number): string {
   if (ctx.measureText(value).width <= maxWidth) return value;
@@ -95,25 +96,30 @@ export function drawPortraitImage(ctx: CanvasRenderingContext2D, data: PortraitP
   ctx.fillRect(0, 0, PORTRAIT_IMAGE_WIDTH, PORTRAIT_IMAGE_HEIGHT);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
+  // The mark: an ink sheet with a marked row and two ink day-blocks (src/ui/logoMark.ts).
   ctx.fillStyle = colors.ink;
-  ctx.fillRect(64, 64, 56, 52);
-  ctx.fillStyle = colors.card;
-  ctx.fillRect(68, 80, 48, 32);
-  ctx.fillStyle = colors.orange;
-  ctx.fillRect(75, 89, 34, 15);
+  ctx.fillRect(64, 62, 56, 56);
+  ctx.fillStyle = colors.mark;
+  ctx.fillRect(64, 81, 56, 18);
   ctx.fillStyle = colors.ink;
-  ctx.font = '700 42px Figtree Variable, system-ui, sans-serif';
+  ctx.fillRect(81, 85, 9, 10);
+  ctx.fillRect(94, 85, 9, 10);
+  ctx.fillStyle = colors.ink;
+  ctx.font = '700 42px Archivo Variable, system-ui, sans-serif';
   ctx.fillText('Gapless', 140, 106);
-  ctx.font = '700 48px Figtree Variable, system-ui, sans-serif';
+  ctx.font = '700 48px Archivo Variable, system-ui, sans-serif';
   ctx.fillText(fitText(ctx, text.title, 952), 64, 209);
   ctx.fillStyle = colors.muted;
-  ctx.font = '400 25px Figtree Variable, system-ui, sans-serif';
+  ctx.font = '400 25px Archivo Variable, system-ui, sans-serif';
   ctx.fillText(text.range, 64, 253);
-  ctx.fillStyle = colors.orange;
-  ctx.font = '700 41px Figtree Variable, system-ui, sans-serif';
-  ctx.fillText(fitText(ctx, text.summary, 952), 64, 330);
+  ctx.font = '800 41px Archivo Variable, system-ui, sans-serif';
+  const summary = fitText(ctx, text.summary, 940);
+  ctx.fillStyle = colors.mark;
+  ctx.fillRect(58, 296, Math.min(ctx.measureText(summary).width + 12, 964), 44);
+  ctx.fillStyle = colors.ink;
+  ctx.fillText(summary, 64, 330);
   ctx.fillStyle = colors.muted;
-  ctx.font = '400 21px Figtree Variable, system-ui, sans-serif';
+  ctx.font = '400 21px Archivo Variable, system-ui, sans-serif';
   ctx.fillText('Calendar days off include weekends, observed holidays, and PTO.', 64, 367);
 
   text.breaks.forEach((brk, index) => {
@@ -123,27 +129,27 @@ export function drawPortraitImage(ctx: CanvasRenderingContext2D, data: PortraitP
     ctx.strokeStyle = colors.line;
     ctx.lineWidth = 2;
     ctx.strokeRect(64, y, 952, 204);
-    ctx.fillStyle = colors.orange;
-    ctx.fillRect(64, y, 7, 204);
+    ctx.fillStyle = colors.mark;
+    ctx.fillRect(64, y, 10, 204);
     ctx.fillStyle = colors.ink;
-    ctx.font = '650 35px Figtree Variable, system-ui, sans-serif';
+    ctx.font = '650 35px Archivo Variable, system-ui, sans-serif';
     ctx.fillText(fitText(ctx, brk.dates, 872), 100, y + 54);
-    ctx.fillStyle = colors.orange;
-    ctx.font = '650 29px Figtree Variable, system-ui, sans-serif';
+    ctx.fillStyle = colors.ink;
+    ctx.font = '650 29px Archivo Variable, system-ui, sans-serif';
     ctx.fillText(brk.metrics, 100, y + 103);
     ctx.fillStyle = colors.muted;
-    ctx.font = '400 22px Figtree Variable, system-ui, sans-serif';
+    ctx.font = '400 22px Archivo Variable, system-ui, sans-serif';
     wrapText(ctx, brk.holidays, 100, y + 145, 872, 29, 2);
   });
   ctx.fillStyle = colors.muted;
-  ctx.font = '400 23px Figtree Variable, system-ui, sans-serif';
+  ctx.font = '400 23px Archivo Variable, system-ui, sans-serif';
   if (text.overflow) ctx.fillText(text.overflow, 64, 1115);
   if (text.balance) ctx.fillText(text.balance, 64, 1154);
   wrapText(ctx, text.assumption, 64, 1210, 952, 30, 2);
   ctx.fillStyle = colors.line;
   ctx.fillRect(64, 1260, 952, 2);
   ctx.fillStyle = colors.ink;
-  ctx.font = '500 24px Figtree Variable, system-ui, sans-serif';
+  ctx.font = '500 24px Archivo Variable, system-ui, sans-serif';
   ctx.fillText(fitText(ctx, text.site, 952), 64, 1303);
 }
 

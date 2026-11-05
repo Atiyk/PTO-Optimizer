@@ -27,14 +27,14 @@ export function InfoHint({ text }: { text: string }) {
         onMouseLeave={() => setOpen(false)}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
-        className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full border border-slate-400 text-[10px] font-semibold leading-none text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]"
+        className="relative inline-flex h-[18px] w-[18px] shrink-0 cursor-help items-center justify-center rounded-full border border-line-strong text-xs font-bold leading-none text-muted before:absolute before:-inset-3 before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]"
       >
         i
       </span>
       {open && (
         <span
           role="tooltip"
-          className="absolute left-1/2 top-full z-20 mt-1 w-max max-w-[16rem] -translate-x-1/2 rounded-md bg-slate-900 px-2.5 py-1.5 text-xs text-white shadow-lg"
+          className="absolute left-1/2 top-full z-20 mt-2 w-max max-w-[min(16rem,calc(100vw-2rem))] -translate-x-1/2 rounded-[3px] bg-ink px-2.5 py-1.5 text-sm font-normal text-white shadow-lg"
         >
           {text}
         </span>

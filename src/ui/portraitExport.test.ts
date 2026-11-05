@@ -30,7 +30,7 @@ describe('portrait share image', () => {
 
   it('uses plan costs, date range and employer holiday assumptions', () => {
     const text = buildPortraitText(data);
-    expect(text.title).toBe('My 2027 Time-Off Plan');
+    expect(text.title).toBe('My 2027 time-off plan');
     expect(text.summary).toBe('4 PTO days → 9 calendar days off');
     expect(text.breaks[0]).toEqual({ dates: 'Jul 3 - Jul 11, 2027', metrics: '9 calendar days off · 4 PTO days', holidays: 'Includes: Independence Day' });
     expect(text.assumption).toContain('customized employer-observed');
@@ -50,7 +50,7 @@ describe('portrait share image', () => {
     const context = { fillRect: vi.fn(), strokeRect: vi.fn(), fillText, measureText: (value: string) => ({ width: value.length * 15 }) } as unknown as CanvasRenderingContext2D;
     const crossYear = { ...data, rangeStart: '2026-12-01', breaks: Array.from({ length: 4 }, () => ({ start: '2026-12-28', end: '2027-01-03', ptoCost: 4, totalDaysOff: 7 })), holidayNamesOf: () => ['An unusually long holiday name '.repeat(15)] };
     const text = buildPortraitText(crossYear);
-    expect(text.title).toBe('My Time-Off Plan');
+    expect(text.title).toBe('My time-off plan');
     expect(text.breaks[0].dates).toContain('2026');
     expect(text.breaks[0].dates).toContain('2027');
     drawPortraitImage(context, crossYear, true);

@@ -8,14 +8,14 @@ export const SHARE_IMAGE_HEIGHT = 630;
 // canvas can't read Tailwind classes, so these are kept in lockstep by hand. Same two
 // colours as the live calendar (PTO role + band role) plus the one neutral holiday dot.
 const COLOR = {
-  bg: '#fbf8f3', // --bg-page (redesign Phase 1 tokens, src/index.css)
-  textPrimary: '#1c1917', // --text-primary
-  textMuted: '#57534e', // --text-muted
-  gridLine: '#e7e0d5', // --border-default
-  ptoFill: '#c2410c', // --pto-bg
+  bg: '#f4f4f0', // --bg-page (2026-11 redesign tokens, src/index.css)
+  textPrimary: '#141414', // --text-primary
+  textMuted: '#56564f', // --text-muted
+  gridLine: '#dcdcd5', // --border-default
+  ptoFill: '#141414', // --pto-bg
   ptoText: '#ffffff',
-  bandFill: '#ffedd5', // --band-bg
-  holidayDot: '#57534e', // --holiday-dot
+  bandFill: '#dcf763', // --band-bg
+  holidayDot: '#56564f', // --holiday-dot
   cellPlain: '#ffffff', // --bg-surface
 };
 
@@ -78,13 +78,13 @@ function drawMonthGrid(
   const dowH = 16;
 
   ctx.fillStyle = COLOR.textPrimary;
-  ctx.font = '600 15px system-ui, sans-serif';
+  ctx.font = '600 15px Archivo Variable, system-ui, sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   ctx.fillText(month.label, x, y + 15);
 
   const dowLabels = month.weekStart === 0 ? ['S', 'M', 'T', 'W', 'T', 'F', 'S'] : ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  ctx.font = '500 10px system-ui, sans-serif';
+  ctx.font = '500 10px Archivo Variable, system-ui, sans-serif';
   ctx.fillStyle = COLOR.textMuted;
   ctx.textAlign = 'center';
   for (let i = 0; i < 7; i++) {
@@ -114,7 +114,7 @@ function drawMonthGrid(
         ctx.fillStyle = COLOR.textMuted;
       }
 
-      ctx.font = '400 10px system-ui, sans-serif';
+      ctx.font = '400 10px Archivo Variable, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(String(day), cx + cell / 2, rowY + cell / 2 + 3);
 
@@ -138,11 +138,11 @@ export function drawShareImage(ctx: CanvasRenderingContext2D, data: ShareImageDa
   const PAD = 48;
 
   ctx.fillStyle = COLOR.textPrimary;
-  ctx.font = '700 46px system-ui, sans-serif';
+  ctx.font = '800 46px Archivo Variable, system-ui, sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText(data.headline, PAD, PAD + 44);
 
-  ctx.font = '400 22px system-ui, sans-serif';
+  ctx.font = '400 22px Archivo Variable, system-ui, sans-serif';
   ctx.fillStyle = COLOR.textMuted;
   ctx.fillText(data.subtitle, PAD, PAD + 80);
 
@@ -174,7 +174,7 @@ export function drawShareImage(ctx: CanvasRenderingContext2D, data: ShareImageDa
     { color: COLOR.ptoFill, label: 'Suggested PTO' },
     { color: COLOR.bandFill, label: 'Days off' },
   ];
-  ctx.font = '400 13px system-ui, sans-serif';
+  ctx.font = '400 13px Archivo Variable, system-ui, sans-serif';
   for (const item of legendItems) {
     ctx.fillStyle = item.color;
     ctx.fillRect(legendX, legendY - 10, 14, 14);
@@ -185,7 +185,7 @@ export function drawShareImage(ctx: CanvasRenderingContext2D, data: ShareImageDa
   }
 
   // Site URL, bottom-right.
-  ctx.font = '400 14px system-ui, sans-serif';
+  ctx.font = '400 14px Archivo Variable, system-ui, sans-serif';
   ctx.fillStyle = COLOR.textMuted;
   ctx.textAlign = 'right';
   ctx.fillText(data.siteUrl, SHARE_IMAGE_WIDTH - PAD, legendY + 1);

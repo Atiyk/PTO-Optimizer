@@ -17,7 +17,7 @@ describe('expiration guard interactions', () => {
   it('shows the real at-risk amount and counts each alert view once across rerenders', () => {
     const onViewed = vi.fn();
     const view = render(<ExpirationGuard policy={policy} country="US" today="2026-11-02" onAlertViewed={onViewed} />);
-    expect(screen.getByText('You could lose 7 days on 2027-01-01.')).toBeTruthy();
+    expect(screen.getByText('You could lose 7 days on Jan 1, 2027.')).toBeTruthy();
     expect(screen.getByRole('link', { name: /Find the best way/ }).getAttribute('href')).toContain('e=2026-12-31');
     view.rerender(<ExpirationGuard policy={policy} country="US" today="2026-11-02" onAlertViewed={onViewed} />);
     expect(onViewed).toHaveBeenCalledTimes(1);
@@ -30,7 +30,7 @@ describe('expiration guard interactions', () => {
     render(<ExpirationGuard policy={policy} country="US" today="2026-11-02" />);
     expect((screen.getByLabelText('Show in-app alerts') as HTMLInputElement).checked).toBe(false);
     fireEvent.click(screen.getByLabelText('Show in-app alerts'));
-    expect(screen.getByText('You could lose 7 days on 2027-01-01.')).toBeTruthy();
+    expect(screen.getByText('You could lose 7 days on Jan 1, 2027.')).toBeTruthy();
   });
   it('exports selected calendar reminders and does not claim background delivery', () => {
     render(<ExpirationGuard policy={policy} country="US" today="2026-11-02" />);
@@ -48,7 +48,7 @@ describe('expiration guard interactions', () => {
   it('connects actual next-reset carryover figures to the existing guard without duplicate projection math', () => {
     render(<ExpirationGuard policy={policy} country="US" today="2026-11-02" />);
     fireEvent.click(screen.getByRole('button', { name: 'Review next policy reset' }));
-    expect(screen.getByText('2027-01-01')).toBeTruthy();
+    expect(screen.getByText('Jan 1, 2027')).toBeTruthy();
     expect(screen.getByText('Estimated carryover')).toBeTruthy();
     expect(screen.getByText('Potentially forfeited at reset')).toBeTruthy();
     // Both the carried amount and after-reset balance may correctly equal five.

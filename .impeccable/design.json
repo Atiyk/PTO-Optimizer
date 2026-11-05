@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-04T12:00:00Z",
+  "title": "Design System: Gapless PTO Optimizer",
+  "extensions": {
+    "colorMeta": {
+      "text-primary": { "role": "primary", "displayName": "Ink", "canonical": "#141414", "tonalRamp": ["#0a0a0a", "#141414", "#232320", "#36362f", "#4a4a44", "#56564f", "#86867e", "#c4c4bc"] },
+      "mark": { "role": "secondary", "displayName": "Highlighter Yellow-Green", "canonical": "#dcf763", "tonalRamp": ["#2f3608", "#4a560c", "#6b7c12", "#8fa61a", "#b4cf2a", "#c9e83d", "#dcf763", "#f1fbc4"] },
+      "mark-strong": { "role": "secondary", "displayName": "Second Marker Pass", "canonical": "#c9e83d", "tonalRamp": ["#2f3608", "#4a560c", "#6b7c12", "#8fa61a", "#b4cf2a", "#c9e83d", "#dcf763", "#f1fbc4"] },
+      "accent-soft": { "role": "secondary", "displayName": "Pale Marker Pass", "canonical": "#f1fbc4", "tonalRamp": ["#2f3608", "#4a560c", "#6b7c12", "#8fa61a", "#b4cf2a", "#c9e83d", "#dcf763", "#f1fbc4"] },
+      "bg-page": { "role": "neutral", "displayName": "Paper", "canonical": "#f4f4f0", "tonalRamp": ["#141414", "#36362f", "#56564f", "#86867e", "#c4c4bc", "#dcdcd5", "#eeeee8", "#f7f7f4"] },
+      "bg-surface": { "role": "neutral", "displayName": "Sheet", "canonical": "#ffffff", "tonalRamp": ["#141414", "#36362f", "#56564f", "#86867e", "#c4c4bc", "#dcdcd5", "#eeeee8", "#f7f7f4"] },
+      "bg-surface-alt": { "role": "neutral", "displayName": "Sheet Tone", "canonical": "#eaeae4", "tonalRamp": ["#141414", "#36362f", "#56564f", "#86867e", "#c4c4bc", "#dcdcd5", "#eeeee8", "#f7f7f4"] },
+      "weekend-bg": { "role": "neutral", "displayName": "Weekend Tone", "canonical": "#eeeee8", "tonalRamp": ["#141414", "#36362f", "#56564f", "#86867e", "#c4c4bc", "#dcdcd5", "#eeeee8", "#f7f7f4"] },
+      "border-default": { "role": "neutral", "displayName": "Hairline", "canonical": "#dcdcd5", "tonalRamp": ["#141414", "#36362f", "#56564f", "#86867e", "#c4c4bc", "#dcdcd5", "#eeeee8", "#f7f7f4"] },
+      "border-strong": { "role": "neutral", "displayName": "Control Edge", "canonical": "#86867e", "tonalRamp": ["#141414", "#36362f", "#56564f", "#86867e", "#c4c4bc", "#dcdcd5", "#eeeee8", "#f7f7f4"] },
+      "text-muted": { "role": "neutral", "displayName": "Pencil", "canonical": "#56564f", "tonalRamp": ["#141414", "#36362f", "#56564f", "#86867e", "#c4c4bc", "#dcdcd5", "#eeeee8", "#f7f7f4"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The landing h1 only, condensed 75% at 800, about 17ch wide." },
+      "display-figure": { "displayName": "Display Figure", "purpose": "Big engine figures (StatNumber) and large section statements; steps up to the 2.75-5.5rem display token from 640px." },
+      "headline": { "displayName": "Headline", "purpose": "Page titles on app screens and landing section heads." },
+      "title": { "displayName": "Title", "purpose": "Section and card headings, timetable dates; width 82%." },
+      "body": { "displayName": "Body", "purpose": "Reading text and control values, tabular figures." },
+      "label": { "displayName": "Label", "purpose": "Field labels, chips, captions; meta text at 400 in pencil. Nothing under 12px." }
+    },
+    "shadows": [
+      { "name": "float", "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)", "purpose": "Tooltips, menus, country-select listbox, info hints. Floating things only." },
+      { "name": "sheet-float", "value": "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)", "purpose": "Touch action sheet and the keyboard-shortcuts dialog." },
+      { "name": "mark-swipe", "value": "inset 0 -0.62em 0 var(--mark)", "purpose": "Not elevation: the marker fill behind inline data text, cloned across line breaks." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.23, 1, 0.32, 1)", "purpose": "All hover, press and change transitions." },
+      { "name": "duration-ui", "value": "150ms", "purpose": "Hover fills, border and underline changes, button press (scale 0.97)." },
+      { "name": "stat-in", "value": "160ms, opacity 0.35 to 1 and translateY 3px to 0", "purpose": "A changed figure eases in once; never on page load." },
+      { "name": "reduced-motion", "value": "0.01ms", "purpose": "prefers-reduced-motion turns every animation and transition off." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "container", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Solid ink, one per view; a link into a tool or a real action, never a submit.",
+      "html": "<button class=\"ds-btn-primary\">See the full plan</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border: none; border-radius: 3px; background: var(--text-primary, #141414); color: #ffffff; font-family: 'Archivo Variable', 'Archivo Fallback', Arial, sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; transition: background-color 150ms cubic-bezier(0.23, 1, 0.32, 1), transform 150ms cubic-bezier(0.23, 1, 0.32, 1); } .ds-btn-primary:hover { background: #3a3a35; } .ds-btn-primary:active { transform: scale(0.97); } .ds-btn-primary:focus-visible { outline: 2px solid var(--focus-ring, #141414); outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Ink outline on the white sheet, for copy, download and share.",
+      "html": "<button class=\"ds-btn-secondary\">Download holidays (.ics)</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 0 20px; border: 1px solid var(--text-primary, #141414); border-radius: 3px; background: var(--bg-surface, #ffffff); color: var(--text-primary, #141414); font-family: 'Archivo Variable', 'Archivo Fallback', Arial, sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; transition: background-color 150ms cubic-bezier(0.23, 1, 0.32, 1), transform 150ms cubic-bezier(0.23, 1, 0.32, 1); } .ds-btn-secondary:hover { background: var(--bg-surface-alt, #eaeae4); } .ds-btn-secondary:active { transform: scale(0.97); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--focus-ring, #141414); outline-offset: 2px; }"
+    },
+    {
+      "name": "Quiet Button / Text Link",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Underlined ink text whose underline thickens on hover; also the inline link style.",
+      "html": "<a class=\"ds-link\" href=\"#\">Check my policy</a>",
+      "css": ".ds-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--text-primary, #141414); font-family: 'Archivo Variable', 'Archivo Fallback', Arial, sans-serif; font-weight: 600; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.22em; transition: text-decoration-thickness 150ms cubic-bezier(0.23, 1, 0.32, 1); } .ds-link:hover { text-decoration-thickness: 2px; } .ds-link:focus-visible { outline: 2px solid var(--focus-ring, #141414); outline-offset: 2px; }"
+    },
+    {
+      "name": "Select",
+      "kind": "input",
+      "refersTo": "select-ink",
+      "description": "Square 44px native select with one drawn ink chevron.",
+      "html": "<select class=\"ds-select\"><option>United States</option><option>Germany</option></select>",
+      "css": ".ds-select { appearance: none; -webkit-appearance: none; min-height: 44px; border: 1px solid var(--border-strong, #86867e); border-radius: 3px; background-color: var(--bg-surface, #ffffff); background-image: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23141414' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\"); background-repeat: no-repeat; background-position: right 12px center; padding: 0 36px 0 12px; color: var(--text-primary, #141414); font-family: 'Archivo Variable', 'Archivo Fallback', Arial, sans-serif; font-size: 16px; } .ds-select:hover { border-color: var(--text-primary, #141414); } .ds-select:focus-visible { outline: 2px solid var(--focus-ring, #141414); outline-offset: 2px; }"
+    },
+    {
+      "name": "Desktop Navigation",
+      "kind": "nav",
+      "refersTo": "nav-tab-bar",
+      "description": "Paper bar; pencil links turn ink on hover; the current page carries a marker stroke behind its label.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-link\" href=\"#\">Sabbatical</a><a class=\"ds-nav-link\" aria-current=\"page\" href=\"#\">My PTO</a><a class=\"ds-nav-link\" href=\"#\">Learn</a></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; gap: 24px; padding: 0 24px; min-height: 68px; background: var(--bg-page, #f4f4f0); border-bottom: 1px solid var(--border-default, #dcdcd5); isolation: isolate; font-family: 'Archivo Variable', 'Archivo Fallback', Arial, sans-serif; } .ds-nav-link { position: relative; display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; font-size: 15px; font-weight: 600; color: var(--text-muted, #56564f); text-decoration: none; transition: color 150ms cubic-bezier(0.23, 1, 0.32, 1); } .ds-nav-link:hover { color: var(--text-primary, #141414); } .ds-nav-link[aria-current='page'] { color: var(--text-primary, #141414); } .ds-nav-link[aria-current='page']::after { content: ''; position: absolute; left: 0; right: 0; bottom: 9px; height: 9px; background: var(--mark, #dcf763); z-index: -1; } .ds-nav-link:focus-visible { outline: 2px solid var(--focus-ring, #141414); outline-offset: 2px; }"
+    },
+    {
+      "name": "Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Square label; as a toggle, selected = marker fill, ink border and a drawn check.",
+      "html": "<span class=\"ds-chip\">3.8×</span> <button class=\"ds-chip ds-chip-toggle\" aria-pressed=\"true\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" aria-hidden=\"true\"><path d=\"M2.5 6.2 5 8.5l4.5-5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>Long weekends</button>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 3px; background: var(--bg-surface-alt, #eaeae4); color: var(--text-primary, #141414); font-family: 'Archivo Variable', 'Archivo Fallback', Arial, sans-serif; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; } .ds-chip-toggle { border: 1px solid transparent; cursor: pointer; transition: border-color 150ms, background-color 150ms; } .ds-chip-toggle:hover { border-color: var(--text-primary, #141414); } .ds-chip-toggle[aria-pressed='true'] { background: var(--mark, #dcf763); border-color: var(--text-primary, #141414); } .ds-chip-toggle:focus-visible { outline: 2px solid var(--focus-ring, #141414); outline-offset: 2px; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "White sheet on paper, hairline edge, 4px corners, no shadow.",
+      "html": "<div class=\"ds-card\"><h3 class=\"ds-card-title\">Track my PTO balance</h3><p class=\"ds-card-body\">See what you could have available by a future date.</p></div>",
+      "css": ".ds-card { border: 1px solid var(--border-default, #dcdcd5); border-radius: 4px; background: var(--bg-surface, #ffffff); padding: 24px; font-family: 'Archivo Variable', 'Archivo Fallback', Arial, sans-serif; color: var(--text-primary, #141414); } .ds-card-title { margin: 0; font-size: 24px; line-height: 1.15; font-weight: 700; font-stretch: 82%; } .ds-card-body { margin: 8px 0 0; font-size: 16px; line-height: 24px; }"
+    },
+    {
+      "name": "Finding Callout",
+      "kind": "custom",
+      "refersTo": "callout-finding",
+      "description": "The plan's own finding on a pale marker pass, led by a small ink square, with a Why line.",
+      "html": "<div class=\"ds-callout\"><p class=\"ds-callout-title\"><span class=\"ds-callout-square\"></span>9 days off for 4 PTO days</p><p class=\"ds-callout-why\"><strong>Why: </strong>bridges Thanksgiving</p></div>",
+      "css": ".ds-callout { border-radius: 4px; padding: 12px 16px; background: var(--accent-soft, #f1fbc4); color: var(--text-primary, #141414); font-family: 'Archivo Variable', 'Archivo Fallback', Arial, sans-serif; } .ds-callout-title { display: flex; align-items: baseline; gap: 8px; margin: 0; font-weight: 600; } .ds-callout-square { display: inline-block; width: 10px; height: 10px; flex-shrink: 0; transform: translateY(-1px); background: var(--text-primary, #141414); } .ds-callout-why { margin: 6px 0 0; font-size: 14px; color: var(--text-muted, #56564f); } .ds-callout-why strong { color: var(--text-primary, #141414); font-weight: 600; }"
+    },
+    {
+      "name": "Calendar Week Row",
+      "kind": "custom",
+      "refersTo": "day-run",
+      "description": "Signature: ink PTO blocks inside one continuous marker run, weekend tone, holiday dot, dashed alternative, today ring.",
+      "html": "<div class=\"ds-week\"><span class=\"ds-run\" style=\"grid-column: 2 / 7\"></span><span class=\"ds-day\" style=\"grid-column:1\">3</span><span class=\"ds-day ds-day-pto\" style=\"grid-column:2\">4</span><span class=\"ds-day ds-day-pto\" style=\"grid-column:3\">5</span><span class=\"ds-day ds-day-inrun\" style=\"grid-column:4\">6<i class=\"ds-dot\"></i></span><span class=\"ds-day ds-day-inrun\" style=\"grid-column:5\">7</span><span class=\"ds-day ds-day-inrun\" style=\"grid-column:6\">8</span><span class=\"ds-day ds-day-alt\" style=\"grid-column:7\">9</span></div>",
+      "css": ".ds-week { position: relative; display: grid; grid-template-columns: repeat(7, 48px); grid-template-rows: 48px; column-gap: 4px; font-family: 'Archivo Variable', 'Archivo Fallback', Arial, sans-serif; font-variant-numeric: tabular-nums; } .ds-run { grid-row: 1; background: var(--band-bg, #dcf763); border-bottom: 1px solid var(--text-primary, #141414); border-radius: 4px; } .ds-day { position: relative; z-index: 1; grid-row: 1; display: flex; align-items: center; justify-content: center; border-radius: 3px; font-size: 14px; font-weight: 500; color: var(--text-primary, #141414); cursor: pointer; transition: background-color 150ms; } .ds-day:hover { outline: 1px solid var(--text-primary, #141414); outline-offset: 1px; } .ds-day-pto { background: var(--pto-bg, #141414); border: 1px solid #000000; color: #ffffff; font-weight: 700; } .ds-day-alt { border: 1px dashed var(--text-primary, #141414); } .ds-dot { position: absolute; bottom: 6px; left: 50%; width: 6px; height: 6px; transform: translateX(-50%); border-radius: 9999px; background: var(--text-muted, #56564f); } .ds-day:focus-visible { outline: none; box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--focus-ring, #141414); }"
+    },
+    {
+      "name": "Marked Result Figure",
+      "kind": "custom",
+      "refersTo": "display-figure",
+      "description": "A condensed heavy figure with the marker swipe behind the data, never behind headline words.",
+      "html": "<p class=\"ds-figure\"><span class=\"ds-mark\">16 days off</span></p><p class=\"ds-figure-sub\">for 7 PTO days, Dec 20 – Jan 4</p>",
+      "css": ".ds-figure { margin: 0; font-family: 'Archivo Variable', 'Archivo Fallback', Arial, sans-serif; font-size: clamp(2.75rem, 1.6rem + 3.8vw, 4.75rem); line-height: 0.95; font-weight: 800; font-stretch: 75%; letter-spacing: -0.02em; color: var(--text-primary, #141414); font-variant-numeric: tabular-nums; } .ds-mark { box-shadow: inset 0 -0.62em 0 var(--mark, #dcf763); box-decoration-break: clone; -webkit-box-decoration-break: clone; padding-inline: 0.12em; margin-inline: -0.12em; } .ds-figure-sub { margin: 12px 0 0; font-family: 'Archivo Variable', 'Archivo Fallback', Arial, sans-serif; font-size: 20px; font-weight: 600; color: var(--text-primary, #141414); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Highlighted Schedule",
+    "overview": "Gapless is a printed schedule someone has gone over with a highlighter. The page is paper, everything you act on is ink, and one fluorescent marker swipes across the time that is yours: the days-off runs, the result figure, the active destination, selected text. The plan is literally the marked run of days, so the visual system and the product's output are the same object.\n\nThe world is flat and typographic. A white sheet sits on a neutral off-white page with a hairline edge and no shadow; depth comes from one tone step down, never from lift. One variable family (Archivo) does all the talking: condensed and heavy for headlines and figures, normal width for controls and reading. Every number is set in tabular figures because every number changes as inputs change. Density follows the job: the landing page breathes in large sections, the planner packs a control rail beside a dominant calendar.\n\nThe system was built to refuse the category default of a calm cream \"wellness\" planner with soft rounded cards and a teal accent. Corners are near-square, there is no second hue, and nothing animates on load.",
+    "keyCharacteristics": [
+      "Ink (#141414) is the action colour and the PTO colour; the marker (#dcf763) is reserved for your time and your results.",
+      "No other hue exists anywhere in the consumer app.",
+      "Archivo variable, one family: condensed 800 for display and figures, normal width for UI.",
+      "Near-square corners (3px controls, 4px sheets); full rounding only on small dot indicators.",
+      "Flat at rest: hairlines and tone steps, shadows only on things that float.",
+      "Tabular figures everywhere; sentence case everywhere."
+    ],
+    "rules": [
+      { "name": "The Ink Acts, the Marker Means Yours Rule", "body": "Ink carries every action and every PTO day. The marker marks only days off, results, selection and \"you are here\"; it never fills a button, a header, or other chrome.", "section": "colors" },
+      { "name": "The No Other Hue Rule", "body": "There is no teal, blue, orange, green or red in the consumer app. State is never carried by colour alone: PTO is a solid ink block, days off are a marker run, a holiday is a dot plus its name, pinned is a pin glyph, unpaid is a ring glyph, an alternative is a dashed ink outline.", "section": "colors" },
+      { "name": "The Contrast Is Tested Rule", "body": "Every text/background token pair is parsed from `src/index.css` and checked by `tokens.test.ts` (4.5:1 for text, 3:1 for UI boundaries). A new colour token joins that check or does not ship.", "section": "colors" },
+      { "name": "The Condensed Is For Headlines And Figures Rule", "body": "The 75% width at 800 appears only in display lines, headings and numerals (and the wordmark). Controls, labels and reading text stay at normal width.", "section": "typography" },
+      { "name": "The Tabular Everywhere Rule", "body": "`font-variant-numeric: tabular-nums` is set on body; every figure, date column and counter inherits it so values never jitter sideways as they change.", "section": "typography" },
+      { "name": "The Sentence Case Rule", "body": "Headings, labels, buttons and captions are sentence case. No tracked uppercase labels.", "section": "typography" },
+      { "name": "The Flat Sheet Rule", "body": "Nothing casts a shadow at rest. If it does not float over other content, it gets a hairline or a tone step instead.", "section": "elevation" }
+    ],
+    "dos": [
+      "**Do** use ink (#141414) for every action and every PTO day, and the marker (#dcf763) only for days off, results, selection and the current destination.",
+      "**Do** set display lines and figures in Archivo at width 75% and weight 800; keep controls and reading text at normal width.",
+      "**Do** keep corners at 3px for controls and 4px for sheets and run ends.",
+      "**Do** separate surfaces with a 1px hairline or one tone step, never a resting shadow.",
+      "**Do** pair every state with a shape or a word as well as a fill (ink block, marker run, dot plus name, pin glyph, dashed outline).",
+      "**Do** keep every touch target at 44px or more, and reserve the phone tab bar's height below 1024px.",
+      "**Do** keep motion to comprehension: 150ms on the custom ease-out for hovers and presses, 160ms when a figure changes, nothing on page load, all of it off under `prefers-reduced-motion`."
+    ],
+    "donts": [
+      "**Don't** introduce a second hue, including blue links or a teal accent.",
+      "**Don't** put the marker on buttons, headers or other chrome, or set the marker on ink outside the logo mark.",
+      "**Don't** use pill-shaped buttons or 12-24px soft cards; full rounding is for dot indicators only.",
+      "**Don't** add tracked uppercase labels or eyebrow captions above headings.",
+      "**Don't** add shadows to anything that does not float.",
+      "**Don't** put the marker swipe or a coloured accent on headline words; mark the data instead.",
+      "**Don't** nest cards; inside a sheet use tone steps or rules.",
+      "**Don't** set text below 12px."
+    ]
+  }
+}

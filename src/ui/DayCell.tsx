@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { MarginalValue } from '@daysoff/engine/solver/marginalValue';
 import { COLORS, HOLIDAY_DOT, TEXT_MUTED, TEXT_PRIMARY, BAND_TEXT } from './colorScheme';
+import { buttonClasses } from './Button';
 import type { DayCategory } from './types';
 
 interface DayCellProps {
@@ -27,7 +28,21 @@ interface DayCellProps {
   onSwapAlternative?: () => void;
   onHoverAlternativeStart?: () => void;
   onHoverAlternativeEnd?: () => void;
-  onArrowKey?: (direction: 'left' | 'right' | 'up' | 'down') => void;
+  onArrowKey?: (direction: 'left' | 'right' | 'up' | 'down' | 'home' | 'end') => void;
+  /** Roving tabindex: the calendar is one tab stop; only the active day has 0. */
+  tabIndex?: 0 | -1;
+  /** Tells the calendar which day now holds the roving tab stop. */
+  onFocusDay?: (date: string) => void;
+  /** 1-based number of the break whose run this day sits in, for the accessible name. */
+  breakIndex?: number;
+  /** The person's explicit choice for this day, when the planner tracks one. */
+  forcedState?: 'include' | 'exclude';
+  /** With this, the touch sheet offers Take / Never / Let the planner decide directly. */
+  onSetState?: (date: string, state: 'include' | 'exclude' | null) => void;
+  /** The real outcome of pinning this day, from the planner's own solve (lazy). When
+   * given, it replaces the engine's marginal estimate, so a hover never promises a gain the
+   * plan cannot deliver. */
+  pinPreview?: (date: string) => string | null;
 }
 
 /** A small pin glyph, not a colour, carries "pinned vs suggested" - placed beside the
@@ -61,6 +76,12 @@ function formatMonthDay(iso: string): string {
   const month = Number(iso.slice(5, 7));
   const day = Number(iso.slice(8, 10));
   return `${MONTHS[month - 1]} ${day}`;
+}
+
+function formatWeekdayMonthDay(iso: string): string {
+  const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]}, ${formatMonthDay(iso)}`;
 }
 
 function marginalValueText(mv: MarginalValue): string {
@@ -108,10 +129,29 @@ export function DayCell({
   onHoverAlternativeStart,
   onHoverAlternativeEnd,
   onArrowKey,
+  tabIndex,
+  onFocusDay,
+  breakIndex,
+  forcedState,
+  onSetState,
+  pinPreview,
 }: DayCellProps) {
   const [tooltipOpen, setTooltipOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const dayButtonRef = useRef<HTMLButtonElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+
+  // Touch: the sheet sits at the bottom of the screen; if the tapped day would be under it,
+  // scroll just enough to keep the day in view above the sheet.
+  useEffect(() => {
+    if (!tooltipOpen || hasHover) return;
+    const frame = requestAnimationFrame(() => {
+      const day = dayButtonRef.current?.getBoundingClientRect();
+      const sheet = sheetRef.current?.getBoundingClientRect();
+      if (day && sheet && day.bottom > sheet.top - 12) window.scrollBy?.({ top: day.bottom - sheet.top + 24 });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [tooltipOpen, hasHover]);
 
   // Touch actions are a disclosure, not a hover-only tooltip. Dismiss when
   // tapping outside or pressing Escape, but preserve focus within the action panel.
@@ -133,19 +173,26 @@ export function DayCell({
     };
   }, [tooltipOpen, hasHover]);
 
-  const tooltipText = isOutOfRange
+  const isHolidayTip = !isOutOfRange && category === 'public-holiday' && !!holidayName;
+  const hasTip = !isOutOfRange && (isHolidayTip || !!marginalValue);
+  // The pin outcome is computed only while the tip is open (one solve per day, cached).
+  const previewText = tooltipOpen && !isHolidayTip && marginalValue && pinPreview ? pinPreview(date) : null;
+  const tooltipText = !hasTip
     ? null
-    : category === 'public-holiday' && holidayName
-      ? holidayName
-      : marginalValue
-        ? marginalValueText(marginalValue)
-        : null;
+    : isHolidayTip
+      ? holidayName!
+      : pinPreview
+        ? previewText ?? 'Pin it to add it to the plan.'
+        : marginalValueText(marginalValue!);
 
   const ariaLabel = [
     formatMonthDay(date),
     stateLabel(category, isAlternative, isBlackout, isOutOfRange),
-    tooltipText && category !== 'public-holiday' ? `gains ${marginalValue!.deltaDays} day${marginalValue!.deltaDays === 1 ? '' : 's'} off` : null,
-    tooltipText && category === 'public-holiday' ? tooltipText : null,
+    !isOutOfRange && breakIndex ? `part of break ${breakIndex}` : null,
+    // The engine's estimate is only spoken where no verified preview exists (sabbatical);
+    // the planner announces the real outcome through the tooltip description instead.
+    hasTip && !isHolidayTip && !pinPreview ? `gains ${marginalValue!.deltaDays} day${marginalValue!.deltaDays === 1 ? '' : 's'} off` : null,
+    isHolidayTip ? holidayName : null,
   ]
     .filter(Boolean)
     .join(', ');
@@ -171,15 +218,15 @@ export function DayCell({
       return;
     }
     const direction =
-      e.key === 'ArrowLeft' ? 'left' : e.key === 'ArrowRight' ? 'right' : e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : null;
+      e.key === 'ArrowLeft' ? 'left' : e.key === 'ArrowRight' ? 'right' : e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : e.key === 'Home' ? 'home' : e.key === 'End' ? 'end' : null;
     if (direction && onArrowKey) {
       e.preventDefault();
       onArrowKey(direction);
     }
   };
 
-  // The calendar's only two colours: the PTO role (coral/blue, "a day you're taking") and
-  // the band role (teal/amber, rendered separately in MonthGrid), plus the one neutral
+  // The calendar's only two colours: the PTO role (solid ink, "a day you're taking") and
+  // the band role (the marker, rendered separately in MonthGrid), plus the one neutral
   // holiday dot. 'pinned' shares the exact same fill AND border as 'suggested-pto' -
   // deliberately - distinguished by the pin glyph beside the numeral below, never a third
   // fill colour or a border-weight difference that turned out illegible at cell size (see
@@ -191,17 +238,19 @@ export function DayCell({
   // real bug in dark mode (near-white text on the still-pale amber fill, 1.13:1 - caught by
   // Lighthouse, not by inspection). Outside a band, weekends stay muted; everything else
   // (holiday not in a band, working) stays TEXT_PRIMARY, matching the original intent.
+  // Highlighted schedule (2026-11): ink numerals on the marker run, muted numerals on the
+  // tone-stepped weekend column, and a solid ink block for every PTO day. Pinned shares the
+  // PTO fill exactly and is told apart by its pin glyph, never by a third fill.
   const textColor = inBand ? BAND_TEXT : category === 'weekend' ? TEXT_MUTED : TEXT_PRIMARY;
   const isPtoLike = category === 'suggested-pto' || category === 'pinned' || category === 'unpaid-leave';
-  // Suggested PTO is the thing the user must act on - the strongest, most saturated
-  // treatment on the page, deliberately heavier than the quiet "days off" band behind it
-  // (font-bold, not font-medium - no border-weight change, which DayCell.test.tsx already
-  // pins pinned/suggested-pto to sharing exactly, border weight included).
   const categoryClasses = isOutOfRange
     ? 'text-slate-300'
     : isPtoLike
       ? `${COLORS.ptoBg} border ${COLORS.ptoBorder} ${COLORS.ptoText} font-bold`
-      : textColor;
+      : `${textColor} ${!inBand && category === 'weekend' ? 'bg-surface-alt' : ''} ${
+          // A second marker pass over the run while its break is hovered or focused.
+          isHighlighted ? 'bg-mark-strong' : ''
+        }`;
 
   return (
     <div
@@ -222,12 +271,13 @@ export function DayCell({
         id={`day-${date}`}
         data-date={date}
         disabled={isOutOfRange}
+        tabIndex={isOutOfRange ? undefined : tabIndex}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         onMouseEnter={() => {
           if (isOutOfRange) return;
           if (isAlternative) onHoverAlternativeStart?.();
-          if (hasHover && tooltipText) setTooltipOpen(true);
+          if (hasHover && hasTip) setTooltipOpen(true);
         }}
         onMouseLeave={() => {
           if (isAlternative) onHoverAlternativeEnd?.();
@@ -235,8 +285,9 @@ export function DayCell({
         }}
         onFocus={() => {
           if (isOutOfRange) return;
+          onFocusDay?.(date);
           if (isAlternative) onHoverAlternativeStart?.();
-          if (hasHover && tooltipText) setTooltipOpen(true);
+          if (hasHover && hasTip) setTooltipOpen(true);
         }}
         aria-label={ariaLabel}
         aria-expanded={!hasHover ? tooltipOpen : undefined}
@@ -247,27 +298,20 @@ export function DayCell({
         // signal that's true everywhere, which is why it isn't gated on tooltipText. An
         // out-of-range cell gets none of this: no cursor, no hover, no focus ring -
         // `disabled` already removes it from the tab order and all hover/click handling.
-        className={`relative z-10 flex h-12 w-full items-center justify-center rounded text-sm transition-colors ${
+        className={`relative z-10 flex h-12 w-full items-center justify-center rounded-[3px] text-sm font-medium tabular-nums transition-colors duration-150 ${
           isOutOfRange
             ? 'cursor-default'
-            : `cursor-pointer hover:brightness-95 hover:outline hover:outline-1 hover:outline-offset-1 hover:outline-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${COLORS.focusRing}`
+            : `cursor-pointer hover:outline hover:outline-1 hover:outline-offset-1 hover:outline-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${COLORS.focusRing}`
         } ${categoryClasses} ${
-          // Noticeably fainter than the solid fill, not equal weight - an alternative is a
-          // suggestion about a suggestion, not a second plan.
-          isAlternative && !isOutOfRange ? `border border-dashed ${COLORS.altBorder}/40` : ''
+          // An alternative is a suggestion about a suggestion: a 1px dashed ink outline, no fill.
+          isAlternative && !isOutOfRange ? `border border-dashed ${COLORS.altBorder}` : ''
         } ${
-          // A thin, mid-tone ring, not the old thick near-black/near-white box - that read
-          // as a selection state rather than a "today" marker, clearly distinct from any
-          // interactive/pressed state a cell can actually be in.
-          isToday && !isOutOfRange ? 'ring-1 ring-inset ring-slate-400' : ''
+          // Today: a 2px ink ring, set off from the cell so it reads on an ink PTO block too.
+          isToday && !isOutOfRange ? 'ring-2 ring-[var(--text-primary)] ring-offset-2 ring-offset-[var(--bg-surface)]' : ''
         } ${
-          // `outline`, not `ring` - a separate CSS property from the "today" ring above, so
-          // a day that's both today AND part of the hovered break shows both at once
-          // instead of one Tailwind ring utility silently overriding the other. A darker,
-          // heavier neutral than the "today" ring (slate-700 vs slate-400) - distinguished
-          // by weight, not a second hue; the accent is reserved for suggested PTO, the
-          // primary action, and focus rings only.
-          isHighlighted && !isOutOfRange ? 'outline outline-2 outline-slate-700 -outline-offset-1' : ''
+          // The hovered break: an ink outline (a separate property from the today ring, so a
+          // day that is both shows both).
+          isHighlighted && !isOutOfRange ? 'outline outline-2 outline-offset-1 outline-[var(--text-primary)]' : ''
         }`}
       >
         {!isOutOfRange && category === 'pinned' ? (
@@ -284,7 +328,7 @@ export function DayCell({
           dayOfMonth
         )}
         {!isOutOfRange && category === 'public-holiday' && (
-          <span aria-hidden className={`absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${HOLIDAY_DOT}`} />
+          <span aria-hidden className={`absolute bottom-1.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${HOLIDAY_DOT}`} />
         )}
         {!isOutOfRange && hasOverlap && (
           // A ring around the dot (not just a colour swap) so it stays visible whatever it
@@ -292,7 +336,7 @@ export function DayCell({
           // fills - rather than needing one colour choice that only works on some of them.
           <span
             aria-label="Overlaps someone else's time off"
-            className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-slate-900 ring-1 ring-white"
+            className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-ink ring-1 ring-white"
           />
         )}
       </button>
@@ -300,42 +344,86 @@ export function DayCell({
       {tooltipOpen && (tooltipText || !hasHover) && (
         <div
           id={`tooltip-${date}`}
+          ref={sheetRef}
           role={hasHover ? 'tooltip' : 'group'}
           aria-label={!hasHover ? `Actions for ${formatMonthDay(date)}` : undefined}
           className={hasHover
-            ? 'absolute left-1/2 top-full z-20 mt-1 w-max max-w-[14rem] -translate-x-1/2 rounded-md bg-slate-900 px-2.5 py-1.5 text-xs text-white shadow-lg'
-            : 'fixed inset-x-4 bottom-4 z-50 mx-auto max-w-sm rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-900 shadow-xl'}
+            ? 'absolute left-1/2 top-full z-20 mt-1 w-max max-w-[15rem] -translate-x-1/2 rounded-[3px] bg-ink px-2.5 py-1.5 text-sm text-white shadow-lg'
+            : 'fixed inset-x-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-sm rounded-[4px] border border-line bg-surface p-4 text-sm text-ink shadow-xl lg:bottom-4'}
         >
-          <p>{tooltipText ?? stateLabel(category, isAlternative, isBlackout, isOutOfRange)}</p>
+          {!hasHover && <p className="text-[15px] font-bold">{formatWeekdayMonthDay(date)}</p>}
+          {hasHover ? <p>{tooltipText}</p> : (
+            <p className="mt-0.5 text-muted">
+              <span>{stateLabel(category, isAlternative, isBlackout, isOutOfRange)}</span>
+              {tooltipText && <>. <span>{tooltipText}</span></>}
+            </p>
+          )}
           {!hasHover && (
-            <>
-              {!isAlternative && (
-                <p className="mt-1 text-xs text-slate-600">Change this date to include it, exclude it, or let the planner decide.</p>
-              )}
-              <div className="mt-3 flex items-center gap-2">
+            onSetState && !isAlternative ? (
+              <div className="mt-3 grid gap-2" role="group" aria-label="Choose for this day">
+                {([
+                  ['include', 'Take this day off'],
+                  ['exclude', 'Never take this day'],
+                  [null, 'Let the planner decide'],
+                ] as const).map(([value, label]) => {
+                  const current = (forcedState ?? null) === value;
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      aria-pressed={current}
+                      onClick={() => {
+                        onSetState(date, value);
+                        setTooltipOpen(false);
+                        dayButtonRef.current?.focus();
+                      }}
+                      className={buttonClasses(current ? 'primary' : 'secondary', 'md', 'w-full justify-start!')}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
                 <button
                   type="button"
                   onClick={() => {
-                    primaryAction?.();
                     setTooltipOpen(false);
                     dayButtonRef.current?.focus();
                   }}
-                  className="min-h-11 flex-1 rounded-lg bg-slate-900 px-3 py-2 font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
-                >
-                  {isAlternative ? 'Swap this in' : 'Change this day'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTooltipOpen(false);
-                    dayButtonRef.current?.focus();
-                  }}
-                  className="min-h-11 rounded-lg border border-slate-300 px-3 py-2 font-medium text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                  className={buttonClasses('quiet', 'md', 'w-full')}
                 >
                   Close
                 </button>
               </div>
-            </>
+            ) : (
+              <>
+                {!isAlternative && (
+                  <p className="mt-1 text-sm text-muted">Change this date to include it, exclude it, or let the planner decide.</p>
+                )}
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      primaryAction?.();
+                      setTooltipOpen(false);
+                      dayButtonRef.current?.focus();
+                    }}
+                    className={buttonClasses('primary', 'md', 'flex-1')}
+                  >
+                    {isAlternative ? 'Swap this in' : 'Change this day'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTooltipOpen(false);
+                      dayButtonRef.current?.focus();
+                    }}
+                    className={buttonClasses('secondary', 'md')}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            )
           )}
         </div>
       )}

@@ -14,7 +14,7 @@ export interface ColorTokens {
   focusRing: string;
 }
 
-// Values live in index.css (calm premium design: deep teal accent, sage-tinted days-off band).
+// Values live in index.css (2026-11 "highlighted schedule": ink actions, one marker for days off).
 // Every pair is verified against the real stylesheet in tokens.test.ts / colorScheme.test.ts.
 /**
  * THE primary-action treatment - the accent's second of its three reserved uses (suggested

@@ -21,7 +21,8 @@ interface PrimaryControlsProps {
 }
 
 const DATE_FIELD_CLASS =
-  'h-11 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400';
+  'h-11 min-w-0 rounded-[3px] border border-line-strong bg-surface px-2.5 text-[15px] font-normal tabular-nums text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
+const LABEL_CLASS = 'text-sm font-semibold text-ink';
 
 /** Always-visible country, date and budget inputs. Dates stack into a shrinkable grid
  * so the native pickers remain usable on 320px screens without page-level overflow.
@@ -48,11 +49,33 @@ export function PrimaryControls({
 
   return (
     <>
-      <CountrySelect country={country} onChangeCountry={onChangeCountry} />
+      {/* PTO days and country share a row when the field group has room (a phone held
+          upright at 375px and up, a tablet); they stack in the narrow desktop rail. */}
+      <div className="@container min-w-0">
+        <div className="grid min-w-0 grid-cols-1 gap-3.5 @min-[19rem]:grid-cols-[6.5rem_minmax(0,1fr)] @min-[19rem]:items-end">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <label htmlFor={budgetId} className={LABEL_CLASS}>PTO days<span className="sr-only"> available</span></label>
+            <input id={budgetId}
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={60}
+              step={1}
+              value={budget}
+              onChange={(e) => onChangeBudget(Number(e.target.value))}
+              className={`${DATE_FIELD_CLASS} w-24 @min-[19rem]:w-full`}
+            />
+          </div>
+          <CountrySelect country={country} onChangeCountry={onChangeCountry} widthClass="w-full" />
+        </div>
+      </div>
 
-      <fieldset className="flex min-w-0 w-full flex-col gap-1 text-xs font-medium text-slate-600 sm:w-auto">
-        <legend className="text-xs font-medium text-slate-600">Date range</legend>
-        <div className="grid min-w-0 w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 sm:gap-2">
+      <fieldset className="@container m-0 flex min-w-0 flex-col gap-1.5 border-0 p-0">
+        <legend className={`${LABEL_CLASS} mb-1.5 p-0`}>Date range</legend>
+        {/* Two columns joined by an arrow when the field has room; stacked when it does
+            not (a 320px phone, the narrow desktop rail), so the native pickers never clip
+            the year. */}
+        <div className="grid min-w-0 grid-cols-1 items-center gap-1.5 @min-[18rem]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
           <input
             type="date"
             lang={locale}
@@ -61,7 +84,7 @@ export function PrimaryControls({
             onChange={(e) => onChangeRangeStart(e.target.value)}
             className={`${DATE_FIELD_CLASS} w-full max-w-full`}
           />
-          <span aria-hidden="true" className="text-slate-400">&rarr;</span>
+          <span aria-hidden="true" className="hidden text-muted @min-[18rem]:inline">&rarr;</span>
           <input
             type="date"
             lang={locale}
@@ -73,52 +96,40 @@ export function PrimaryControls({
         </div>
       </fieldset>
 
-      <div className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-        <label htmlFor={budgetId}>PTO days available</label>
-        <input id={budgetId}
-          type="number"
-          min={0}
-          max={60}
-          step={1}
-          value={budget}
-          onChange={(e) => onChangeBudget(Number(e.target.value))}
-          className={`${DATE_FIELD_CLASS} w-24`}
-        />
-        {/* Phase 3.2: unlimited-PTO workers still self-cap (66% at 15 or fewer) because the
-            expectation is unclear, not because they prefer fewer days - this seeds a
-            concrete starting number rather than leaving the field blank/undefined. The
-            budget field above stays fully editable either way - this is a default, not a
-            lock on the number. */}
-        {advanced && <span className="flex items-center gap-1.5 font-normal normal-case">
-          <input
-            type="checkbox"
-            id="unlimited-pto"
-            checked={unlimitedPto}
-            onChange={(e) => onToggleUnlimitedPto(e.target.checked)}
-          />
-          <label htmlFor="unlimited-pto">I have unlimited PTO</label>
-        </span>}
-        {advanced && unlimitedPto && (
-          <span className="max-w-[16rem] text-xs font-normal normal-case text-slate-500">
-            Most people with unlimited PTO take 15 days or fewer. Adjust if yours differs.
-          </span>
-        )}
-        {/* Phase 3.1: compared against the budget actually available to the solver
-            (after reserve), never the raw total - otherwise every deliberately-reserved
-            day would misleadingly look like a solver failure ("add no days off at any
-            position"), which is exactly what this warning must never say about a reserve. */}
-        {budgetSpent < effectiveBudget && (
-          <span className="text-xs font-normal normal-case text-amber-700">
+      {advanced && (
+        <ReserveControls budget={budget} reserveDays={reserveDays} onChangeReserveDays={onChangeReserveDays} unlimitedPto={unlimitedPto} onToggleUnlimitedPto={onToggleUnlimitedPto} />
+      )}
+      {/* Phase 3.1: compared against the budget actually available to the solver (after
+          reserve), never the raw total, so a deliberate reserve never reads as a failure. */}
+      {budgetSpent < effectiveBudget && (
+        <p className="flex gap-2 text-sm text-ink">
+          <span aria-hidden="true" className="mt-1.5 inline-block h-2 w-2 shrink-0 bg-ink" />
+          <span>
             Using {budgetSpent} of {effectiveBudget} planned day{effectiveBudget === 1 ? '' : 's'} &mdash; the remaining{' '}
             {effectiveBudget - budgetSpent} day{effectiveBudget - budgetSpent === 1 ? '' : 's'} remain unplanned under your current constraints.
           </span>
-        )}
-      </div>
+        </p>
+      )}
+    </>
+  );
+}
 
-      {advanced && <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-        Keep in reserve
+/** Reserve days and unlimited PTO: balance settings that live with the other advanced
+ * options in More options (PrimaryControls still renders them inline when `advanced`). */
+export function ReserveControls({ budget, reserveDays, onChangeReserveDays, unlimitedPto, onToggleUnlimitedPto }: {
+  budget: number;
+  reserveDays: number;
+  onChangeReserveDays: (v: number) => void;
+  unlimitedPto: boolean;
+  onToggleUnlimitedPto: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <label className="flex flex-col gap-1.5">
+        <span className={LABEL_CLASS}>Keep in reserve</span>
         <input
           type="number"
+          inputMode="numeric"
           min={0}
           max={budget}
           step={1}
@@ -127,7 +138,23 @@ export function PrimaryControls({
           aria-label="Days to keep in reserve"
           className={`${DATE_FIELD_CLASS} w-24`}
         />
-      </label>}
-    </>
+      </label>
+      {/* Phase 3.2: unlimited-PTO workers still self-cap, so this seeds a concrete starting
+          number; the budget field stays fully editable either way. */}
+      <label htmlFor="unlimited-pto" className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-sm text-ink">
+        <input
+          type="checkbox"
+          id="unlimited-pto"
+          checked={unlimitedPto}
+          onChange={(e) => onToggleUnlimitedPto(e.target.checked)}
+        />
+        I have unlimited PTO
+      </label>
+      {unlimitedPto && (
+        <span className="text-sm text-muted">
+          Most people with unlimited PTO take 15 days or fewer. Adjust if yours differs.
+        </span>
+      )}
+    </div>
   );
 }

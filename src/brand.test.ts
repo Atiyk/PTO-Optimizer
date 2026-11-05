@@ -45,7 +45,7 @@ describe('brand', () => {
 
   it('publishes an accessible privacy page and a real email support action', () => {
     const privacy = SOURCES['../public/privacy.html'];
-    expect(privacy).toContain('Privacy at Gapless');
+    expect(privacy).toContain('<h1>Your time off is personal.');
     expect(privacy).toContain('What stays in your browser');
     expect(privacy).toContain('What happens when you share a plan');
     expect(privacy).toContain('Vercel Web Analytics');

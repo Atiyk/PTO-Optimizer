@@ -28,6 +28,13 @@ interface MonthGridProps {
   alternativeForDate: (iso: string) => Alternative | undefined;
   onSwapAlternative: (alt: Alternative) => void;
   onHoverAlternative: (id: string | null) => void;
+  /** Roving tabindex, owned by Calendar so arrow keys cross month boundaries. */
+  activeDate?: string;
+  onFocusDay?: (date: string) => void;
+  onArrow?: (from: string, direction: 'left' | 'right' | 'up' | 'down' | 'home' | 'end') => void;
+  forcedStateOf?: (iso: string) => 'include' | 'exclude' | undefined;
+  onSetDayState?: (date: string, state: 'include' | 'exclude' | null) => void;
+  pinPreview?: (date: string) => string | null;
 }
 
 const WEEKDAY_LABELS_MONDAY = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
@@ -54,6 +61,12 @@ export function MonthGrid({
   alternativeForDate,
   onSwapAlternative,
   onHoverAlternative,
+  activeDate,
+  onFocusDay,
+  onArrow,
+  forcedStateOf,
+  onSetDayState,
+  pinPreview,
 }: MonthGridProps) {
   const labels = weekStart === 0 ? WEEKDAY_LABELS_SUNDAY : WEEKDAY_LABELS_MONDAY;
   // Padding always builds exactly 6 rows (42 cells) so every month box lines up at a fixed
@@ -76,18 +89,25 @@ export function MonthGrid({
   );
 
   const inBand = (iso: string) => offRuns.some((run) => iso >= run.start && iso <= run.end);
+  const breakIndexOf = (iso: string) => {
+    const runIndex = offRuns.findIndex((run) => iso >= run.start && iso <= run.end);
+    return runIndex === -1 ? undefined : breakBandByRunIndex.get(runIndex)?.index;
+  };
 
-  const moveFocus = (fromDate: string, direction: 'left' | 'right' | 'up' | 'down') => {
+  // Standalone use (no Calendar-owned roving focus): arrows stay within this month.
+  const moveFocus = (fromDate: string, direction: 'left' | 'right' | 'up' | 'down' | 'home' | 'end') => {
+    if (onArrow) return onArrow(fromDate, direction);
+    if (direction === 'home' || direction === 'end') return;
     const delta = direction === 'left' ? -1 : direction === 'right' ? 1 : direction === 'up' ? -7 : 7;
     const target = addDays(fromDate, delta);
-    if (!validDates.has(target)) return; // arrow-key navigation is bounded to this month
+    if (!validDates.has(target)) return;
     document.getElementById(`day-${target}`)?.focus();
   };
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-      <h3 className="mb-1.5 text-sm font-semibold text-slate-700">{monthLabel(descriptor.year, descriptor.month)}</h3>
-      <div className="mb-1 grid grid-cols-7 text-center text-xs text-slate-400">
+    <div className="min-w-0">
+      <h3 className="mb-2 border-b border-line pb-1.5 text-lg font-bold leading-6 text-ink type-condensed">{monthLabel(descriptor.year, descriptor.month)}</h3>
+      <div className="mb-1 grid grid-cols-7 gap-x-1 text-center text-xs font-medium text-muted">
         {labels.map((l) => (
           <span key={l}>{l}</span>
         ))}
@@ -114,17 +134,17 @@ export function MonthGrid({
                 <div className="grid grid-cols-7 gap-x-1">
                   {leadingLabels.map(({ seg, band }) => (
                     <div key={`label-${seg.colStart}`} style={{ gridColumn: seg.colStart + 1 }} className="flex items-center">
-                      <button
-                        type="button"
+                      {/* A label, not a tab stop: each day in the run says "part of break N"
+                          in its own accessible name, so the badge is a picture of that. */}
+                      <span
+                        aria-hidden="true"
+                        title={`Break ${band.index}, ${formatCardDateRange(band.brk.start, band.brk.end)}`}
                         onMouseEnter={() => onHoverBreak(band.brk.id)}
                         onMouseLeave={() => onHoverBreak(null)}
-                        onFocus={() => onHoverBreak(band.brk.id)}
-                        onBlur={() => onHoverBreak(null)}
-                        aria-label={`Break ${band.index}, ${formatCardDateRange(band.brk.start, band.brk.end)}`}
-                        className="flex h-6 w-6 cursor-default items-center justify-center rounded-full bg-slate-600 text-[10px] font-semibold leading-none text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]"
+                        className="flex h-6 min-w-6 items-center justify-center rounded-[3px] bg-ink px-1 text-xs font-bold leading-none tabular-nums text-white"
                       >
                         {band.index}
-                      </button>
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -141,8 +161,8 @@ export function MonthGrid({
                   <div
                     key={`band-${i}`}
                     style={{ gridColumn: `${seg.colStart + 1} / ${seg.colEnd + 2}`, gridRow: '1' }}
-                    className={`my-0.5 ${COLORS.bandBg} ${seg.roundedLeft ? 'rounded-l-xl' : ''} ${
-                      seg.roundedRight ? 'rounded-r-xl' : ''
+                    className={`border-b border-[var(--text-primary)] ${COLORS.bandBg} ${seg.roundedLeft ? 'rounded-l-[4px]' : ''} ${
+                      seg.roundedRight ? 'rounded-r-[4px]' : ''
                     }`}
                   />
                 ))}
@@ -150,8 +170,8 @@ export function MonthGrid({
                   <div
                     key={`preview-${i}`}
                     style={{ gridColumn: `${seg.colStart + 1} / ${seg.colEnd + 2}`, gridRow: '1' }}
-                    className={`my-0.5 ${COLORS.previewBandBg} ${seg.roundedLeft ? 'rounded-l-xl' : ''} ${
-                      seg.roundedRight ? 'rounded-r-xl' : ''
+                    className={`${COLORS.previewBandBg} ${seg.roundedLeft ? 'rounded-l-[4px]' : ''} ${
+                      seg.roundedRight ? 'rounded-r-[4px]' : ''
                     }`}
                   />
                 ))}
@@ -179,6 +199,12 @@ export function MonthGrid({
                           onHoverAlternativeStart={alt ? () => onHoverAlternative(alt.id) : undefined}
                           onHoverAlternativeEnd={alt ? () => onHoverAlternative(null) : undefined}
                           onArrowKey={(direction) => moveFocus(iso, direction)}
+                          tabIndex={activeDate === undefined ? undefined : iso === activeDate ? 0 : -1}
+                          onFocusDay={onFocusDay}
+                          breakIndex={breakIndexOf(iso)}
+                          forcedState={forcedStateOf?.(iso)}
+                          onSetState={onSetDayState}
+                          pinPreview={pinPreview}
                         />
                       )}
                     </div>

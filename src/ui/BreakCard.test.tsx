@@ -74,12 +74,12 @@ afterEach(() => {
 describe('BreakCard defaultExpanded (regression: async holiday loading changes which break is "position 0")', () => {
   it('BUG FOUND: a plain useState(defaultExpanded) locked in a mount-time snapshot, so a break that was briefly "position 0" during an early render (before holidays loaded) stayed expanded forever, even after it moved away from position 0 once the real plan settled - leaving two cards expanded. Fixed: `expanded` now mirrors the CURRENT defaultExpanded prop every render, absent an explicit user choice.', () => {
     const { rerender } = mountInteractive({ defaultExpanded: true });
-    expect(container!.textContent).toContain('Hide ↑');
+    expect(container!.textContent).toContain('Hide request tools');
 
     // The plan settles (e.g. holidays finish loading) and this break is no longer position 0.
     rerender({ defaultExpanded: false });
-    expect(container!.textContent).toContain('Request this time off ↓');
-    expect(container!.textContent).not.toContain('Hide ↑');
+    expect(container!.textContent).toContain('Request this time off');
+    expect(container!.textContent).not.toContain('Hide request tools');
   });
 
   it('an explicit user choice overrides the prop on every later render, in both directions', () => {
@@ -87,18 +87,18 @@ describe('BreakCard defaultExpanded (regression: async holiday loading changes w
     act(() => {
       container!.querySelector('button')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
-    expect(container!.textContent).toContain('Hide ↑');
+    expect(container!.textContent).toContain('Hide request tools');
 
     // Even if the prop later says this card should collapse, the user's own expand stands.
     rerender({ defaultExpanded: false });
-    expect(container!.textContent).toContain('Hide ↑');
+    expect(container!.textContent).toContain('Hide request tools');
   });
 });
 
 describe('BreakCard collapse (UI density pass: collapsed by default, request tools behind a toggle)', () => {
   it('starts collapsed by default: no request-by line, no copy dropdown, just a toggle', () => {
     const html = render(makeBreak());
-    expect(html).toContain('Request this time off ↓');
+    expect(html).toContain('Request this time off');
     expect(html).not.toContain('Copy request');
     expect(html).not.toContain('Request by');
     expect(html).not.toContain('already started');
@@ -120,8 +120,8 @@ describe('BreakCard collapse (UI density pass: collapsed by default, request too
       />,
     );
     expect(html).toContain('Copy request');
-    expect(html).toContain('Hide ↑');
-    expect(html).not.toContain('Request this time off ↓');
+    expect(html).toContain('Hide request tools');
+    expect(html).not.toContain('Request this time off');
   });
 
   it('a single "Copy request" control replaces the three always-visible copy buttons', () => {

@@ -8,17 +8,19 @@ import type { Scores } from '@daysoff/engine/solver/types';
 describe('SummaryMetrics', () => {
   const scores: Scores = { efficiency: { percentile: 91 }, travel: { percentile: 78 } };
 
-  it('renders all five labels, in order', () => {
+  it('explains every figure in plain language instead of bare pills', () => {
     const html = renderToStaticMarkup(
-      <SummaryMetrics budgetSpent={12} totalDaysOff={33} breakCountActual={9} scores={scores} />,
+      <SummaryMetrics budgetSpent={12} totalDaysOff={27} breakCountActual={3} scores={scores} />,
     );
-    const labels = ['PTO days used', 'Days off', 'Breaks', 'Travel', 'Efficiency'];
-    let lastIndex = -1;
-    for (const label of labels) {
-      const idx = html.indexOf(label);
-      expect(idx).toBeGreaterThan(lastIndex);
-      lastIndex = idx;
-    }
+    // The multiplier is the same number (27 / 12 = 2.25), stated in words too.
+    expect(html).toContain('2.25×');
+    expect(html).toContain('27 days off for 12 PTO days');
+    expect(html).toContain('Each PTO day buys 2.25 days off');
+    // Each percentile carries the band reading scoreFormat derives from it.
+    expect(html).toContain('Efficiency percentile');
+    expect(html).toContain('better than most plans at this budget');
+    expect(html).toContain('Travel percentile');
+    expect(html).toContain('quieter than most weeks');
   });
 
   it('renders the raw counts and the ordinal percentiles', () => {
@@ -27,7 +29,7 @@ describe('SummaryMetrics', () => {
     );
     expect(html).toContain('12');
     expect(html).toContain('33');
-    expect(html).toContain('9');
+    expect(html).toContain('in 9 breaks');
     expect(html).toContain('78th');
     expect(html).toContain('91st');
   });
@@ -65,15 +67,16 @@ describe('SummaryMetrics motion (metrics crossfade/pulse on change rather than s
     act(() => {
       root!.render(<SummaryMetrics budgetSpent={12} totalDaysOff={33} breakCountActual={9} scores={testScores} />);
     });
-    const tiles = () => Array.from(container!.querySelectorAll('span')).filter((s) => s.className.includes('bg-slate-200'));
+    const tiles = () => Array.from(container!.querySelectorAll('[data-figure]')).filter((s) => s.className.includes('bg-accent-soft'));
     expect(tiles()).toHaveLength(0);
 
     // Only totalDaysOff changes - budgetSpent/breakCountActual/scores stay the same.
     act(() => {
       root!.render(<SummaryMetrics budgetSpent={12} totalDaysOff={34} breakCountActual={9} scores={testScores} />);
     });
+    // totalDaysOff drives the days-per-PTO figure (33/12 -> 34/12), the only figure that moved.
     expect(tiles()).toHaveLength(1);
-    expect(tiles()[0].textContent).toBe('34');
+    expect(tiles()[0].textContent).toBe('2.83×');
 
     act(() => {
       vi.advanceTimersByTime(150);

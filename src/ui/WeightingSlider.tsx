@@ -32,12 +32,12 @@ export function WeightingSlider({ value, onChange }: WeightingSliderProps) {
     <div className="flex flex-col gap-1">
       {/* Interaction-detail pass: the value sits in the label row itself, not only in the
           caption below - the eye shouldn't have to travel down to see what's currently set. */}
-      <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+      <div className="flex items-center gap-1.5 text-[15px] font-semibold text-ink">
         What matters more?
         <InfoHint text={TRAVEL_HINT} />
-        <span className="ml-auto tabular-nums text-slate-500">{value}</span>
+        <span className="ml-auto tabular-nums text-muted">{value}</span>
       </div>
-      <div className="flex items-center justify-between text-xs text-slate-500">
+      <div className="flex items-center justify-between gap-3 text-xs text-muted">
         <span>Most days off</span>
         <span>Avoid busy travel periods</span>
       </div>
@@ -50,9 +50,9 @@ export function WeightingSlider({ value, onChange }: WeightingSliderProps) {
         onChange={(e) => onChange(Number(e.target.value))}
         aria-label="What matters more?"
         aria-valuetext={`${value}: ${CAPTIONS[value]}`}
-        className="w-full accent-slate-800"
+        className="h-11 w-full cursor-pointer"
       />
-      <p className="text-xs text-slate-600">{CAPTIONS[value]}</p>
+      <p className="-mt-1 text-sm text-muted">{CAPTIONS[value][0].toUpperCase() + CAPTIONS[value].slice(1)}</p>
     </div>
   );
 }

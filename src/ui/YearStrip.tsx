@@ -13,7 +13,7 @@ interface YearStripProps {
 }
 
 const WIDTH = 920;
-const HEIGHT = 110;
+const HEIGHT = 116;
 const BASELINE_Y = 56;
 const DRY_SPELL_THRESHOLD_DAYS = 8;
 
@@ -58,7 +58,8 @@ export function YearStrip({ today, stripEnd, holidays, bridgeableHolidayDates }:
     const [y, m] = cursor.split('-').map(Number);
     const candidateX = x(cursor);
     const prev = months[months.length - 1];
-    if (!prev || candidateX - prev.x >= MIN_LABEL_GAP) {
+    // ...and one starting too close to the right edge would be clipped mid-word.
+    if ((!prev || candidateX - prev.x >= MIN_LABEL_GAP) && candidateX <= WIDTH - 80) {
       months.push({ x: candidateX, label: monthLabel(y, m) });
     }
     const nextMonth = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
@@ -69,9 +70,7 @@ export function YearStrip({ today, stripEnd, holidays, bridgeableHolidayDates }:
     <div className="overflow-x-auto">
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        width={WIDTH}
-        height={HEIGHT}
-        className="min-w-[920px]"
+        className="block h-auto w-full min-w-[920px]"
         role="group"
         aria-label={`A timeline from ${formatLong(today)} through ${formatLong(stripEnd)}, marking ${holidays.length} public holiday${holidays.length === 1 ? '' : 's'} and the longest stretches without a public holiday.`}
       >
@@ -83,16 +82,16 @@ export function YearStrip({ today, stripEnd, holidays, bridgeableHolidayDates }:
             y={BASELINE_Y - 10}
             width={Math.max(1, x(addDays(run.end, 1)) - x(run.start))}
             height={20}
-            className="fill-slate-100"
+            fill="var(--bg-surface-alt)"
           />
         ))}
 
         {/* Baseline. */}
-        <line x1={0} y1={BASELINE_Y} x2={WIDTH} y2={BASELINE_Y} className="stroke-slate-200" strokeWidth={1} />
+        <line x1={0} y1={BASELINE_Y} x2={WIDTH} y2={BASELINE_Y} stroke="var(--border-strong)" strokeWidth={1} />
 
         {/* Today marker. */}
-        <line x1={0} y1={BASELINE_Y - 24} x2={0} y2={BASELINE_Y + 24} className="stroke-slate-900" strokeWidth={2} />
-        <text x={4} y={BASELINE_Y - 28} className="fill-slate-900 text-[10px] font-semibold">
+        <line x1={1} y1={BASELINE_Y - 24} x2={1} y2={BASELINE_Y + 24} stroke="var(--text-primary)" strokeWidth={2} />
+        <text x={6} y={BASELINE_Y - 28} fill="var(--text-primary)" className="text-[12px] font-semibold">
           Start
         </text>
 
@@ -105,12 +104,15 @@ export function YearStrip({ today, stripEnd, holidays, bridgeableHolidayDates }:
           const tickHeight = tall ? 20 : 10;
           return (
             <g key={h.date}>
+              {/* The marker swipe behind a holiday that is already a long weekend (or one
+                  PTO day from one): height and the marker both say it, never colour alone. */}
+              {tall && <rect x={x(h.date) - 4} y={BASELINE_Y - tickHeight} width={8} height={tickHeight} fill="var(--mark)" pointerEvents="none" />}
               <line
                 x1={x(h.date)}
                 y1={BASELINE_Y - tickHeight}
                 x2={x(h.date)}
                 y2={BASELINE_Y}
-                className={tall ? 'stroke-slate-900' : 'stroke-slate-400'}
+                stroke={tall ? 'var(--text-primary)' : 'var(--text-muted)'}
                 strokeWidth={tall ? 2 : 1}
                 pointerEvents="none"
               >
@@ -143,13 +145,13 @@ export function YearStrip({ today, stripEnd, holidays, bridgeableHolidayDates }:
 
         {/* Month labels beneath. */}
         {months.map((m) => (
-          <text key={m.label + m.x} x={m.x} y={HEIGHT - 6} className="fill-slate-500 text-[10px]">
+          <text key={m.label + m.x} x={m.x} y={HEIGHT - 6} fill="var(--text-muted)" className="text-[12px]">
             {m.label}
           </text>
         ))}
       </svg>
       {tapped && (
-        <p className="mt-1 text-xs text-slate-600">
+        <p className="mt-1 text-sm text-ink" role="status">
           {tapped.name} — {daysAwayLabel(today, tapped.date)}
         </p>
       )}

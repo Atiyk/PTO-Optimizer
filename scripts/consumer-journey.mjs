@@ -232,7 +232,7 @@ async function verifyAnalyticsTransport() {
     await page.clock.setFixedTime(new Date('2027-01-01T17:00:00Z'));
     const referer = unsafe ? `${virtualOrigin}/legacy?cb=139.25&note=qa-sdk-private-note-2027` : `${virtualOrigin}/`;
     await page.goto(`${virtualOrigin}/policy/?b=7&s=2027-01-15&e=2027-01-24&cb=139.25&bao=2027-01-01&note=qa-sdk-private-note-2027#qa-sdk-private-fragment`, { referer, waitUntil: 'networkidle' });
-    await page.getByRole('heading', { name: 'Your PTO balance and policy', exact: true }).waitFor();
+    await page.getByRole('heading', { level: 1, name: 'How much PTO will I have, and what am I about to lose?', exact: true }).waitFor();
     assert.equal(await page.evaluate(() => navigator.webdriver), false);
     assert.equal(await page.evaluate(() => document.referrer), referer, 'The incoming referrer must be real browser state, including the unsafe canary.');
     try {
@@ -312,7 +312,7 @@ try {
       assert.notEqual(await main.locator('h1').innerText(), initialHeadline);
     }, 'PTO input should update the live plan without submission');
     assert.equal(await main.getByRole('button', { name: /^(?:Generate|Submit)/i }).count(), 0);
-    const trackButton = main.getByRole('region', { name: 'Your top 3 time-off opportunities', exact: true }).getByRole('button', { name: 'Track this PTO request', exact: true }).first();
+    const trackButton = main.getByRole('region', { name: 'Requesting each break', exact: true }).getByRole('button', { name: 'Track this PTO request', exact: true }).first();
     await trackButton.click();
     const tracker = main.getByRole('region', { name: 'My PTO requests', exact: true });
     await tracker.getByRole('article').waitFor({ state: 'visible' });
@@ -326,15 +326,19 @@ try {
     }).length;
     assert.ok(trackedCost > 0 && trackedCost <= 3);
     assert.match(await row.innerText(), new RegExp(`${trackedCost} PTO days?`));
+    // Tracking confirms in place: the button is replaced by "Tracked" on the card. Reload so
+    // the card offers it again, then track the same break a second time.
+    assert.equal(await trackButton.count(), 0, 'A tracked break must confirm in place instead of offering Track again.');
+    await main.reload({ waitUntil: 'networkidle' });
     await trackButton.click();
-    assert.equal(await tracker.getByRole('article').count(), 1, 'Tracking the same break twice must not duplicate it.');
+    await eventually(async () => assert.equal(await tracker.getByRole('article').count(), 1), 'Tracking the same break twice must not duplicate it.');
     await row.getByRole('combobox', { name: `Status for request ${trackedStart}`, exact: true }).selectOption('requested');
     await row.locator('summary').filter({ hasText: 'Personal note' }).click();
     await row.getByLabel(`Personal note for request ${trackedStart}`, { exact: true }).fill(privateNote);
     assert.ok(!main.url().includes(privateNote));
     await noOverflow(main); await screenshot(main, '01-requested-375.png');
     await main.getByRole('link', { name: 'Forecast my balance and check expiration', exact: true }).click();
-    await main.getByRole('heading', { name: 'Your PTO balance and policy', exact: true }).waitFor();
+    await main.getByRole('heading', { level: 1, name: 'How much PTO will I have, and what am I about to lose?', exact: true }).waitFor();
     const quick = main.getByRole('region', { name: 'Quick balance forecast', exact: true });
     await quick.getByLabel('Current PTO balance (days)', { exact: true }).fill('20');
     await quick.getByLabel('Balance as-of date', { exact: true }).fill('2027-01-01');
@@ -422,8 +426,8 @@ try {
     await quick.getByLabel('Reset date (new plan year begins)', { exact: true }).fill('2027-04-01');
     const guard = page.getByRole('region', { name: 'PTO expiration guard', exact: true });
     await eventually(async () => {
-      assert.equal(await guard.getByText('You could lose 8 days on 2027-04-01.', { exact: true }).count(), 1);
-      assert.equal(await guard.getByText('Last day to use this PTO: 2027-03-31.', { exact: true }).count(), 1);
+      assert.equal(await guard.getByText('You could lose 8 days on Apr 1, 2027.', { exact: true }).count(), 1);
+      assert.equal(await guard.getByText('Last day to use this PTO: Mar 31, 2027.', { exact: true }).count(), 1);
     }, 'The entered reset must produce an exact use-by warning');
     const handoff = guard.getByRole('link', { name: 'Find the best way to use those days →', exact: true });
     const href = new URL(await handoff.getAttribute('href'), origin);
@@ -454,17 +458,17 @@ try {
       assert.equal(new URL(page.url()).searchParams.get('e'), '2027-03-31');
     }, 'The real optimizer handoff must preserve the safe budget and use-by boundary');
     await page.goBack({ waitUntil: 'networkidle' });
-    await guard.getByRole('button', { name: 'Dismiss You could lose 8 days on 2027-04-01.', exact: true }).click();
+    await guard.getByRole('button', { name: 'Dismiss You could lose 8 days on Apr 1, 2027.', exact: true }).click();
     await page.reload({ waitUntil: 'networkidle' });
     await eventually(async () => assert.equal(await guard.getByText('All current alerts are dismissed.', { exact: true }).count(), 1), 'Dismissal must survive refresh');
     await guard.getByRole('button', { name: 'Show dismissed alerts', exact: true }).click();
-    await guard.getByText('You could lose 8 days on 2027-04-01.', { exact: true }).waitFor();
+    await guard.getByText('You could lose 8 days on Apr 1, 2027.', { exact: true }).waitFor();
     await guard.getByRole('checkbox', { name: 'Show in-app alerts', exact: true }).uncheck();
     await page.reload({ waitUntil: 'networkidle' });
     assert.equal(await guard.getByRole('checkbox', { name: 'Show in-app alerts', exact: true }).isChecked(), false);
     await guard.getByText('In-app expiration alerts are off in this browser.', { exact: true }).waitFor();
     await guard.getByRole('checkbox', { name: 'Show in-app alerts', exact: true }).check();
-    await guard.getByText('You could lose 8 days on 2027-04-01.', { exact: true }).waitFor();
+    await guard.getByText('You could lose 8 days on Apr 1, 2027.', { exact: true }).waitFor();
     await noOverflow(page);
   });
 

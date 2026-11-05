@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "run": "gapless-consumer-autonomous-redesign",
+  "updated_at": "2026-11-04",
+  "status": "awaiting_owner_review",
+  "scope": {
+    "in": ["repo root consumer app: src/, index.html, public/, country and learn routes, export renderers, OG images, consumer QA scripts"],
+    "out": ["apps/teams", "packages/engine and solver math", "src/planning", "src/policy", "src/personal", "URL state modules", "env vars", "auth and data handling"]
+  },
+  "branch": "claude/gapless-consumer-redesign",
+  "base": { "branch": "main", "sha": "d66f88e" },
+  "commits": [
+    "4c4a213 foundation", "1d02747 pages", "025d809 OG images and QA navigation",
+    "ba796c7 foundation fixes", "b50c046 exports", "2c14a97 landing fixes", "1200e1e learn fixes",
+    "4b26103 policy and sabbatical fixes", "95c9718 planner fixes and pin fallback",
+    "b1c8e8d 320px overflow and QA updates", "f5cad39 decisions and critique docs",
+    "79f1c50 DESIGN.md", "de30405 round-2 fixes", "HEAD: execution state, dist baseline"
+  ],
+  "pull_request": { "number": null, "state": "to be opened as draft by this run", "url": null },
+  "deployment": { "preview": "Vercel builds the PR branch automatically; not yet verified", "production": "not deployed; requires owner approval" },
+  "tests": {
+    "run_locally_on_final_build": {
+      "vitest": "1116 passed (111 files)",
+      "tsc_noEmit": "clean",
+      "tsc_b": "clean",
+      "lint": "0 errors (pre-existing warnings in apps/teams and elsewhere)",
+      "npm_run_build": "exit 0",
+      "verify_dist": "baseline regenerated for the deliberate Days Off change; identical after rewrite (696 files)",
+      "consumer_qa": "passed, 34 route/viewport checks",
+      "consumer_header_qa": "passed at 1440, 768, 375, 320",
+      "consumer_privacy_qa": "passed at 1440, 768, 375, 320",
+      "consumer_journey": "6 of 6 passed; hosted-analytics check unavailable offline (CI has network)",
+      "date_editor_qa": "passed at 1440, 768, 375, 320",
+      "touch_calendar_qa": "passed at 375, 320",
+      "axe_core": "0 violations on /, /pto/, /policy/, /sabbatical/, /glossary/ at 1440 and 375 (critic round 2)",
+      "lighthouse": "not run locally; runs in CI on the PR"
+    },
+    "note": "Local browser checks used /opt/pw-browsers/chromium because the repo pins a different Playwright build; scripts are otherwise unchanged except for intended copy updates."
+  },
+  "critique": {
+    "round_1": "visual, brand, product UX, mobile UX, technical: all 'fix'; all high and critical findings addressed or declined with reasons",
+    "round_2": "independent re-inspection: 8 of 10 resolved, 2 fixed after (tab order at lg, policy marker hovers); one pre-existing high engine issue documented",
+    "log": "docs/DESIGN-CRITIQUE.md"
+  },
+  "open_findings": [
+    { "severity": "high", "pre_existing": true, "owner_decision": true, "finding": "Pinning a lone weekday beside a weekend (e.g. Dec 7 on the default plan) makes the engine count that break as 1 day off without its adjacent weekend, so the headline (25) and the calendar run (27 days) disagree. Happens on main too, even with no minimum break.", "fix_location": "packages/engine break-extent accounting (frozen for this run)" },
+    { "severity": "medium", "pre_existing": true, "finding": "Tab out of the Country combobox drops focus to <body> for one step." },
+    { "severity": "medium", "finding": "At 375 the 18x18 info buttons sit 2px from the nearest target (WCAG 2.5.8 spacing)." },
+    { "severity": "low", "finding": "After a pin, the break-count note blames the budget rather than the pin; policy warning rounds 11.25 to 11.3." },
+    { "severity": "low", "finding": "Archivo variable adds ~27 KB gzip; subsetting the width axis is optional." }
+  ],
+  "questions_for_atiyk": [
+    "Engine: should a pinned weekday absorb the adjacent weekend into its break's extent and day count? This is a change to packages/engine, which this run was told not to touch.",
+    "Pins vs minimum break: the redesign keeps your pins and sets the minimum aside (with a notice and two ways back) instead of returning an empty plan. Keep that, or prefer the old strict behaviour?",
+    "Old open PRs that touch the same consumer files (#87 to #104, #107, #108, #110, #111) will conflict with this redesign. Close them, or rebase the ones you still want afterwards?"
+  ],
+  "blockers": [
+    "Merging to main needs your approval of the Vercel preview (repo CLAUDE.md, step 6).",
+    "Production deployment: you asked for exactly one; it happens only after you approve the merge."
+  ],
+  "next_actions": [
+    "Owner: open the draft PR's Vercel preview and review it at desktop and phone widths.",
+    "Owner: answer questions_for_atiyk.",
+    "Run: fix CI failures or review comments on the PR, if any.",
+    "Owner: approve, then merge; verify the production URL after the single deploy."
+  ],
+  "scheduled_resume": {
+    "configured": false,
+    "reason": "No autonomous work remains; everything left waits on the owner. PR activity wakes the owning session instead.",
+    "design_if_needed": "docs/AUTONOMOUS-DESIGN-REDESIGN.md#scheduled-resume-decided-against-not-configured"
+  },
+  "lock": { "holder": null, "acquired_at": null, "expires_at": null }
+}

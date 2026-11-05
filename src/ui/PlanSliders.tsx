@@ -40,10 +40,10 @@ export function PlanSliders({
 }: PlanSlidersProps) {
   return (
     <>
-      <div className="min-w-[15rem] max-w-xs flex-1 basis-60">
+      <div className="min-w-0">
         <WeightingSlider value={w} onChange={onChangeW} />
       </div>
-      <div className="min-w-[15rem] max-w-xs flex-1 basis-60">
+      <div className="min-w-0">
         <BreakCountSlider
           value={manualBreakCount}
           onChange={onChangeManualBreakCount}

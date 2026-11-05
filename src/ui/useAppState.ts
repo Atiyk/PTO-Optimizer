@@ -1,6 +1,7 @@
 import { getConsumerHolidays as getHolidays, getConsumerHolidaysWithStatus as getHolidaysWithStatus, getConsumerSubdivisionCandidates as getSubdivisionCandidates } from '../personal/consumerHolidays';
 import { SUBDIVISION_NAMES } from '@daysoff/engine/data/countries';
-import { solveConsumer, solveLegacyConsumer, planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
+import { solveLegacyConsumer, planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
+import { previewPinnedDay, solveWithPinFallback, type PinPreview, type PlannerOutcome } from './pinPreview';
 import { defaultEmployerCalendar, readEmployerCalendar, saveEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { computeScores } from '@daysoff/engine/solver/solve';
@@ -652,10 +653,12 @@ export function useAppState() {
   const lastGoodResultRef = useRef<SolveResult>(EMPTY_RESULT);
   const lastGoodScoresRef = useRef<Scores | null>(null);
 
-  const solved = useMemo((): { result: SolveResult; issue?: string } => {
+  const solved = useMemo((): PlannerOutcome => {
     if (!isValidInput) return { result: lastGoodResultRef.current };
     try {
-      const outcome = planningVersion === 2 ? solveConsumer(solveInput, { minimumBreakDays, style: planningStyle }) : solveLegacyConsumer(solveInput);
+      // Pinned days that cannot sit inside the minimum break no longer collapse the whole
+      // plan: the minimum is set aside for that plan and App says so (see pinPreview.ts).
+      const outcome = planningVersion === 2 ? solveWithPinFallback(solveInput, { minimumBreakDays, style: planningStyle }) : solveLegacyConsumer(solveInput);
       lastGoodResultRef.current = outcome.result;
       return outcome;
     } catch {
@@ -663,6 +666,25 @@ export function useAppState() {
     }
   }, [solveInput, isValidInput, planningVersion, minimumBreakDays, planningStyle]);
   const solveResult = solved.result;
+
+  // The real outcome of pinning one more day, from the same planning call, cached per
+  // input so hovering across the grid never re-solves the same day twice.
+  const previewPin = useMemo(() => {
+    const cache = new Map<string, PinPreview>();
+    return (date: string): PinPreview | null => {
+      if (!isValidInput || planningVersion !== 2) return null;
+      let hit = cache.get(date);
+      if (!hit) {
+        try {
+          hit = previewPinnedDay(solveInput, { minimumBreakDays, style: planningStyle }, date);
+        } catch {
+          return null;
+        }
+        cache.set(date, hit);
+      }
+      return hit;
+    };
+  }, [solveInput, isValidInput, planningVersion, minimumBreakDays, planningStyle]);
 
   const breaks = solveResult.primary;
   const alternatives = solveResult.alternatives;
@@ -997,6 +1019,8 @@ export function useAppState() {
   return {
     validationIssues,
     solverIssue: solved.issue,
+    relaxedMinimum: solved.relaxedMinimum,
+    previewPin,
     solveInput,
     planningVersion,
     planningStyle,

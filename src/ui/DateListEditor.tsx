@@ -54,30 +54,30 @@ export function DateListEditor({ dates, onAdd, onRemove, label = 'Date to add' }
             setAnnouncement('');
           }}
           onKeyDown={onDateKeyDown}
-          className="h-11 min-w-0 max-w-full flex-1 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+          className="h-11 min-w-0 max-w-full flex-1 rounded-[3px] border border-line-strong bg-surface px-3 text-[15px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
         />
         <button
           type="button"
           disabled={!canAdd}
           onClick={addDate}
-          className="min-h-11 shrink-0 rounded-md bg-slate-100 px-4 text-sm font-medium text-slate-700 hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-slate-100"
+          className="min-h-11 shrink-0 rounded-[3px] border border-ink bg-surface px-4 text-sm font-semibold text-ink hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface"
         >
           Add
         </button>
       </div>
-      <p id={statusId} role="status" aria-live="polite" className={duplicate ? 'text-xs text-amber-800' : 'sr-only'}>
+      <p id={statusId} role="status" aria-live="polite" className={duplicate ? 'text-sm font-semibold text-ink' : 'sr-only'}>
         {duplicate ? draft + ' is already in the list.' : announcement}
       </p>
       {dates.length > 0 && (
         <ul aria-label={label + ' selected dates'} className="flex min-w-0 flex-wrap gap-2">
           {dates.map((date) => (
-            <li key={date} className="flex min-h-11 items-center gap-1 rounded-lg bg-slate-100 pl-3 pr-1 text-sm text-slate-700">
+            <li key={date} className="flex min-h-11 items-center gap-1 rounded-[3px] bg-surface-alt pl-3 text-sm tabular-nums text-ink">
               <time dateTime={date}>{date}</time>
               <button
                 type="button"
                 aria-label={'Remove ' + date}
                 onClick={() => removeDate(date)}
-                className="flex h-11 min-w-11 items-center justify-center rounded-md text-slate-600 hover:bg-slate-200 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+                className="flex h-11 min-w-11 items-center justify-center rounded-[3px] text-muted hover:bg-surface hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
               >
                 <span aria-hidden="true">&times;</span>
               </button>

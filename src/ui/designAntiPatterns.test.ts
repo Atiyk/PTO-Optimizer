@@ -23,7 +23,7 @@ const PUBLIC_UI: Record<string, string> = import.meta.glob(
 describe('Consumer anti-pattern source checks', () => {
   it('scans the real consumer screens and legal pages', () => {
     expect(Object.keys(PUBLIC_UI).length).toBe(10);
-    expect(PUBLIC_UI['../../public/privacy.html']).toContain('Privacy at Gapless');
+    expect(PUBLIC_UI['../../public/privacy.html']).toContain('<h1>Your time off is personal.');
     expect(PUBLIC_UI['../../public/terms.html']).toContain('<h1>Terms of use</h1>');
   });
 

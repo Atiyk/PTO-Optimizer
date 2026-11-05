@@ -1,5 +1,4 @@
 import { ordinal } from './scoreFormat';
-import { Container } from './Container';
 
 export interface PinnedPlanSummary {
   budgetSpent: number;
@@ -37,18 +36,18 @@ function summaryText(s: PinnedPlanSummary): string {
 export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlansStripProps) {
   if (summaries.length === 0) return null;
   return (
-    <div className="border-b border-slate-200 bg-slate-50">
-      <Container className="flex flex-wrap items-center gap-2 px-4 py-4">
+    <ul aria-label="Pinned plans" className="m-0 flex list-none flex-wrap items-center gap-2 p-0">
       {summaries.map((s, i) => (
-        <div
+        <li
           key={i}
-          className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs text-slate-700"
+          className="flex min-h-11 items-center gap-1 rounded-[3px] border border-line bg-surface pl-3 text-sm tabular-nums text-ink"
         >
+          <span aria-hidden="true" className="mr-1 inline-block h-2.5 w-2.5 shrink-0 bg-mark ring-1 ring-ink" />
           <span>{summaryText(s)}</span>
           <button
             type="button"
             onClick={() => onRestore(i)}
-            className="font-medium text-slate-800 underline underline-offset-2 hover:no-underline"
+            className="flex min-h-11 items-center px-2 font-semibold underline underline-offset-[0.22em] hover:bg-surface-alt"
           >
             restore
           </button>
@@ -56,13 +55,12 @@ export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlans
             type="button"
             onClick={() => onRemove(i)}
             aria-label="Remove pinned plan"
-            className="text-slate-400 hover:text-slate-700"
+            className="flex h-11 w-11 items-center justify-center text-lg text-muted hover:bg-surface-alt hover:text-ink"
           >
             &times;
           </button>
-        </div>
+        </li>
       ))}
-      </Container>
-    </div>
+    </ul>
   );
 }

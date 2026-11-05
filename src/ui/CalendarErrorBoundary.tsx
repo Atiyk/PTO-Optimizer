@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react';
+import { buttonClasses } from './Button';
 
 interface Props {
   children: ReactNode;
@@ -30,16 +31,16 @@ export class CalendarErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.error) {
       return (
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-8 text-center">
-          <p className="text-sm font-medium text-red-800">The calendar couldn&apos;t render.</p>
-          <p className="max-w-sm text-xs text-red-700">
-            Try the button below, or adjust the date range, PTO days, or other settings above - a change there often
+        <div role="alert" className="flex flex-col items-center gap-3 rounded-[4px] border-2 border-ink bg-surface p-8 text-center text-ink">
+          <p className="text-[15px] font-semibold">The calendar couldn&apos;t render.</p>
+          <p className="max-w-sm text-sm text-muted">
+            Try the button below, or adjust the date range, PTO days, or other plan settings - a change there often
             clears it.
           </p>
           <button
             type="button"
             onClick={() => this.setState({ error: null })}
-            className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
+            className={buttonClasses('secondary', 'md')}
           >
             Try again
           </button>

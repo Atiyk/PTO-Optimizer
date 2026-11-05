@@ -1,3 +1,4 @@
+import { Chevron } from './Chevron';
 import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
 import { mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 
@@ -77,11 +78,12 @@ export function PlanExplanation({
   const consistent = breakdown.ptoDays === budgetSpent && breakdown.calendarDays === totalDaysOff;
 
   return (
-    <details className="mt-4 rounded-xl border border-line bg-surface px-4 py-3" data-testid="plan-explanation">
-      <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-ink">
-        Why this plan? <span className="ml-1 font-normal text-muted">See how the days add up</span>
+    <details className="group border-y border-line" data-testid="plan-explanation">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 py-2 text-[15px] font-semibold text-ink [&::-webkit-details-marker]:hidden">
+        <span aria-hidden="true" className="inline-flex w-3 transition-transform duration-150 group-open:rotate-90"><Chevron direction="right" /></span>
+        <span>Why this plan? <span className="ml-1 font-normal text-muted">See how the days add up</span></span>
       </summary>
-      <div className="mt-3 border-t border-line pt-3 text-sm text-muted">
+      <div className="border-t border-line pb-4 pt-3 text-sm text-muted">
         {consistent ? (
           <>
             <p>
@@ -91,10 +93,10 @@ export function PlanExplanation({
               That makes {days(breakdown.calendarDays)} off across the recommended breaks.
             </p>
             <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div><dt className="text-xs text-muted">PTO used</dt><dd className="font-semibold tabular-nums text-ink">{days(breakdown.ptoDays)}</dd></div>
-              <div><dt className="text-xs text-muted">Regular days off</dt><dd className="font-semibold tabular-nums text-ink">{days(breakdown.regularDaysOff)}</dd></div>
-              <div><dt className="text-xs text-muted">Calendar holidays / days off</dt><dd className="font-semibold tabular-nums text-ink">{days(breakdown.calendarDaysOff)}</dd></div>
-              <div><dt className="text-xs text-muted">Total time off</dt><dd className="font-semibold tabular-nums text-ink">{days(breakdown.calendarDays)}</dd></div>
+              <div><dt className="text-xs text-muted">PTO used</dt><dd className="text-lg font-bold tabular-nums text-ink type-condensed">{days(breakdown.ptoDays)}</dd></div>
+              <div><dt className="text-xs text-muted">Regular days off</dt><dd className="text-lg font-bold tabular-nums text-ink type-condensed">{days(breakdown.regularDaysOff)}</dd></div>
+              <div><dt className="text-xs text-muted">Calendar holidays / days off</dt><dd className="text-lg font-bold tabular-nums text-ink type-condensed">{days(breakdown.calendarDaysOff)}</dd></div>
+              <div><dt className="text-xs text-muted">Total time off</dt><dd className="text-lg font-bold tabular-nums text-ink type-condensed">{days(breakdown.calendarDays)}</dd></div>
             </dl>
             <p className="mt-3 text-xs">
               A date off under both your workweek and holiday calendar is counted only once. Adjust your workweek,

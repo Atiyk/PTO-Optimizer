@@ -30,31 +30,36 @@ describe('live homepage planner', () => {
   it('prerenders a real planning preview from embedded holiday data', () => {
     const html = renderToStaticMarkup(<Landing />);
     expect(html).toContain('Your recommended break');
-    expect(html).toContain('calendar days off');
+    expect(html).toContain('days off');
     expect(html).toContain('15 of 15 PTO days');
     expect(html).not.toContain('Calculating');
     expect(html).not.toContain('Updating your holiday calendar');
     expect((html.match(/<h1\b/g) ?? []).length).toBe(1);
   });
 
-  it('places the real recommended break before editable fields in reading and focus order', () => {
+  it('reads as a live sentence: heading, then the sentence inputs, then the real result, then the finer controls', () => {
     const html = renderToStaticMarkup(<Landing />);
-    const heading = html.indexOf('Your recommended break');
+    const heading = html.indexOf('<h1');
     const budgetField = html.indexOf('id="landing-budget"');
-    const dateDisclosure = html.indexOf('Planning dates');
+    const countryField = html.indexOf('id="landing-country"');
+    const result = html.indexOf('id="landing-result"');
+    const slider = html.indexOf('id="landing-budget-slider"');
+    const dates = html.indexOf('Planning dates');
     expect(heading).toBeGreaterThan(0);
     expect(budgetField).toBeGreaterThan(heading);
-    expect(dateDisclosure).toBeGreaterThan(heading);
-    expect(html).toContain('Make this preview yours');
-    expect(html).toContain('Your recommendation updates automatically.');
-    expect(html).toContain('grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]');
+    expect(countryField).toBeGreaterThan(budgetField);
+    expect(result).toBeGreaterThan(countryField);
+    expect(slider).toBeGreaterThan(result);
+    expect(dates).toBeGreaterThan(result);
+    expect(html).toMatch(/<span class="mark">\d+ days off<\/span>/);
+    expect(html).toContain('Preview assumes a Monday–Friday workweek.');
   });
 
   it('updates a real plan and its URL when the PTO budget changes, without submission', async () => {
     const event = vi.fn();
     window.plausible = event;
     await act(async () => { render(<Landing />); });
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toContain('every day off');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('More days off from the same PTO.');
     expect(screen.getByRole('spinbutton', { name: 'PTO days available' }).getAttribute('value')).toBe('15');
     expect(screen.getByText(/15 of 15 PTO days/)).toBeTruthy();
     await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '5' } }); });
@@ -75,22 +80,39 @@ describe('live homepage planner', () => {
     expect((screen.getByRole('spinbutton', { name: 'PTO days available' }) as HTMLInputElement).value).toBe('7');
     expect(slider.getAttribute('aria-valuetext')).toBe('7 PTO days available');
     expect(new URLSearchParams(window.location.search).get('b')).toBe('7');
-    expect(screen.getByRole('heading', { name: 'Make your PTO worth more time away.' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Take the next step with your plan.' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Plan the breaks, then keep track of the days.' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Put your days off on the calendar.' })).toBeTruthy();
   });
 
-  it('provides a mobile quick-edit link from the long result to the live slider', () => {
-    const html = renderToStaticMarkup(<Landing />);
-    expect(html).toContain('href="#landing-budget-slider"');
-    expect(html).toContain('Change PTO days in this preview');
+  it('draws every break of the plan on a weekday-aligned year schedule and names each one in words', async () => {
+    await act(async () => { render(<Landing />); });
+    const breaks = screen.getByRole('list', { name: 'Breaks in this plan' });
+    expect(breaks.querySelectorAll('li').length).toBe(Number(/across (\d+) break/.exec(document.body.textContent ?? '')![1]));
+    expect(breaks.textContent).toContain('(longest)');
+    expect(screen.getByText('Day off in a break')).toBeTruthy();
   });
 
-  it('keeps the full 23-day mobile calendar accessible but collapsed so the controls are nearer the top', () => {
-    const html = renderToStaticMarkup(<Landing />);
-    expect(html).toMatch(/View all \d+ calendar days/);
-    expect(html).toContain('data-testid="home-break-calendar"');
-    expect(html).toContain('sm:hidden');
-    expect(html).toContain('hidden sm:block');
+  it('starts the schedule week on the same day as the planner for the chosen country', async () => {
+    await act(async () => { render(<Landing />); });
+    const header = () => screen.getByRole('figure').querySelector('[aria-hidden="true"].sm\\:grid')!.textContent;
+    expect(header()).toMatch(/^SMTWTFS/);
+    await act(async () => { fireEvent.change(screen.getByLabelText('Country'), { target: { value: 'GB' } }); });
+    expect(header()).toMatch(/^MTWTFSS/);
+  });
+
+  it('uses one label for the primary planner action everywhere on the page', async () => {
+    await act(async () => { render(<Landing />); });
+    const primary = screen.getAllByRole('link', { name: 'See the full plan →' });
+    expect(primary.length).toBe(2);
+    expect(new Set(primary.map((link) => link.getAttribute('href'))).size).toBe(1);
+  });
+
+  it('leaves unmarked root queries to the historic /pto redirect', async () => {
+    // Root links without home=1 are historic optimizer links (index.html redirects them),
+    // so the homepage must not claim them.
+    window.history.replaceState(null, '', '/?c=GB&b=20');
+    await act(async () => { render(<Landing />); });
+    expect((screen.getByRole('spinbutton', { name: 'PTO days available' }) as HTMLInputElement).value).toBe('15');
   });
 
   it('shows explicit empty and invalid-date states while preserving the basic controls', async () => {
@@ -107,12 +129,19 @@ describe('live homepage planner', () => {
     expect(screen.getByText(/Preview: November 2, 2026 – November 1, 2027\./)).toBeTruthy();
   });
 
-  it('stacks country and PTO fields at phone widths and provides clear accessible names', () => {
+  it('sets the PTO days and country as labelled controls inside one sentence', () => {
     const html = renderToStaticMarkup(<Landing />);
-    expect(html).toContain('landing-input-pair grid min-w-0 gap-3');
-    expect(html).toContain('repeat(auto-fit, minmax(min(100%, 16rem), 1fr))');
+    expect(html).toMatch(/I have <input id="landing-budget" aria-label="PTO days available"/);
     expect(html).toContain('id="landing-country" aria-label="Country"');
-    expect(html).toContain('id="landing-budget" aria-label="PTO days available"');
+    expect(html).toContain('PTO days in');
+  });
+
+  it('lists every upcoming holiday with its own deep link into the planner', async () => {
+    await act(async () => { render(<Landing />); });
+    const list = screen.getByRole('list', { name: /upcoming holidays/ });
+    expect(list.querySelectorAll('li').length).toBe(3);
+    expect(screen.getAllByRole('link', { name: /Plan around this holiday|Connect a \d+-day break/ }).length).toBe(3);
+    expect(screen.getByRole('button', { name: 'Download holidays (.ics)' })).toBeTruthy();
   });
 
   it('keeps planning dates visible and accessible without a hidden disclosure', async () => {
