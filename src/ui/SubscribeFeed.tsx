@@ -93,7 +93,7 @@ export function SubscribeFeed({ planSearch, origin, path = '/api/feed', calendar
                   timer.current = setTimeout(() => setCopyMessage(null), 2500);
                 }}
               >
-                {copyMessage ?? 'Copy link'}
+                {copyMessage ?? 'Copy calendar link'}
               </Button>
             </div>
             <span className="sr-only" role="status">{copyMessage ?? ''}</span>

@@ -34,7 +34,7 @@ describe('SubscribeFeed', () => {
     const input = screen.getByLabelText(/paste this link/i) as HTMLInputElement;
     expect(input.readOnly).toBe(true);
     expect(input.value).toBe(`${ORIGIN}/api/feed?${SEARCH}`);
-    expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Copy calendar link' })).toBeTruthy();
     expect(document.querySelector('button[type="submit"], form')).toBeNull();
     expect(screen.getByText(/Editing the plan here gives a new link/)).toBeTruthy();
   });
