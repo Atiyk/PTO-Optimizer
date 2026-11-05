@@ -22,6 +22,7 @@ export interface AccountDeps {
 }
 
 export const SESSION_COOKIE = 'gapless_session';
+export const SIGNED_IN_COOKIE = 'gapless_signed_in';
 const SESSION_TTL = 60 * 60 * 24 * 30;
 const LOGIN_TTL = 60 * 30;
 const UNSUBSCRIBE_TTL = 60 * 60 * 24 * 365;
@@ -30,8 +31,10 @@ const EMAIL = /^[^\s@<>()",;:]{1,64}@[a-z0-9.-]{1,253}\.[a-z]{2,63}$/i;
 
 const SECURITY_HEADERS = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' };
 
-function json(status: number, body: unknown, headers: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', ...SECURITY_HEADERS, ...headers } });
+function json(status: number, body: unknown, headers: Record<string, string> = {}, cookies: string[] = []): Response {
+  const all = new Headers({ 'content-type': 'application/json; charset=utf-8', ...SECURITY_HEADERS, ...headers });
+  for (const cookie of cookies) all.append('set-cookie', cookie);
+  return new Response(JSON.stringify(body), { status, headers: all });
 }
 
 function page(status: number, title: string, message: string, origin: string): Response {
@@ -41,9 +44,9 @@ function page(status: number, title: string, message: string, origin: string): R
   return new Response(html, { status, headers: { 'content-type': 'text/html; charset=utf-8', ...SECURITY_HEADERS } });
 }
 
-function redirect(location: string, cookie?: string): Response {
-  const headers: Record<string, string> = { location, ...SECURITY_HEADERS };
-  if (cookie) headers['set-cookie'] = cookie;
+function redirect(location: string, cookies: string[] = []): Response {
+  const headers = new Headers({ location, ...SECURITY_HEADERS });
+  for (const cookie of cookies) headers.append('set-cookie', cookie);
   return new Response(null, { status: 303, headers });
 }
 
@@ -55,10 +58,14 @@ function today(deps: AccountDeps): string {
   return (deps.now?.() ?? new Date()).toISOString().slice(0, 10);
 }
 
-function sessionCookie(token: string | null): string {
+/** The HttpOnly session plus a readable "signed in" hint (no secret in it), so signed-out
+ * pages never need to call /api/account to find out. */
+function sessionCookies(token: string | null): string[] {
   return token
-    ? `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_TTL}`
-    : `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+    ? [`${SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_TTL}`,
+      `${SIGNED_IN_COOKIE}=1; Path=/; Secure; SameSite=Lax; Max-Age=${SESSION_TTL}`]
+    : [`${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`,
+      `${SIGNED_IN_COOKIE}=; Path=/; Secure; SameSite=Lax; Max-Age=0`];
 }
 
 function readCookie(request: Request, name: string): string | null {
@@ -151,15 +158,16 @@ export async function handleAccount(request: Request, deps: AccountDeps): Promis
       const next = url.searchParams.get('next');
       if (!email) return redirect(`${origin}${landing(next, 'expired')}`);
       const row = await deps.store().findOrCreate(email);
-      return redirect(`${origin}${landing(next, 'ok')}`, sessionCookie(signToken(secret, 'session', row.id, SESSION_TTL, nowMs)));
+      return redirect(`${origin}${landing(next, 'ok')}`, sessionCookies(signToken(secret, 'session', row.id, SESSION_TTL, nowMs)));
     }
     const row = await currentAccount(request, deps);
+    const stale = !row && readCookie(request, SIGNED_IN_COOKIE) !== null;
     return json(200, {
       features: { accounts: true, inbound: flags.inbound },
       inboundAddress: flags.inbound ? config.inboundAddress : null,
       account: row ? publicAccount(row) : null,
       missing: missingSettings(config),
-    });
+    }, {}, stale ? sessionCookies(null) : []);
   }
 
   if (request.method !== 'POST') return json(405, { error: 'Method not allowed.' }, { allow: 'GET, POST' });
@@ -193,7 +201,7 @@ export async function handleAccount(request: Request, deps: AccountDeps): Promis
   }
 
   const row = await currentAccount(request, deps);
-  if (!row) return json(401, { error: 'Sign in first.' }, { 'set-cookie': sessionCookie(null) });
+  if (!row) return json(401, { error: 'Sign in first.' }, {}, sessionCookies(null));
 
   if (body.action === 'save') {
     const planLink = normalizeLink(body.planLink);
@@ -205,10 +213,10 @@ export async function handleAccount(request: Request, deps: AccountDeps): Promis
     const saved = await deps.store().save(row.id, { planLink, policyLink, reminders: body.reminders as boolean | undefined });
     return json(200, { account: saved ? publicAccount(saved) : null });
   }
-  if (body.action === 'signout') return json(200, { ok: true }, { 'set-cookie': sessionCookie(null) });
+  if (body.action === 'signout') return json(200, { ok: true }, {}, sessionCookies(null));
   if (body.action === 'delete') {
     await deps.store().remove(row.id);
-    return json(200, { ok: true }, { 'set-cookie': sessionCookie(null) });
+    return json(200, { ok: true }, {}, sessionCookies(null));
   }
   return json(400, { error: 'Unknown action.' });
 }

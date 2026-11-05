@@ -77,7 +77,7 @@ async function signIn(ctx: ReturnType<typeof setup>, email = 'me@example.com'): 
   await handleAccount(post({ action: 'login', email }), ctx.deps);
   const link = ctx.sent.at(-1)!.text.match(/https:\/\/\S+verify=\S+/)![0];
   const res = await handleAccount(new Request(link), ctx.deps);
-  return res.headers.get('set-cookie')!.split(';')[0];
+  return res.headers.getSetCookie().map((cookie) => cookie.split(';')[0]).join('; ');
 }
 
 describe('config and flags', () => {
@@ -127,7 +127,10 @@ describe('/api/account', () => {
     await handleAccount(post({ action: 'login', email: 'b@example.com', returnTo: 'https://evil.example/policy?c=US&signin=x' }), ctx.deps);
     const back = await handleAccount(new Request(ctx.sent.at(-1)!.text.match(/https:\/\/\S+verify=\S+/)![0]), ctx.deps);
     expect(back.headers.get('location')).toBe('https://gapless.example/policy?c=US&signin=ok#account');
-    expect(landing.headers.get('set-cookie')).toMatch(/HttpOnly; Secure; SameSite=Lax/);
+    const cookies = landing.headers.getSetCookie();
+    expect(cookies[0]).toMatch(/^gapless_session=.+HttpOnly; Secure; SameSite=Lax/);
+    expect(cookies[1]).toMatch(/^gapless_signed_in=1; Path=\/; Secure/);
+    expect(cookies[1]).not.toContain('HttpOnly');
     expect(ctx.rows.size).toBe(2);
   });
 
@@ -150,7 +153,7 @@ describe('/api/account', () => {
     const status = await (await handleAccount(new Request('https://gapless.example/api/account', { headers: { cookie } }), ctx.deps)).json();
     expect(status).toMatchObject({ features: { accounts: true, inbound: true }, inboundAddress: 'abc123@cloudmailin.net', account: { email: 'me@example.com' } });
     const del = await handleAccount(post({ action: 'delete' }, { cookie }), ctx.deps);
-    expect(del.headers.get('set-cookie')).toContain('Max-Age=0');
+    expect(del.headers.getSetCookie().every((cookie) => cookie.includes('Max-Age=0'))).toBe(true);
     expect(ctx.rows.size).toBe(0);
   });
 

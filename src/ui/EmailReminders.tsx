@@ -19,7 +19,16 @@ export interface EmailRemindersProps {
   search: string;
   /** For tests and screenshots: skips the fetch. */
   initialStatus?: AccountStatus | null;
+  /** Whether this build has accounts set up (defaults to the build-time flag). */
+  enabled?: boolean;
 }
+
+/** Set by vite.config.ts from the server's settings at build time; undefined outside Vite. */
+const BUILD_ENABLED = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_GAPLESS_ACCOUNTS === 'true';
+/** A non-secret cookie the server sets beside the HttpOnly session, so the page only asks
+ * /api/account who is signed in when someone actually is. */
+const SIGNED_IN_HINT = 'gapless_signed_in=1';
+const SIGNED_OUT: AccountStatus = { features: { accounts: true, inbound: false }, account: null };
 
 async function post(body: Record<string, unknown>): Promise<Response> {
   return fetch('/api/account', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) });
@@ -27,7 +36,7 @@ async function post(body: Record<string, unknown>): Promise<Response> {
 
 const INPUT = 'h-11 w-full min-w-0 flex-1 rounded-[3px] border border-line-strong bg-surface px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
 
-export function EmailReminders({ kind, search, initialStatus }: EmailRemindersProps) {
+export function EmailReminders({ kind, search, initialStatus, enabled = BUILD_ENABLED }: EmailRemindersProps) {
   const id = useId();
   const [status, setStatus] = useState<AccountStatus | null>(initialStatus ?? null);
   const [email, setEmail] = useState('');
@@ -41,16 +50,17 @@ export function EmailReminders({ kind, search, initialStatus }: EmailRemindersPr
     const params = new URLSearchParams(window.location.search);
     if (params.get('signin') === 'ok') setMessage('You’re signed in.');
     if (params.get('signin') === 'expired') setMessage('That sign-in link has expired or was already used. Ask for a new one.');
-    if (initialStatus !== undefined) return;
+    if (initialStatus !== undefined || !enabled) return;
+    if (!document.cookie.split(/;\s*/).includes(SIGNED_IN_HINT)) { setStatus(SIGNED_OUT); return; }
     let live = true;
     fetch('/api/account', { credentials: 'same-origin' })
       .then((res) => (res.ok ? res.json() as Promise<AccountStatus> : null))
       .then((data) => { if (live && data?.features) setStatus(data); })
       .catch(() => {});
     return () => { live = false; };
-  }, [initialStatus]);
+  }, [initialStatus, enabled]);
 
-  if (!status?.features.accounts || path === null) return null;
+  if (!enabled || !status?.features.accounts || path === null) return null;
 
   const currentLink = `${kind === 'policy' ? '/policy' : path}?${search}`;
   const account = status.account;

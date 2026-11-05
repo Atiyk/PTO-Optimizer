@@ -43,6 +43,11 @@ function siteUrlHtmlPlugin(): Plugin {
   }
 }
 
+// Optional email features (server/account): the browser only learns whether they're set up,
+// as a build-time boolean, so signed-out visitors never call /api/account. No secret is exposed.
+process.env.VITE_GAPLESS_ACCOUNTS = process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD
+  && (process.env.DATABASE_URL || process.env.POSTGRES_URL) && (process.env.APP_SECRET ?? '').length >= 32 ? 'true' : ''
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), siteUrlHtmlPlugin()],
