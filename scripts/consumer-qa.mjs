@@ -203,6 +203,20 @@ try {
             && await page.getByRole('link', { name: /See the full plan/ }).first().isVisible();
           await page.screenshot({ path: resolve(outputDirectory, `home-controls-${width}.png`), fullPage: true });
         }
+        if (route.name === 'home') {
+          // The first meaningful result must precede editable controls visually AND
+          // in DOM reading order, even on the narrowest 320px viewport.
+          const previewHeading = page.getByRole('heading', { name: 'Your recommended break' });
+          const budgetField = page.getByRole('spinbutton', { name: 'PTO days available' });
+          const previewBox = await previewHeading.boundingBox();
+          const budgetBox = await budgetField.boundingBox();
+          result.homeResultBeforeControls = Boolean(previewBox && budgetBox && previewBox.y < budgetBox.y);
+          result.homeReadingOrder = await page.evaluate(() => {
+            const preview = [...document.querySelectorAll('h2')].find((node) => node.textContent?.trim() === 'Your recommended break');
+            const budget = document.getElementById('landing-budget');
+            return Boolean(preview && budget && (preview.compareDocumentPosition(budget) & Node.DOCUMENT_POSITION_FOLLOWING));
+          });
+        }
         if (route.name === 'pto') {
           // The two live planning sliders must be directly visible without opening
           // More options, including on a 320px viewport.
