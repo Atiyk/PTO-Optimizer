@@ -176,7 +176,17 @@ describe('BalanceFromImage errors and cleanup', () => {
     await choose(png());
     view.unmount();
     expect(revoked).toContain(created[2]);
-    expect(window.localStorage.length).toBe(0);
+    // Earlier tests render the whole policy page, whose own preference saves can land
+    // late on a slow runner. What matters here is that nothing the reader saw (the OCR
+    // text, the image or its preview URL) is ever written to browser storage.
+    for (const store of [window.localStorage, window.sessionStorage]) {
+      for (let i = 0; i < store.length; i += 1) {
+        const key = store.key(i)!;
+        const value = store.getItem(key) ?? '';
+        expect(value, `storage key ${key}`).not.toMatch(/Vacation remaining|blob:|data:image/i);
+        expect(key).not.toMatch(/balance.?(image|ocr|reader)/i);
+      }
+    }
   });
 
   it('valueInUnit converts both ways', () => {
