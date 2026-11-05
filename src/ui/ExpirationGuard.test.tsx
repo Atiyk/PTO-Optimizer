@@ -43,7 +43,7 @@ describe('expiration guard interactions', () => {
     // Each reminder names the rescue dates that are still ahead of it.
     expect(vi.mocked(downloadReminderICS).mock.calls[0][0][0].description).toMatch(/Suggested: take .*PTO day/);
     expect(vi.mocked(downloadReminderICS).mock.calls[0][0][0].description).toContain('does not update automatically');
-    expect(screen.getByText(/does not send scheduled email or push/)).toBeTruthy();
+    expect(screen.getByText(/your calendar app sends the alerts/)).toBeTruthy();
   });
   it('does not warn that full-carryover PTO expires at year-end', () => {
     render(<ExpirationGuard holidayCalendar={ready} policy={{ ...policy, carryover: { mode: 'all' } }} country="US" today="2026-11-02" />);

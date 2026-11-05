@@ -150,7 +150,7 @@ function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalen
   }
 
   return (
-    <section aria-labelledby={`${id}-heading`} className="min-w-0 rounded-[4px] border border-line bg-surface p-4 sm:p-6">
+    <section aria-labelledby={`${id}-heading`} className="min-w-0 rounded-[10px] border border-line bg-surface p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-x-3">
         <h2 id={`${id}-heading`} className="text-lg font-bold type-condensed text-ink">PTO expiration guard</h2>
         <label className="flex min-h-11 items-center gap-2 text-sm text-muted"><input type="checkbox" className="h-4 w-4" checked={prefs.enabled} onChange={(event) => update({ ...prefs, enabled: event.target.checked })} />Show in-app alerts</label>
@@ -239,7 +239,7 @@ function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalen
           <span aria-hidden="true" className="hidden text-muted group-open:inline">−</span>
         </summary>
         <div className="pb-2">
-          <p className="text-sm leading-6 text-muted">Download reminders before PTO expires. Each one names the suggested dates above. Import the file into your calendar to receive its alerts. Gapless does not send scheduled email or push notifications.</p>
+          <p className="text-sm leading-6 text-muted">Download reminders before PTO expires. Each one names the suggested dates above. Import the file into your calendar and your calendar app sends the alerts.</p>
           <div className="mt-1 flex flex-wrap gap-x-5">
             {EXPIRATION_REMINDER_LEADS.map((lead) => <label key={lead} className="flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" className="h-4 w-4" checked={prefs.leads.includes(lead)} onChange={(event) => update({ ...prefs, leads: event.target.checked ? [...prefs.leads, lead] : prefs.leads.filter((value) => value !== lead) })} />{lead} days before</label>)}
           </div>

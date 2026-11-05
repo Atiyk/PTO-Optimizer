@@ -21,7 +21,7 @@ interface PrimaryControlsProps {
 }
 
 const DATE_FIELD_CLASS =
-  'h-11 min-w-0 rounded-[3px] border border-line-strong bg-surface px-2.5 text-[15px] font-normal tabular-nums text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
+  'h-11 min-w-0 rounded-[6px] border border-line-strong bg-surface px-2.5 text-[15px] font-normal tabular-nums text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
 const LABEL_CLASS = 'text-sm font-semibold text-ink';
 
 /** Always-visible country, date and budget inputs. Dates stack into a shrinkable grid

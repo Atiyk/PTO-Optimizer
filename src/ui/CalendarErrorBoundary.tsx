@@ -31,7 +31,7 @@ export class CalendarErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.error) {
       return (
-        <div role="alert" className="flex flex-col items-center gap-3 rounded-[4px] border-2 border-ink bg-surface p-8 text-center text-ink">
+        <div role="alert" className="flex flex-col items-center gap-3 rounded-[10px] border-2 border-ink bg-surface p-8 text-center text-ink">
           <p className="text-[15px] font-semibold">The calendar couldn&apos;t render.</p>
           <p className="max-w-sm text-sm text-muted">
             Try the button below, or adjust the date range, PTO days, or other plan settings - a change there often

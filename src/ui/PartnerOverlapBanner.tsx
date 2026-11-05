@@ -12,7 +12,7 @@ interface PartnerOverlapBannerProps {
  * states the design system reserves a semantic colour for. */
 export function PartnerOverlapBanner({ overlapDayCount, onDismiss }: PartnerOverlapBannerProps) {
   return (
-    <div className="flex items-start justify-between gap-3 rounded-[4px] border border-line bg-surface py-2 pl-4 pr-1 text-sm text-ink">
+    <div className="flex items-start justify-between gap-3 rounded-[10px] border border-line bg-surface py-2 pl-4 pr-1 text-sm text-ink">
         <p className="py-2">
           <span className="font-semibold">Someone shared their days off with you.</span> Their{' '}
           {overlapDayCount} day
@@ -23,7 +23,7 @@ export function PartnerOverlapBanner({ overlapDayCount, onDismiss }: PartnerOver
         <button
           type="button"
           onClick={onDismiss}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[3px] text-lg text-ink hover:bg-surface-alt"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[6px] text-lg text-ink hover:bg-surface-alt"
           aria-label="Dismiss"
         >
           &times;

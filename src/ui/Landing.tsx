@@ -26,8 +26,8 @@ import { HOLIDAY_DOT } from './colorScheme';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 
 /** A control set inside the sentence: it takes the sentence's own size and weight. */
-const INLINE_FIELD = 'h-[1.45em] min-h-11 rounded-[3px] border border-line-strong bg-surface px-[0.3em] align-baseline font-bold text-ink hover:border-ink';
-const DATE_FIELD = 'h-11 min-w-0 rounded-[3px] border border-line-strong bg-surface px-2.5 text-base font-semibold text-ink hover:border-ink';
+const INLINE_FIELD = 'h-[1.45em] min-h-11 rounded-[6px] border border-line-strong bg-surface px-[0.3em] align-baseline font-bold text-ink hover:border-ink';
+const DATE_FIELD = 'h-11 min-w-0 rounded-[6px] border border-line-strong bg-surface px-2.5 text-base font-semibold text-ink hover:border-ink';
 const LINK = 'link-mark inline-flex min-h-11 items-center font-semibold';
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -96,7 +96,7 @@ function PlanYear({ breaks, best, rangeStart, rangeEnd, holidayName, weekStart }
           <span className="text-xs font-semibold text-ink">{monthShortName(first)}{month.endsWith('-01') || month === months[0] ? ` ’${month.slice(2, 4)}` : ''}</span>
           {days.map((date, index) => {
             const inRange = date >= rangeStart && date <= rangeEnd;
-            const tone = !inRange ? 'bg-transparent' : ptoDays.has(date) ? 'bg-ink' : offDays.has(date) ? 'bg-mark' : mondayIndexedDow(date) >= 5 ? 'bg-surface-alt' : 'bg-page';
+            const tone = !inRange ? 'bg-transparent' : ptoDays.has(date) ? 'bg-accent' : offDays.has(date) ? 'bg-mark' : mondayIndexedDow(date) >= 5 ? 'bg-surface-alt' : 'bg-page';
             return <span key={date} className={`relative h-5 lg:h-6 ${tone}`} style={index === 0 ? { gridColumnStart: offset + 2 } : undefined}>
               {inRange && holidayName.has(date) && <span className={`absolute bottom-0.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${HOLIDAY_DOT}`} />}
             </span>;
@@ -106,12 +106,12 @@ function PlanYear({ breaks, best, rangeStart, rangeEnd, holidayName, weekStart }
     </div>
   </div>;
 
-  return <figure className="min-w-0 rounded-[4px] bg-surface p-3 sm:p-5">
+  return <figure className="min-w-0 rounded-[10px] bg-surface p-3 sm:p-5">
     <figcaption className="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
       <span className="text-h2 font-bold type-condensed">Every break in this plan</span>
       <span className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
-        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="size-3.5 bg-ink" />PTO day</span>
-        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-3.5 w-6 bg-mark" />Day off in a break</span>
+        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="size-3.5 rounded-[3px] bg-accent" />PTO day</span>
+        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-3.5 w-6 rounded-[3px] bg-mark" />Day off in a break</span>
         <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="size-3.5 bg-surface-alt" />Weekend</span>
         <span className="inline-flex items-center gap-2"><span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${HOLIDAY_DOT}`} />Public holiday</span>
       </span>
@@ -126,6 +126,23 @@ function PlanYear({ breaks, best, rangeStart, rangeEnd, holidayName, weekStart }
 }
 
 /** One live engine calculation drives the preview and full-plan handoff. */
+function ToolGroup({ title, rows }: { title: string; rows: { href: string; title: string; body: string }[] }) {
+  return <div className="min-w-0">
+    <h3 className="mb-3 text-sm font-semibold text-muted">{title}</h3>
+    <ul className="divide-y divide-line overflow-hidden rounded-[10px] border border-line bg-surface">
+      {rows.map((row) => <li key={row.title}>
+        <a href={row.href} className="group flex min-h-16 items-center gap-4 px-4 py-4 transition-colors duration-150 hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:px-5">
+          <span className="min-w-0 flex-1">
+            <span className="block text-lg font-semibold text-ink">{row.title}</span>
+            <span className="mt-0.5 block text-[15px] leading-6 text-muted">{row.body}</span>
+          </span>
+          <span aria-hidden="true" className="text-xl text-muted transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-accent">→</span>
+        </a>
+      </li>)}
+    </ul>
+  </div>;
+}
+
 export function Landing() {
   const today = todayISO();
   const [state, setState] = useState(() => readLandingState(typeof window === 'undefined' ? '' : window.location.search, today, geolocateCountry()));
@@ -255,38 +272,22 @@ export function Landing() {
         </section>
       </Container>
 
-      {/* What the rest of Gapless does: the heading and the tracking tools on one side, the
-          planner set large on the other, so neither column runs out before the other. */}
+      {/* What the rest of Gapless does, in the header's own structure: three ways to plan,
+          then the tools that keep a plan true. Rows, not posters: each is one tap on a phone. */}
       <Container className="px-4 pt-20 sm:px-6 lg:pt-28">
-        <section aria-labelledby="landing-tools" className="grid gap-x-16 gap-y-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-          <div className="flex min-w-0 flex-col gap-8">
-            <h2 id="landing-tools" className="max-w-[16ch] text-h1 type-display text-ink">Plan the breaks, then keep track of the days.</h2>
-            <div>
-              <h3 className="text-h2 font-bold type-condensed text-ink">Track my PTO balance</h3>
-              <p className="mt-2 max-w-md text-base text-ink">See what you could have available by a future date, including planned leave, and set reminders before days expire.</p>
-              <a className={LINK} href="/policy#balance">Forecast my balance →</a>
-            </div>
-            <div>
-              <h3 className="text-h2 font-bold type-condensed text-ink">Understand my policy</h3>
-              <p className="mt-2 max-w-md text-base text-ink">Make sense of accrual, carryover, and deadlines before your days slip away.</p>
-              <a className={LINK} href="/policy">Check my policy →</a>
-            </div>
-          </div>
-          <div className="flex min-w-0 flex-col gap-4">
-            <div className="rounded-[4px] bg-surface p-6 sm:p-9">
-              <h3 className="text-display-sm type-display text-ink">Plan PTO</h3>
-              <p className="mt-3 max-w-lg text-lg text-ink">Find longer vacations and useful long weekends around the dates that work for you. Pin the days you want, rule out the ones you can’t, then add the plan to your calendar or copy a request.</p>
-              <a href={href} className={`${LINK} mt-2 text-lg`}>Explore my plan →</a>
-            </div>
-            <div className="rounded-[4px] bg-surface-alt p-6 sm:p-9">
-              <h3 className="text-h2 font-bold type-condensed text-ink">Planning something bigger?</h3>
-              <p className="mt-2 max-w-lg text-base text-ink">Find where a sabbatical lands best and what each extra PTO day adds to it, or line your PTO up with your kids’ school breaks. New to the terms? The guides explain accrual, carryover, and payout in plain language.</p>
-              <div className="flex flex-wrap gap-x-6">
-                <a href="/sabbatical" className={LINK}>Explore sabbatical planning →</a>
-                <a href="/family" className={LINK}>Plan around school breaks →</a>
-                <a href="/glossary" className={LINK}>Read the guides →</a>
-              </div>
-            </div>
+        <section aria-labelledby="landing-tools">
+          <h2 id="landing-tools" className="max-w-[20ch] text-h1 type-display text-ink">Plan the breaks, then keep track of the days.</h2>
+          <div className="mt-8 grid gap-6 lg:grid-cols-2 lg:gap-8">
+            <ToolGroup title="Plan" rows={[
+              { href, title: 'Time off', body: 'Longer breaks and long weekends from your PTO budget. Pin days, rule some out, export the plan.' },
+              { href: '/family', title: 'Family', body: 'Line your PTO up with your kids’ school breaks, from 12 US district calendars or your own.' },
+              { href: '/sabbatical', title: 'Sabbatical', body: 'Where a long leave lands best, and what each extra PTO day adds to it.' },
+            ]} />
+            <ToolGroup title="Keep it on track" rows={[
+              { href: '/policy#balance', title: 'Forecast my balance', body: 'What you could have by a future date, including planned leave.' },
+              { href: '/policy', title: 'Check my policy', body: 'Accrual, carryover and expiry deadlines, with calendar reminders before days lapse.' },
+              { href: '/glossary', title: 'Learn the terms', body: 'Accrual, carryover and payout, explained in plain language.' },
+            ]} />
           </div>
         </section>
       </Container>
@@ -305,7 +306,7 @@ export function Landing() {
             {holidays.length > 0 && <Button variant="secondary" onClick={() => downloadHolidaysICS(holidays)}>Download holidays (.ics)</Button>}
           </div>
 
-          {validRange && holidays.length > 0 && <div className="mt-6 min-w-0 rounded-[4px] bg-surface p-4 sm:p-5">
+          {validRange && holidays.length > 0 && <div className="mt-6 min-w-0 rounded-[10px] bg-surface p-4 sm:p-5">
             <YearStrip today={rangeStart} stripEnd={rangeEnd} holidays={holidays} bridgeableHolidayDates={bridgeableDates} />
             <p className="mt-2 text-sm text-muted">Tall marked ticks are holidays that already make a long weekend or sit one PTO day from one. Shaded stretches run eight days or more without a holiday.</p>
           </div>}
@@ -313,7 +314,7 @@ export function Landing() {
           {upcoming.length > 0 ? <ol aria-label={`All ${upcoming.length} upcoming holidays`} className="mt-6 list-none p-0">
             {upcoming.map((entry) => {
               const bridge = bridges.find((candidate) => candidate.combined.start === entry.run.start || candidate.combined.end === entry.run.end);
-              return <li key={entry.holiday.date} className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-baseline gap-x-4 rounded-[3px] px-3 py-3 odd:bg-surface sm:px-5 sm:grid-cols-[7rem_minmax(0,1fr)_auto] sm:gap-x-8">
+              return <li key={entry.holiday.date} className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-baseline gap-x-4 rounded-[6px] px-3 py-3 odd:bg-surface sm:px-5 sm:grid-cols-[7rem_minmax(0,1fr)_auto] sm:gap-x-8">
                 <p className="text-h2 font-bold type-condensed text-ink tabular-nums">{formatShort(entry.holiday.date)}</p>
                 <div className="min-w-0">
                   <p className="text-lg font-semibold text-ink">{entry.holiday.name}</p>
@@ -322,7 +323,7 @@ export function Landing() {
                 <a href={landingPlanHref(state, bridge?.bridgeDate, employer)} className={`${LINK} col-start-2 text-sm sm:col-start-3 sm:justify-self-end`}>{bridge ? `Connect a ${runLength(bridge.combined)}-day break` : 'Plan around this holiday'} →</a>
               </li>;
             })}
-          </ol> : <p className="mt-8 rounded-[4px] bg-surface p-5 text-base text-muted">{loading ? 'Updating public holidays…' : calendar.degraded ? 'Holiday data could not be loaded. You can still use the planner with your own holiday dates.' : 'No upcoming observed holidays in this range. The planner can still help you make more of your weekends.'}</p>}
+          </ol> : <p className="mt-8 rounded-[10px] bg-surface p-5 text-base text-muted">{loading ? 'Updating public holidays…' : calendar.degraded ? 'Holiday data could not be loaded. You can still use the planner with your own holiday dates.' : 'No upcoming observed holidays in this range. The planner can still help you make more of your weekends.'}</p>}
         </section>
       </Container>
 

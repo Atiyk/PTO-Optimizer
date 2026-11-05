@@ -146,7 +146,7 @@ export default function BalanceReader({ id, unit, hoursPerDay, today, onUse, rec
       id={id}
       role="region"
       aria-label="Read your balance from a screenshot"
-      className="mt-2 min-w-0 rounded-[4px] border border-line bg-surface-alt p-4"
+      className="mt-2 min-w-0 rounded-[10px] border border-line bg-surface-alt p-4"
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
     >
@@ -155,7 +155,7 @@ export default function BalanceReader({ id, unit, hoursPerDay, today, onUse, rec
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
         <label
           htmlFor={`${baseId}-file`}
-          className="inline-flex min-h-11 cursor-pointer items-center rounded-[3px] border border-line-strong bg-surface px-4 text-sm font-semibold text-ink hover:bg-surface-alt focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink"
+          className="inline-flex min-h-11 cursor-pointer items-center rounded-[6px] border border-line-strong bg-surface px-4 text-sm font-semibold text-ink hover:bg-surface-alt focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink"
         >
           Choose a screenshot
           <input
@@ -172,7 +172,7 @@ export default function BalanceReader({ id, unit, hoursPerDay, today, onUse, rec
 
       {previewUrl && (
         <div className="mt-3 flex items-start gap-3">
-          <img src={previewUrl} alt="Your screenshot" className="max-h-24 max-w-[40%] rounded-[3px] border border-line object-contain" />
+          <img src={previewUrl} alt="Your screenshot" className="max-h-24 max-w-[40%] rounded-[6px] border border-line object-contain" />
           <button type="button" onClick={clear} className="min-h-11 px-1 text-sm text-muted underline decoration-1 underline-offset-[0.22em] hover:decoration-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink">Remove image</button>
         </div>
       )}
@@ -201,7 +201,7 @@ export default function BalanceReader({ id, unit, hoursPerDay, today, onUse, rec
                   <button
                     type="button"
                     onClick={() => use(c)}
-                    className="flex min-h-11 w-full min-w-0 flex-col items-start rounded-[3px] border border-line-strong bg-surface px-3 py-2 text-left hover:border-ink hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                    className="flex min-h-11 w-full min-w-0 flex-col items-start rounded-[6px] border border-line-strong bg-surface px-3 py-2 text-left hover:border-ink hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                   >
                     <span className="text-sm font-semibold text-ink [overflow-wrap:anywhere]">
                       {c.label} · {fmtNumber(c.value)} {unitWord(c.value, c.unit)}
@@ -236,7 +236,7 @@ export default function BalanceReader({ id, unit, hoursPerDay, today, onUse, rec
               onChange={(e) => { setPastedText(e.target.value); setSource('text'); setUsedMessage(''); }}
               rows={4}
               placeholder="e.g. Vacation available 12.5 days as of 10/31/2026"
-              className="mt-1 block w-full min-w-0 rounded-[3px] border border-line-strong bg-surface p-3 text-base text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+              className="mt-1 block w-full min-w-0 rounded-[6px] border border-line-strong bg-surface p-3 text-base text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
             />
           </div>
         )}

@@ -54,13 +54,13 @@ export function DateListEditor({ dates, onAdd, onRemove, label = 'Date to add' }
             setAnnouncement('');
           }}
           onKeyDown={onDateKeyDown}
-          className="h-11 min-w-0 max-w-full flex-1 rounded-[3px] border border-line-strong bg-surface px-3 text-[15px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+          className="h-11 min-w-0 max-w-full flex-1 rounded-[6px] border border-line-strong bg-surface px-3 text-[15px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
         />
         <button
           type="button"
           disabled={!canAdd}
           onClick={addDate}
-          className="min-h-11 shrink-0 rounded-[3px] border border-ink bg-surface px-4 text-sm font-semibold text-ink hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface"
+          className="min-h-11 shrink-0 rounded-[6px] border border-ink bg-surface px-4 text-sm font-semibold text-ink hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface"
         >
           Add
         </button>
@@ -71,13 +71,13 @@ export function DateListEditor({ dates, onAdd, onRemove, label = 'Date to add' }
       {dates.length > 0 && (
         <ul aria-label={label + ' selected dates'} className="flex min-w-0 flex-wrap gap-2">
           {dates.map((date) => (
-            <li key={date} className="flex min-h-11 items-center gap-1 rounded-[3px] bg-surface-alt pl-3 text-sm tabular-nums text-ink">
+            <li key={date} className="flex min-h-11 items-center gap-1 rounded-[6px] bg-surface-alt pl-3 text-sm tabular-nums text-ink">
               <time dateTime={date}>{date}</time>
               <button
                 type="button"
                 aria-label={'Remove ' + date}
                 onClick={() => removeDate(date)}
-                className="flex h-11 min-w-11 items-center justify-center rounded-[3px] text-muted hover:bg-surface hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+                className="flex h-11 min-w-11 items-center justify-center rounded-[6px] text-muted hover:bg-surface hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
               >
                 <span aria-hidden="true">&times;</span>
               </button>

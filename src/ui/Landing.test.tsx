@@ -160,8 +160,8 @@ describe('live homepage planner', () => {
     expect((screen.getByLabelText('Country') as HTMLSelectElement).value).toBe('GB');
     expect((screen.getByLabelText('From') as HTMLInputElement).value).toBe('2027-01-01');
     expect((screen.getByLabelText('Through') as HTMLInputElement).value).toBe('2027-08-01');
-    expect(screen.getByRole('link', { name: 'Forecast my balance →' }).getAttribute('href')).toBe('/policy#balance');
-    expect(screen.getByRole('link', { name: 'Check my policy →' }).getAttribute('href')).toBe('/policy');
+    expect(screen.getByRole('link', { name: /^Forecast my balance/ }).getAttribute('href')).toBe('/policy#balance');
+    expect(screen.getByRole('link', { name: /^Check my policy/ }).getAttribute('href')).toBe('/policy');
     expect(screen.getByText(/Preview assumes a Monday–Friday workweek/)).toBeTruthy();
   });
 

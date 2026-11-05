@@ -96,7 +96,7 @@ export function SubscribeFeed({ planSearch, origin, path = '/api/feed', calendar
                 readOnly
                 value={links.https}
                 onFocus={(event) => event.currentTarget.select()}
-                className="h-11 w-full min-w-0 basis-full rounded-[3px] border border-line-strong bg-surface px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+                className="h-11 w-full min-w-0 basis-full rounded-[6px] border border-line-strong bg-surface px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
               />
               <Button
                 variant="secondary"

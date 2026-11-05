@@ -96,7 +96,7 @@ export function Glossary() {
                   onChange={(e) => setQuery(e.target.value)}
                   aria-describedby={statusId}
                   placeholder="Try “carryover” or “accrual”"
-                  className={`h-12 w-full min-w-0 rounded-[3px] border border-line-strong bg-surface px-4 text-[17px] text-ink placeholder:text-muted hover:border-ink ${FOCUS}`}
+                  className={`h-12 w-full min-w-0 rounded-[6px] border border-line-strong bg-surface px-4 text-[17px] text-ink placeholder:text-muted hover:border-ink ${FOCUS}`}
                 />
               </label>
               {query.length > 0 && (
@@ -146,7 +146,7 @@ export function Glossary() {
                 <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12">
                   <a
                     href={`/glossary/${featured.termId}`}
-                    className={`group flex flex-col self-start rounded-[4px] border border-line bg-surface p-6 transition-colors duration-150 hover:border-ink sm:p-8 ${FOCUS}`}
+                    className={`group flex flex-col self-start rounded-[10px] border border-line bg-surface p-6 transition-colors duration-150 hover:border-ink sm:p-8 ${FOCUS}`}
                   >
                     <h3 className="text-h1 text-ink type-display">{featured.title}</h3>
                     <p className="mt-3 max-w-[56ch] text-ink">{featured.answer}</p>
@@ -171,7 +171,7 @@ export function Glossary() {
                 </div>
               </section>
 
-              <section className="mt-16 flex flex-col gap-5 rounded-[4px] bg-surface-alt p-6 sm:p-8 lg:mt-20 lg:flex-row lg:items-center lg:justify-between" aria-label="Put your PTO knowledge to work">
+              <section className="mt-16 flex flex-col gap-5 rounded-[10px] bg-surface-alt p-6 sm:p-8 lg:mt-20 lg:flex-row lg:items-center lg:justify-between" aria-label="Put your PTO knowledge to work">
                 <div>
                   <h2 className="text-h2 font-bold text-ink type-condensed">Make the policy work for you</h2>
                   <p className="mt-1 max-w-[60ch] text-ink">Already know how your time off works? Forecast your balance and expiry dates, then find the best days to use it.</p>

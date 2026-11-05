@@ -179,7 +179,7 @@ export function Sabbatical() {
                 round-trips through the URL (c, s, len, pto, unpaid). */}
             <div className="min-w-0 lg:sticky lg:top-6 lg:self-start">
               <h2 className="sr-only">Your sabbatical</h2>
-              <div className="flex flex-col gap-6 rounded-[4px] border border-line bg-surface p-4 sm:p-5 md:grid md:grid-cols-3 lg:flex">
+              <div className="flex flex-col gap-6 rounded-[10px] border border-line bg-surface p-4 sm:p-5 md:grid md:grid-cols-3 lg:flex">
                 <fieldset className="min-w-0">
                   <legend className="text-base font-bold type-condensed text-ink">When you can go</legend>
                   <div className="mt-3 flex flex-col gap-4">
@@ -192,7 +192,7 @@ export function Sabbatical() {
                         type="date"
                         value={eligibleFrom}
                         onChange={(e) => e.target.value && setEligibleFrom(e.target.value)}
-                        className="mt-1.5 h-11 w-full min-w-0 rounded-[3px] border border-line-strong bg-surface px-3 text-base text-ink"
+                        className="mt-1.5 h-11 w-full min-w-0 rounded-[6px] border border-line-strong bg-surface px-3 text-base text-ink"
                       />
                     </div>
                   </div>
@@ -205,7 +205,7 @@ export function Sabbatical() {
                     {/* 4B: any whole number of weeks, not a fixed list. Steppers for +/-1,
                         typing for anything else; no submit, updates live. */}
                     <div className="mt-1.5 flex items-center gap-2">
-                      <div className="inline-flex items-stretch overflow-hidden rounded-[3px] border border-line-strong bg-surface">
+                      <div className="inline-flex items-stretch overflow-hidden rounded-[6px] border border-line-strong bg-surface">
                         <button type="button" aria-label="Decrease sabbatical length by one week" disabled={lengthWeeks <= 1} onClick={() => setLengthWeeks((w) => Math.max(1, w - 1))} className={stepBtn}>&minus;</button>
                         <input
                           id="sabbatical-length"
@@ -253,7 +253,7 @@ export function Sabbatical() {
                       {/* 4C: extends the block the same way PTO does, but tracked as its own
                           budget - the tradeoff is financial, not a PTO balance. */}
                       <div className="mt-1.5 flex items-center gap-2">
-                        <div className="inline-flex items-stretch overflow-hidden rounded-[3px] border border-line-strong bg-surface">
+                        <div className="inline-flex items-stretch overflow-hidden rounded-[6px] border border-line-strong bg-surface">
                           <button type="button" aria-label="Decrease unpaid leave by one week" disabled={unpaidWeeksToAdd <= 0} onClick={() => setUnpaidWeeksToAdd((w) => Math.max(0, w - 1))} className={stepBtn}>&minus;</button>
                           <input
                             id="sabbatical-unpaid"
@@ -375,11 +375,11 @@ function PlacementList({
             tabIndex={isSelected || (!selectedStart && index === 0) ? 0 : -1}
             onClick={() => onSelect(p.start)}
             onKeyDown={(event) => onKeyDown(event, index)}
-            className={`grid min-h-11 w-full grid-cols-[2rem_minmax(0,1fr)] gap-x-3 rounded-[4px] border bg-surface p-3 text-left transition-colors duration-150 sm:grid-cols-[2rem_minmax(0,13rem)_minmax(0,1fr)] sm:items-center sm:p-4 ${
+            className={`grid min-h-11 w-full grid-cols-[2rem_minmax(0,1fr)] gap-x-3 rounded-[10px] border bg-surface p-3 text-left transition-colors duration-150 sm:grid-cols-[2rem_minmax(0,13rem)_minmax(0,1fr)] sm:items-center sm:p-4 ${
               isSelected ? 'border-2 border-ink' : 'border-line hover:border-ink'
             }`}
           >
-            <span aria-hidden="true" className={`flex h-8 w-8 items-center justify-center rounded-[3px] text-base font-bold ${isSelected ? 'bg-ink text-white' : 'bg-surface-alt text-ink'}`}>{index + 1}</span>
+            <span aria-hidden="true" className={`flex h-8 w-8 items-center justify-center rounded-[6px] text-base font-bold ${isSelected ? 'bg-accent text-white' : 'bg-surface-alt text-ink'}`}>{index + 1}</span>
             <span className="min-w-0">
               <span className="block text-base font-bold text-ink">{formatShortWithYear(p.start)}</span>
               <span className="block text-sm text-muted">{formatCardDateRange(p.extendedStart, p.extendedEnd)}</span>
@@ -387,7 +387,7 @@ function PlacementList({
             <span className="col-span-2 mt-2 min-w-0 sm:col-span-1 sm:mt-0">
               <span className="flex items-center gap-3">
                 <span aria-hidden="true" className="h-3 min-w-0 flex-1 bg-surface-alt">
-                  <span className={`block h-full ${isSelected ? 'bg-mark outline outline-1 outline-ink' : 'bg-ink'}`} style={{ width: `${(p.totalAwayDays / max) * 100}%` }} />
+                  <span className={`block h-full ${isSelected ? 'bg-accent' : 'bg-[var(--mark-strong)]'}`} style={{ width: `${(p.totalAwayDays / max) * 100}%` }} />
                 </span>
                 <span className="shrink-0 text-base font-bold tabular-nums text-ink">{p.totalAwayDays} days away</span>
               </span>
@@ -445,7 +445,7 @@ function MarginalBars({ marginal, currentDaysUsed }: { marginal: { daysUsed: num
           return (
             <div key={g.daysUsed} className={`flex min-w-0 max-w-12 flex-1 flex-col items-center justify-end px-0.5 pt-6 ${isCurrent ? 'bg-mark' : ''}`} style={{ height: `${CHART + 24}px` }}>
               <span className="text-sm font-bold tabular-nums text-ink">+{g.gained}</span>
-              <span className="mt-1 block w-full bg-ink" style={{ height: `${Math.max(3, (g.gained / maxGain) * CHART)}px` }} />
+              <span className="mt-1 block w-full rounded-t-[3px] bg-accent" style={{ height: `${Math.max(3, (g.gained / maxGain) * CHART)}px` }} />
             </div>
           );
         })}
@@ -468,11 +468,11 @@ function MarginalBars({ marginal, currentDaysUsed }: { marginal: { daysUsed: num
 /** The legend draws the same marks the calendar below draws (and /pto's calendar uses),
  * so it never describes a swatch the calendar doesn't have. */
 function SabbaticalLegend() {
-  const swatch = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-[3px]';
+  const swatch = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px]';
   return (
     <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink">
       <li className="flex min-h-7 items-center gap-2">
-        <span aria-hidden="true" className="h-6 w-9 rounded-[4px] border-b border-ink bg-mark" />
+        <span aria-hidden="true" className="h-6 w-9 rounded-[8px] border-b-[3px] border-accent bg-mark" />
         Time away: the sabbatical and the weekends and holidays it joins
       </li>
       <li className="flex min-h-7 items-center gap-2">
@@ -560,7 +560,7 @@ function SabbaticalCalendar({
                       <span
                         key={`band-${seg.from}`}
                         aria-hidden="true"
-                        className={`border-b border-[var(--text-primary)] ${COLORS.bandBg} ${seg.roundL ? 'rounded-l-[4px]' : ''} ${seg.roundR ? 'rounded-r-[4px]' : ''}`}
+                        className={`border-b border-[var(--text-primary)] ${COLORS.bandBg} ${seg.roundL ? 'rounded-l-[8px]' : ''} ${seg.roundR ? 'rounded-r-[8px]' : ''}`}
                         style={{ gridColumn: `${seg.from + 1} / ${seg.to + 2}`, gridRow: 1 }}
                       />
                     ))}
@@ -583,7 +583,7 @@ function SabbaticalCalendar({
                         <span
                           key={di}
                           title={holidayName}
-                          className={`relative z-10 flex h-10 items-center justify-center rounded-[3px] text-sm font-medium tabular-nums ${fill} ${
+                          className={`relative z-10 flex h-10 items-center justify-center rounded-[6px] text-sm font-medium tabular-nums ${fill} ${
                             iso === today ? 'ring-2 ring-[var(--text-primary)] ring-offset-2 ring-offset-[var(--bg-surface)]' : ''
                           }`}
                           style={{ gridColumn: di + 1, gridRow: 1 }}
@@ -648,17 +648,17 @@ function SabbaticalExportRow({
     if (!ctx) return;
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT);
-    ctx.fillStyle = '#dcf763';
-    ctx.fillRect(40, 66, Math.min(SHARE_IMAGE_WIDTH - 80, 860), 58);
-    ctx.fillStyle = '#141414';
+    ctx.fillStyle = '#3a36d0';
+    ctx.fillRect(40, 72, 6, 48);
+    ctx.fillStyle = '#12141c';
     ctx.font = '800 44px "Archivo Variable", system-ui, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(`Away for ${placement.totalAwayDays} consecutive days`, 48, 110);
+    ctx.fillText(`Away for ${placement.totalAwayDays} consecutive days`, 60, 110);
     ctx.font = '400 24px system-ui, sans-serif';
-    ctx.fillStyle = '#56564f';
-    ctx.fillText(`${formatLong(placement.extendedStart)} – ${formatLong(placement.extendedEnd)}`, 48, 150);
+    ctx.fillStyle = '#535968';
+    ctx.fillText(`${formatLong(placement.extendedStart)} – ${formatLong(placement.extendedEnd)}`, 60, 150);
     ctx.font = '400 15px system-ui, sans-serif';
-    ctx.fillStyle = '#56564f';
+    ctx.fillStyle = '#535968';
     ctx.fillText(window.location.host, 48, SHARE_IMAGE_HEIGHT - 32);
     const result = await copyCanvasImage(canvas, 'sabbatical.png');
     flash(result.method === 'clipboard' ? 'Copied!' : result.method === 'download' ? 'Downloaded instead' : 'Could not copy');

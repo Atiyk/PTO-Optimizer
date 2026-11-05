@@ -141,7 +141,7 @@ export function MonthGrid({
                         title={`Break ${band.index}, ${formatCardDateRange(band.brk.start, band.brk.end)}`}
                         onMouseEnter={() => onHoverBreak(band.brk.id)}
                         onMouseLeave={() => onHoverBreak(null)}
-                        className="flex h-6 min-w-6 items-center justify-center rounded-[3px] bg-ink px-1 text-xs font-bold leading-none tabular-nums text-white"
+                        className="flex h-6 min-w-6 items-center justify-center rounded-[6px] bg-accent px-1 text-xs font-bold leading-none tabular-nums text-white"
                       >
                         {band.index}
                       </span>
@@ -161,8 +161,8 @@ export function MonthGrid({
                   <div
                     key={`band-${i}`}
                     style={{ gridColumn: `${seg.colStart + 1} / ${seg.colEnd + 2}`, gridRow: '1' }}
-                    className={`border-b border-[var(--text-primary)] ${COLORS.bandBg} ${seg.roundedLeft ? 'rounded-l-[4px]' : ''} ${
-                      seg.roundedRight ? 'rounded-r-[4px]' : ''
+                    className={`border-b-[3px] border-[var(--accent)] ${COLORS.bandBg} ${seg.roundedLeft ? 'rounded-l-[8px]' : ''} ${
+                      seg.roundedRight ? 'rounded-r-[8px]' : ''
                     }`}
                   />
                 ))}
@@ -170,8 +170,8 @@ export function MonthGrid({
                   <div
                     key={`preview-${i}`}
                     style={{ gridColumn: `${seg.colStart + 1} / ${seg.colEnd + 2}`, gridRow: '1' }}
-                    className={`${COLORS.previewBandBg} ${seg.roundedLeft ? 'rounded-l-[4px]' : ''} ${
-                      seg.roundedRight ? 'rounded-r-[4px]' : ''
+                    className={`${COLORS.previewBandBg} ${seg.roundedLeft ? 'rounded-l-[8px]' : ''} ${
+                      seg.roundedRight ? 'rounded-r-[8px]' : ''
                     }`}
                   />
                 ))}

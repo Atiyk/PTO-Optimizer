@@ -72,7 +72,7 @@ function Field({ label, termId, children }: { label: string; termId?: string; ch
   );
 }
 
-const inputClass = 'h-11 w-full min-w-0 rounded-[3px] border border-line-strong bg-surface px-3 text-base text-ink';
+const inputClass = 'h-11 w-full min-w-0 rounded-[6px] border border-line-strong bg-surface px-3 text-base text-ink';
 const selectClass = 'select-ink h-11 w-full min-w-0 text-base';
 const checkRow = 'flex min-h-11 items-center gap-2 text-sm text-ink';
 
@@ -288,7 +288,7 @@ export function Policy() {
               risk: the number first, then what drives it, then what could be lost. */}
           <div id="balance" className="mt-6 flex scroll-mt-24 flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,27rem)]">
             <div className="order-2 flex min-w-0 flex-col gap-6 lg:order-none lg:col-start-1 lg:row-start-1">
-              <section aria-label="Quick balance forecast" className="min-w-0 rounded-[4px] border border-line bg-surface p-4 sm:p-6">
+              <section aria-label="Quick balance forecast" className="min-w-0 rounded-[10px] border border-line bg-surface p-4 sm:p-6">
                 <h2 className="text-h2 font-bold type-condensed text-ink">Your balance and how you earn it</h2>
                 <p className="mt-1 text-sm text-muted">Use your real balance and employer rules. Full carryover at reset is assumed until you choose another rule.</p>
                 <div className="mt-5 grid gap-x-4 gap-y-4 sm:grid-cols-2">
@@ -313,7 +313,7 @@ export function Policy() {
                 {saveMessage && <p role="status" className="mt-1 text-sm text-muted">{saveMessage}</p>}
               </section>
 
-              <details className="group min-w-0 rounded-[4px] border border-line bg-surface">
+              <details className="group min-w-0 rounded-[10px] border border-line bg-surface">
                 <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
                   <span>
                     <span className="block text-lg font-bold type-condensed text-ink">Advanced policy options and explanation</span>
@@ -342,7 +342,7 @@ export function Policy() {
                           }}
                           rows={5}
                           placeholder="Paste a paragraph from your handbook — nothing here is stored or put in the URL."
-                          className="w-full rounded-[3px] border border-line-strong bg-surface p-3 text-base text-ink"
+                          className="w-full rounded-[6px] border border-line-strong bg-surface p-3 text-base text-ink"
                         />
                         <p className="mt-1 text-xs text-muted">
                           Never stored, never in the URL — cleared on reload. We only match it against our own glossary.
@@ -639,7 +639,7 @@ export function Policy() {
             </div>
             <div id="requests" className="order-4 mt-6 min-w-0 scroll-mt-24 lg:order-none lg:col-start-1 lg:row-start-2 lg:mt-4">
               <PtoTracker today={visitDate} ledger={ledger} calendar={trackerCalendar.calendar} calendarReady={!trackerCalendar.loading && !trackerCalendar.degraded} calendarNotice={trackerCalendar.loading ? 'Loading your employer calendar…' : trackerCalendar.degraded ? 'Holiday data or a calendar input is unavailable. Check the calendar settings before adding or changing request dates.' : selectedForecast?.confirmed.balance === null || selectedForecast?.confirmed.balance === undefined ? undefined : `Projected balance on ${compactDate(forecastDate)}: ${new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(selectedForecast.confirmed.balance)} ${unit}. Approved requests you track here reduce it.`} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
-              <details className="group mt-3 rounded-[4px] border border-line bg-surface">
+              <details className="group mt-3 rounded-[10px] border border-line bg-surface">
                 <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 font-semibold text-ink sm:px-6 [&::-webkit-details-marker]:hidden">
                   My request calendar and workweek
                   <span aria-hidden="true" className="shrink-0 text-xl leading-none group-open:rotate-45 motion-safe:transition-transform">+</span>

@@ -9,12 +9,12 @@
 
 
 /*
- * Gapless visual system, 2026-11 redesign: "the highlighted schedule".
+ * Gapless visual system, 2026-11 brand overhaul: "the line".
  *
- * The world is a printed schedule that someone has gone over with a highlighter: crisp ink on
- * paper-white, one fluorescent marker for the time that is yours. Ink carries every action and
- * every PTO day; the marker carries the days-off runs, the result, and text selection. No other
- * hue exists. Full rationale: docs/DESIGN-SYSTEM.md.
+ * A break is one unbroken stretch of line through the calendar. Ink on a cool paper ground for
+ * reading; one route colour, Line indigo, for every action, every PTO day and the brand; a soft
+ * pass of the same indigo for the days off it joins up. No highlighter swipes, no second hue.
+ * Full rationale: DESIGN.md and docs/BRAND-IDENTITY.md.
  *
  * Type: Archivo (Omnibus-Type, OFL), one variable family with a width axis. Condensed heavy
  * cuts set display lines and figures, the normal width sets UI and reading text. The shipped
@@ -51,37 +51,40 @@
  * --band-bg / --mark.
  */
 :root {
-  --bg-page: #f4f4f0; /* paper: a neutral off-white, not cream */
+  /* "The line": a cool paper ground, ink text, and one route colour (Line indigo) that
+     carries every action, every PTO day and the brand. Days off sit on a soft pass of
+     the same hue, so a break reads as one continuous stretch of line. */
+  --bg-page: #f5f6f8; /* cool off-white ground, not cream */
   --bg-surface: #ffffff; /* the sheet */
-  --bg-surface-alt: #eaeae4; /* one tone step down: chips, hover fills, quiet panels */
-  --border-default: #dcdcd5;
-  --border-strong: #86867e; /* control boundaries: 3:1 on page, surface and alt */
-  --text-primary: #141414; /* ink */
-  --text-muted: #56564f; /* pencil */
-  --focus-ring: #141414;
+  --bg-surface-alt: #eceef2; /* one tone step down: chips, hover fills, quiet panels */
+  --border-default: #dde0e6;
+  --border-strong: #80869a; /* control boundaries: 3:1 on page, surface and alt */
+  --text-primary: #12141c; /* ink */
+  --text-muted: #535968; /* graphite */
+  --focus-ring: #3a36d0;
 
-  --accent: #141414; /* ink is the action colour */
-  --accent-hover: #000000;
-  --accent-soft: #f1fbc4; /* a pale pass of the marker: selected chips, soft highlights */
-  --accent-ink: #141414;
+  --accent: #3a36d0; /* Line indigo: the action, PTO and brand colour */
+  --accent-hover: #2c28ad;
+  --accent-soft: #efeefd; /* finding callouts and quiet selected fills */
+  --accent-ink: #2c28ad; /* indigo text on light surfaces */
 
-  --mark: #dcf763; /* the highlighter */
-  --mark-strong: #c9e83d; /* a second pass of the marker: hover on marked things */
+  --mark: #e3e2fb; /* the days-off tint: selected chips, together days, chart bars */
+  --mark-strong: #cfcdf7; /* hover on a break */
 
-  --pto-bg: #141414; /* suggested PTO: a solid ink block, the strongest thing on the page */
-  --pto-border: #000000;
+  --pto-bg: #3a36d0; /* suggested PTO: a solid indigo block, the strongest thing on the page */
+  --pto-border: #2c28ad;
   --pto-text: #ffffff;
-  /* The day-off run: the highlighter swipe. */
-  --band-bg: #dcf763;
-  --band-text: #141414;
-  --holiday-dot: #56564f; /* a ring, never colour alone */
-  --weekend-bg: #eeeee8;
-  --alt-border: #141414; /* alternative placement: the same ink, dashed */
+  /* A break's days off: a soft continuous run of the line colour. */
+  --band-bg: #e3e2fb;
+  --band-text: #12141c;
+  --holiday-dot: #535968; /* a ring, never colour alone */
+  --weekend-bg: #eef0f3;
+  --alt-border: #3a36d0; /* alternative placement: the same indigo, dashed */
 
-  --score-track: #dcdcd5;
-  --score-1: #141414;
-  --score-2: #0a0a0a;
-  --score-3: #000000;
+  --score-track: #dde0e6;
+  --score-1: #3a36d0;
+  --score-2: #2c28ad;
+  --score-3: #1f1c86;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
@@ -134,17 +137,17 @@
  * 4.5:1 on the page, surface, surface-alt, band and weekend backgrounds (tokens.test.ts).
  */
 @theme {
-  --color-slate-50: #f7f7f4;
-  --color-slate-100: #eeeee8;
-  --color-slate-200: #dcdcd5;
-  --color-slate-300: #c4c4bc;
-  --color-slate-400: #5f5f58;
-  --color-slate-500: #56564f;
-  --color-slate-600: #4a4a44;
-  --color-slate-700: #36362f;
-  --color-slate-800: #232320;
-  --color-slate-900: #141414;
-  --color-slate-950: #0a0a0a;
+  --color-slate-50: #f7f8fa;
+  --color-slate-100: #eef0f3;
+  --color-slate-200: #dde0e6;
+  --color-slate-300: #c3c7d0;
+  --color-slate-400: #5b6170;
+  --color-slate-500: #535968;
+  --color-slate-600: #474c5a;
+  --color-slate-700: #343845;
+  --color-slate-800: #22252f;
+  --color-slate-900: #12141c;
+  --color-slate-950: #0a0b10;
 }
 
 /* In the base layer so any component's own utility classes still win over these defaults. */
@@ -178,7 +181,7 @@
     text-wrap: pretty;
   }
 
-  /* Browser surfaces carry the design too: the marker for selection, ink for the caret. */
+  /* Browser surfaces carry the design too: the soft line tint for selection, indigo caret. */
   ::selection {
     background: var(--mark);
     color: var(--text-primary);
@@ -186,7 +189,7 @@
 
   input,
   textarea {
-    caret-color: var(--text-primary);
+    caret-color: var(--accent);
   }
 
   a {
@@ -201,7 +204,7 @@
   }
 
   input[type='range'] {
-    accent-color: var(--text-primary);
+    accent-color: var(--accent);
     /* A vertical swipe that starts on a full-width slider scrolls the page instead of
        silently changing the plan; horizontal drags still move the slider. */
     touch-action: pan-y;
@@ -209,7 +212,7 @@
 
   input[type='checkbox'],
   input[type='radio'] {
-    accent-color: var(--text-primary);
+    accent-color: var(--accent);
   }
 
   * {
@@ -220,29 +223,22 @@
 @layer components {
   /* The display voice: condensed, heavy, tight. Headlines and the big figures only. */
   .type-display {
-    font-stretch: 75%;
-    font-weight: 800;
-    letter-spacing: -0.02em;
+    font-stretch: 88%;
+    font-weight: 760;
+    letter-spacing: -0.022em;
   }
 
   .type-condensed {
-    font-stretch: 82%;
+    font-stretch: 92%;
   }
 
-  /*
-   * The marker swipe: a highlighter pass behind inline text (a result figure, a link on hover).
-   * Drawn as an inset fill (not a gradient) so it wraps with the text and sits low like a real
-   * marker stroke, slightly short of the cap height.
-   */
+  /* Emphasis inside a sentence ("9 days off"): weight and ink, never a fill behind text. */
   .mark {
-    box-shadow: inset 0 -0.62em 0 var(--mark);
-    box-decoration-break: clone;
-    -webkit-box-decoration-break: clone;
-    padding-inline: 0.12em;
-    margin-inline: -0.12em;
+    font-weight: 700;
+    color: var(--text-primary);
   }
 
-  /* Text links that mark themselves on hover: the system's signature micro-interaction. */
+  /* Text links: an underline that thickens and turns indigo on hover. */
   .link-mark {
     color: var(--text-primary);
     text-decoration-line: underline;
@@ -252,6 +248,7 @@
   }
   .link-mark:hover {
     text-decoration-thickness: 2px;
+    text-decoration-color: var(--accent);
   }
 
   /*
@@ -263,9 +260,9 @@
     -webkit-appearance: none;
     min-height: 2.75rem;
     border: 1px solid var(--border-strong);
-    border-radius: 3px;
+    border-radius: 6px;
     background-color: var(--bg-surface);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23141414' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%2312141c' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.75rem center;
     padding: 0 2.25rem 0 0.75rem;

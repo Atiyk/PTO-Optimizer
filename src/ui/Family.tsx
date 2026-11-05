@@ -128,7 +128,7 @@ export function Family() {
       <main id="main-content" tabIndex={-1}>
         <Container className="px-4 pb-12 pt-6 sm:px-6 lg:pt-10">
           {ask && (
-            <section aria-labelledby="family-ask-heading" className="mb-6 rounded-[4px] border-2 border-ink bg-surface p-4 sm:p-5">
+            <section aria-labelledby="family-ask-heading" className="mb-6 rounded-[10px] border-2 border-ink bg-surface p-4 sm:p-5">
               <h2 id="family-ask-heading" className="text-xl font-bold text-ink type-condensed">Someone asked you to add the school calendar</h2>
               <p className="mt-1 max-w-2xl text-sm text-ink">
                 Pick the school district below, or add the school&apos;s days off from a file, a photo, pasted text or by typing them. Then copy the link and send it back. The link carries only the dates.
@@ -185,7 +185,7 @@ export function Family() {
           <div className="mt-6 grid gap-8 lg:mt-8 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-12">
             <div className="min-w-0">
               <h2 className="sr-only">Your details and school calendar</h2>
-              <div className="flex flex-col gap-6 rounded-[4px] border border-line bg-surface p-4 sm:p-5">
+              <div className="flex flex-col gap-6 rounded-[10px] border border-line bg-surface p-4 sm:p-5">
                 <fieldset className="min-w-0">
                   <legend className="text-base font-bold type-condensed text-ink">You</legend>
                   <div className="mt-3 flex flex-col gap-4 sm:grid sm:grid-cols-3 lg:flex">
@@ -197,14 +197,14 @@ export function Family() {
                         type="date"
                         value={start}
                         onChange={(e) => e.target.value && setStart(e.target.value)}
-                        className={`mt-1.5 h-11 w-full min-w-0 rounded-[3px] border border-line-strong bg-surface px-3 text-base text-ink ${FOCUS}`}
+                        className={`mt-1.5 h-11 w-full min-w-0 rounded-[6px] border border-line-strong bg-surface px-3 text-base text-ink ${FOCUS}`}
                       />
                       <p className="mt-1 text-xs text-muted">Through {formatShortWithYear(end)}</p>
                     </div>
                     <div className="min-w-0">
                       <label className="block text-sm font-semibold text-ink" htmlFor="family-pto">PTO for school breaks</label>
                       <div className="mt-1.5 flex items-center gap-2">
-                        <div className="inline-flex items-stretch overflow-hidden rounded-[3px] border border-line-strong bg-surface">
+                        <div className="inline-flex items-stretch overflow-hidden rounded-[6px] border border-line-strong bg-surface">
                           <button type="button" aria-label="One fewer PTO day" disabled={ptoBudget <= 0} onClick={() => setBudget(ptoBudget - 1)} className={stepBtn}>&minus;</button>
                           <input id="family-pto" type="number" min={0} max={MAX_FAMILY_PTO} step={1} value={ptoBudget} onChange={(e) => { const n = Number(e.target.value); if (Number.isFinite(n)) setBudget(n); }} className={numberInput} />
                           <button type="button" aria-label="One more PTO day" disabled={ptoBudget >= MAX_FAMILY_PTO} onClick={() => setBudget(ptoBudget + 1)} className={stepBtn}>+</button>
@@ -252,10 +252,10 @@ export function Family() {
 
             <div className="flex min-w-0 flex-col gap-10 lg:gap-12">
               {received.invalid && (
-                <p role="alert" className="rounded-[4px] border border-ink p-3 text-sm text-ink">The shared availability in this link is invalid or too large. Ask for a new link.</p>
+                <p role="alert" className="rounded-[10px] border border-ink p-3 text-sm text-ink">The shared availability in this link is invalid or too large. Ask for a new link.</p>
               )}
               {initial.invalid.includes('sd') && (
-                <p role="alert" className="rounded-[4px] border border-ink p-3 text-sm text-ink">The school dates in this link couldn&apos;t be read. Ask for a new link, or add the dates here.</p>
+                <p role="alert" className="rounded-[10px] border border-ink p-3 text-sm text-ink">The school dates in this link couldn&apos;t be read. Ask for a new link, or add the dates here.</p>
               )}
               {received.availability && (
                 <OtherAdultNote availability={received.availability} plan={plan} />
@@ -319,7 +319,7 @@ export function Family() {
 
 function EmptyResults({ hasSchoolDates }: { hasSchoolDates: boolean }) {
   return (
-    <section aria-labelledby="family-empty-heading" className="rounded-[4px] bg-surface-alt p-5 sm:p-6">
+    <section aria-labelledby="family-empty-heading" className="rounded-[10px] bg-surface-alt p-5 sm:p-6">
       <h2 id="family-empty-heading" className="text-h2 font-bold type-condensed text-ink">{hasSchoolDates ? 'No school breaks in this window' : 'Start with the school calendar'}</h2>
       <ul className="mt-3 flex max-w-2xl list-disc flex-col gap-1.5 pl-5 text-base text-ink">
         <li>Choose a district preset, if yours is listed.</li>
@@ -351,7 +351,7 @@ function BreakRow({ brk, plan, onToggle }: { brk: SchoolBreak; plan: FamilyBreak
   else outcome = <span className="text-muted">Not chosen: covering it takes {plural(work, 'PTO day')}.{plan.togetherDays ? ` ${plural(plan.togetherDays, 'day')} together anyway.` : ''}</span>;
 
   return (
-    <li className={`grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 rounded-[4px] border bg-surface p-3 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] sm:items-center sm:p-4 ${included ? 'border-line' : 'border-dashed border-line-strong'}`}>
+    <li className={`grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 rounded-[10px] border bg-surface p-3 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] sm:items-center sm:p-4 ${included ? 'border-line' : 'border-dashed border-line-strong'}`}>
       <div className="min-w-0">
         <p className={`text-base font-bold ${included ? 'text-ink' : 'text-muted'}`}>{title}</p>
         <p className="text-sm text-muted">{range} · {plural(brk.schoolOffWeekdays.length, 'school day')} off, you work {work}</p>
@@ -486,7 +486,7 @@ function OtherAdultNote({ availability, plan }: { availability: PartnerAvailabil
   const first = availability.days[0];
   const last = availability.days[availability.days.length - 1];
   return (
-    <section aria-labelledby="family-other-heading" className="rounded-[4px] border border-ink bg-surface p-4">
+    <section aria-labelledby="family-other-heading" className="rounded-[10px] border border-ink bg-surface p-4">
       <h2 id="family-other-heading" className="text-lg font-bold text-ink type-condensed">Another adult shared their days</h2>
       <p className="mt-1 text-sm text-ink">
         {plural(availability.days.length, 'date')} between {formatShortWithYear(first)} and {formatShortWithYear(last)}, {availability.status === 'confirmed' ? 'marked as confirmed' : 'proposed, not yet confirmed'}.{' '}

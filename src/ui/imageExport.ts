@@ -8,14 +8,14 @@ export const SHARE_IMAGE_HEIGHT = 630;
 // canvas can't read Tailwind classes, so these are kept in lockstep by hand. Same two
 // colours as the live calendar (PTO role + band role) plus the one neutral holiday dot.
 const COLOR = {
-  bg: '#f4f4f0', // --bg-page (2026-11 redesign tokens, src/index.css)
-  textPrimary: '#141414', // --text-primary
-  textMuted: '#56564f', // --text-muted
-  gridLine: '#dcdcd5', // --border-default
-  ptoFill: '#141414', // --pto-bg
+  bg: '#f5f6f8', // --bg-page (2026-11 brand overhaul tokens, src/index.css)
+  textPrimary: '#12141c', // --text-primary
+  textMuted: '#535968', // --text-muted
+  gridLine: '#dde0e6', // --border-default
+  ptoFill: '#3a36d0', // --pto-bg
   ptoText: '#ffffff',
-  bandFill: '#dcf763', // --band-bg
-  holidayDot: '#56564f', // --holiday-dot
+  bandFill: '#e3e2fb', // --band-bg
+  holidayDot: '#535968', // --holiday-dot
   cellPlain: '#ffffff', // --bg-surface
 };
 

@@ -39,14 +39,14 @@ export function formatScoreLine({ label, percentile, gloss }: ScoreLineInput): s
  * as "below average," "average," and "above average" - one definition of the bands, not two.
  */
 const EFFICIENCY_GLOSS: Record<IntensityBand, string> = {
-  0: 'worse than most plans at this budget',
-  1: 'about average for this budget',
-  2: 'better than most plans at this budget',
+  0: 'fewer days off per PTO day than most travel settings we tried',
+  1: 'mid-range among the travel settings we tried',
+  2: 'more days off per PTO day than most travel settings we tried',
 };
 const TRAVEL_GLOSS: Record<IntensityBand, string> = {
-  0: 'busier than most weeks',
-  1: 'about average for the year',
-  2: 'quieter than most weeks',
+  0: 'busier than most weeks in your dates',
+  1: 'about average for your dates',
+  2: 'quieter than most weeks in your dates',
 };
 
 export function efficiencyLine(scores: Scores): string {
@@ -80,7 +80,7 @@ export type IntensityBand = 0 | 1 | 2;
  * doesn't separate from either in greyscale), and "red" reads as "broken" when a
  * 30th-percentile plan is merely below average, not wrong.
  *
- * Redesign Phase 1: the hue is the site's one accent (evergreen teal) and its two darker
+ * 2026-11 brand overhaul: the hue is the site's one accent (Line indigo) and its two darker
  * shades - "one accent hue only" - instead of a separate indigo. The bars always sit next to
  * their percentile and gloss text, so sharing the accent never makes a bar read as a PTO
  * day. All three clear 4.5:1 on every background the strip can sit on (tokens.test.ts).
@@ -93,9 +93,9 @@ export const SCORE_INTENSITY = {
   thresholds: [33, 66] as const,
   barClasses: ['bg-[var(--score-1)]', 'bg-[var(--score-2)]', 'bg-[var(--score-3)]'] as const,
   rgb: [
-    [20, 20, 20], // #141414
-    [10, 10, 10], // #0a0a0a
-    [0, 0, 0], // #000000
+    [58, 54, 208], // #3a36d0
+    [44, 40, 173], // #2c28ad
+    [31, 28, 134], // #1f1c86
   ] as [number, number, number][],
 } as const;
 

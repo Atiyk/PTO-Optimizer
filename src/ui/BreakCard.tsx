@@ -133,7 +133,7 @@ function CopyRequestDropdown({ options }: { options: CopyOption[] }) {
           role="menu"
           aria-label="Copy request format"
           onKeyDown={onMenuKeyDown}
-          className="absolute left-0 z-20 mt-1 min-w-[13rem] max-w-[calc(100vw-2rem)] rounded-[4px] border border-line-strong bg-surface py-1 shadow-lg"
+          className="absolute left-0 z-20 mt-1 min-w-[13rem] max-w-[calc(100vw-2rem)] rounded-[10px] border border-line-strong bg-surface py-1 shadow-lg"
         >
           {options.map((option, index) => (
             <button
@@ -218,20 +218,20 @@ export function BreakCard({
       onMouseLeave={() => onHover(null)}
       onFocus={() => onHover(brk.id)}
       onBlur={() => onHover(null)}
-      className={`grid grid-cols-1 gap-x-3 rounded-[4px] px-3 py-4 sm:grid-cols-[auto_minmax(0,1fr)] transition-colors duration-150 ease-[var(--ease-out)] sm:gap-x-4 sm:px-4 ${
+      className={`grid grid-cols-1 gap-x-3 rounded-[10px] px-3 py-4 sm:grid-cols-[auto_minmax(0,1fr)] transition-colors duration-150 ease-[var(--ease-out)] sm:gap-x-4 sm:px-4 ${
         // The hovered break gets one tone step (chrome never takes the marker; its days get
         // the stronger marker pass on the calendar at the same moment).
         highlighted ? 'bg-surface-alt' : 'bg-transparent'
       }`}
     >
       {/* The same number its calendar badge shows: one shared, chronological index. */}
-      <span aria-hidden="true" className="mt-0.5 hidden h-7 min-w-7 items-center justify-center rounded-[3px] bg-ink px-1 text-sm font-bold tabular-nums text-white sm:flex">
+      <span aria-hidden="true" className="mt-0.5 hidden h-7 min-w-7 items-center justify-center rounded-[6px] bg-accent px-1 text-sm font-bold tabular-nums text-white sm:flex">
         {index}
       </span>
       <div className="flex min-w-0 flex-col gap-1.5">
         <h3 className="text-xl font-bold leading-7 text-ink type-condensed">
           <span className="sr-only">Break {index}: </span>
-          <span aria-hidden="true" className="mr-2 inline-flex h-6 min-w-6 -translate-y-0.5 items-center justify-center rounded-[3px] bg-ink px-1 align-middle text-sm font-bold tabular-nums text-white sm:hidden">{index}</span>
+          <span aria-hidden="true" className="mr-2 inline-flex h-6 min-w-6 -translate-y-0.5 items-center justify-center rounded-[6px] bg-accent px-1 align-middle text-sm font-bold tabular-nums text-white sm:hidden">{index}</span>
           {formatCardDateRange(brk.start, brk.end)}
         </h3>
         {/* What it costs and what it buys, in words; the multiplier figure is kept beside
@@ -244,12 +244,12 @@ export function BreakCard({
             {brk.multiplier.toFixed(2)}× · {lowValue ? 'no extra days beyond the PTO itself' : `each PTO day buys ${brk.multiplier.toFixed(2)} days off`}
           </span>
           {brk.tags.map((tag) => (
-            <span key={tag} className="rounded-[3px] bg-surface-alt px-2 py-0.5 text-xs font-medium text-ink">
+            <span key={tag} className="rounded-[6px] bg-surface-alt px-2 py-0.5 text-xs font-medium text-ink">
               {tag}
             </span>
           ))}
           {contested && (
-            <span className="rounded-[3px] bg-surface-alt px-2 py-0.5 text-xs font-medium text-ink">Popular dates</span>
+            <span className="rounded-[6px] bg-surface-alt px-2 py-0.5 text-xs font-medium text-ink">Popular dates</span>
           )}
         </p>
 

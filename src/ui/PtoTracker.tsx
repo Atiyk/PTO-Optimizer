@@ -7,7 +7,7 @@ import { formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
 import { DEFAULT_NOTICE_PERIOD_DAYS, submitByDate } from '../personal/outOfOffice';
 import { ApprovalAssistant } from './ApprovalAssistant';
 
-const fieldClass = 'h-11 w-full min-w-0 rounded-[3px] border border-line-strong bg-surface px-3 text-[15px] font-normal text-ink';
+const fieldClass = 'h-11 w-full min-w-0 rounded-[6px] border border-line-strong bg-surface px-3 text-[15px] font-normal text-ink';
 const statusLabel = (status: RequestStatus) => status[0].toUpperCase() + status.slice(1);
 
 function SubmitBy({ start, noticePeriodDays, calendar, today }: { start: string; noticePeriodDays: number; calendar: RequestCalendar; today: string }) {
@@ -59,7 +59,7 @@ function RequestRow({ request, ledger, calendar, calendarReady, onStatusChanged,
       <details className="mt-3 text-sm">
         <summary className="flex min-h-11 w-fit cursor-pointer items-center font-medium text-ink">Personal note</summary>
         <label htmlFor={id} className="sr-only">Personal note for request {request.start}</label>
-        <textarea id={id} rows={2} maxLength={1000} value={request.note} className="mt-1 w-full rounded-[3px] border border-line-strong bg-surface p-3 text-ink" placeholder="Optional. Stored in this browser, never added to a share link." onChange={(event) => ledger.updateRequest(request.id, { note: event.target.value }, calendar)} />
+        <textarea id={id} rows={2} maxLength={1000} value={request.note} className="mt-1 w-full rounded-[6px] border border-line-strong bg-surface p-3 text-ink" placeholder="Optional. Stored in this browser, never added to a share link." onChange={(event) => ledger.updateRequest(request.id, { note: event.target.value }, calendar)} />
       </details>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted">Updated {compactDate(request.updatedAt.slice(0, 10))}</p>
@@ -102,7 +102,7 @@ export function PtoTracker({ ledger, calendar, calendarReady = true, calendarNot
   ];
   const conflicts = requestConflicts(ledger.requests);
   return (
-    <section id="my-pto-requests" aria-labelledby={`${id}-heading`} className="min-w-0 rounded-[4px] border border-line bg-surface p-5 sm:p-6">
+    <section id="my-pto-requests" aria-labelledby={`${id}-heading`} className="min-w-0 rounded-[10px] border border-line bg-surface p-5 sm:p-6">
       <h2 id={`${id}-heading`} className="text-h2 font-bold text-ink type-condensed">My PTO requests</h2>
       <p className="mt-1 text-sm leading-6 text-muted">A personal tracker. You update each status yourself; Gapless does not send requests to your employer or confirm approval.</p>
       {coverageHint && <p className="mt-3 text-sm leading-6 text-muted">{compactDatesIn(coverageHint)}</p>}

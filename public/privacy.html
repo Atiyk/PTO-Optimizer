@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="referrer" content="no-referrer">
   <meta name="viewport" content="width=device-width,initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f4f4f0">
+  <meta name="theme-color" content="#f5f6f8">
   <meta name="description" content="How Gapless handles local PTO settings, planning links, analytics, holiday lookups and feedback.">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="alternate icon" href="/favicon.ico">
@@ -12,7 +12,7 @@
   <title>Privacy and your data — Gapless PTO Optimizer</title>
   <style>
     @font-face{font-family:'Archivo Variable';src:url('/fonts/archivo-latin-var.woff2') format('woff2-variations'),url('/fonts/archivo-latin-var.woff2') format('woff2');font-style:normal;font-weight:400 800;font-stretch:75% 100%;font-display:swap}
-    :root{color-scheme:light;--page:#f4f4f0;--paper:#fff;--alt:#eaeae4;--ink:#141414;--muted:#56564f;--line:#dcdcd5;--line-strong:#86867e;--mark:#dcf763;--ease:cubic-bezier(.23,1,.32,1)}
+    :root{color-scheme:light;--page:#f5f6f8;--paper:#fff;--alt:#eceef2;--ink:#12141c;--muted:#535968;--line:#dde0e6;--line-strong:#80869a;--mark:#3a36d0;--ease:cubic-bezier(.23,1,.32,1)}
     *{box-sizing:border-box}
     html{background:var(--page);-webkit-text-size-adjust:100%}
     body{margin:0;background:var(--page);color:var(--ink);font:16px/1.5 'Archivo Variable',Arial,system-ui,-apple-system,sans-serif;font-stretch:100%;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
@@ -34,7 +34,7 @@
     .nav a{display:inline-flex;min-height:44px;align-items:center;padding:0 4px;text-decoration:none;font-size:15px;font-weight:600;color:var(--muted)}
     .nav a:hover{color:var(--ink)}
     .nav .cta{color:#fff;background:var(--ink);border-radius:3px;padding:0 14px;font-size:14px;margin-left:4px;transition:background-color 150ms var(--ease),color 150ms var(--ease)}
-    .nav .cta:hover{background:#3a3a35;color:#fff}
+    .nav .cta:hover{background:#2c28ad;color:#fff}
     main{padding:clamp(40px,6vw,64px) 0 96px}
     h1{font-size:clamp(2.25rem,1.5rem + 3vw,3.75rem);line-height:1;font-weight:800;font-stretch:75%;letter-spacing:-.02em;margin:0 0 20px;max-width:24ch}
     .lede{max-width:62ch;font-size:18px;line-height:1.55;margin:0}
@@ -58,9 +58,9 @@
     .contact{display:inline-flex;min-height:44px;align-items:center;justify-content:center;background:var(--paper);color:var(--ink);border:1px solid var(--ink);border-radius:3px;padding:0 20px;font-weight:600;text-decoration:none;overflow-wrap:anywhere;transition:background-color 150ms var(--ease),color 150ms var(--ease),transform 150ms var(--ease)}
     .contact:hover{background:var(--alt)}
     .contact:active{transform:scale(.97)}
-    footer{background:var(--ink);color:#b5b5ad;padding:28px 0 32px;font-size:14px}
+    footer{background:var(--ink);color:#b4b9c6;padding:28px 0 32px;font-size:14px}
     footer .shell{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
-    footer a{color:#ececE6;display:inline-flex;min-height:44px;align-items:center;padding:0 4px;margin:0 -4px}
+    footer a{color:#e6e8ee;display:inline-flex;min-height:44px;align-items:center;padding:0 4px;margin:0 -4px}
     footer a:hover{color:#fff;text-decoration-thickness:2px}
     footer a:focus-visible{outline-color:#fff}
     @media(max-width:760px){.content{grid-template-columns:1fr}.toc{position:static;display:flex;flex-wrap:wrap;gap:0 18px}.toc span{width:100%}.nav{gap:8px}.nav a:not(.cta){display:none}.sections{padding:0 20px}section{padding:32px 0 28px}}
@@ -70,13 +70,13 @@
 <body>
   <a class="skip" href="#main-content">Skip to main content</a>
   <header><div class="shell">
-    <a href="/" class="brand"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect x="1" y="1" width="30" height="30" rx="5" fill="#141414"/><rect x="1" y="11" width="30" height="10" fill="#dcf763"/><rect x="10" y="13" width="5" height="6" rx="0.75" fill="#141414"/><rect x="17" y="13" width="5" height="6" rx="0.75" fill="#141414"/></svg><span><strong>Gapless</strong> <small>PTO Optimizer</small></span></a>
+    <a href="/" class="brand"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#3a36d0"/><path d="M24.5 16A8.5 8.5 0 0 0 21.46 9.49" stroke="#8c89f5" fill="none" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21.46 9.49A8.5 8.5 0 1 0 24.5 16H17" stroke="#ffffff" fill="none" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><strong>Gapless</strong> <small>PTO Optimizer</small></span></a>
     <nav class="nav" aria-label="Quick links"><a href="/sabbatical">Sabbatical</a><a href="/policy">My PTO</a><a href="/glossary">Learn</a><a href="/pto" class="cta">Plan PTO</a></nav>
   </div></header>
   <main id="main-content" class="shell" tabindex="-1">
     <h1>Your time off is personal. Your planning should be, too.</h1>
     <p class="lede">This page explains what stays in your browser, what a shared link reveals, and how basic site analytics and holiday lookups work.</p>
-    <div class="trust"><strong>Most planning runs on your device.</strong><p>No account is required. Email reminders are optional: if you sign in for them, Gapless stores only your email address and the plan or policy links you save. Personal PTO records are not uploaded or synced between devices.</p></div>
+    <div class="trust"><strong>Most planning runs on your device.</strong><p>No account is required. Calendar subscriptions and optional email reminders send your plan link to Gapless&rsquo;s server, which builds the calendar or email from it. If you sign in for reminders, Gapless stores your email address, the plan or policy links you save, and when it last emailed you. Personal PTO records are not uploaded or synced between devices.</p></div>
     <div class="content">
       <nav class="toc" aria-label="On this page"><span>On this page</span>
         <a href="#local">Saved information</a><a href="#sharing">Shared links</a><a href="#email">Email reminders</a><a href="#analytics">Analytics</a>
@@ -85,7 +85,7 @@
       <div class="sections">
         <section id="local"><h2>What stays in your browser</h2>
           <p>Balance settings, employer calendars, and tracked PTO requests are saved locally in your browser when you use the relevant features. The planner and its calculations work without a user account. These records are not automatically synchronized across browsers or devices.</p>
-          <p>Calendar exports and share images are generated on your device. We do not automatically upload exported calendar files.</p>
+          <p>Downloaded calendar files and share images are generated on your device. We do not automatically upload them. A calendar subscription is different: your calendar app (Google, Apple or Microsoft) keeps the subscription link and asks Gapless&rsquo;s server for the latest calendar each time it refreshes.</p>
         </section>
         <section id="sharing"><h2>What happens when you share a plan</h2>
           <p>A planning or policy URL may encode dates, PTO balances, employer holidays, and other chosen settings. Anyone with that link can read those settings. Opening the URL also sends it to the hosting provider as part of a normal web request. We do not put personal request notes or tracker approval statuses in shared planning URLs.</p>
@@ -112,7 +112,7 @@
           <p class="note">Clearing browser storage does not retract a plan link or file you previously shared with someone else. See our <a href="/terms.html">Terms of use</a> for limits on the planner’s estimates.</p>
         </section>
         <section id="feedback"><h2>Questions or feedback?</h2>
-          <p>Write directly to the creator. There is no account or support form to fill out. Please don't include private PTO notes, salary information, or sensitive records in your email.</p>
+          <p>Write directly to the creator. There is no support form to fill out. Please don't include private PTO notes, salary information, or sensitive records in your email.</p>
           <p><a class="contact" href="mailto:atiykahmeed6310@gmail.com?subject=Gapless%20feedback">Email Gapless</a></p>
           <p class="note">atiykahmeed6310@gmail.com</p>
         </section>

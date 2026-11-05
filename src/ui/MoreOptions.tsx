@@ -10,7 +10,7 @@ import { buttonClasses } from './Button';
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const H4_CLASS = 'mb-2 text-[15px] font-semibold text-ink';
-const FIELD_CLASS = 'h-11 min-w-0 max-w-full rounded-[3px] border border-line-strong bg-surface px-2.5 text-[15px] font-normal tabular-nums text-ink';
+const FIELD_CLASS = 'h-11 min-w-0 max-w-full rounded-[6px] border border-line-strong bg-surface px-2.5 text-[15px] font-normal tabular-nums text-ink';
 const CHECK_LABEL = 'flex min-h-11 w-fit cursor-pointer items-center gap-2 text-sm text-ink';
 const NOTE = 'mt-1 text-sm text-muted';
 
@@ -359,7 +359,7 @@ export function MoreOptions(props: MoreOptionsProps) {
                 type="button"
                 aria-label={`Delete ${h.name}`}
                 onClick={() => props.onRemoveHoliday(h.date, h.name)}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[3px] text-muted hover:bg-surface-alt hover:text-ink"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[6px] text-muted hover:bg-surface-alt hover:text-ink"
               >
                 &times;
               </button>}

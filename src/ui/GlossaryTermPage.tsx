@@ -43,7 +43,7 @@ function MiniExample({ id }: { id: string }) {
       <ExampleBlock title="Example: one PTO day, four days off">
         <ol className="flex max-w-sm">
           {days.map((day) => (
-            <li key={day.d} className={`flex flex-1 flex-col items-center py-2 text-center ${day.pto ? 'bg-ink text-white' : 'bg-mark text-ink'}`}>
+            <li key={day.d} className={`flex flex-1 flex-col items-center py-2 text-center ${day.pto ? 'bg-accent text-white' : 'bg-mark text-ink'}`}>
               <span className="font-bold">{day.d}</span>
               <span className="text-sm">{day.note}</span>
             </li>
@@ -146,7 +146,7 @@ export function GlossaryTermPage({ termId }: { termId: string }) {
                     </ol>
                   </section>
 
-                  <section className="rounded-[4px] border border-line bg-surface p-5 sm:p-6" aria-labelledby="guide-example-heading">
+                  <section className="rounded-[10px] border border-line bg-surface p-5 sm:p-6" aria-labelledby="guide-example-heading">
                     <SubHeading id="guide-example-heading">A worked example</SubHeading>
                     <p className="mt-3 text-ink">{guide.example.setup}</p>
                     <p className="mt-4 text-lg font-bold leading-7 text-ink tabular-nums">
@@ -162,7 +162,7 @@ export function GlossaryTermPage({ termId }: { termId: string }) {
                     </ul>
                   </section>
 
-                  <section className="rounded-[4px] bg-surface-alt p-5 sm:p-6" aria-labelledby="guide-hr-heading">
+                  <section className="rounded-[10px] bg-surface-alt p-5 sm:p-6" aria-labelledby="guide-hr-heading">
                     <SubHeading id="guide-hr-heading">Three questions for HR</SubHeading>
                     <ol className="mt-3 list-decimal space-y-2 pl-5 text-ink">
                       {guide.hrQuestions.map((question) => <li key={question} className="pl-1">{question}</li>)}

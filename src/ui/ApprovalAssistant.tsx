@@ -130,12 +130,12 @@ export function ApprovalAssistant({ ledger, calendar, today, locale, onStatusCha
       <textarea
         id={`${id}-paste`} aria-describedby={`${id}-privacy`} rows={4} maxLength={MAX_APPROVAL_INPUT} value={text}
         spellCheck={false} autoComplete="off" placeholder="Approved, enjoy! …"
-        className="mt-2 block w-full min-w-0 rounded-[3px] border border-line-strong bg-surface p-3 text-[15px] text-ink hover:border-ink"
+        className="mt-2 block w-full min-w-0 rounded-[6px] border border-line-strong bg-surface p-3 text-[15px] text-ink hover:border-ink"
         onChange={(event) => { setText(event.target.value); if (event.target.value.trim()) setConfirmed(null); }}
       />
       <div aria-live="polite" className="mt-3 empty:mt-0">{body}</div>
       {confirmed && (
-        <div className="mt-3 min-w-0 rounded-[4px] bg-surface-alt px-4 py-3">
+        <div className="mt-3 min-w-0 rounded-[10px] bg-surface-alt px-4 py-3">
           <h3 ref={doneRef} tabIndex={-1} className="font-semibold text-ink focus:outline-none">
             Marked as {confirmed.status}: {rangeText(confirmed.request.start, confirmed.request.end)}
           </h3>
@@ -148,7 +148,7 @@ export function ApprovalAssistant({ ledger, calendar, today, locale, onStatusCha
             <label htmlFor={`${id}-ooo`} className="mt-4 block text-sm font-semibold text-ink">Out-of-office message</label>
             <p id={`${id}-ooo-hint`} className="text-xs leading-5 text-muted">Edit the [bracketed] parts, then copy it into your email auto-reply.</p>
             <textarea id={`${id}-ooo`} aria-describedby={`${id}-ooo-hint`} rows={9} value={oooDraft} onChange={(event) => setOooDraft(event.target.value)}
-              className="mt-2 block w-full min-w-0 rounded-[3px] border border-line-strong bg-surface p-3 text-[15px] text-ink hover:border-ink" />
+              className="mt-2 block w-full min-w-0 rounded-[6px] border border-line-strong bg-surface p-3 text-[15px] text-ink hover:border-ink" />
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <Button variant="secondary" onClick={async () => setCopyStatus(await copyText(oooDraft) ? 'Copied.' : 'Copy failed. Select the text and copy it yourself.')}>Copy message</Button>
               <p role="status" className="text-sm text-muted">{copyStatus}</p>

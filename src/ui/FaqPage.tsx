@@ -40,7 +40,7 @@ function FaqSection({ id, title, items }: { id: string; title: string; items: FA
           <details key={item.question} className="group border-b border-line">
             <summary className={`flex min-h-11 cursor-pointer list-none items-start justify-between gap-4 py-4 text-left hover:bg-surface-alt/60 [&::-webkit-details-marker]:hidden ${FOCUS}`}>
               <h3 className="text-[17px] font-semibold leading-6 text-ink">{item.question}</h3>
-              <span aria-hidden="true" className="relative mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[3px] border border-ink group-open:bg-ink">
+              <span aria-hidden="true" className="relative mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border border-ink group-open:bg-ink">
                 <span className="absolute h-[1.5px] w-2.5 bg-ink group-open:bg-white" />
                 <span className="absolute h-2.5 w-[1.5px] bg-ink group-open:hidden" />
               </span>

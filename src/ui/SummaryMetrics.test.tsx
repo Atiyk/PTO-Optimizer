@@ -16,11 +16,14 @@ describe('SummaryMetrics', () => {
     expect(html).toContain('2.25×');
     expect(html).toContain('27 days off for 12 PTO days');
     expect(html).toContain('Each PTO day buys 2.25 days off');
-    // Each percentile carries the band reading scoreFormat derives from it.
-    expect(html).toContain('Efficiency percentile');
-    expect(html).toContain('better than most plans at this budget');
-    expect(html).toContain('Travel percentile');
-    expect(html).toContain('quieter than most weeks');
+    // The travel percentile carries its band reading and says what it is based on; the
+    // efficiency percentile is no longer a headline figure (it only compares travel settings).
+    expect(html).not.toContain('Efficiency percentile');
+    expect(html).toContain('Travel quietness (est.)');
+    expect(html).toContain('quieter than most weeks in your dates');
+    expect(html).toContain('seasonal estimate');
+    const us = renderToStaticMarkup(<SummaryMetrics budgetSpent={12} totalDaysOff={27} breakCountActual={3} scores={scores} travelBasis="us" />);
+    expect(us).toContain('2025 US airport checkpoint counts');
   });
 
   it('renders the raw counts and the ordinal percentiles', () => {
@@ -31,7 +34,7 @@ describe('SummaryMetrics', () => {
     expect(html).toContain('33');
     expect(html).toContain('in 9 breaks');
     expect(html).toContain('78th');
-    expect(html).toContain('91st');
+    expect(html).not.toContain('91st');
   });
 
   it('falls back to an em dash for Travel/Efficiency when scores are not yet available', () => {

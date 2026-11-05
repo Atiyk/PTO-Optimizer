@@ -298,7 +298,7 @@ export function DayCell({
         // signal that's true everywhere, which is why it isn't gated on tooltipText. An
         // out-of-range cell gets none of this: no cursor, no hover, no focus ring -
         // `disabled` already removes it from the tab order and all hover/click handling.
-        className={`relative z-10 flex h-12 w-full items-center justify-center rounded-[3px] text-sm font-medium tabular-nums transition-colors duration-150 ${
+        className={`relative z-10 flex h-12 w-full items-center justify-center rounded-[6px] text-sm font-medium tabular-nums transition-colors duration-150 ${
           isOutOfRange
             ? 'cursor-default'
             : `cursor-pointer hover:outline hover:outline-1 hover:outline-offset-1 hover:outline-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${COLORS.focusRing}`
@@ -348,8 +348,8 @@ export function DayCell({
           role={hasHover ? 'tooltip' : 'group'}
           aria-label={!hasHover ? `Actions for ${formatMonthDay(date)}` : undefined}
           className={hasHover
-            ? 'absolute left-1/2 top-full z-20 mt-1 w-max max-w-[15rem] -translate-x-1/2 rounded-[3px] bg-ink px-2.5 py-1.5 text-sm text-white shadow-lg'
-            : 'fixed inset-x-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-sm rounded-[4px] border border-line bg-surface p-4 text-sm text-ink shadow-xl lg:bottom-4'}
+            ? 'absolute left-1/2 top-full z-20 mt-1 w-max max-w-[15rem] -translate-x-1/2 rounded-[6px] bg-ink px-2.5 py-1.5 text-sm text-white shadow-lg'
+            : 'fixed inset-x-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-sm rounded-[10px] border border-line bg-surface p-4 text-sm text-ink shadow-xl lg:bottom-4'}
         >
           {!hasHover && <p className="text-[15px] font-bold">{formatWeekdayMonthDay(date)}</p>}
           {hasHover ? <p>{tooltipText}</p> : (

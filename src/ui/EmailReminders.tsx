@@ -34,7 +34,7 @@ async function post(body: Record<string, unknown>): Promise<Response> {
   return fetch('/api/account', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) });
 }
 
-const INPUT = 'h-11 w-full min-w-0 flex-1 rounded-[3px] border border-line-strong bg-surface px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
+const INPUT = 'h-11 w-full min-w-0 flex-1 rounded-[6px] border border-line-strong bg-surface px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
 
 export function EmailReminders({ kind, search, initialStatus, enabled = BUILD_ENABLED }: EmailRemindersProps) {
   const id = useId();
@@ -93,7 +93,7 @@ export function EmailReminders({ kind, search, initialStatus, enabled = BUILD_EN
       {!account ? (
         <>
           <p className="max-w-prose text-sm text-muted">
-            Optional. Sign in with just your email and Gapless emails you {remindersText}. It stores only your email and the links you save, and you can delete them in one click.
+            Optional. Sign in with just your email and Gapless emails you {remindersText}. It stores your email, the links you save and when it last emailed you, and you can delete them in one click.
           </p>
           <form
             className="flex min-w-0 flex-wrap gap-2 sm:flex-nowrap"

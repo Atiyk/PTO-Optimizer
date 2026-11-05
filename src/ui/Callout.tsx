@@ -20,10 +20,10 @@ export function Callout({
   className?: string;
 }) {
   return (
-    <div className={`rounded-[4px] py-3 pr-4 pl-4 ${tone === 'accent' ? 'bg-accent-soft' : 'bg-surface-alt'} ${className}`}>
+    <div className={`rounded-[10px] py-3 pr-4 pl-4 ${tone === 'accent' ? 'bg-accent-soft' : 'bg-surface-alt'} ${className}`}>
       {title && (
         <p className="flex items-baseline gap-2 font-semibold text-ink">
-          {tone === 'accent' && <span aria-hidden="true" className="inline-block h-2.5 w-2.5 shrink-0 translate-y-[-1px] bg-ink" />}
+          {tone === 'accent' && <span aria-hidden="true" className="inline-block h-2.5 w-2.5 shrink-0 translate-y-[-1px] rounded-[2px] bg-accent" />}
           {title}
         </p>
       )}

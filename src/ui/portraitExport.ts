@@ -65,7 +65,7 @@ export function buildPortraitText(data: PortraitPlanData, includeBalance = false
 }
 
 // 2026-11 redesign palette (src/index.css): paper, ink, pencil, hairline, and the marker.
-const colors = { page: '#f4f4f0', card: '#ffffff', ink: '#141414', muted: '#56564f', line: '#dcdcd5', mark: '#dcf763' };
+const colors = { page: '#f5f6f8', card: '#ffffff', ink: '#12141c', muted: '#535968', line: '#dde0e6', accent: '#3a36d0', tint: '#e3e2fb', bridge: '#8c89f5' };
 
 function fitText(ctx: CanvasRenderingContext2D, value: string, maxWidth: number): string {
   if (ctx.measureText(value).width <= maxWidth) return value;
@@ -90,23 +90,44 @@ function wrapText(ctx: CanvasRenderingContext2D, value: string, x: number, y: nu
   if (line) ctx.fillText(fitText(ctx, line, width), x, y + lines * lineHeight);
 }
 
+function drawLogoMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+  const k = size / 32;
+  // Path drawing is optional so a minimal 2D context (tests, odd canvases) still renders text.
+  if (typeof ctx.arc !== 'function' || typeof ctx.save !== 'function') return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(k, k);
+  ctx.fillStyle = colors.accent;
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') ctx.roundRect(0, 0, 32, 32, 8); else ctx.rect(0, 0, 32, 32);
+  ctx.fill();
+  ctx.lineWidth = 4.2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const start = (-50 * Math.PI) / 180;
+  ctx.strokeStyle = colors.bridge;
+  ctx.beginPath();
+  ctx.arc(16, 16, 8.5, start, 0);
+  ctx.stroke();
+  ctx.strokeStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(16, 16, 8.5, start, 0, true);
+  ctx.lineTo(17, 16);
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function drawPortraitImage(ctx: CanvasRenderingContext2D, data: PortraitPlanData, includeBalance = false): void {
   const text = buildPortraitText(data, includeBalance);
   ctx.fillStyle = colors.page;
   ctx.fillRect(0, 0, PORTRAIT_IMAGE_WIDTH, PORTRAIT_IMAGE_HEIGHT);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
-  // The mark: an ink sheet with a marked row and two ink day-blocks (src/ui/logoMark.ts).
-  ctx.fillStyle = colors.ink;
-  ctx.fillRect(64, 62, 56, 56);
-  ctx.fillStyle = colors.mark;
-  ctx.fillRect(64, 81, 56, 18);
-  ctx.fillStyle = colors.ink;
-  ctx.fillRect(81, 85, 9, 10);
-  ctx.fillRect(94, 85, 9, 10);
+  // The mark: the bridged G (src/ui/logoMark.ts), drawn at 56px from the same geometry.
+  drawLogoMark(ctx, 64, 62, 56);
   ctx.fillStyle = colors.ink;
   ctx.font = '700 42px Archivo Variable, system-ui, sans-serif';
-  ctx.fillText('Gapless', 140, 106);
+  ctx.fillText('gapless', 136, 104);
   ctx.font = '700 48px Archivo Variable, system-ui, sans-serif';
   ctx.fillText(fitText(ctx, text.title, 952), 64, 209);
   ctx.fillStyle = colors.muted;
@@ -114,9 +135,7 @@ export function drawPortraitImage(ctx: CanvasRenderingContext2D, data: PortraitP
   ctx.fillText(text.range, 64, 253);
   ctx.font = '800 41px Archivo Variable, system-ui, sans-serif';
   const summary = fitText(ctx, text.summary, 940);
-  ctx.fillStyle = colors.mark;
-  ctx.fillRect(58, 296, Math.min(ctx.measureText(summary).width + 12, 964), 44);
-  ctx.fillStyle = colors.ink;
+  ctx.fillStyle = colors.accent;
   ctx.fillText(summary, 64, 330);
   ctx.fillStyle = colors.muted;
   ctx.font = '400 21px Archivo Variable, system-ui, sans-serif';
@@ -129,8 +148,8 @@ export function drawPortraitImage(ctx: CanvasRenderingContext2D, data: PortraitP
     ctx.strokeStyle = colors.line;
     ctx.lineWidth = 2;
     ctx.strokeRect(64, y, 952, 204);
-    ctx.fillStyle = colors.mark;
-    ctx.fillRect(64, y, 10, 204);
+    ctx.fillStyle = colors.accent;
+    ctx.fillRect(64, y, 8, 204);
     ctx.fillStyle = colors.ink;
     ctx.font = '650 35px Archivo Variable, system-ui, sans-serif';
     ctx.fillText(fitText(ctx, brk.dates, 872), 100, y + 54);

@@ -5,7 +5,7 @@ import { estimateDeparturePayout, type CompanyPayoutRule } from '../personal/pay
 
 type PayMode = 'hourly' | 'annual';
 type EmployerRule = CompanyPayoutRule['kind'];
-const input = 'mt-1.5 h-11 w-full min-w-0 rounded-[3px] border border-line-strong bg-surface px-3 text-base font-normal text-ink';
+const input = 'mt-1.5 h-11 w-full min-w-0 rounded-[6px] border border-line-strong bg-surface px-3 text-base font-normal text-ink';
 const selectCls = 'select-ink mt-1.5 h-11 w-full min-w-0 text-base font-normal';
 const labelCls = 'block min-w-0 text-sm font-semibold text-ink';
 const money = (cents: number, currency: string) =>

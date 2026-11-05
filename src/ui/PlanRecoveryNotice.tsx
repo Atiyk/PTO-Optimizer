@@ -19,7 +19,7 @@ export function PlanRecoveryNotice({
   onReviewSettings,
 }: PlanRecoveryNoticeProps) {
   return (
-    <section role="alert" aria-label="Planning needs attention" className="flex gap-3 rounded-[4px] border-2 border-ink bg-surface p-4 text-ink">
+    <section role="alert" aria-label="Planning needs attention" className="flex gap-3 rounded-[10px] border-2 border-ink bg-surface p-4 text-ink">
       <svg aria-hidden="true" viewBox="0 0 20 20" className="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M10 2.5 18 17H2L10 2.5Z" strokeLinejoin="round" /><path d="M10 8v4" strokeLinecap="round" /><circle cx="10" cy="14.6" r="0.9" fill="currentColor" stroke="none" /></svg>
       <div className="min-w-0">
         <h2 className="text-[15px] font-semibold">These settings don&apos;t produce a valid plan yet.</h2>
@@ -50,7 +50,7 @@ export function PlanRecoveryNotice({
  */
 export function RelaxedMinimumNotice({ minimum, onClearPins, onNoMinimum }: { minimum: number; onClearPins: () => void; onNoMinimum: () => void }) {
   return (
-    <section role="status" aria-label="Minimum break set aside" className="rounded-[4px] border border-ink bg-surface p-4 text-ink">
+    <section role="status" aria-label="Minimum break set aside" className="rounded-[10px] border border-ink bg-surface p-4 text-ink">
       <h2 className="text-[15px] font-semibold">Your pinned days don&apos;t fit a {minimum}-day minimum break.</h2>
       <p className="mt-1 max-w-prose text-sm text-muted">
         So this plan keeps your pins and sets the minimum aside. Remove the pins to get a plan that respects the

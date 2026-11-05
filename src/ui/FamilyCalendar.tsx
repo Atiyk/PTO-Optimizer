@@ -22,14 +22,14 @@ const STATE_WORDS: Record<FamilyDayState, string> = {
   none: '',
 };
 
-const swatch = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-[3px]';
+const swatch = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px]';
 
 /** The legend draws exactly the marks the calendar draws. */
 export function FamilyLegend({ showOtherAdult }: { showOtherAdult: boolean }) {
   return (
     <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink">
       <li className="flex min-h-7 items-center gap-2">
-        <span aria-hidden="true" className={`${swatch} border-b border-ink bg-mark`} />
+        <span aria-hidden="true" className={`${swatch} border-b-[3px] border-accent bg-mark`} />
         School off, you&apos;re off: days with your kids
       </li>
       <li className="flex min-h-7 items-center gap-2">
@@ -43,7 +43,7 @@ export function FamilyLegend({ showOtherAdult }: { showOtherAdult: boolean }) {
         </li>
       )}
       <li className="flex min-h-7 items-center gap-2">
-        <span aria-hidden="true" className={`${swatch} relative border border-dashed border-ink bg-surface`}><span className="absolute inset-0 rounded-[3px] opacity-25" style={HATCH_STYLE} /></span>
+        <span aria-hidden="true" className={`${swatch} relative border border-dashed border-ink bg-surface`}><span className="absolute inset-0 rounded-[6px] opacity-25" style={HATCH_STYLE} /></span>
         Uncovered: school is off and you work
       </li>
       <li className="flex min-h-7 items-center gap-2">
@@ -105,7 +105,7 @@ export function FamilyCalendar({
                 const isWeekend = mondayIndexedDow(iso) >= 5;
                 const fill =
                   state === 'pto' ? `${COLORS.ptoBg} border ${COLORS.ptoBorder} text-white font-bold`
-                    : state === 'together' ? 'bg-mark border-b border-ink font-semibold text-ink'
+                    : state === 'together' ? 'bg-mark border-b-[3px] border-accent font-semibold text-ink'
                       : state === 'other-adult' ? 'border-2 border-ink bg-surface font-semibold text-ink'
                         : state === 'uncovered' ? 'border border-dashed border-ink bg-surface font-bold text-ink'
                           : isWeekend || state === 'free' ? 'bg-surface-alt text-muted' : 'text-ink';
@@ -114,11 +114,11 @@ export function FamilyCalendar({
                   <span
                     key={iso}
                     title={[label, holidayName].filter(Boolean).join(' · ') || undefined}
-                    className={`relative flex h-10 items-center justify-center rounded-[3px] text-sm font-medium tabular-nums ${fill} ${
+                    className={`relative flex h-10 items-center justify-center rounded-[6px] text-sm font-medium tabular-nums ${fill} ${
                       iso === today ? 'ring-2 ring-[var(--text-primary)] ring-offset-2 ring-offset-[var(--bg-surface)]' : ''
                     }`}
                   >
-                    {state === 'uncovered' && <span aria-hidden="true" className="absolute inset-0 rounded-[3px] opacity-25" style={HATCH_STYLE} />}
+                    {state === 'uncovered' && <span aria-hidden="true" className="absolute inset-0 rounded-[6px] opacity-25" style={HATCH_STYLE} />}
                     <span aria-hidden="true" className={state === 'uncovered' ? 'relative bg-surface px-0.5' : undefined}>{Number(iso.slice(8))}</span>
                     <span className="sr-only">{words}</span>
                     {state === 'other-adult' && <OtherAdultNotch />}
