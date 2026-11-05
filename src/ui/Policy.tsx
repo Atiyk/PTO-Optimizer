@@ -571,7 +571,7 @@ export function Policy() {
                     <section>
                       <h3 className="mb-2 text-base font-bold text-ink">Alerts</h3>
                       {!projection ? <p role="status" className="text-sm text-muted">Check the policy inputs before relying on expiration or cap warnings.</p> : alerts.length === 0 ? (
-                        <p className="text-sm text-muted">Nothing to flag — no forfeiture, cap, or deadline risk in the next 18 months.</p>
+                        <p className="text-sm text-muted">Nothing to flag: no forfeiture, cap or deadline risk in the 18 months after your balance date.</p>
                       ) : (
                         <ul className="flex flex-col divide-y divide-line border-y border-line">
                           {alerts.map((a) => (

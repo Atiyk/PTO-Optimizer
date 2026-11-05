@@ -39,7 +39,7 @@ export const ITEMS: FAQItem[] = [
   {
     question: 'Will I get the same result if I come back?',
     answer:
-      'Yes - the same inputs always produce the same plan. That is why a shared link reproduces exactly what the sender saw.',
+      "Yes, as long as the link includes its dates and the holiday data hasn't been updated since. That is why a shared link reproduces what the sender saw.",
   },
 ];
 

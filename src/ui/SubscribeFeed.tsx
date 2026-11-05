@@ -46,7 +46,7 @@ export interface SubscribeFeedProps {
   idPrefix?: string;
 }
 
-const PLAN_DESCRIPTION = 'Subscribe once to see your PTO days, holidays and a “book by” reminder before each break, kept current.';
+const PLAN_DESCRIPTION = 'Subscribe once to see your PTO days, holidays and a “book by” reminder before each break, rebuilt from this link when your calendar refreshes (usually within a day).';
 const PLAN_CAVEAT = 'After editing the plan, subscribe again. Anyone with the link can see the plan.';
 
 /** Mirrors the /api/feed bound so the page never offers a link the function will refuse. */

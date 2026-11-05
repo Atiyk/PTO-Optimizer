@@ -245,7 +245,7 @@ export function BreakCard({
           </span>
           {brk.tags.map((tag) => (
             <span key={tag} className="rounded-[6px] bg-surface-alt px-2 py-0.5 text-xs font-medium text-ink">
-              {tag}
+              {tag === 'Estimated' ? 'Travel demand estimated' : tag}
             </span>
           ))}
           {contested && (

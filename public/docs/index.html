@@ -85,7 +85,7 @@
           <tr><th>Param</th><th>Type</th><th>Default</th><th>What it does</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>c</code></td><td>ISO country code, e.g. <code>US</code>, <code>GB</code></td><td>Geolocated guess</td><td>Country used for public holidays.</td></tr>
+          <tr><td><code>c</code></td><td>ISO country code, e.g. <code>US</code>, <code>GB</code></td><td>Guessed from browser language</td><td>Country used for public holidays.</td></tr>
           <tr><td><code>sd</code></td><td>string</td><td>&mdash;</td><td>Subdivision (state/province) code for region-specific holidays, where the country supports it.</td></tr>
           <tr><td><code>s</code></td><td>date, <code>YYYY-MM-DD</code></td><td>Today</td><td>Date range start.</td></tr>
           <tr><td><code>e</code></td><td>date, <code>YYYY-MM-DD</code></td><td>Dec 31 this year</td><td>Date range end.</td></tr>
@@ -154,7 +154,7 @@
           <tr><th>Param</th><th>Type</th><th>Default</th><th>What it does</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>c</code></td><td>ISO country code</td><td>Geolocated guess</td><td>Country used for public holidays.</td></tr>
+          <tr><td><code>c</code></td><td>ISO country code</td><td>Guessed from browser language</td><td>Country used for public holidays.</td></tr>
           <tr><td><code>len</code></td><td>number, 1&ndash;52</td><td><code>4</code></td><td>Sabbatical length, in weeks.</td></tr>
           <tr><td><code>s</code></td><td>date, <code>YYYY-MM-DD</code></td><td>Today</td><td>Earliest eligible start date.</td></tr>
           <tr><td><code>pto</code></td><td>number, 0&ndash;15</td><td><code>5</code></td><td>PTO days to add, extending the block (spent before unpaid leave).</td></tr>

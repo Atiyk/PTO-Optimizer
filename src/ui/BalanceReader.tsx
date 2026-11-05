@@ -151,7 +151,7 @@ export default function BalanceReader({ id, unit, hoursPerDay, today, onUse, rec
       onDrop={onDrop}
     >
       <p className="text-sm text-ink">Pick or paste a screenshot of your payslip or HR time-off page. We read it and show the balances we find; tap one to use it.</p>
-      <p className="mt-1 text-xs text-muted">Reading happens on this device and your image is never uploaded. The first time, the reading engine (about 7 MB) downloads once from this site.</p>
+      <p className="mt-1 text-xs text-muted">Reading happens on this device and your image is never uploaded. The first time, the reading engine (about 7 MB) downloads from this site (your browser may keep a copy).</p>
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
         <label
           htmlFor={`${baseId}-file`}

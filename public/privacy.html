@@ -87,13 +87,16 @@
           <p>Balance settings, employer calendars, and tracked PTO requests are saved locally in your browser when you use the relevant features. The planner and its calculations work without a user account. These records are not automatically synchronized across browsers or devices.</p>
           <p>Downloaded calendar files and share images are generated on your device. We do not automatically upload them. A calendar subscription is different: your calendar app (Google, Apple or Microsoft) keeps the subscription link and asks Gapless&rsquo;s server for the latest calendar each time it refreshes.</p>
         </section>
+        <section id="subscriptions"><h2>Calendar subscriptions</h2>
+          <p>When you subscribe to a plan or expiry calendar, your calendar app (and its provider, such as Google, Apple or Microsoft) keeps the subscription link and fetches it regularly. Gapless&rsquo;s server rebuilds the calendar from the settings in that link each time; it does not store the link. Anyone with the link can see those settings.</p>
+        </section>
         <section id="sharing"><h2>What happens when you share a plan</h2>
           <p>A planning or policy URL may encode dates, PTO balances, employer holidays, and other chosen settings. Anyone with that link can read those settings. Opening the URL also sends it to the hosting provider as part of a normal web request. We do not put personal request notes or tracker approval statuses in shared planning URLs.</p>
           <p><strong>Before sharing:</strong> check the dates, URL and any balance-visibility controls. You can choose not to share any plan or export.</p>
         </section>
         <section id="email"><h2>If you turn on email reminders</h2>
           <p>Signing in is optional and only adds reminder emails and forwarding. Gapless emails you a one-time sign-in link; asking for a link does not create an account. Once you sign in, it stores your email address, the plan or policy link you choose to save, whether reminders are on, and the date of the last reminder. Your notice period, balance and planned days are inside those links, exactly as in a link you share.</p>
-          <p>Emails are sent through Gmail. If you forward an approval email to Gapless, it passes through CloudMailin, is read once to write a reply to your own address, and is not stored. Every reminder has a link to stop reminders, and “Delete my account” removes everything at once.</p>
+          <p>Emails are sent through Gmail. If you forward an approval email to Gapless, it passes through CloudMailin, is read once to write a reply to your own address, and is not stored. Every reminder has a link to stop reminders, and “Delete my account” removes everything at once. Reminder emails are best-effort and can be skipped on days the site reaches its email limit.</p>
         </section>
         <section id="analytics"><h2>Lightweight usage analytics</h2>
           <p>We use <a href="https://vercel.com/analytics" target="_blank" rel="noopener noreferrer">Vercel Web Analytics</a> and <a href="https://plausible.io" target="_blank" rel="noopener noreferrer">Plausible</a> to understand aggregate page visits and feature interactions. The analytics integration strips query strings and URL fragments from reported page URLs and does not intentionally send PTO balances, request details or policy values as event properties.</p>

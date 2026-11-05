@@ -259,7 +259,7 @@ function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalen
             idPrefix={`${id}-watch`}
             calendarName={WATCH_CALENDAR_NAME}
             heading="Get these reminders in your calendar"
-            description="Subscribe once to get the 60, 30 and 7-day reminders and suggested days to use expiring PTO, updated against today's date."
+            description="Subscribe once to get the 60, 30 and 7-day reminders and suggested days to use expiring PTO, recalculated from today's date when your calendar refreshes."
             caveat="Requests tracked on this device aren't included. After editing your policy, subscribe again. Anyone with the link can see the policy details in it."
           />
           <div className="mt-4"><EmailReminders kind="policy" search={watchSearch} /></div>
