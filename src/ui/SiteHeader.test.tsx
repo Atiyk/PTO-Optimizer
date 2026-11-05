@@ -11,7 +11,8 @@ describe('SiteHeader (redesign Phase 1)', () => {
 
   it('uses one strong Gapless wordmark with an accessible full product name', () => {
     expect(html).not.toContain('aria-label="Gapless PTO Optimizer, home"');
-    expect(html).toMatch(/>Gapless\s*<\/span>/);
+    // The wordmark is outlined type: one SVG named "Gapless" for assistive tech.
+    expect(html).toMatch(/<svg[^>]*role="img"[^>]*aria-label="Gapless"[^>]*>\s*<title>Gapless<\/title>/);
     expect(html).toMatch(/>PTO Optimizer\s*<\/span>/);
   });
 

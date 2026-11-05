@@ -1,6 +1,7 @@
 import type { Break } from '@daysoff/engine/solver/types';
 import { formatDateRange } from '@daysoff/engine/calendar/dateFormat';
 import { copyCanvasImage, type ShareImageResult } from './imageExport';
+import { MARK_G_PATH } from './logoOutlines';
 
 export const PORTRAIT_IMAGE_WIDTH = 1080;
 export const PORTRAIT_IMAGE_HEIGHT = 1350;
@@ -96,14 +97,20 @@ export function drawPortraitImage(ctx: CanvasRenderingContext2D, data: PortraitP
   ctx.fillRect(0, 0, PORTRAIT_IMAGE_WIDTH, PORTRAIT_IMAGE_HEIGHT);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
-  // The mark: an ink sheet with a marked row and two ink day-blocks (src/ui/logoMark.ts).
-  ctx.fillStyle = colors.ink;
-  ctx.fillRect(64, 62, 56, 56);
+  // The mark: the ink G on a marker tile (src/ui/logoMark.ts), drawn from the same outline.
   ctx.fillStyle = colors.mark;
-  ctx.fillRect(64, 81, 56, 18);
+  ctx.fillRect(64, 62, 56, 56);
   ctx.fillStyle = colors.ink;
-  ctx.fillRect(81, 85, 9, 10);
-  ctx.fillRect(94, 85, 9, 10);
+  if (typeof Path2D !== 'undefined' && typeof ctx.save === 'function' && typeof ctx.fill === 'function') {
+    ctx.save();
+    ctx.translate(64, 62);
+    ctx.scale(56 / 32, 56 / 32);
+    ctx.fill(new Path2D(MARK_G_PATH));
+    ctx.restore();
+  } else {
+    ctx.font = '800 40px Archivo Variable, system-ui, sans-serif';
+    ctx.fillText('G', 79, 104);
+  }
   ctx.fillStyle = colors.ink;
   ctx.font = '700 42px Archivo Variable, system-ui, sans-serif';
   ctx.fillText('Gapless', 140, 106);
