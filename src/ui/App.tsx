@@ -497,7 +497,7 @@ export function App() {
               <section aria-labelledby="take-it-heading" className="flex min-w-0 flex-col gap-5">
                 <div>
                   <h2 id="take-it-heading" className="text-h2 font-bold text-ink type-condensed">Take it with you</h2>
-                  <p className="mt-1 text-sm text-muted">Free, no sign-up, no email. Everything stays in this browser until you share it.</p>
+                  <p className="mt-1 text-sm text-muted">Free, and no account needed. Your plan stays in this browser unless you share it or turn on email reminders.</p>
                 </div>
                 {plannable ? <ExportBar
                   breaks={state.breaks}

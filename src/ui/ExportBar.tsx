@@ -9,6 +9,7 @@ import { track } from './analytics';
 import { DEFAULT_SITE_HOST } from './siteUrl';
 import { buttonClasses } from './Button';
 import { SubscribeFeed } from './SubscribeFeed';
+import { EmailReminders } from './EmailReminders';
 
 interface ExportBarProps {
   breaks: Break[];
@@ -190,6 +191,7 @@ export function ExportBar(props: ExportBarProps) {
         )}
       </label>
       {props.planSearch !== undefined && <SubscribeFeed planSearch={props.planSearch} />}
+      {props.planSearch !== undefined && <EmailReminders kind="plan" search={props.planSearch} />}
     </div>
   );
 }

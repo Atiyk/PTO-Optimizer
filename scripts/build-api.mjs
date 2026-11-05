@@ -31,7 +31,7 @@ const embedHolidays = {
 };
 await build({
   absWorkingDir: root,
-  entryPoints: { feed: 'server/feedEntry.ts' },
+  entryPoints: { feed: 'server/feedEntry.ts', account: 'server/accountEntry.ts' },
   outdir: 'api/_bundle',
   outExtension: { '.js': '.mjs' },
   bundle: true,
