@@ -190,23 +190,6 @@ function addBoundedDays(busy: Set<string>, first: string, last: string): void {
   }
 }
 
-/** Guard BEFORE expanding ranges; an imported file must never freeze the browser. */
-function addBoundedDays(busy: Set<string>, first: string, last: string): void {
-  if (!validCalendarDate(first) || !validCalendarDate(last)) {
-    throw new IcsParseError('Calendar event has an invalid date.');
-  }
-  const span = isoToSerial(last) - isoToSerial(first);
-  if (!Number.isSafeInteger(span) || span < 0 || span > MAX_IMPORT_SPAN_DAYS) {
-    throw new IcsParseError('Calendar event has an invalid or excessively long date range.');
-  }
-  for (const date of rangeISO(first, last)) {
-    busy.add(date);
-    if (busy.size > MAX_IMPORT_BUSY_DAYS) {
-      throw new IcsParseError('Calendar includes too many distinct dates to import safely.');
-    }
-  }
-}
-
 /**
  * Phase 3 item 3: an .ics import, not a live OAuth calendar sync - that needs a backend for
  * token exchange and Google's calendar-scope verification, which breaks the no-backend
