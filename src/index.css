@@ -9,12 +9,12 @@
 
 
 /*
- * Gapless visual system, 2026-11 redesign: "the highlighted schedule".
+ * Gapless visual system, 2026-11 brand overhaul: "the line".
  *
- * The world is a printed schedule that someone has gone over with a highlighter: crisp ink on
- * paper-white, one fluorescent marker for the time that is yours. Ink carries every action and
- * every PTO day; the marker carries the days-off runs, the result, and text selection. No other
- * hue exists. Full rationale: docs/DESIGN-SYSTEM.md.
+ * A break is one unbroken stretch of line through the calendar. Ink on a cool paper ground for
+ * reading; one route colour, Line indigo, for every action, every PTO day and the brand; a soft
+ * pass of the same indigo for the days off it joins up. No highlighter swipes, no second hue.
+ * Full rationale: DESIGN.md and docs/BRAND-IDENTITY.md.
  *
  * Type: Archivo (Omnibus-Type, OFL), one variable family with a width axis. Condensed heavy
  * cuts set display lines and figures, the normal width sets UI and reading text. The shipped
@@ -46,42 +46,59 @@
  * colorScheme.ts and scoreFormat.ts stay the single source of truth. tokens.test.ts parses
  * THIS block and checks every text/background pair (4.5:1, or 3:1 for UI boundaries).
  *
- * Token names are kept from the previous system so every component keeps resolving; their
- * roles changed: --accent is now ink (the action and PTO colour), and the marker lives in
- * --band-bg / --mark.
+ * Token names are kept from earlier systems so every component keeps resolving: --accent and
+ * --pto-bg are Line indigo (actions and PTO days); --band-bg and --mark are the soft indigo
+ * tint for days off; there is no marker or highlighter any more.
  */
 :root {
-  --bg-page: #f4f4f0; /* paper: a neutral off-white, not cream */
-  --bg-surface: #ffffff; /* the sheet */
-  --bg-surface-alt: #eaeae4; /* one tone step down: chips, hover fills, quiet panels */
-  --border-default: #dcdcd5;
-  --border-strong: #86867e; /* control boundaries: 3:1 on page, surface and alt */
-  --text-primary: #141414; /* ink */
-  --text-muted: #56564f; /* pencil */
-  --focus-ring: #141414;
+  /* "The line": a cool paper ground, ink text, and one route colour (Line indigo) that
+     carries every action, every PTO day and the brand. Days off sit on a soft pass of
+     the same hue, so a break reads as one continuous stretch of line. */
+  --bg-page: #f8fafc; /* Main canvas */
+  --bg-surface: #ffffff; /* Surface white: forms, cards, sheets, navigation */
+  --bg-surface-alt: #f1f4f6; /* Secondary surface: grouped sections, inactive controls */
+  --border-default: #dce3ea; /* dividers, quiet input outlines */
+  --border-strong: #75838f; /* control boundaries: 3:1 on canvas, surface and secondary */
+  --text-primary: #1b2935; /* Ink */
+  --text-muted: #536575; /* Secondary text */
+  --focus-ring: #245da6;
 
-  --accent: #141414; /* ink is the action colour */
-  --accent-hover: #000000;
-  --accent-soft: #f1fbc4; /* a pale pass of the marker: selected chips, soft highlights */
-  --accent-ink: #141414;
+  /* Signal Blue: actions, selection, the current location, PTO days. */
+  --accent: #245da6;
+  --accent-hover: #1d4c88;
+  --accent-pressed: #173d6e;
+  --accent-soft: #e9f1fb; /* Soft blue: selected backgrounds and quiet active surfaces */
+  --accent-ink: #1d4c88; /* blue text on light surfaces */
 
-  --mark: #dcf763; /* the highlighter */
-  --mark-strong: #c9e83d; /* a second pass of the marker: hover on marked things */
+  --mark: #e9f1fb; /* selected chips, together days, chart bars */
+  --mark-strong: #d4e3f6; /* hover on a recommended break */
 
-  --pto-bg: #141414; /* suggested PTO: a solid ink block, the strongest thing on the page */
-  --pto-border: #000000;
+  --pto-bg: #245da6; /* a PTO day: a solid Signal Blue block */
+  --pto-border: #1d4c88;
   --pto-text: #ffffff;
-  /* The day-off run: the highlighter swipe. */
-  --band-bg: #dcf763;
-  --band-text: #141414;
-  --holiday-dot: #56564f; /* a ring, never colour alone */
-  --weekend-bg: #eeeee8;
-  --alt-border: #141414; /* alternative placement: the same ink, dashed */
+  /* A recommended break's days off: Soft blue with a Signal Blue rule along the bottom. */
+  --band-bg: #e9f1fb;
+  --band-text: #1b2935;
+  /* Sea Glass Teal: holidays and other time-off context, never actions. */
+  --holiday-dot: #176a70;
+  --holiday-bg: #e5f3f0;
+  --holiday-ink: #176a70;
+  --weekend-bg: #f1f4f6;
+  --alt-border: #245da6; /* alternative placement: the same blue, dashed */
 
-  --score-track: #dcdcd5;
-  --score-1: #141414;
-  --score-2: #0a0a0a;
-  --score-3: #000000;
+  /* Feedback. Separate from the brand roles so a warning never reads as a PTO day. */
+  --success: #24704c;
+  --success-soft: #e8f3ed;
+  --warning: #9a5b0d;
+  --warning-soft: #fbf2e4;
+  --error: #b93838;
+  --error-soft: #fbecec;
+  --disabled-text: #9aa6b2;
+
+  --score-track: #dce3ea;
+  --score-1: #245da6;
+  --score-2: #1d4c88;
+  --score-3: #163a69;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
@@ -109,6 +126,15 @@
   --color-mark-strong: var(--mark-strong);
   --color-band: var(--band-bg);
   --color-holiday: var(--holiday-dot);
+  --color-holiday-soft: var(--holiday-bg);
+  --color-holiday-ink: var(--holiday-ink);
+  --color-accent-pressed: var(--accent-pressed);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-error: var(--error);
+  --color-error-soft: var(--error-soft);
   --color-weekend: var(--weekend-bg);
 
   --font-sans: 'Archivo Variable', 'Archivo Fallback', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -134,17 +160,17 @@
  * 4.5:1 on the page, surface, surface-alt, band and weekend backgrounds (tokens.test.ts).
  */
 @theme {
-  --color-slate-50: #f7f7f4;
-  --color-slate-100: #eeeee8;
-  --color-slate-200: #dcdcd5;
-  --color-slate-300: #c4c4bc;
-  --color-slate-400: #5f5f58;
-  --color-slate-500: #56564f;
-  --color-slate-600: #4a4a44;
-  --color-slate-700: #36362f;
-  --color-slate-800: #232320;
-  --color-slate-900: #141414;
-  --color-slate-950: #0a0a0a;
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f4f6;
+  --color-slate-200: #dce3ea;
+  --color-slate-300: #c3ccd5;
+  --color-slate-400: #5a6b7b;
+  --color-slate-500: #536575;
+  --color-slate-600: #455666;
+  --color-slate-700: #344350;
+  --color-slate-800: #26333f;
+  --color-slate-900: #1b2935;
+  --color-slate-950: #0f1a23;
 }
 
 /* In the base layer so any component's own utility classes still win over these defaults. */
@@ -178,7 +204,7 @@
     text-wrap: pretty;
   }
 
-  /* Browser surfaces carry the design too: the marker for selection, ink for the caret. */
+  /* Browser surfaces carry the design too: soft blue selection, a Signal Blue caret. */
   ::selection {
     background: var(--mark);
     color: var(--text-primary);
@@ -186,7 +212,20 @@
 
   input,
   textarea {
-    caret-color: var(--text-primary);
+    caret-color: var(--accent);
+  }
+
+  /* One interaction language for text fields and selects: a quiet edge at rest, Signal Blue
+     while focused, the error colour when a field is invalid. */
+  input:not([type='range']):not([type='checkbox']):not([type='radio']):focus,
+  select:focus,
+  textarea:focus {
+    border-color: var(--accent);
+  }
+  input[aria-invalid='true'],
+  select[aria-invalid='true'],
+  textarea[aria-invalid='true'] {
+    border-color: var(--error);
   }
 
   a {
@@ -194,14 +233,14 @@
     text-decoration-thickness: 1px;
   }
 
-  /* Visible keyboard focus everywhere, in ink, without a ring on mouse clicks. */
+  /* Visible keyboard focus everywhere, in Signal Blue, without a ring on mouse clicks. */
   :focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
   }
 
   input[type='range'] {
-    accent-color: var(--text-primary);
+    accent-color: var(--accent);
     /* A vertical swipe that starts on a full-width slider scrolls the page instead of
        silently changing the plan; horizontal drags still move the slider. */
     touch-action: pan-y;
@@ -209,7 +248,7 @@
 
   input[type='checkbox'],
   input[type='radio'] {
-    accent-color: var(--text-primary);
+    accent-color: var(--accent);
   }
 
   * {
@@ -220,29 +259,22 @@
 @layer components {
   /* The display voice: condensed, heavy, tight. Headlines and the big figures only. */
   .type-display {
-    font-stretch: 75%;
-    font-weight: 800;
-    letter-spacing: -0.02em;
+    font-stretch: 88%;
+    font-weight: 760;
+    letter-spacing: -0.022em;
   }
 
   .type-condensed {
-    font-stretch: 82%;
+    font-stretch: 92%;
   }
 
-  /*
-   * The marker swipe: a highlighter pass behind inline text (a result figure, a link on hover).
-   * Drawn as an inset fill (not a gradient) so it wraps with the text and sits low like a real
-   * marker stroke, slightly short of the cap height.
-   */
+  /* Emphasis inside a sentence ("9 days off"): weight and ink, never a fill behind text. */
   .mark {
-    box-shadow: inset 0 -0.62em 0 var(--mark);
-    box-decoration-break: clone;
-    -webkit-box-decoration-break: clone;
-    padding-inline: 0.12em;
-    margin-inline: -0.12em;
+    font-weight: 700;
+    color: var(--text-primary);
   }
 
-  /* Text links that mark themselves on hover: the system's signature micro-interaction. */
+  /* Text links: an underline that thickens and turns indigo on hover. */
   .link-mark {
     color: var(--text-primary);
     text-decoration-line: underline;
@@ -252,10 +284,11 @@
   }
   .link-mark:hover {
     text-decoration-thickness: 2px;
+    text-decoration-color: var(--accent);
   }
 
   /*
-   * Native selects in the system: square, 44px, ink border, one drawn chevron (the same
+   * Native selects in the system: 6px corners, 44px, control-edge border, one drawn chevron (the same
    * one CountrySelect draws), so every select in the product looks like one control.
    */
   .select-ink {
@@ -263,9 +296,9 @@
     -webkit-appearance: none;
     min-height: 2.75rem;
     border: 1px solid var(--border-strong);
-    border-radius: 3px;
+    border-radius: 6px;
     background-color: var(--bg-surface);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23141414' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%2312141c' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.75rem center;
     padding: 0 2.25rem 0 0.75rem;
@@ -306,9 +339,9 @@
 /* The homepage Country/PTO pair uses a container-width-aware inline CSS grid;
    its actual computed columns are asserted at 320 and 375 in consumer QA. */
 
-/* The phone tab bar (SiteHeader, below lg) is fixed to the bottom; reserve its height so the
+/* The phone tab bar (SiteHeader, below md) is fixed to the bottom; reserve its height so the
    last content and the footer are never covered. */
-@media (max-width: 1023.98px) {
+@media (max-width: 767.98px) {
   body {
     padding-bottom: calc(3.5rem + 1px + env(safe-area-inset-bottom));
   }
@@ -317,5 +350,16 @@
   html {
     scroll-padding-top: 3.5rem;
     scroll-padding-bottom: calc(3.5rem + 1px + env(safe-area-inset-bottom));
+  }
+}
+
+/* iOS Safari zooms the page when a focused field is under 16px. Unlayered, so it outranks the
+   utility classes on phones only; larger inline fields (the homepage sentence) keep their size
+   because they inherit it from their parent. */
+@media (max-width: 639.98px) {
+  input:not([type='range']):not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
   }
 }

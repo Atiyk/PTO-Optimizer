@@ -35,7 +35,7 @@ import { PeakCapBanner } from './PeakCapBanner';
 import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { Container } from './Container';
-import { mostContestedBreakId } from '@daysoff/engine/calendar/requestDeadline';
+import { isContested, mostContestedBreakId } from '@daysoff/engine/calendar/requestDeadline';
 import { breakReason } from './breakReason';
 import { useAppState, todayISO } from './useAppState';
 import { useHasHover } from './useHasHover';
@@ -101,7 +101,10 @@ export function App() {
   // line just tells a visitor which card number to look for first, so the information the
   // old reordering carried survives without disturbing the scannable chronological list.
   const mostContestedId = mostContestedBreakId(state.breaks);
-  const mostContestedIndex = state.orderedBreaks.find(({ brk }) => brk.id === mostContestedId)?.index;
+  const mostContested = state.orderedBreaks.find(({ brk }) => brk.id === mostContestedId);
+  // Only say a break is in a busy period when it actually passes the busy-dates threshold;
+  // "the busiest of three quiet breaks" is not a busy period.
+  const mostContestedIndex = mostContested && isContested(mostContested.brk) ? mostContested.index : undefined;
 
   const { showHelp, setShowHelp } = useKeyboardShortcuts({
     onCopyLink: () => document.getElementById('shortcut-copy-link')?.click(),
@@ -152,6 +155,7 @@ export function App() {
                 totalDaysOff={state.totalDaysOff}
                 breakCountActual={state.breakCountActual}
                 scores={state.scores}
+                travelBasis={state.country === 'US' ? 'us' : 'estimate'}
               />
               {plannable && (
                 <PlanExplanation
@@ -162,10 +166,17 @@ export function App() {
                   totalDaysOff={state.totalDaysOff}
                 />
               )}
+              {/* Phones: the calendar sits two screens down, below the settings, so the result
+                  carries direct links to each part of the page. */}
+              <nav aria-label="On this page" className="-mt-1 flex gap-2 overflow-x-auto md:hidden">
+                {[['#complete-plan-heading', 'Calendar'], ['#breaks-heading', 'Request each break'], ['#take-it-heading', 'Export and share']].map(([href, label]) => (
+                  <a key={href} href={href} className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-line bg-surface px-4 text-sm font-semibold text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]">{label}</a>
+                ))}
+              </nav>
             </section>
 
             <aside id="plan-controls" aria-label="Plan settings" className="min-w-0 scroll-mt-16 lg:sticky lg:top-4 lg:col-start-1 lg:row-start-2 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto lg:overscroll-auto">
-              <div className="rounded-[4px] border border-line bg-surface p-4 sm:p-5 md:grid md:grid-cols-2 md:gap-x-10 lg:block">
+              <div className="rounded-[10px] border border-line bg-surface p-4 sm:p-5 md:grid md:grid-cols-2 md:gap-x-10 lg:block">
                 <section aria-labelledby="plan-inputs-heading" className="flex min-w-0 flex-col gap-3.5">
                   <h2 id="plan-inputs-heading" className="text-xl font-bold leading-6 text-ink type-condensed">Your time off</h2>
                   <PrimaryControls
@@ -331,8 +342,8 @@ export function App() {
                   {state.partnerOverlapReceived && (
                     <PartnerOverlapBanner overlapDayCount={state.overlapDays.length} onDismiss={state.dismissPartnerOverlapBanner} />
                   )}
-                  {partnerReceived.invalid && <p role="alert" className="rounded-[4px] border border-ink bg-surface p-4 text-sm text-ink">This partner availability link is invalid or too large. Ask for a new link with fewer dates.</p>}
-                  {partnerReceived.availability && <p role="status" className="rounded-[4px] bg-surface-alt p-4 text-sm text-ink">Someone shared {partnerReceived.availability.days.length} {partnerReceived.availability.status} available dates. Your own PTO budget and calendar apply. <a className="link-mark font-semibold" href="#partner-planner">See dates you can both take off</a></p>}
+                  {partnerReceived.invalid && <p role="alert" className="rounded-[10px] border border-error bg-error-soft p-4 text-sm text-ink">This partner availability link is invalid or too large. Ask for a new link with fewer dates.</p>}
+                  {partnerReceived.availability && <p role="status" className="rounded-[10px] bg-surface-alt p-4 text-sm text-ink">Someone shared {partnerReceived.availability.days.length} {partnerReceived.availability.status} available dates. Your own PTO budget and calendar apply. <a className="link-mark font-semibold" href="#partner-planner">See dates you can both take off</a></p>}
                   <ValidationBanner issues={state.validationIssues} />
                   {state.relaxedMinimum !== undefined && (
                     <RelaxedMinimumNotice
@@ -368,7 +379,7 @@ export function App() {
                     endDate={state.peakCapEnd}
                   />
                   {state.holidaysDegraded && (
-                    <p role="status" className="rounded-[4px] bg-surface-alt p-4 text-sm text-ink">
+                    <p role="status" className="rounded-[10px] bg-surface-alt p-4 text-sm text-ink">
                       Couldn&apos;t reach public holiday data for this country &mdash; showing weekends and any holidays
                       already cached. You can add known holidays manually in More options, or try again later.
                     </p>
@@ -401,7 +412,7 @@ export function App() {
                             onBlur={() => state.setHoveredBreakId(null)}
                             className="group grid min-h-11 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 py-2 text-ink hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
                           >
-                            <span aria-hidden="true" className="flex h-6 min-w-6 items-center justify-center rounded-[3px] bg-ink px-1 text-xs font-bold tabular-nums text-white">{index}</span>
+                            <span aria-hidden="true" className="flex h-6 min-w-6 items-center justify-center rounded-[6px] bg-accent px-1 text-xs font-bold tabular-nums text-white">{index}</span>
                             <span className="min-w-0 tabular-nums">
                               <span className="sr-only">Break {index}: </span>
                               <span className="font-bold type-condensed text-lg leading-6">{formatCardDateRange(brk.start, brk.end)}</span>
@@ -417,7 +428,7 @@ export function App() {
                     </ol>
                     {state.breaks.length > 1 && mostContestedIndex !== undefined && (
                       <p className="mt-2 max-w-prose text-sm text-muted">
-                        Break {mostContestedIndex} falls in an estimated popular vacation period. This reflects public demand, not coworkers&apos; plans.
+                        Break {mostContestedIndex} has the highest travel demand in this plan ({state.country === 'US' ? 'based on 2025 US airport checkpoint counts' : 'a seasonal estimate'}). It reflects public travel, not your coworkers&apos; plans.
                       </p>
                     )}
                   </>
@@ -427,11 +438,11 @@ export function App() {
               <section aria-labelledby="complete-plan-heading" className="min-w-0">
                 <h2 id="complete-plan-heading" tabIndex={-1} className="text-h2 font-bold text-ink type-condensed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Your complete plan</h2>
                 <p className="mt-1 max-w-prose text-sm text-muted">
-                  {hasHover
-                    ? 'Click a day to take it, click again to rule it out, a third time to let the planner decide. Hover or focus a day to see what pinning it would do. Arrow keys move between days.'
-                    : 'Tap a day to take it, rule it out, or let the planner decide.'}
+                  {/* Chosen by CSS, not JS, so the prerendered page is right on touch from the first paint. */}
+                  <span className="hidden [@media(hover:hover)]:inline">Click a day to take it, click again to rule it out, a third time to let the planner decide. Hover or focus a day to see what pinning it would do. Arrow keys move between days.</span>
+                  <span className="[@media(hover:hover)]:hidden">Tap a day to take it, rule it out, or let the planner decide.</span>
                 </p>
-                <div className="mt-4 rounded-[4px] border border-line bg-surface p-3 sm:p-5">
+                <div className="mt-4 rounded-[10px] border border-line bg-surface p-3 sm:p-5">
                   {!state.validationIssues.length ? <CalendarErrorBoundary>
                     <Calendar
                       rangeStart={state.rangeStart}
@@ -448,6 +459,7 @@ export function App() {
                       overlapSet={state.overlapSet}
                       marginalValues={state.marginalValues}
                       holidayNameFor={state.holidayNameFor}
+                      holidayKindFor={state.holidayKindFor}
                       hasHover={hasHover}
                       onDayClick={state.toggleDay}
                       alternativeForDate={state.alternativeForDate}
@@ -459,7 +471,7 @@ export function App() {
                     />
                   </CalendarErrorBoundary> : <p role="status" className="text-sm text-muted">Choose valid dates and a PTO balance to display the calendar.</p>}
                   <div className="mt-5 border-t border-line pt-4">
-                    <Legend />
+                    <Legend showCompany={state.holidayEntries.some((h) => h.checked && h.source === 'custom')} showBlackout={state.hasBlackouts} />
                   </div>
                 </div>
               </section>
@@ -497,7 +509,7 @@ export function App() {
               <section aria-labelledby="take-it-heading" className="flex min-w-0 flex-col gap-5">
                 <div>
                   <h2 id="take-it-heading" className="text-h2 font-bold text-ink type-condensed">Take it with you</h2>
-                  <p className="mt-1 text-sm text-muted">Free, and no account needed. Your plan stays in this browser unless you share it or turn on email reminders.</p>
+                  <p className="mt-1 text-sm text-muted">Free, and no account needed. Your plan stays in this browser unless you share its link, subscribe to its calendar feed, or turn on email reminders.</p>
                 </div>
                 {plannable ? <ExportBar
                   breaks={state.breaks}

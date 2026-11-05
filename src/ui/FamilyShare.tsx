@@ -30,7 +30,7 @@ export function FamilyShare({
   const nothing = !(includeSchool && schoolDayCount > 0) && !(includeAvailability && canShareAvailability);
 
   return (
-    <section className="rounded-[4px] border border-line bg-surface px-4 py-2 sm:px-5" aria-labelledby={`${id}-h`}>
+    <section className="rounded-[10px] border border-line bg-surface px-4 py-2 sm:px-5" aria-labelledby={`${id}-h`}>
       <h2 id={`${id}-h`}>
         <button type="button" className="flex min-h-12 w-full items-center justify-between gap-3 text-left text-xl font-bold text-ink type-condensed" aria-expanded={open} aria-controls={id} onClick={() => setOpen((v) => !v)}>
           <span>Share with family</span><PlusMinus open={open} className="h-4 w-4" />

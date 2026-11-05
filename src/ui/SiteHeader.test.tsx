@@ -6,10 +6,10 @@ import { Footer } from './Footer';
 
 afterEach(cleanup);
 
-describe('SiteHeader (redesign Phase 1)', () => {
+describe('SiteHeader (2026-11 information architecture)', () => {
   const html = renderToStaticMarkup(<SiteHeader active="pto" />);
 
-  it('uses one strong Gapless wordmark with an accessible full product name', () => {
+  it('uses one Gapless lockup whose accessible name keeps the full product name', () => {
     expect(html).not.toContain('aria-label="Gapless PTO Optimizer, home"');
     expect(html).toMatch(/>Gapless\s*<\/span>/);
     expect(html).toMatch(/>PTO Optimizer\s*<\/span>/);
@@ -17,67 +17,75 @@ describe('SiteHeader (redesign Phase 1)', () => {
 
   it('derives the home link name from visible brand text and an unobtrusive home cue', () => {
     const { getByRole } = render(<SiteHeader active="pto" />);
-    // JSDOM's accessible-name calculator concatenates nested flex spans without
-    // the whitespace supplied by real browser layout. The Playwright header QA
-    // and Lighthouse WCAG 2.5.3 gate assert the exact normalized name in Chromium.
     const home = getByRole('link', { name: /Gapless.*PTO Optimizer.*home/i });
     expect(home.getAttribute('href')).toBe('/');
     expect(home.hasAttribute('aria-label')).toBe(false);
     expect(home.querySelector('.sr-only')?.textContent?.trim()).toBe('home');
-    expect(home.textContent).toContain('Gapless');
-    expect(home.textContent).toContain('PTO Optimizer');
   });
 
-  it('uses four flat destinations and one primary PTO action without nested categories', () => {
-    for (const [label, href] of [
-      ['Plan PTO', '/pto'],
-      ['Sabbatical', '/sabbatical'],
-      ['Family', '/family'],
-      ['My PTO', '/policy'],
-      ['Learn', '/glossary'],
-    ]) {
-      expect(html).toContain(`href="${href}"`);
-      expect(html).toContain(`>${label}<`);
+  it('has three destinations: Plan, My PTO, Learn', () => {
+    const { getByRole } = render(<SiteHeader active="landing" />);
+    const main = getByRole('navigation', { name: 'Main' });
+    expect([...main.querySelectorAll('a')].map((a) => [a.textContent?.trim(), a.getAttribute('href')])).toEqual([
+      ['Plan', '/pto'], ['My PTO', '/policy'], ['Learn', '/glossary'],
+    ]);
+  });
+
+  it('shows the three ways to plan on every planning route, and marks the current one', () => {
+    for (const [route, label] of [['pto', 'Time off'], ['family', 'Family'], ['sabbatical', 'Sabbatical']] as const) {
+      const { getByRole } = render(<SiteHeader active={route} />);
+      const modes = getByRole('navigation', { name: 'Ways to plan' });
+      expect([...modes.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(['/pto', '/family', '/sabbatical']);
+      expect(modes.querySelector('[aria-current="page"]')?.textContent).toBe(label);
+      // "Plan" stays the current destination for all three: 'page' on /pto itself, 'true'
+      // (current section) on the other two, since its link points at /pto.
+      const plan = getByRole('navigation', { name: 'Main' }).querySelector('[aria-current]');
+      expect(plan?.textContent).toBe('Plan');
+      expect(plan?.getAttribute('aria-current')).toBe(route === 'pto' ? 'page' : 'true');
+      cleanup();
     }
-    expect(html).toContain('aria-label="Explore"');
-    expect(html).not.toContain('aria-label="Understand"');
-    expect(html).toMatch(/>PTO Optimizer\s*<\/span>/);
-    expect(html).not.toContain('>Sabbatical Planning<');
+  });
+
+  it('does not show the planning modes off the planning routes', () => {
+    for (const route of ['landing', 'policy', 'glossary', 'other'] as const) {
+      expect(renderToStaticMarkup(<SiteHeader active={route} />)).not.toContain('Ways to plan');
+    }
   });
 
   it('provides an accessible skip-to-main link before the navigation', () => {
-    const html = renderToStaticMarkup(<SiteHeader active="pto" />);
     expect(html).toContain('href="#main-content"');
     expect(html).toContain('Skip to main content');
     expect(html).toContain('focus:not-sr-only');
-    expect(html.indexOf('Skip to main content')).toBeLessThan(html.indexOf('aria-label="Explore"'));
+    expect(html.indexOf('Skip to main content')).toBeLessThan(html.indexOf('aria-label="Main"'));
   });
 
-  it('the primary action is a link into the tool, not a submit', () => {
-    expect(html).toMatch(/<a href="\/pto"[^>]*>Plan PTO<\/a>/);
+  it('has no submit-style control', () => {
     expect(html).not.toMatch(/type="submit"/);
-  });
-
-  it('marks the current page', () => {
-    expect(html).toMatch(/href="\/pto"[^>]*aria-current="page"/);
-  });
-
-  it('does not waste header space on unavailable sign-in', () => {
     expect(html).not.toContain('data-slot="sign-in"');
   });
 
-  it('provides visible keyboard focus and 44px+ phone tab-bar targets for every destination', () => {
-    const { getByRole } = render(<SiteHeader active="pto" />);
+  it('gives the phone tab bar three 56px targets with visible focus', () => {
+    const { getByRole } = render(<SiteHeader active="family" />);
     const tabs = getByRole('navigation', { name: 'Tools' });
     const links = [...tabs.querySelectorAll('a')];
-    expect(links.map((l) => l.textContent?.trim())).toEqual(['Plan PTO', 'Sabbatical', 'Family', 'My PTO', 'Learn']);
-    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/pto', '/sabbatical', '/family', '/policy', '/glossary']);
+    expect(links.map((l) => l.textContent?.trim())).toEqual(['Plan', 'My PTO', 'Learn']);
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/pto', '/policy', '/glossary']);
     for (const link of links) {
       expect(link.className).toContain('min-h-14');
       expect(link.className).toContain('focus-visible:outline');
     }
-    expect(links[0].getAttribute('aria-current')).toBe('page');
-    expect(tabs.className).toContain('lg:hidden');
+    expect(links[0].getAttribute('aria-current')).toBe('true');
+    expect(tabs.className).toContain('md:hidden');
+  });
+
+  it('carries country and dates onto the planning links at tap time', () => {
+    window.history.replaceState(null, '', '/pto?c=GB&b=22&s=2027-01-01&e=2027-12-31&w=40');
+    const { getByRole } = render(<SiteHeader active="pto" />);
+    const family = [...getByRole('navigation', { name: 'Ways to plan' }).querySelectorAll('a')].find((a) => a.textContent === 'Family')!;
+    family.addEventListener('click', (e) => e.preventDefault());
+    family.click();
+    expect(family.getAttribute('href')).toBe('/family?c=GB&s=2027-01-01');
+    window.history.replaceState(null, '', '/');
   });
 
   it('keeps every destination one tap away on phones, with no menu to open first', () => {
@@ -91,17 +99,28 @@ describe('Footer (redesign Phase 1)', () => {
   const html = renderToStaticMarkup(<Footer />);
   it('has Product / Resources / About columns and the D2 tool names', () => {
     for (const h of ['Explore', 'Resources', 'Help &amp; privacy']) expect(html).toContain(`>${h}</h2>`);
-    for (const l of ['Plan PTO', 'Sabbatical', 'Family', 'My PTO', 'Learn', 'FAQ', 'Privacy', 'Terms of use']) expect(html).toContain(`>${l}<`);
+    for (const l of ['Plan time off', 'Plan around school breaks', 'Plan a sabbatical', 'My PTO', 'Learn', 'FAQ', 'Privacy', 'Terms of use']) expect(html).toContain(`>${l}<`);
   });
-  it('links directly to the configured feedback address', () => {
-    expect(html).toContain('mailto:atiykahmeed6310@gmail.com?subject=Gapless%20feedback');
-    expect(html).toContain('Contact &amp; feedback');
+  it('links contact and bug reports to the Gapless inbox', () => {
+    expect(html).toContain('href="mailto:gaplessreminders@gmail.com?subject=Gapless%20Contact"');
+    expect(html).toContain('>Contact us<');
+    expect(html).toContain('>Report a bug<');
+    const bug = /href="(mailto:[^"]*Bug%20Report[^"]*)"/.exec(html)?.[1].replace(/&amp;/g, '&');
+    expect(bug).toBeDefined();
+    const url = new URL(bug!);
+    expect(url.pathname).toBe('gaplessreminders@gmail.com');
+    expect(url.searchParams.get('subject')).toBe('Gapless Bug Report');
+    const body = url.searchParams.get('body')!;
+    for (const prompt of ['What happened?', 'What did you expect to happen?', 'Steps to reproduce', 'Device and browser']) expect(body).toContain(prompt);
+    // Nothing from the page (plan link, dates, balances) is put in the email.
+    expect(body).not.toMatch(/https?:|\d{4}-\d{2}-\d{2}|PTO remaining/);
+    expect(html).not.toContain('atiykahmeed');
     expect(html).not.toContain('formerly');
     expect(html).toContain('href="/terms.html"');
   });
 
   it('links to no external product', () => {
     const external = [...html.matchAll(/href="(https?:[^"]+)"/g)].map((m) => m[1]);
-    expect(external).toEqual(['https://github.com/Atiyk/PTO-Optimizer/issues']);
+    expect(external).toEqual([]);
   });
 });

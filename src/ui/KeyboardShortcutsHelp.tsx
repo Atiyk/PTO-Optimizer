@@ -20,14 +20,14 @@ export function KeyboardShortcutsHelp({ open, onClose }: KeyboardShortcutsHelpPr
       aria-label="Keyboard shortcuts"
       onClick={onClose}
     >
-      <div className="w-full max-w-sm rounded-[4px] bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-sm rounded-[10px] bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-xl font-bold text-ink type-condensed">Keyboard shortcuts</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex h-11 w-11 items-center justify-center rounded-[3px] text-lg text-muted hover:bg-surface-alt hover:text-ink"
+            className="flex h-11 w-11 items-center justify-center rounded-[6px] text-lg text-muted hover:bg-surface-alt hover:text-ink"
           >
             &times;
           </button>
@@ -36,7 +36,7 @@ export function KeyboardShortcutsHelp({ open, onClose }: KeyboardShortcutsHelpPr
           {SHORTCUTS.map((s) => (
             <div key={s.keys} className="flex items-center justify-between gap-4">
               <dt>
-                <kbd className="rounded-[3px] border border-line-strong bg-surface-alt px-2 py-0.5 text-sm font-semibold text-ink">
+                <kbd className="rounded-[6px] border border-line-strong bg-surface-alt px-2 py-0.5 text-sm font-semibold text-ink">
                   {s.keys}
                 </kbd>
               </dt>

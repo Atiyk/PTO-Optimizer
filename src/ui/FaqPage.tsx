@@ -9,7 +9,7 @@ import { FAMILY_FAQ_ITEMS } from './familyFaqItems';
 const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
 
 const SECTIONS: { id: string; title: string; items: FAQItem[] }[] = [
-  { id: 'pto', title: 'Plan PTO', items: PTO_FAQ_ITEMS },
+  { id: 'pto', title: 'Time off planner', items: PTO_FAQ_ITEMS },
   { id: 'sabbatical', title: 'Sabbatical', items: SABBATICAL_FAQ_ITEMS },
   { id: 'family', title: 'Family & school breaks', items: FAMILY_FAQ_ITEMS },
   { id: 'about', title: 'About this site', items: ABOUT_FAQ_ITEMS },
@@ -40,7 +40,7 @@ function FaqSection({ id, title, items }: { id: string; title: string; items: FA
           <details key={item.question} className="group border-b border-line">
             <summary className={`flex min-h-11 cursor-pointer list-none items-start justify-between gap-4 py-4 text-left hover:bg-surface-alt/60 [&::-webkit-details-marker]:hidden ${FOCUS}`}>
               <h3 className="text-[17px] font-semibold leading-6 text-ink">{item.question}</h3>
-              <span aria-hidden="true" className="relative mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[3px] border border-ink group-open:bg-ink">
+              <span aria-hidden="true" className="relative mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border border-ink group-open:bg-ink">
                 <span className="absolute h-[1.5px] w-2.5 bg-ink group-open:bg-white" />
                 <span className="absolute h-2.5 w-[1.5px] bg-ink group-open:hidden" />
               </span>
@@ -61,9 +61,9 @@ export function FaqPage() {
         <Container className="px-4 pt-10 pb-4 sm:px-6 lg:pt-16">
           <h1 className="max-w-[16ch] text-display-sm text-ink type-display">Frequently asked questions</h1>
           <p className="mt-4 max-w-[62ch] text-lg leading-7 text-ink">
-            Questions about the <a href="/pto" className={`link-mark ${FOCUS}`}>Plan PTO</a>,{' '}
-            <a href="/sabbatical" className={`link-mark ${FOCUS}`}>Sabbatical</a> and{' '}
-            <a href="/family" className={`link-mark ${FOCUS}`}>Family</a> tools, in one place. Each tool's own page has the same
+            Questions about planning <a href="/pto" className={`link-mark ${FOCUS}`}>time off</a>,{' '}
+            <a href="/family" className={`link-mark ${FOCUS}`}>around school breaks</a> and{' '}
+            <a href="/sabbatical" className={`link-mark ${FOCUS}`}>a sabbatical</a>, in one place. Each tool's own page has the same
             answers inline, right where they are relevant.
           </p>
 

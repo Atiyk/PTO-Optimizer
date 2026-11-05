@@ -20,7 +20,7 @@ import { classifyDay } from './dayCategory';
 import { alternativeForDate as alternativeForDateImpl } from './alternativeForDate';
 import { track } from './analytics';
 import { validateInputs, isSupportedPlanningRange } from './validation';
-import { defaultRangeEnd, holidayEntriesFor, stateHolidayCandidatesFor, altFridayOffDatesFor, effectiveOffDaysFor, mustIncludeDaysFor, effectiveBlackoutsFor, effectiveBudgetFor, policyAccrualFieldsFor, buildSolveInput, solvePlan, isSuggestedPtoDay, type HolidayEntry } from '../autopilot/planFromSearch';
+import { defaultRangeEnd, defaultPlanRangeEnd, holidayEntriesFor, stateHolidayCandidatesFor, altFridayOffDatesFor, effectiveOffDaysFor, mustIncludeDaysFor, effectiveBlackoutsFor, effectiveBudgetFor, policyAccrualFieldsFor, buildSolveInput, solvePlan, isSuggestedPtoDay, type HolidayEntry } from '../autopilot/planFromSearch';
 
 export { defaultRangeEnd };
 export type { HolidayEntry };
@@ -110,7 +110,10 @@ export function useAppState() {
   const initial = useMemo(() => {
     const defaults = {
       rangeStart: todayISO(),
-      rangeEnd: defaultRangeEnd(todayISO()),
+      // The next 12 months, the same default the homepage preview uses, so the planner and the
+      // homepage show the same plan for the same inputs (a bare /pto in November used to plan
+      // only the 8 weeks left in the year).
+      rangeEnd: defaultPlanRangeEnd(todayISO()),
       budget: 15,
       // A country landing page's preset wins over the geolocated guess - a visitor to
       // /uk should see GB selected regardless of their own browser locale - but an
@@ -700,6 +703,15 @@ export function useAppState() {
     [holidayEntries],
   );
 
+  /** 'company' for days the employer calendar adds, 'public' for public and state holidays. */
+  const holidayKindFor = useCallback(
+    (iso: string): 'public' | 'company' | undefined => {
+      const entry = holidayEntries.find((h) => h.date === iso && h.checked);
+      return entry ? (entry.source === 'custom' ? 'company' : 'public') : undefined;
+    },
+    [holidayEntries],
+  );
+
   const baseOffSet = useMemo(() => new Set(effectiveOffDays), [effectiveOffDays]);
   const blackoutSet = useMemo(() => new Set(effectiveBlackouts), [effectiveBlackouts]);
   const chosenDaySet = useMemo(() => {
@@ -1003,6 +1015,7 @@ export function useAppState() {
     setWeekStartOverride,
     marginalValues,
     holidayNameFor,
+    holidayKindFor,
     totalDaysOff,
     scores,
     highlightedBreakIds,
@@ -1054,6 +1067,7 @@ export function useAppState() {
     swapAlternative,
     categoryOf,
     isBlackoutDay,
+    hasBlackouts: blackoutSet.size > 0,
     isSuggestedPto,
     overlapSet,
     offRuns,

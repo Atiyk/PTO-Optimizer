@@ -150,7 +150,7 @@ function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalen
   }
 
   return (
-    <section aria-labelledby={`${id}-heading`} className="min-w-0 rounded-[4px] border border-line bg-surface p-4 sm:p-6">
+    <section aria-labelledby={`${id}-heading`} className="min-w-0 rounded-[10px] border border-line bg-surface p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-x-3">
         <h2 id={`${id}-heading`} className="text-lg font-bold type-condensed text-ink">PTO expiration guard</h2>
         <label className="flex min-h-11 items-center gap-2 text-sm text-muted"><input type="checkbox" className="h-4 w-4" checked={prefs.enabled} onChange={(event) => update({ ...prefs, enabled: event.target.checked })} />Show in-app alerts</label>
@@ -160,14 +160,14 @@ function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalen
         : !validPolicy ? <p role="status" className="mt-3 text-sm text-ink">Enter valid policy values, including a current carried portion no greater than your balance and its future use-by date, to check expiration risk.</p>
           : visible.length === 0 ? (
             <p className="mt-3 flex items-start gap-2 text-sm text-ink">
-              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="mt-0.5 shrink-0"><path d="M3 8.4 6.4 11.5 13 4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" /></svg>
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="mt-0.5 shrink-0 text-success"><path d="M3 8.4 6.4 11.5 13 4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" /></svg>
               <span>{risks.length ? 'All current alerts are dismissed.' : 'No upcoming forfeiture, carryover expiration, or accrual-cap risk found under these rules.'}</span>
             </p>
           )
-          : <ul className="mt-3 divide-y divide-line border-t border-ink">{visible.map((risk) => (
+          : <ul className="mt-3 divide-y divide-line border-t-2 border-warning">{visible.map((risk) => (
             <li key={risk.id} className="py-3">
               <p className="flex items-start gap-2 font-bold text-ink">
-                <span aria-hidden="true" className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center bg-ink text-xs font-bold text-white">!</span>
+                <span aria-hidden="true" className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-warning text-xs font-bold text-white">!</span>
                 <span>{compactDatesIn(risk.text)}</span>
               </p>
               <p className="mt-1 pl-7 text-sm text-ink">{risk.kind === 'cap' ? 'Creating space in your balance may prevent lost accrual.' : `Last day to use this PTO: ${compactDate(risk.deadline)}.`}</p>
@@ -239,7 +239,7 @@ function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalen
           <span aria-hidden="true" className="hidden text-muted group-open:inline">−</span>
         </summary>
         <div className="pb-2">
-          <p className="text-sm leading-6 text-muted">Download reminders before PTO expires. Each one names the suggested dates above. Import the file into your calendar to receive its alerts. Gapless does not send scheduled email or push notifications.</p>
+          <p className="text-sm leading-6 text-muted">Download reminders before PTO expires. Each one names the suggested dates above. Import the file into your calendar and your calendar app sends the alerts.</p>
           <div className="mt-1 flex flex-wrap gap-x-5">
             {EXPIRATION_REMINDER_LEADS.map((lead) => <label key={lead} className="flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" className="h-4 w-4" checked={prefs.leads.includes(lead)} onChange={(event) => update({ ...prefs, leads: event.target.checked ? [...prefs.leads, lead] : prefs.leads.filter((value) => value !== lead) })} />{lead} days before</label>)}
           </div>
@@ -259,7 +259,7 @@ function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalen
             idPrefix={`${id}-watch`}
             calendarName={WATCH_CALENDAR_NAME}
             heading="Get these reminders in your calendar"
-            description="Subscribe once to get the 60, 30 and 7-day reminders and suggested days to use expiring PTO, updated against today's date."
+            description="Subscribe once to get the 60, 30 and 7-day reminders and suggested days to use expiring PTO, recalculated from today's date when your calendar refreshes."
             caveat="Requests tracked on this device aren't included. After editing your policy, subscribe again. Anyone with the link can see the policy details in it."
           />
           <div className="mt-4"><EmailReminders kind="policy" search={watchSearch} /></div>

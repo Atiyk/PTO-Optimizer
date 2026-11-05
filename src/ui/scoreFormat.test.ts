@@ -36,13 +36,13 @@ describe('ordinal', () => {
 describe('score lines', () => {
   it('render the spec examples verbatim', () => {
     const scores: Scores = { efficiency: { percentile: 91 }, travel: { percentile: 78 } };
-    expect(travelLine(scores)).toBe('Travel 78th · quieter than most weeks');
-    expect(efficiencyLine(scores)).toBe('Efficiency 91st · better than most plans at this budget');
+    expect(travelLine(scores)).toBe('Travel 78th · quieter than most weeks in your dates');
+    expect(efficiencyLine(scores)).toBe('Efficiency 91st · more days off per PTO day than most travel settings we tried');
   });
 
   it('both go through the same formatScoreLine template', () => {
     const scores: Scores = { efficiency: { percentile: 91 }, travel: { percentile: 78 } };
-    expect(formatScoreLine({ label: 'Travel', percentile: 78, gloss: 'quieter than most weeks' })).toBe(travelLine(scores));
+    expect(formatScoreLine({ label: 'Travel', percentile: 78, gloss: 'quieter than most weeks in your dates' })).toBe(travelLine(scores));
   });
 
   it('never embeds a raw indexed number - only the ordinal percentile', () => {
@@ -60,13 +60,13 @@ describe('score lines', () => {
     const mid: Scores = { efficiency: { percentile: 50 }, travel: { percentile: 50 } };
     const high: Scores = { efficiency: { percentile: 91 }, travel: { percentile: 91 } };
 
-    expect(efficiencyLine(low)).toBe('Efficiency 14th · worse than most plans at this budget');
-    expect(efficiencyLine(mid)).toBe('Efficiency 50th · about average for this budget');
-    expect(efficiencyLine(high)).toBe('Efficiency 91st · better than most plans at this budget');
+    expect(efficiencyLine(low)).toBe('Efficiency 14th · fewer days off per PTO day than most travel settings we tried');
+    expect(efficiencyLine(mid)).toBe('Efficiency 50th · mid-range among the travel settings we tried');
+    expect(efficiencyLine(high)).toBe('Efficiency 91st · more days off per PTO day than most travel settings we tried');
 
-    expect(travelLine(low)).toBe('Travel 14th · busier than most weeks');
-    expect(travelLine(mid)).toBe('Travel 50th · about average for the year');
-    expect(travelLine(high)).toBe('Travel 91st · quieter than most weeks');
+    expect(travelLine(low)).toBe('Travel 14th · busier than most weeks in your dates');
+    expect(travelLine(mid)).toBe('Travel 50th · about average for your dates');
+    expect(travelLine(high)).toBe('Travel 91st · quieter than most weeks in your dates');
 
     // All three glosses, per metric, must be textually distinct from one another.
     const effGlosses = new Set([efficiencyLine(low), efficiencyLine(mid), efficiencyLine(high)].map((l) => l.split(' · ')[1]));
@@ -81,7 +81,7 @@ describe('score lines', () => {
       const band = intensityBand(p);
       const effGloss = efficiencyLine(scores).split(' · ')[1];
       const expectedEffGloss =
-        band === 0 ? 'worse than most plans at this budget' : band === 1 ? 'about average for this budget' : 'better than most plans at this budget';
+        band === 0 ? 'fewer days off per PTO day than most travel settings we tried' : band === 1 ? 'mid-range among the travel settings we tried' : 'more days off per PTO day than most travel settings we tried';
       expect(effGloss).toBe(expectedEffGloss);
     }
   });
@@ -146,7 +146,7 @@ describe('greyscale and colour-independence', () => {
     const scores: Scores = { efficiency: { percentile: 91 }, travel: { percentile: 78 } };
     // The gloss text states the meaning in words, independent of any colour class.
     expect(travelLine(scores)).toContain('quieter than most weeks');
-    expect(efficiencyLine(scores)).toContain('better than most plans at this budget');
+    expect(efficiencyLine(scores)).toContain('than most travel settings we tried');
     // The bar's width (the position/length signal) is a pure function of the percentile
     // alone - it never reads SCORE_INTENSITY's colour classes, so colour can be deleted
     // from the page entirely and the bar still reports the right value by length.

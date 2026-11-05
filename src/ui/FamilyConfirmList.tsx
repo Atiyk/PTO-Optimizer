@@ -47,7 +47,7 @@ export function FamilyConfirmList({ heading, candidates, onAdd, onDiscard }: Fam
       <ul className="mt-2 flex max-h-96 flex-col gap-1.5 overflow-y-auto pr-1">
         {candidates.map((c) => (
           <li key={c.id}>
-            <label className="flex min-h-11 cursor-pointer items-start gap-2.5 rounded-[3px] border border-line bg-surface px-3 py-2 hover:border-line-strong">
+            <label className="flex min-h-11 cursor-pointer items-start gap-2.5 rounded-[6px] border border-line bg-surface px-3 py-2 hover:border-line-strong">
               <input
                 type="checkbox"
                 className="mt-1 h-4 w-4 shrink-0"
@@ -62,7 +62,7 @@ export function FamilyConfirmList({ heading, candidates, onAdd, onDiscard }: Fam
                 <span className="block text-sm font-semibold tabular-nums text-ink">
                   {rangeText(c.start, c.end)}
                   {c.label ? <span className="font-normal text-muted"> · {c.label}</span> : null}
-                  {c.confidence === 'unsure' ? <span className="ml-1.5 inline-block rounded-[3px] bg-surface-alt px-1.5 text-xs font-semibold text-ink">Unsure</span> : null}
+                  {c.confidence === 'unsure' ? <span className="ml-1.5 inline-block rounded-[6px] bg-surface-alt px-1.5 text-xs font-semibold text-ink">Unsure</span> : null}
                 </span>
                 {c.snippet ? <span className="mt-0.5 block break-words text-xs text-muted">“{c.snippet}”</span> : null}
               </span>

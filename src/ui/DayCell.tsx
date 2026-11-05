@@ -23,6 +23,8 @@ interface DayCellProps {
   isOutOfRange: boolean;
   marginalValue: MarginalValue | null;
   holidayName: string | undefined;
+  /** 'company' marks a day the employer calendar adds; drawn with a square, not a dot. */
+  holidayKind?: 'public' | 'company';
   hasHover: boolean;
   onToggle: (date: string) => void;
   onSwapAlternative?: () => void;
@@ -90,7 +92,7 @@ function marginalValueText(mv: MarginalValue): string {
   return `${withCaveat} Click to pin.`;
 }
 
-function stateLabel(category: DayCategory, isAlternative: boolean, isBlackout: boolean, isOutOfRange: boolean): string {
+function stateLabel(category: DayCategory, isAlternative: boolean, isBlackout: boolean, isOutOfRange: boolean, holidayKind?: 'public' | 'company'): string {
   if (isOutOfRange) return 'outside the selected date range';
   if (isBlackout) return 'blackout, cannot be used for PTO';
   if (isAlternative) return 'alternative placement';
@@ -102,7 +104,7 @@ function stateLabel(category: DayCategory, isAlternative: boolean, isBlackout: b
     case 'unpaid-leave':
       return 'unpaid leave day';
     case 'public-holiday':
-      return 'public holiday';
+      return holidayKind === 'company' ? 'employer day off' : 'public holiday';
     case 'weekend':
       return 'weekend';
     case 'working':
@@ -123,6 +125,7 @@ export function DayCell({
   isOutOfRange,
   marginalValue,
   holidayName,
+  holidayKind,
   hasHover,
   onToggle,
   onSwapAlternative,
@@ -187,7 +190,7 @@ export function DayCell({
 
   const ariaLabel = [
     formatMonthDay(date),
-    stateLabel(category, isAlternative, isBlackout, isOutOfRange),
+    stateLabel(category, isAlternative, isBlackout, isOutOfRange, holidayKind),
     !isOutOfRange && breakIndex ? `part of break ${breakIndex}` : null,
     // The engine's estimate is only spoken where no verified preview exists (sabbatical);
     // the planner announces the real outcome through the tooltip description instead.
@@ -241,13 +244,23 @@ export function DayCell({
   // Highlighted schedule (2026-11): ink numerals on the marker run, muted numerals on the
   // tone-stepped weekend column, and a solid ink block for every PTO day. Pinned shares the
   // PTO fill exactly and is told apart by its pin glyph, never by a third fill.
-  const textColor = inBand ? BAND_TEXT : category === 'weekend' ? TEXT_MUTED : TEXT_PRIMARY;
+  // Ink & Signal Blue (2026-11): a holiday is Sea Glass Teal. Off a recommended run it sits on
+  // the soft teal fill; inside a run the soft blue run shows through and the numeral and
+  // marker turn teal, so "a holiday inside your break" reads as both at once.
+  const isHoliday = category === 'public-holiday';
+  const textColor = isHoliday
+    ? 'text-[var(--holiday-ink)] font-semibold'
+    : inBand ? BAND_TEXT : category === 'weekend' ? TEXT_MUTED : TEXT_PRIMARY;
   const isPtoLike = category === 'suggested-pto' || category === 'pinned' || category === 'unpaid-leave';
   const categoryClasses = isOutOfRange
     ? 'text-slate-300'
     : isPtoLike
       ? `${COLORS.ptoBg} border ${COLORS.ptoBorder} ${COLORS.ptoText} font-bold`
-      : `${textColor} ${!inBand && category === 'weekend' ? 'bg-surface-alt' : ''} ${
+      : `${textColor} ${!inBand && category === 'weekend' ? 'bg-surface-alt' : ''} ${!inBand && isHoliday ? 'bg-holiday-soft' : ''} ${
+          // A blackout day: neutral hatching (no brand colour), so "PTO can't go here" is a
+          // texture plus its label, never a hue alone.
+          isBlackout && !isPtoLike ? 'bg-[repeating-linear-gradient(135deg,var(--border-default)_0_2px,transparent_2px_7px)]' : ''
+        } ${
           // A second marker pass over the run while its break is hovered or focused.
           isHighlighted ? 'bg-mark-strong' : ''
         }`;
@@ -298,7 +311,7 @@ export function DayCell({
         // signal that's true everywhere, which is why it isn't gated on tooltipText. An
         // out-of-range cell gets none of this: no cursor, no hover, no focus ring -
         // `disabled` already removes it from the tab order and all hover/click handling.
-        className={`relative z-10 flex h-12 w-full items-center justify-center rounded-[3px] text-sm font-medium tabular-nums transition-colors duration-150 ${
+        className={`relative z-10 flex h-12 w-full items-center justify-center rounded-[6px] text-sm font-medium tabular-nums transition-colors duration-150 ${
           isOutOfRange
             ? 'cursor-default'
             : `cursor-pointer hover:outline hover:outline-1 hover:outline-offset-1 hover:outline-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${COLORS.focusRing}`
@@ -328,7 +341,10 @@ export function DayCell({
           dayOfMonth
         )}
         {!isOutOfRange && category === 'public-holiday' && (
-          <span aria-hidden className={`absolute bottom-1.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${HOLIDAY_DOT}`} />
+          <span
+            aria-hidden
+            className={`absolute bottom-1.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 ${holidayKind === 'company' ? 'rounded-[1px]' : 'rounded-full'} ${HOLIDAY_DOT}`}
+          />
         )}
         {!isOutOfRange && hasOverlap && (
           // A ring around the dot (not just a colour swap) so it stays visible whatever it
@@ -348,13 +364,13 @@ export function DayCell({
           role={hasHover ? 'tooltip' : 'group'}
           aria-label={!hasHover ? `Actions for ${formatMonthDay(date)}` : undefined}
           className={hasHover
-            ? 'absolute left-1/2 top-full z-20 mt-1 w-max max-w-[15rem] -translate-x-1/2 rounded-[3px] bg-ink px-2.5 py-1.5 text-sm text-white shadow-lg'
-            : 'fixed inset-x-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-sm rounded-[4px] border border-line bg-surface p-4 text-sm text-ink shadow-xl lg:bottom-4'}
+            ? 'absolute left-1/2 top-full z-20 mt-1 w-max max-w-[15rem] -translate-x-1/2 rounded-[6px] bg-ink px-2.5 py-1.5 text-sm text-white shadow-lg'
+            : 'fixed inset-x-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-sm rounded-[10px] border border-line bg-surface p-4 text-sm text-ink shadow-xl md:bottom-4'}
         >
           {!hasHover && <p className="text-[15px] font-bold">{formatWeekdayMonthDay(date)}</p>}
           {hasHover ? <p>{tooltipText}</p> : (
             <p className="mt-0.5 text-muted">
-              <span>{stateLabel(category, isAlternative, isBlackout, isOutOfRange)}</span>
+              <span>{stateLabel(category, isAlternative, isBlackout, isOutOfRange, holidayKind)}</span>
               {tooltipText && <>. <span>{tooltipText}</span></>}
             </p>
           )}

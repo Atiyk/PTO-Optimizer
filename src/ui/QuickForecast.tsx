@@ -51,12 +51,12 @@ export function QuickForecast({ policy, requests = [], forecastDate, onForecastD
   const explanation = showExplanation && forecast ? explainConnectedPolicy(policy, forecastDate, requests) : null;
   const presets = forecastPresets(policy.balanceAsOf);
   return (
-    <section aria-labelledby={`${dateId}-heading`} className="min-w-0 rounded-[4px] border border-ink bg-surface p-4 sm:p-6">
+    <section aria-labelledby={`${dateId}-heading`} className="min-w-0 rounded-[10px] border border-ink bg-surface p-4 sm:p-6">
       <h2 id={`${dateId}-heading`} className="text-h2 font-bold type-condensed text-ink">PTO balance forecast</h2>
       <label htmlFor={dateId} className="mt-3 block text-sm font-semibold text-ink">Forecast my balance on</label>
       <input
         id={dateId} type="date" min={policy.balanceAsOf} value={forecastDate}
-        className="mt-1.5 h-11 w-full min-w-0 rounded-[3px] border border-line-strong bg-surface px-3 text-base text-ink"
+        className="mt-1.5 h-11 w-full min-w-0 rounded-[6px] border border-line-strong bg-surface px-3 text-base text-ink"
         onChange={(event) => { onForecastDateChange(event.target.value); onForecastUsed?.(); }}
       />
       {presets.length > 0 && (
@@ -66,7 +66,7 @@ export function QuickForecast({ policy, requests = [], forecastDate, onForecastD
               key={preset.key}
               type="button"
               aria-pressed={forecastDate === preset.date}
-              className="min-h-11 min-w-0 rounded-[3px] border border-line-strong bg-surface px-1 text-sm font-semibold text-ink transition-colors duration-150 hover:border-ink hover:bg-surface-alt aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-white"
+              className="min-h-11 min-w-0 rounded-[6px] border border-line-strong bg-surface px-1 text-sm font-semibold text-ink transition-colors duration-150 hover:border-ink hover:bg-surface-alt aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-white"
               onClick={() => { onForecastDateChange(preset.date); onForecastUsed?.(); }}
             >
               {preset.label}
@@ -88,7 +88,7 @@ export function QuickForecast({ policy, requests = [], forecastDate, onForecastD
           </p>
           {upcomingLoss && (
             <p role="status" className="mt-3 flex gap-2 text-sm font-semibold text-ink">
-              <span aria-hidden="true" className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center bg-ink text-xs font-bold text-white">!</span>
+              <span aria-hidden="true" className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-warning text-xs font-bold text-white">!</span>
               <span>
                 {compactDatesIn(upcomingLoss.text)}{' '}
                 <span className="font-normal">
@@ -110,8 +110,8 @@ export function QuickForecast({ policy, requests = [], forecastDate, onForecastD
           </dl>
           <p className="mt-3 text-xs leading-5 text-muted">Subject to your cap, resets and borrowing limit. Scheduled PTO counts approved requests and planned days in your policy; days on or before {compactDate(policy.balanceAsOf)} are already in your balance.</p>
           {confirmed.unfunded > 0.000001 && (
-            <p role="status" className="mt-4 flex gap-2 rounded-[4px] border border-ink bg-accent-soft p-3 text-sm text-ink">
-              <span aria-hidden="true" className="mt-1.5 inline-block h-2.5 w-2.5 shrink-0 bg-ink" />
+            <p role="status" className="mt-4 flex gap-2 rounded-[10px] border border-ink bg-accent-soft p-3 text-sm text-ink">
+              <span aria-hidden="true" className="mt-1.5 inline-block h-2.5 w-2.5 shrink-0 rounded-[2px] bg-accent" />
               <span>Your scheduled leave exceeds the estimated balance by {number(confirmed.unfunded)} {unit}. The displayed balance stops at your borrowing limit; that does not make this leave affordable.</span>
             </p>
           )}

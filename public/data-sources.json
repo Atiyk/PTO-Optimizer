@@ -9,7 +9,7 @@
       "url": "https://date.nager.at",
       "description": "Public holiday dates and names by country and, where available, by subdivision (state/province/county).",
       "coverage": "All countries this tool supports (United States, United Kingdom, Canada, Australia, Germany, Ireland, India, and any other country selectable in the Country field). Subdivision-level detail varies by country.",
-      "accessPattern": "Fetched live from the browser on each visit, one request per (country, year); cached in the browser's localStorage so repeat visits for the same country/year don't re-fetch.",
+      "accessPattern": "Served with the site as a snapshot for 2026-2028 and cached in the browser. For other years the browser asks Nager.Date directly, one request per (country, year).",
       "license": "Public domain / open data, per Nager.Date's own terms."
     },
     {
@@ -17,7 +17,7 @@
       "name": "TSA checkpoint travel numbers",
       "url": "https://www.tsa.gov/travel/passenger-volumes",
       "description": "Daily US airport security checkpoint throughput, used as a proxy for how many people are travelling on a given date.",
-      "coverage": "United States only. Other countries fall back to a generic seasonal estimate, built from the same US data and labelled \"Estimated\" wherever it's shown.",
+      "coverage": "United States only. Other countries use a simple seasonal estimate, not derived from travel data, labelled as an estimate.",
       "accessPattern": "A static, pre-built index checked into the app (see scripts/build-demand-index.ts) - not fetched live.",
       "license": "US public domain (government work)."
     }

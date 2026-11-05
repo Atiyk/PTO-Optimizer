@@ -24,7 +24,7 @@ export const ITEMS: FAQItem[] = [
   {
     question: 'Where does the travel data come from?',
     answer:
-      'Daily US TSA checkpoint throughput, public domain, linked below. It measures how many people are flying, not ticket prices, and uses last year’s figures as a proxy for this year’s patterns. It is US-only; other countries fall back to a generic seasonal estimate, labelled "Estimated". It does not predict fares. The Travel score and its percentile are built from this same throughput data, which moves far less than destination-level prices do.',
+      'Daily US TSA checkpoint counts from 2025, public domain, linked below. They measure how many people flew, not ticket prices, and are lined up with your dates by calendar date. Because they are not realigned by weekday, day-to-day differences in other years are approximate. Other countries use a simple seasonal estimate (late December, July and August, and March to April count as busier), labelled as an estimate. It does not predict fares.',
   },
   {
     question: 'Why are the suggestions all near holidays?',
@@ -39,7 +39,7 @@ export const ITEMS: FAQItem[] = [
   {
     question: 'Will I get the same result if I come back?',
     answer:
-      'Yes - the same inputs always produce the same plan. That is why a shared link reproduces exactly what the sender saw.',
+      "Yes, as long as the link includes its dates and the holiday data hasn't been updated since. That is why a shared link reproduces what the sender saw.",
   },
 ];
 
@@ -50,7 +50,7 @@ export function FAQ() {
       <div className="flex flex-col divide-y divide-line border-y border-line">
         {ITEMS.map((item) => (
           <details key={item.question} className="group">
-            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-[3px] py-2 text-left hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] [&::-webkit-details-marker]:hidden">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-[6px] py-2 text-left hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] [&::-webkit-details-marker]:hidden">
               <h3 className="text-[15px] font-semibold text-ink">
                 {item.question}
               </h3>

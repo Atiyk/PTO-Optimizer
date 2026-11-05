@@ -215,3 +215,37 @@ describe('DayCell coarse-pointer disclosure', () => {
     expect(onToggle).not.toHaveBeenCalled();
   });
 });
+
+describe('Ink & Signal Blue calendar semantics', () => {
+  const cell = (over: Partial<Parameters<typeof DayCell>[0]>) => renderToStaticMarkup(
+    <DayCell date="2027-11-25" dayOfMonth={25} category="public-holiday" hasOverlap={false} isAlternative={false} isToday={false}
+      inBand={false} isHighlighted={false} isBlackout={false} isOutOfRange={false} marginalValue={null} holidayName="Thanksgiving"
+      hasHover onToggle={() => {}} {...over} />,
+  );
+
+  it('draws a public holiday in teal on the soft teal fill, with a round marker and its name', () => {
+    const html = cell({});
+    expect(html).toContain('bg-holiday-soft');
+    expect(html).toContain('text-[var(--holiday-ink)]');
+    expect(html).toContain('rounded-full');
+    expect(html).toContain('public holiday');
+  });
+
+  it('lets the recommended run show through a holiday inside a break, keeping the teal numeral', () => {
+    const html = cell({ inBand: true });
+    expect(html).not.toContain('bg-holiday-soft');
+    expect(html).toContain('text-[var(--holiday-ink)]');
+  });
+
+  it('marks an employer day off with a square, and says so', () => {
+    const html = cell({ holidayKind: 'company', holidayName: 'Office closed' });
+    expect(html).toContain('rounded-[1px]');
+    expect(html).toContain('employer day off');
+  });
+
+  it('hatches a blackout day instead of colouring it', () => {
+    const html = cell({ category: 'working', isBlackout: true, holidayName: undefined });
+    expect(html).toContain('repeating-linear-gradient');
+    expect(html).toContain('blackout, cannot be used for PTO');
+  });
+});

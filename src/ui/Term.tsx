@@ -50,7 +50,7 @@ export function Term({ id, children }: { id: string; children?: React.ReactNode 
       {open && (
         <span
           role="tooltip"
-          className="absolute left-1/2 top-full z-20 mt-1 w-max max-w-[min(18rem,calc(100vw-2rem))] -translate-x-1/2 rounded-[3px] bg-ink px-2.5 py-2 text-sm font-normal text-white shadow-lg"
+          className="absolute left-1/2 top-full z-20 mt-1 w-max max-w-[min(18rem,calc(100vw-2rem))] -translate-x-1/2 rounded-[6px] bg-ink px-2.5 py-2 text-sm font-normal text-white shadow-lg"
         >
           <span className="block font-semibold">{term.term}</span>
           <span className="mt-0.5 block">{term.short}</span>

@@ -3,7 +3,7 @@ import { InfoHint } from './InfoHint';
 /** UI density pass: moved off its own permanent line, into a hover/focus hint on the label -
  * still true, just no longer worth a fourth line of prose above the calendar on every load. */
 const TRAVEL_HINT =
-  "Not travelling? Set this toward 0 — this slider is about demand on your dates, not whether you're going anywhere.";
+  "Not travelling? Set this toward 0 — this slider is about demand on your dates, not whether you're going anywhere. Outside the US this uses a rough seasonal estimate.";
 
 // Captions for every step (0, 10, 20, ..., 100) of the weighting slider. The 0 and 100
 // wordings match the spec's own definitions verbatim; the rest fill in a legible gradient

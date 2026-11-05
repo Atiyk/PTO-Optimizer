@@ -6,7 +6,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#f4f4f0" />
+    <meta name="theme-color" content="#f8fafc" />
     <title>URL parameter contract &mdash; Gapless PTO Optimizer</title>
     <meta
       name="description"
@@ -16,11 +16,11 @@
     <link rel="preload" href="/fonts/archivo-latin-var.woff2" as="font" type="font/woff2" crossorigin />
     <style>
       @font-face{font-family:'Archivo Variable';src:url('/fonts/archivo-latin-var.woff2') format('woff2-variations'),url('/fonts/archivo-latin-var.woff2') format('woff2');font-style:normal;font-weight:400 800;font-stretch:75% 100%;font-display:swap}
-      :root{color-scheme:light;--page:#f4f4f0;--paper:#fff;--alt:#eaeae4;--ink:#141414;--muted:#56564f;--line:#dcdcd5;--line-strong:#86867e;--hover:#3a3a35;--ease:cubic-bezier(.23,1,.32,1)}
+      :root{color-scheme:light;--page:#f8fafc;--paper:#fff;--alt:#f1f4f6;--ink:#1b2935;--muted:#536575;--line:#dce3ea;--line-strong:#75838f;--hover:#1d4c88;--ease:cubic-bezier(.23,1,.32,1)}
       *{box-sizing:border-box}
       html{background:var(--page);-webkit-text-size-adjust:100%}
       body{margin:0;background:var(--page);color:var(--ink);font:16px/1.5 'Archivo Variable',Arial,system-ui,-apple-system,sans-serif;font-stretch:100%;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
-      ::selection{background:#dcf763;color:var(--ink)}
+      ::selection{background:#245da6;color:var(--ink)}
       h1,h2{text-wrap:balance}p{text-wrap:pretty}
       a{color:var(--ink);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.22em;transition:text-decoration-thickness 150ms var(--ease)}
       a:hover{text-decoration-thickness:2px}
@@ -61,7 +61,7 @@
   <body>
     <a class="skip" href="#main-content">Skip to main content</a>
     <header><div class="shell">
-      <a href="/" class="brand"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect x="1" y="1" width="30" height="30" rx="5" fill="#141414"/><rect x="1" y="11" width="30" height="10" fill="#dcf763"/><rect x="10" y="13" width="5" height="6" rx="0.75" fill="#141414"/><rect x="17" y="13" width="5" height="6" rx="0.75" fill="#141414"/></svg><span><strong>Gapless</strong> <small>PTO Optimizer</small></span></a>
+      <a href="/" class="brand"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#245da6"/><path d="M24.5 16A8.5 8.5 0 0 0 21.46 9.49" stroke="#8fd6ca" fill="none" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21.46 9.49A8.5 8.5 0 1 0 24.5 16H17" stroke="#ffffff" fill="none" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><strong>Gapless</strong> <small>PTO Optimizer</small></span></a>
       <nav class="nav" aria-label="Quick links"><a href="/sabbatical">Sabbatical</a><a href="/policy">My PTO</a><a href="/glossary">Learn</a><a href="/pto" class="cta">Plan PTO</a></nav>
     </div></header>
     <main id="main-content" class="shell" tabindex="-1">
@@ -85,7 +85,7 @@
           <tr><th>Param</th><th>Type</th><th>Default</th><th>What it does</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>c</code></td><td>ISO country code, e.g. <code>US</code>, <code>GB</code></td><td>Geolocated guess</td><td>Country used for public holidays.</td></tr>
+          <tr><td><code>c</code></td><td>ISO country code, e.g. <code>US</code>, <code>GB</code></td><td>Guessed from browser language</td><td>Country used for public holidays.</td></tr>
           <tr><td><code>sd</code></td><td>string</td><td>&mdash;</td><td>Subdivision (state/province) code for region-specific holidays, where the country supports it.</td></tr>
           <tr><td><code>s</code></td><td>date, <code>YYYY-MM-DD</code></td><td>Today</td><td>Date range start.</td></tr>
           <tr><td><code>e</code></td><td>date, <code>YYYY-MM-DD</code></td><td>Dec 31 this year</td><td>Date range end.</td></tr>
@@ -154,7 +154,7 @@
           <tr><th>Param</th><th>Type</th><th>Default</th><th>What it does</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>c</code></td><td>ISO country code</td><td>Geolocated guess</td><td>Country used for public holidays.</td></tr>
+          <tr><td><code>c</code></td><td>ISO country code</td><td>Guessed from browser language</td><td>Country used for public holidays.</td></tr>
           <tr><td><code>len</code></td><td>number, 1&ndash;52</td><td><code>4</code></td><td>Sabbatical length, in weeks.</td></tr>
           <tr><td><code>s</code></td><td>date, <code>YYYY-MM-DD</code></td><td>Today</td><td>Earliest eligible start date.</td></tr>
           <tr><td><code>pto</code></td><td>number, 0&ndash;15</td><td><code>5</code></td><td>PTO days to add, extending the block (spent before unpaid leave).</td></tr>

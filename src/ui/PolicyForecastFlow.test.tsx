@@ -84,7 +84,7 @@ describe('quick policy forecast in the real consumer page', () => {
     render(<Policy />);
     expect(forecastOutput().getByText(/current carried PTO portion must be between zero and your current balance/)).toBeTruthy();
     expect(forecastOutput().queryByText('Estimated available PTO on Apr 1, 2027')).toBeNull();
-    expect(screen.queryByText(/Nothing to flag — no forfeiture/)).toBeNull();
+    expect(screen.queryByText(/Nothing to flag: no forfeiture/)).toBeNull();
     expect(screen.queryByText(/No balance to chart — unlimited/)).toBeNull();
   });
 

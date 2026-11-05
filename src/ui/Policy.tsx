@@ -72,7 +72,7 @@ function Field({ label, termId, children }: { label: string; termId?: string; ch
   );
 }
 
-const inputClass = 'h-11 w-full min-w-0 rounded-[3px] border border-line-strong bg-surface px-3 text-base text-ink';
+const inputClass = 'h-11 w-full min-w-0 rounded-[6px] border border-line-strong bg-surface px-3 text-base text-ink';
 const selectClass = 'select-ink h-11 w-full min-w-0 text-base';
 const checkRow = 'flex min-h-11 items-center gap-2 text-sm text-ink';
 
@@ -154,6 +154,7 @@ export function Policy() {
   const [payoutOnLeaving, setPayoutOnLeaving] = useState<TimeOffPolicy['payoutOnLeaving']>(d.payoutOnLeaving);
 
   const [currentBalance, setCurrentBalance] = useState(d.currentBalance);
+  const needsBalance = currentBalance === 0;
   const [balanceAsOf, setBalanceAsOf] = useState(d.balanceAsOf);
   const [plannedDays, setPlannedDays] = useState<string[]>(d.plannedDays);
   const [currentCarriedBalance, setCurrentCarriedBalance] = useState(d.currentCarriedBalance ?? 0);
@@ -283,12 +284,14 @@ export function Policy() {
             Enter your balance and how you earn PTO. The forecast and the expiry check update as you type; the rest of your policy lives in Advanced options.
           </p>
 
+          {/* Phones: until a balance is entered, the inputs come first (a forecast from a zero
+              balance answers nothing); after that the answer leads. */}
           {/* Inputs left, the answer right (sticky on desktop). Below lg the answer column
               dissolves (display: contents) so its two parts can be ordered answer, inputs,
               risk: the number first, then what drives it, then what could be lost. */}
           <div id="balance" className="mt-6 flex scroll-mt-24 flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,27rem)]">
-            <div className="order-2 flex min-w-0 flex-col gap-6 lg:order-none lg:col-start-1 lg:row-start-1">
-              <section aria-label="Quick balance forecast" className="min-w-0 rounded-[4px] border border-line bg-surface p-4 sm:p-6">
+            <div className={`${needsBalance ? 'order-1' : 'order-2'} flex min-w-0 flex-col gap-6 lg:order-none lg:col-start-1 lg:row-start-1`}>
+              <section aria-label="Quick balance forecast" className="min-w-0 rounded-[10px] border border-line bg-surface p-4 sm:p-6">
                 <h2 className="text-h2 font-bold type-condensed text-ink">Your balance and how you earn it</h2>
                 <p className="mt-1 text-sm text-muted">Use your real balance and employer rules. Full carryover at reset is assumed until you choose another rule.</p>
                 <div className="mt-5 grid gap-x-4 gap-y-4 sm:grid-cols-2">
@@ -313,7 +316,7 @@ export function Policy() {
                 {saveMessage && <p role="status" className="mt-1 text-sm text-muted">{saveMessage}</p>}
               </section>
 
-              <details className="group min-w-0 rounded-[4px] border border-line bg-surface">
+              <details className="group min-w-0 rounded-[10px] border border-line bg-surface">
                 <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
                   <span>
                     <span className="block text-lg font-bold type-condensed text-ink">Advanced policy options and explanation</span>
@@ -342,7 +345,7 @@ export function Policy() {
                           }}
                           rows={5}
                           placeholder="Paste a paragraph from your handbook — nothing here is stored or put in the URL."
-                          className="w-full rounded-[3px] border border-line-strong bg-surface p-3 text-base text-ink"
+                          className="w-full rounded-[6px] border border-line-strong bg-surface p-3 text-base text-ink"
                         />
                         <p className="mt-1 text-xs text-muted">
                           Never stored, never in the URL — cleared on reload. We only match it against our own glossary.
@@ -571,12 +574,12 @@ export function Policy() {
                     <section>
                       <h3 className="mb-2 text-base font-bold text-ink">Alerts</h3>
                       {!projection ? <p role="status" className="text-sm text-muted">Check the policy inputs before relying on expiration or cap warnings.</p> : alerts.length === 0 ? (
-                        <p className="text-sm text-muted">Nothing to flag — no forfeiture, cap, or deadline risk in the next 18 months.</p>
+                        <p className="text-sm text-muted">Nothing to flag: no forfeiture, cap or deadline risk in the 18 months after your balance date.</p>
                       ) : (
                         <ul className="flex flex-col divide-y divide-line border-y border-line">
                           {alerts.map((a) => (
                             <li key={a.id} className="flex gap-2 py-3 text-sm text-ink">
-                              <span aria-hidden="true" className="mt-1.5 inline-block h-2.5 w-2.5 shrink-0 bg-ink" />
+                              <span aria-hidden="true" className="mt-1.5 inline-block h-2.5 w-2.5 shrink-0 rounded-[2px] bg-warning" />
                               <div>
                                 <p>{compactDatesIn(a.text)}</p>
                                 {a.daysAtStake > 0 && (
@@ -630,7 +633,7 @@ export function Policy() {
             </div>
 
             <div className="contents lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:flex lg:flex-col lg:gap-4">
-              <div className="order-1 min-w-0 lg:order-none">
+              <div className={`${needsBalance ? 'order-2' : 'order-1'} min-w-0 lg:order-none`}>
                 <QuickForecast policy={policy} requests={ledger.requests} upcomingLoss={upcomingLoss} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')} />
               </div>
               <div id="expiration" className="order-3 min-w-0 scroll-mt-24 lg:order-none">
@@ -639,7 +642,7 @@ export function Policy() {
             </div>
             <div id="requests" className="order-4 mt-6 min-w-0 scroll-mt-24 lg:order-none lg:col-start-1 lg:row-start-2 lg:mt-4">
               <PtoTracker today={visitDate} ledger={ledger} calendar={trackerCalendar.calendar} calendarReady={!trackerCalendar.loading && !trackerCalendar.degraded} calendarNotice={trackerCalendar.loading ? 'Loading your employer calendar…' : trackerCalendar.degraded ? 'Holiday data or a calendar input is unavailable. Check the calendar settings before adding or changing request dates.' : selectedForecast?.confirmed.balance === null || selectedForecast?.confirmed.balance === undefined ? undefined : `Projected balance on ${compactDate(forecastDate)}: ${new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(selectedForecast.confirmed.balance)} ${unit}. Approved requests you track here reduce it.`} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
-              <details className="group mt-3 rounded-[4px] border border-line bg-surface">
+              <details className="group mt-3 rounded-[10px] border border-line bg-surface">
                 <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 font-semibold text-ink sm:px-6 [&::-webkit-details-marker]:hidden">
                   My request calendar and workweek
                   <span aria-hidden="true" className="shrink-0 text-xl leading-none group-open:rotate-45 motion-safe:transition-transform">+</span>

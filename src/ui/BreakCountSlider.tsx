@@ -80,7 +80,7 @@ export function BreakCountSlider({
           checked={letSolverDecide}
           onChange={(e) => onToggleLetSolverDecide(e.target.checked)}
         />
-        Let the solver decide
+        Let the planner choose
       </label>
       {/* Dimmed AND desaturated as a single block (labels + thumb together) - opacity alone
           left a still-fully-coloured thumb sitting at a specific position, which read as

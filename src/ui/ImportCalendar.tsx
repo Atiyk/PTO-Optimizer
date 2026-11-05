@@ -88,10 +88,10 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
           const file = e.target.files?.[0];
           if (file) handleFile(file);
         }}
-        className="block w-full max-w-full text-sm text-muted file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-[3px] file:border file:border-solid file:border-ink file:bg-surface file:px-4 file:text-sm file:font-semibold file:text-ink hover:file:bg-surface-alt"
+        className="block w-full max-w-full text-sm text-muted file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-[6px] file:border file:border-solid file:border-ink file:bg-surface file:px-4 file:text-sm file:font-semibold file:text-ink hover:file:bg-surface-alt"
       />
       {state.kind === 'error' && (
-        <p role="alert" className="mt-2 text-sm font-semibold text-ink">
+        <p role="alert" className="mt-2 text-sm font-semibold text-error">
           {state.message}
         </p>
       )}
@@ -106,7 +106,7 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
               This file has more than {state.result.cappedAt} events &mdash; only the first {state.result.cappedAt} were read.
             </p>
           )}
-          <details className="mt-1 rounded-[3px] border border-line bg-surface px-2">
+          <details className="mt-1 rounded-[6px] border border-line bg-surface px-2">
             <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-ink">Review individual dates</summary>
             <p className="mb-2 break-words text-sm text-muted">
               {state.result.busyDays.slice(0, 30).join(', ')}

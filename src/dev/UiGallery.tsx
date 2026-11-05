@@ -68,7 +68,7 @@ function Bare() {
         <Section title="Tokens">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
             {SWATCHES.map(([v, name]) => (
-              <div key={v} className="overflow-hidden rounded-[4px] border border-line bg-surface">
+              <div key={v} className="overflow-hidden rounded-[10px] border border-line bg-surface">
                 <div className="h-14" style={{ background: `var(${v})` }} />
                 <div className="px-3 py-2 text-xs">
                   <div className="font-semibold text-ink">{name}</div>
@@ -215,7 +215,7 @@ function Bare() {
                 <details key={q} open={i === 0} className="group border-b border-line">
                   <summary className="flex min-h-11 cursor-pointer list-none items-start justify-between gap-4 py-4 [&::-webkit-details-marker]:hidden">
                     <span className="font-semibold text-ink">{q}</span>
-                    <span aria-hidden="true" className="relative mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[3px] border border-ink group-open:bg-ink">
+                    <span aria-hidden="true" className="relative mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border border-ink group-open:bg-ink">
                       <span className="absolute h-[1.5px] w-2.5 bg-ink group-open:bg-white" />
                       <span className="absolute h-2.5 w-[1.5px] bg-ink group-open:hidden" />
                     </span>
@@ -226,7 +226,7 @@ function Bare() {
             </div>
             <div className="lg:col-span-2">
               <p className="mb-2 text-sm text-muted">Worked example and day cells</p>
-              <div className="rounded-[4px] border border-line bg-surface p-5">
+              <div className="rounded-[10px] border border-line bg-surface p-5">
                 <p className="text-lg font-bold text-ink"><span className="mark">12 unused − 5 carried = 7 days above the cap.</span></p>
                 <ol className="mt-4 flex max-w-sm">
                   {[['Thu', 'Holiday', false], ['Fri', 'PTO', true], ['Sat', 'Weekend', false], ['Sun', 'Weekend', false]].map(([d, n, pto]) => (
@@ -244,7 +244,7 @@ function Bare() {
         <Section title="Header (each active state)">
           <div className="flex flex-col gap-3">
             {routes.map((r) => (
-              <div key={r} className="overflow-hidden rounded-[4px] border border-line">
+              <div key={r} className="overflow-hidden rounded-[10px] border border-line">
                 <SiteHeader active={r} />
               </div>
             ))}
@@ -269,7 +269,7 @@ function Frame({ width }: { width: number }) {
   return (
     <div>
       <p className="mb-2 text-sm font-semibold text-ink">{width}px</p>
-      <div className="overflow-x-auto rounded-[4px] border border-line bg-surface">
+      <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
         <iframe ref={ref} title={`Gallery at ${width}px`} src="?bare" width={width} height={height} className="block border-0" />
       </div>
     </div>

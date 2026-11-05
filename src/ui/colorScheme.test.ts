@@ -61,7 +61,7 @@ describe("the calendar's two colours plus the holiday dot stay distinguishable, 
 
 describe('regression: a weekend/holiday numeral sitting on the band fill must use BAND_TEXT, not TEXT_PRIMARY', () => {
   it('BAND_TEXT is its own token, pinned regardless of TEXT_PRIMARY - bandBg never changes, so neither does the text that sits on it', () => {
-    expect(BAND_TEXT).toEqual([20, 20, 20]); // #141414 ink on the marker
+    expect(BAND_TEXT).toEqual([27, 41, 53]); // #1b2935 ink on the soft blue run; was the marker
   });
 
   it('BAND_TEXT on the band fill passes 4.5:1', () => {

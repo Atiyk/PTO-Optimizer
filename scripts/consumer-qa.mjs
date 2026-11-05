@@ -146,11 +146,19 @@ try {
         // A keyboard walk may leave the country listbox open. Finish that interaction
         // before independently testing the navigation menu and options disclosure.
         await page.keyboard.press('Escape');
-        if (width < 1024) {
-          // 2026-11 redesign: the Menu disclosure became a bottom tab bar of real links.
-          const tabs = page.getByRole('navigation', { name: 'Tools' });
-          result.tabBarDestinations = (await tabs.getByRole('link').allTextContents()).map((t) => t.trim());
-        }
+        // 2026-11 IA overhaul: three destinations (Plan, My PTO, Learn). Below 768px they
+        // are a fixed bottom tab bar ("Tools"); from 768px up they are the header's "Main"
+        // nav. Exactly one of the two must be visible and list the three destinations.
+        const visibleNavLinks = async (name) => {
+          const nav = page.getByRole('navigation', { name });
+          if (!(await nav.count()) || !(await nav.first().isVisible())) return [];
+          return (await nav.first().getByRole('link').allTextContents()).map((t) => t.trim());
+        };
+        result.tabBarDestinations = await visibleNavLinks('Tools');
+        result.mainNavDestinations = await visibleNavLinks('Main');
+        result.destinationsReachable = JSON.stringify(width < 768 ? result.tabBarDestinations : result.mainNavDestinations)
+          === JSON.stringify(['Plan', 'My PTO', 'Learn'])
+          && (width < 768 ? result.mainNavDestinations.length === 0 : result.tabBarDestinations.length === 0);
         if (route.name === 'home') {
           // 2026-11 redesign: the hero is one live sentence ("I have [15] PTO days in
           // [country]") directly followed by the engine result. The guarantee kept from the
@@ -261,7 +269,7 @@ try {
           || result.optionsHorizontalOverflow || result.h1Count !== 1 || result.unlabeledInputs.length
           || result.unnamedButtons.length || result.loadingDidNotSettle || result.formSubmitControls
           || !result.correctRoute || result.guideContentVisible === false || result.guideExampleVisible === false || result.guideQuestionsVisible === false
-          || (result.tabBarDestinations && result.tabBarDestinations.length !== 5) || result.menuOpenedWithKeyboard === false || result.menuClosedWithEscape === false
+          || result.destinationsReachable === false || result.menuOpenedWithKeyboard === false || result.menuClosedWithEscape === false
           || result.menuFocusReturned === false || result.slidersVisible === false || result.slidersOutsideAdvanced === false
           || result.weightingKeyboardResponsive === false || result.plannerResponsiveHeadings === false
           || result.searchEmptyState === false || result.searchHidesUnrelatedPaths === false

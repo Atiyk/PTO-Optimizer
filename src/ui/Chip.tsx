@@ -20,14 +20,14 @@ export function Chip({
   className?: string;
 }) {
   const toneCls = tone === 'accent' ? 'bg-mark text-ink' : 'bg-surface-alt text-ink';
-  const base = `inline-flex items-center gap-1.5 rounded-[3px] px-2.5 py-1 text-sm font-semibold tabular-nums ${toneCls}`;
+  const base = `inline-flex items-center gap-1.5 rounded-[6px] px-2.5 py-1 text-sm font-semibold tabular-nums ${toneCls}`;
   if (!onClick) return <span className={`${base} ${className}`}>{children}</span>;
   return (
     <button
       type="button"
       aria-pressed={selected ?? false}
       onClick={onClick}
-      className={`${base} border transition-colors duration-150 ${selected ? 'border-ink bg-mark' : 'border-transparent hover:border-ink'} ${className}`}
+      className={`${base} border transition-colors duration-150 ${selected ? 'border-accent bg-accent-soft text-accent-ink' : 'border-transparent hover:border-ink'} ${className}`}
     >
       {selected && (
         <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">

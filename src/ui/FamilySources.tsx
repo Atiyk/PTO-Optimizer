@@ -10,8 +10,8 @@ import { Button } from './Button';
 import { copyText } from './requestText';
 
 const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
-const FIELD = `h-11 w-full min-w-0 rounded-[3px] border border-line-strong bg-surface px-3 text-base text-ink ${FOCUS}`;
-const FILE_INPUT = 'block w-full max-w-full text-sm text-muted file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-[3px] file:border file:border-solid file:border-ink file:bg-surface file:px-4 file:text-sm file:font-semibold file:text-ink hover:file:bg-surface-alt';
+const FIELD = `h-11 w-full min-w-0 rounded-[6px] border border-line-strong bg-surface px-3 text-base text-ink ${FOCUS}`;
+const FILE_INPUT = 'block w-full max-w-full text-sm text-muted file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-[6px] file:border file:border-solid file:border-ink file:bg-surface file:px-4 file:text-sm file:font-semibold file:text-ink hover:file:bg-surface-alt';
 
 /** Consecutive dates as ranges, for showing an .ics import in the confirm list. */
 function datesToRuns(dates: readonly string[]): { start: string; end: string }[] {
@@ -33,7 +33,7 @@ function Disclosure({ title, hint, children, defaultOpen = false }: { title: str
           <span className="block text-[15px] font-semibold text-ink">{title}</span>
           <span className="block text-sm text-muted">{hint}</span>
         </span>
-        <span aria-hidden="true" className="relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[3px] border border-ink group-open:bg-ink">
+        <span aria-hidden="true" className="relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border border-ink group-open:bg-ink">
           <span className="absolute h-[1.5px] w-2.5 bg-ink group-open:bg-white" />
           <span className="absolute h-2.5 w-[1.5px] bg-ink group-open:hidden" />
         </span>
@@ -80,14 +80,14 @@ export function DistrictPicker({ districtId, onChange }: { districtId?: string; 
         <legend className="text-xs text-muted">{query.trim() ? `${matches.length} of ${SCHOOL_DISTRICT_PRESETS.length} presets match` : `${SCHOOL_DISTRICT_PRESETS.length} district presets: search or scroll`}</legend>
         <ul id={listId} className="flex max-h-64 flex-col gap-1 overflow-y-auto pr-1">
           <li>
-            <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[3px] px-2 text-sm text-ink hover:bg-surface-alt">
+            <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[6px] px-2 text-sm text-ink hover:bg-surface-alt">
               <input type="radio" name="family-district" checked={!selected} onChange={() => onChange(undefined)} />
               No preset: I&apos;ll add my school&apos;s dates
             </label>
           </li>
           {matches.map((p) => (
             <li key={p.id}>
-              <label className={`flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[3px] px-2 py-1.5 text-sm text-ink hover:bg-surface-alt ${p.id === districtId ? 'bg-surface-alt' : ''}`}>
+              <label className={`flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[6px] px-2 py-1.5 text-sm text-ink hover:bg-surface-alt ${p.id === districtId ? 'bg-surface-alt' : ''}`}>
                 <input type="radio" name="family-district" checked={p.id === districtId} onChange={() => onChange(p.id)} />
                 <span className="min-w-0">
                   <span className="block font-semibold">{p.shortName}</span>
@@ -100,7 +100,7 @@ export function DistrictPicker({ districtId, onChange }: { districtId?: string; 
         </ul>
       </fieldset>
       {selected && (
-        <div className="rounded-[4px] bg-surface-alt p-3 text-sm text-ink">
+        <div className="rounded-[10px] bg-surface-alt p-3 text-sm text-ink">
           <p className="font-semibold">{selected.district}, {selected.schoolYear}</p>
           <p className="mt-0.5 text-muted">
             Classes {formatShortWithYear(selected.firstDay)} to {formatShortWithYear(selected.lastDay)} · {selected.closures.length} closures listed
@@ -290,7 +290,7 @@ export function ImportSources({
           rows={5}
           maxLength={50_000}
           placeholder={'Winter recess: Dec 21 – Jan 1\nNo school Mon, Feb 15'}
-          className={`w-full min-w-0 rounded-[3px] border border-line-strong bg-surface px-3 py-2 text-base text-ink ${FOCUS}`}
+          className={`w-full min-w-0 rounded-[6px] border border-line-strong bg-surface px-3 py-2 text-base text-ink ${FOCUS}`}
         />
         {pasted.trim() && pastedCandidates.length === 0 && <p className="mt-1 text-sm text-muted">No dates found yet. Dates like “Dec 21 – Jan 1” or “11/26/2026” work.</p>}
         {pastedCandidates.length > 0 && (

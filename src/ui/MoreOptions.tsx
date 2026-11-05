@@ -10,7 +10,7 @@ import { buttonClasses } from './Button';
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const H4_CLASS = 'mb-2 text-[15px] font-semibold text-ink';
-const FIELD_CLASS = 'h-11 min-w-0 max-w-full rounded-[3px] border border-line-strong bg-surface px-2.5 text-[15px] font-normal tabular-nums text-ink';
+const FIELD_CLASS = 'h-11 min-w-0 max-w-full rounded-[6px] border border-line-strong bg-surface px-2.5 text-[15px] font-normal tabular-nums text-ink';
 const CHECK_LABEL = 'flex min-h-11 w-fit cursor-pointer items-center gap-2 text-sm text-ink';
 const NOTE = 'mt-1 text-sm text-muted';
 
@@ -230,8 +230,8 @@ export function MoreOptions(props: MoreOptionsProps) {
         )}
         <p className={NOTE}>
           Off by default. Some employers cap how much leave you can take during a busy season
-          &mdash; turn this on if yours does. The rest of your budget still gets used, just moved
-          elsewhere in your range.
+          &mdash; turn this on if yours does. The planner moves PTO out of that window where it can;
+          days you pinned stay put.
         </p>
       </section>
 
@@ -307,8 +307,8 @@ export function MoreOptions(props: MoreOptionsProps) {
       <section>
         <h3 className={H4_CLASS}>Days I can&apos;t take off</h3>
         <p className="mb-2 text-sm text-muted">
-          Mandatory coverage, notice periods, quarter close, or any week you simply don&apos;t want &mdash; these
-          narrow what the solver can pick. They never count against your travel or efficiency scores.
+          Mandatory coverage, notice periods, quarter close, or any week you simply don&apos;t want. These
+          narrow what the solver can pick. The efficiency score compares plans under the same limits.
         </p>
         <DateListEditor label="Unavailable date to add" dates={props.blackouts} onAdd={props.onAddBlackout} onRemove={props.onRemoveBlackout} />
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -359,7 +359,7 @@ export function MoreOptions(props: MoreOptionsProps) {
                 type="button"
                 aria-label={`Delete ${h.name}`}
                 onClick={() => props.onRemoveHoliday(h.date, h.name)}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[3px] text-muted hover:bg-surface-alt hover:text-ink"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[6px] text-muted hover:bg-surface-alt hover:text-ink"
               >
                 &times;
               </button>}

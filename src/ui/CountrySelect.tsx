@@ -9,7 +9,7 @@ interface CountrySelectProps {
 }
 
 export const FIELD_CLASS =
-  'h-11 w-full appearance-none rounded-[3px] border border-line-strong bg-surface bg-[length:1rem] bg-[right_0.75rem_center] bg-no-repeat pl-3 pr-9 text-[15px] font-normal text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
+  'h-11 w-full appearance-none rounded-[6px] border border-line-strong bg-surface bg-[length:1rem] bg-[right_0.75rem_center] bg-no-repeat pl-3 pr-9 text-[15px] font-normal text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
 export const CHEVRON_BG = { backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23141414'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E\")" };
 
 /** Country only - the subdivision ("State") picker is a separate component
@@ -101,7 +101,7 @@ export function CountrySelect({ country, onChangeCountry, widthClass = 'w-56 max
           style={CHEVRON_BG}
         />
         {open && (
-          <ul id={listId} role="listbox" aria-labelledby={labelId} className="absolute z-20 mt-1 max-h-64 w-full min-w-56 max-w-[calc(100vw-2rem)] overflow-auto rounded-[4px] border border-line-strong bg-surface py-1 font-normal shadow-lg">
+          <ul id={listId} role="listbox" aria-labelledby={labelId} className="absolute z-20 mt-1 max-h-64 w-full min-w-56 max-w-[calc(100vw-2rem)] overflow-auto rounded-[10px] border border-line-strong bg-surface py-1 font-normal shadow-lg">
             {matches.map((c, index) => (
               <li
                 id={`${listId}-${c.code}`}

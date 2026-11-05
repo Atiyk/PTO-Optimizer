@@ -1,6 +1,7 @@
 import type { Break } from '@daysoff/engine/solver/types';
 import { formatDateRange } from '@daysoff/engine/calendar/dateFormat';
 import { copyCanvasImage, type ShareImageResult } from './imageExport';
+import { LOGO_COLORS, LOGO_GLYPH } from './logoMark';
 
 export const PORTRAIT_IMAGE_WIDTH = 1080;
 export const PORTRAIT_IMAGE_HEIGHT = 1350;
@@ -65,7 +66,7 @@ export function buildPortraitText(data: PortraitPlanData, includeBalance = false
 }
 
 // 2026-11 redesign palette (src/index.css): paper, ink, pencil, hairline, and the marker.
-const colors = { page: '#f4f4f0', card: '#ffffff', ink: '#141414', muted: '#56564f', line: '#dcdcd5', mark: '#dcf763' };
+const colors = { page: '#f8fafc', card: '#ffffff', ink: '#1b2935', muted: '#536575', line: '#dce3ea', accent: '#245da6', tint: '#e9f1fb' };
 
 function fitText(ctx: CanvasRenderingContext2D, value: string, maxWidth: number): string {
   if (ctx.measureText(value).width <= maxWidth) return value;
@@ -90,23 +91,27 @@ function wrapText(ctx: CanvasRenderingContext2D, value: string, x: number, y: nu
   if (line) ctx.fillText(fitText(ctx, line, width), x, y + lines * lineHeight);
 }
 
+function drawLogoMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+  const k = size / 32;
+  ctx.fillStyle = LOGO_COLORS.tile;
+  ctx.fillRect(x, y, size, size);
+  for (const [gx, gy, w, h, part] of LOGO_GLYPH) {
+    ctx.fillStyle = part === 'bridge' ? LOGO_COLORS.bridge : LOGO_COLORS.stroke;
+    ctx.fillRect(x + gx * k, y + gy * k, w * k, h * k);
+  }
+}
+
 export function drawPortraitImage(ctx: CanvasRenderingContext2D, data: PortraitPlanData, includeBalance = false): void {
   const text = buildPortraitText(data, includeBalance);
   ctx.fillStyle = colors.page;
   ctx.fillRect(0, 0, PORTRAIT_IMAGE_WIDTH, PORTRAIT_IMAGE_HEIGHT);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
-  // The mark: an ink sheet with a marked row and two ink day-blocks (src/ui/logoMark.ts).
+  // The mark: the bridged G (src/ui/logoMark.ts), drawn at 56px from the same geometry.
+  drawLogoMark(ctx, 64, 62, 56);
   ctx.fillStyle = colors.ink;
-  ctx.fillRect(64, 62, 56, 56);
-  ctx.fillStyle = colors.mark;
-  ctx.fillRect(64, 81, 56, 18);
-  ctx.fillStyle = colors.ink;
-  ctx.fillRect(81, 85, 9, 10);
-  ctx.fillRect(94, 85, 9, 10);
-  ctx.fillStyle = colors.ink;
-  ctx.font = '700 42px Archivo Variable, system-ui, sans-serif';
-  ctx.fillText('Gapless', 140, 106);
+  ctx.font = '760 42px Archivo Variable, system-ui, sans-serif';
+  ctx.fillText('gapless', 136, 104);
   ctx.font = '700 48px Archivo Variable, system-ui, sans-serif';
   ctx.fillText(fitText(ctx, text.title, 952), 64, 209);
   ctx.fillStyle = colors.muted;
@@ -114,9 +119,7 @@ export function drawPortraitImage(ctx: CanvasRenderingContext2D, data: PortraitP
   ctx.fillText(text.range, 64, 253);
   ctx.font = '800 41px Archivo Variable, system-ui, sans-serif';
   const summary = fitText(ctx, text.summary, 940);
-  ctx.fillStyle = colors.mark;
-  ctx.fillRect(58, 296, Math.min(ctx.measureText(summary).width + 12, 964), 44);
-  ctx.fillStyle = colors.ink;
+  ctx.fillStyle = colors.accent;
   ctx.fillText(summary, 64, 330);
   ctx.fillStyle = colors.muted;
   ctx.font = '400 21px Archivo Variable, system-ui, sans-serif';
@@ -129,8 +132,8 @@ export function drawPortraitImage(ctx: CanvasRenderingContext2D, data: PortraitP
     ctx.strokeStyle = colors.line;
     ctx.lineWidth = 2;
     ctx.strokeRect(64, y, 952, 204);
-    ctx.fillStyle = colors.mark;
-    ctx.fillRect(64, y, 10, 204);
+    ctx.fillStyle = colors.accent;
+    ctx.fillRect(64, y, 8, 204);
     ctx.fillStyle = colors.ink;
     ctx.font = '650 35px Archivo Variable, system-ui, sans-serif';
     ctx.fillText(fitText(ctx, brk.dates, 872), 100, y + 54);

@@ -20,7 +20,7 @@ export function Card({
   padded?: boolean;
 }) {
   return (
-    <Tag className={`rounded-[4px] border border-line bg-surface ${padded ? 'p-5 sm:p-6' : ''} ${className}`}>
+    <Tag className={`rounded-[10px] border border-line bg-surface ${padded ? 'p-5 sm:p-6' : ''} ${className}`}>
       {eyebrow && <p className="mb-2 text-sm font-semibold text-muted">{eyebrow}</p>}
       {children}
     </Tag>

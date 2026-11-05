@@ -13,13 +13,13 @@ const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outli
 /** Stage 3C's "interactive mini-example where it helps" - a tiny, static illustration for
  * the handful of terms a picture genuinely clarifies, not all 30 (most are better served by
  * the plain-English long definition alone). Drawn in the calendar's own language: PTO is a
- * solid ink block, days off are the marker run, and every cell also carries a word. */
+ * solid blue block, days off are the tinted run, and every cell also carries a word. */
 function MiniExample({ id }: { id: string }) {
   if (id === 'accrual-cap') {
     return (
       <ExampleBlock title="Example: a 22.5-day cap">
         <div className="h-3 w-full max-w-sm bg-surface-alt" aria-hidden="true">
-          <div className="h-full bg-ink" style={{ width: '100%' }} />
+          <div className="h-full bg-accent" style={{ width: '100%' }} />
         </div>
         <p className="mt-2 text-muted">Balance at the cap. Accrual pauses here until a day is taken.</p>
       </ExampleBlock>
@@ -43,7 +43,7 @@ function MiniExample({ id }: { id: string }) {
       <ExampleBlock title="Example: one PTO day, four days off">
         <ol className="flex max-w-sm">
           {days.map((day) => (
-            <li key={day.d} className={`flex flex-1 flex-col items-center py-2 text-center ${day.pto ? 'bg-ink text-white' : 'bg-mark text-ink'}`}>
+            <li key={day.d} className={`flex flex-1 flex-col items-center py-2 text-center ${day.pto ? 'bg-accent text-white' : 'bg-mark text-ink shadow-[inset_0_-3px_0_var(--accent)]'}`}>
               <span className="font-bold">{day.d}</span>
               <span className="text-sm">{day.note}</span>
             </li>
@@ -146,7 +146,7 @@ export function GlossaryTermPage({ termId }: { termId: string }) {
                     </ol>
                   </section>
 
-                  <section className="rounded-[4px] border border-line bg-surface p-5 sm:p-6" aria-labelledby="guide-example-heading">
+                  <section className="rounded-[10px] border border-line bg-surface p-5 sm:p-6" aria-labelledby="guide-example-heading">
                     <SubHeading id="guide-example-heading">A worked example</SubHeading>
                     <p className="mt-3 text-ink">{guide.example.setup}</p>
                     <p className="mt-4 text-lg font-bold leading-7 text-ink tabular-nums">
@@ -162,7 +162,7 @@ export function GlossaryTermPage({ termId }: { termId: string }) {
                     </ul>
                   </section>
 
-                  <section className="rounded-[4px] bg-surface-alt p-5 sm:p-6" aria-labelledby="guide-hr-heading">
+                  <section className="rounded-[10px] bg-surface-alt p-5 sm:p-6" aria-labelledby="guide-hr-heading">
                     <SubHeading id="guide-hr-heading">Three questions for HR</SubHeading>
                     <ol className="mt-3 list-decimal space-y-2 pl-5 text-ink">
                       {guide.hrQuestions.map((question) => <li key={question} className="pl-1">{question}</li>)}
