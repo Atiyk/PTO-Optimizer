@@ -22,7 +22,7 @@ export async function buildOrg(db: Db, name: string) {
   const { org, owner, team, location } = await createOrganization(
     db,
     { provider: 'dev', subject: `${name}-owner`, name: `${name} Owner`, email: null, slackTeamId: null, issuedAt: 0 },
-    { orgName: name, countryCode: 'US', today: TODAY, teamName: 'Eng' },
+    { orgName: name, countryCode: 'US', today: TODAY, teamName: 'Eng', now: NOW },
   );
   const mk = async (n: string, role: 'manager' | 'employee', managerId?: string) =>
     (await db.insert(members).values({ orgId: org.id, name: `${name} ${n}`, role, teamId: team.id, locationId: location.id, startDate: '2024-01-01', managerId, tags: ['engineer'] }).returning())[0]!;

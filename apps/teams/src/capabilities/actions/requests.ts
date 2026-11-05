@@ -312,6 +312,7 @@ export const submitLeaveRequest = defineCapability({
         .insert(leaveRequests)
         .values({
           orgId: actor.orgId,
+          createdAt: now,
           memberId: member.id,
           leaveTypeId: ev.leaveType.id,
           status,

@@ -63,7 +63,9 @@ export async function advanceEscalations(db: Db, orgId: string | null, now: Date
       steps.push({ requestId: r.id, kind: 'escalated', to: [to.id], level: target });
       continue;
     }
-    if (target === 0 && hours >= choice.slaHours && !r.lastRemindedAt) {
+    // An urgent request whose ladder has only one person can't move up a level, so that person
+    // is reminded at once instead of waiting out the SLA.
+    if (target === 0 && (hours >= choice.slaHours || urgent) && !r.lastRemindedAt) {
       const to = ladder[0]!;
       await db.update(leaveRequests).set({ lastRemindedAt: now }).where(and(eq(leaveRequests.orgId, r.orgId), eq(leaveRequests.id, r.id), isNull(leaveRequests.lastRemindedAt)));
       await audit(db, r.orgId, r.id, `Reminded the approver about request ${r.startDate} to ${r.endDate}`);

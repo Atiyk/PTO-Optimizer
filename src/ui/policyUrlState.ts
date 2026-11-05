@@ -192,7 +192,10 @@ export function writePolicyStateToURL(params: URLSearchParams, state: PolicyURLS
     params.delete('pda');
     params.delete('gd');
   }
-  if (state.accrualKind !== 'per-hour-worked') params.delete('hr'), params.delete('twh');
+  if (state.accrualKind !== 'per-hour-worked') {
+    params.delete('hr');
+    params.delete('twh');
+  }
   if (state.accrualKind !== 'unlimited') params.delete('edy');
 
   if (state.planYearKind !== 'calendar') params.set('py', PLAN_YEAR_CODE[state.planYearKind]);
