@@ -19,6 +19,7 @@ import { expirationRisks } from '../personal/expiration';
 import { compactDate, compactDatesIn } from './compactDate';
 import { initialPolicyPreferences, savePolicyPreferences, deletePolicyPreferences } from '../personal/policyPreferences';
 import { QuickForecast } from './QuickForecast';
+import { BalanceFromImage } from './BalanceFromImage';
 import { useRequestLedger } from './useRequestLedger';
 import { generateAlerts } from '../policy/alerts';
 import { generatePolicySummary } from '../policy/summary';
@@ -232,6 +233,15 @@ export function Policy() {
     window.history.replaceState(null, '', url);
   }, [currentPolicyURLState]);
 
+  // Query string for the expiry watch feed: the same state the URL carries, with the
+  // country always present because the feed has no geolocation default.
+  const watchSearch = useMemo(() => {
+    const params = new URLSearchParams();
+    writePolicyStateToURL(params, currentPolicyURLState);
+    params.set('c', country);
+    return params.toString();
+  }, [currentPolicyURLState, country]);
+
   const horizonEnd = useMemo(() => addMonthsISO(balanceAsOf, HORIZON_MONTHS), [balanceAsOf]);
   const projection = useMemo(() => forecastWithRequests(policy, horizonEnd, ledger.requests), [policy, horizonEnd, ledger.requests]);
   const selectedForecast = useMemo(() => forecastWithRequests(policy, forecastDate, ledger.requests), [policy, forecastDate, ledger.requests]);
@@ -287,6 +297,7 @@ export function Policy() {
                     <p id="current-balance-hint" className="text-xs leading-5 text-muted">{currentBalance === 0 ? 'Starts at 0 until you enter yours: the number on your payslip or HR portal.' : 'From your payslip or HR portal, on the date beside it.'}</p>
                   </div>
                   <Field label="Balance as-of date"><input type="date" value={balanceAsOf} onChange={event => setBalanceAsOf(event.target.value)} className={inputClass} /></Field>
+                  <BalanceFromImage unit={unit} hoursPerDay={hoursPerDay} today={visitDate} onUse={(balance, asOf) => { setCurrentBalance(balance); if (asOf) setBalanceAsOf(asOf); }} />
                   <Field label="How PTO accrues"><select value={accrualKind} onChange={event => setAccrualKind(event.target.value as AccrualMethod['kind'])} className={selectClass}><option value="front-loaded">Granted all at once</option><option value="per-pay-period">Each pay period</option><option value="per-hour-worked">For each hour worked</option><option value="unlimited">Unlimited PTO</option></select></Field>
                   <Field label="Balance unit"><select value={unit} onChange={event => setUnit(event.target.value as 'days' | 'hours')} className={selectClass}><option value="days">Days</option><option value="hours">Hours</option></select></Field>
                   {(accrualKind === 'per-pay-period' || accrualKind === 'front-loaded') && <Field label={`${unit === 'hours' ? 'Hours' : 'Days'} earned each ${accrualKind === 'front-loaded' ? 'grant' : 'pay period'}`}><input type="number" min={0} step="any" value={amount} onChange={event => setAmount(Number(event.target.value))} className={inputClass} /></Field>}
@@ -623,7 +634,7 @@ export function Policy() {
                 <QuickForecast policy={policy} requests={ledger.requests} upcomingLoss={upcomingLoss} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')} />
               </div>
               <div id="expiration" className="order-3 min-w-0 scroll-mt-24 lg:order-none">
-                <ExpirationGuard policy={policy} country={country} requests={ledger.requests} today={visitDate} onAlertViewed={() => track('expiration_alert_viewed')} onAlertAction={() => track('expiration_alert_action_taken')} />
+                <ExpirationGuard policy={policy} country={country} requests={ledger.requests} today={visitDate} holidayCalendar={trackerCalendar} subdivision={trackerSubdivision} watchSearch={watchSearch} onAlertViewed={() => track('expiration_alert_viewed')} onAlertAction={() => track('expiration_alert_action_taken')} />
               </div>
             </div>
             <div id="requests" className="order-4 mt-6 min-w-0 scroll-mt-24 lg:order-none lg:col-start-1 lg:row-start-2 lg:mt-4">
