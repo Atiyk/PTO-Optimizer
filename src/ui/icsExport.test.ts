@@ -113,7 +113,7 @@ describe('generateICS reminders', () => {
     const ics = generateICS([brk], () => false, FIXED_NOW, { enabled: true, leadDays: 14 });
     expect(ics).toContain('BEGIN:VALARM');
     expect(ics).toContain('ACTION:DISPLAY');
-    expect(ics).toContain('TRIGGER:PT0S');
+    expect(ics).toContain('TRIGGER:PT9H'); // 9:00 on the book-by day (was PT0S, midnight) - F2
     expect(ics).toContain('END:VALARM');
   });
 

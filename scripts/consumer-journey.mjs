@@ -429,7 +429,7 @@ try {
       assert.equal(await guard.getByText('You could lose 8 days on Apr 1, 2027.', { exact: true }).count(), 1);
       assert.equal(await guard.getByText('Last day to use this PTO: Mar 31, 2027.', { exact: true }).count(), 1);
     }, 'The entered reset must produce an exact use-by warning');
-    const handoff = guard.getByRole('link', { name: 'Find the best way to use those days →', exact: true });
+    const handoff = guard.getByRole('link', { name: 'Open this plan in the planner →', exact: true });
     const href = new URL(await handoff.getAttribute('href'), origin);
     assert.equal(href.pathname, '/pto');
     assert.equal(href.searchParams.get('b'), '8');

@@ -1,10 +1,17 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { TimeOffPolicy } from '../policy/model';
-import type { PtoRequest } from '../personal/requestLedger';
-import { EXPIRATION_REMINDER_LEADS, expirationReminders, expirationRisks, type ExpirationReminderLead } from '../personal/expiration';
+import type { PtoRequest, RequestCalendar } from '../personal/requestLedger';
+import { EXPIRATION_REMINDER_LEADS, expirationReminders, expirationRisks, type ExpirationReminderLead, type ExpirationRisk } from '../personal/expiration';
+import { formatRescueRange, rescueAmount, rescuePlans, rescueSentence, rescueSuggestions, type RescuePlan } from '../personal/expiryRescue';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import { useRequestCalendar } from './useRequestCalendar';
+import { Callout } from './Callout';
 import { forecastWithRequests } from '../personal/forecast';
 import { carryoverSnapshot } from '../personal/carryoverSnapshot';
 import { Button } from './Button';
+import { SubscribeFeed } from './SubscribeFeed';
+
+const WATCH_CALENDAR_NAME = 'Gapless PTO Optimizer - PTO expiry watch';
 import { downloadReminderICS } from './icsExport';
 import { compactDate, compactDatesIn } from './compactDate';
 
@@ -26,18 +33,87 @@ function loadPreferences(): GuardPreferences {
   } catch { return DEFAULT_PREFS; }
 }
 
+/** The employer calendar a rescue plan is placed on: work week plus observed days off.
+ * Loading it is asynchronous in the browser (public holidays come from /holidays/*.json). */
+export interface GuardHolidayCalendar {
+  calendar: RequestCalendar;
+  loading: boolean;
+  degraded: boolean;
+}
+
 export interface ExpirationGuardProps {
   policy: TimeOffPolicy;
   country: string;
   requests?: readonly PtoRequest[];
   today?: string;
+  /** The page's own holiday calendar (Policy passes its tracker calendar). Without it the
+   * guard loads the country's public holidays itself on a Monday to Friday week. */
+  holidayCalendar?: GuardHolidayCalendar;
+  subdivision?: string;
+  /** The /policy link's query string. When given, the guard offers the expiry watch feed
+   * (/api/watch), which recomputes risks and rescue dates each time the calendar refreshes. */
+  watchSearch?: string;
   onAlertViewed?: () => void;
   onAlertAction?: () => void;
 }
 
-export function ExpirationGuard({ policy, country, requests = EMPTY_REQUESTS, today, onAlertViewed, onAlertAction }: ExpirationGuardProps) {
+const visitDateNow = () => new Date().toISOString().slice(0, 10);
+
+export function ExpirationGuard(props: ExpirationGuardProps) {
+  return props.holidayCalendar ? <Guard {...props} holidayCalendar={props.holidayCalendar} /> : <GuardWithOwnCalendar {...props} />;
+}
+
+function GuardWithOwnCalendar(props: ExpirationGuardProps) {
+  const [visitDate] = useState(visitDateNow);
+  const year = Number((props.today ?? visitDate).slice(0, 4));
+  const loaded = useRequestCalendar({ country: props.country, subdivision: props.subdivision, rangeStart: `${year}-01-01`, rangeEnd: `${year + 2}-12-31`, workWeek: DEFAULT_WORK_WEEK });
+  return <Guard {...props} holidayCalendar={loaded} />;
+}
+
+function RescueDetails({ plan, risk, calendarState, onAlertAction }: { plan: RescuePlan | undefined; risk: ExpirationRisk; calendarState: 'loading' | 'ready' | 'degraded'; onAlertAction?: () => void }) {
+  if (calendarState === 'loading') {
+    return <p className="mt-2 pl-7 text-sm text-muted">Finding dates before {compactDate(risk.deadline)} that keep these days&hellip;</p>;
+  }
+  const short = plan?.shortfall;
+  const link = (label: string) => (
+    <a href={plan?.ptoHref ?? risk.ptoHref} className="link-mark inline-flex min-h-11 items-center text-sm font-semibold" onClick={onAlertAction}>{label}</a>
+  );
+  if (!plan || plan.breaks.length === 0) {
+    return (
+      <div className="mt-2 pl-7">
+        {short && <p className="text-sm text-ink"><strong>{rescueAmount(plan!, short.days)} can&apos;t be rescued.</strong> {short.message}</p>}
+        {!short && plan && plan.daysStillAtRisk === 0 && <p className="text-sm text-ink">An earlier suggestion on this list already keeps these days.</p>}
+        {risk.canPlan && link('Try other dates in the planner →')}
+      </div>
+    );
+  }
+  const many = plan.breaks.length > 2;
+  return (
+    <div className="mt-2 pl-7">
+      <Callout title={many
+        ? `Take ${plan.ptoDays} PTO days across ${plan.breaks.length} breaks before ${compactDate(plan.deadline)}${plan.kind === 'cap' ? ' to make room under your accrual cap.' : ` and ${plan.daysStillAtRisk > 0 ? `keep ${rescueAmount(plan, plan.daysRescued)} of ${rescueAmount(plan, plan.daysAtRisk)}` : `keep all ${rescueAmount(plan, plan.daysAtRisk)}`}.`}`
+        : rescueSentence(plan)}>
+        {many && (
+          <ul className="mt-1 space-y-0.5">
+            {plan.breaks.map((brk) => (
+              <li key={brk.start} className="text-sm">
+                <span className="font-semibold">{formatRescueRange(brk.start, brk.end)}</span>
+                <span className="text-muted">: {brk.ptoDays} PTO {brk.ptoDays === 1 ? 'day' : 'days'} for {brk.totalDaysOff} {brk.totalDaysOff === 1 ? 'day' : 'days'} off</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {short && <p className="mt-1 text-sm"><strong>{rescueAmount(plan, short.days)} can&apos;t be rescued.</strong> {short.message}</p>}
+      </Callout>
+      {calendarState === 'degraded' && <p className="mt-1 text-xs leading-5 text-muted">Public holidays couldn&apos;t be loaded, so these dates treat every day of your work week as a working day. Check them in the planner.</p>}
+      {link('Open this plan in the planner →')}
+    </div>
+  );
+}
+
+function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalendar, subdivision, watchSearch, onAlertViewed, onAlertAction }: ExpirationGuardProps & { holidayCalendar: GuardHolidayCalendar }) {
   const id = useId();
-  const [visitDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [visitDate] = useState(visitDateNow);
   const effectiveToday = today ?? visitDate;
   const [prefs, setPrefs] = useState(loadPreferences);
   const [message, setMessage] = useState('');
@@ -45,7 +121,16 @@ export function ExpirationGuard({ policy, country, requests = EMPTY_REQUESTS, to
   const validPolicy = useMemo(() => forecastWithRequests(policy, policy.balanceAsOf) !== null, [policy]);
   const risks = useMemo(() => expirationRisks(policy, country, requests, effectiveToday), [policy, country, requests, effectiveToday]);
   const visible = useMemo(() => prefs.enabled ? risks.filter((risk) => !prefs.dismissed.includes(risk.id)) : [], [prefs, risks]);
-  const reminders = useMemo(() => expirationReminders(visible, prefs.leads, effectiveToday), [visible, prefs.leads, effectiveToday]);
+  const { calendar, loading: calendarLoading, degraded: calendarDegraded } = holidayCalendar;
+  // Plans cover every risk (not only visible ones) so dismissing one alert never moves
+  // another alert's suggested dates. Recomputed live whenever an input changes.
+  // The calendar object itself is rebuilt on every render; its parts are memoized.
+  const { workWeek: calendarWorkWeek, offDays: calendarOffDays, rangeStart: calendarStart, rangeEnd: calendarEnd } = calendar;
+  const plans = useMemo(() => calendarLoading || risks.length === 0 ? new Map<string, RescuePlan>()
+    : rescuePlans(risks, { policy, country, requests, calendar: { workWeek: calendarWorkWeek, offDays: calendarOffDays, rangeStart: calendarStart, rangeEnd: calendarEnd, subdivision }, today: effectiveToday }),
+  [calendarLoading, risks, policy, country, requests, calendarWorkWeek, calendarOffDays, calendarStart, calendarEnd, subdivision, effectiveToday]);
+  const calendarState = calendarLoading ? 'loading' : calendarDegraded ? 'degraded' : 'ready';
+  const reminders = useMemo(() => expirationReminders(visible, prefs.leads, effectiveToday, rescueSuggestions(plans)), [visible, prefs.leads, effectiveToday, plans]);
   const [showReset, setShowReset] = useState(false);
   // Lazy: no extra reset projection until a user asks to inspect their next reset.
   const reset = useMemo(() => showReset ? carryoverSnapshot(policy, requests) : null, [showReset, policy, requests]);
@@ -85,12 +170,11 @@ export function ExpirationGuard({ policy, country, requests = EMPTY_REQUESTS, to
                 <span>{compactDatesIn(risk.text)}</span>
               </p>
               <p className="mt-1 pl-7 text-sm text-ink">{risk.kind === 'cap' ? 'Creating space in your balance may prevent lost accrual.' : `Last day to use this PTO: ${compactDate(risk.deadline)}.`}</p>
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 pl-7">
-                {risk.canPlan ? <a href={risk.ptoHref} className="link-mark inline-flex min-h-11 items-center text-sm font-semibold" onClick={onAlertAction}>Find the best way to use those days →</a>
-                  : <p className="text-sm text-ink">No additional whole PTO day is safely available to plan before this deadline under the entered rules. Review your forecast and policy.</p>}
+              <RescueDetails plan={plans.get(risk.id)} risk={risk} calendarState={calendarState} onAlertAction={onAlertAction} />
+              {risk.canPlan && <p className="mt-1 pl-7 text-xs leading-5 text-muted">Uses up to {risk.planningBudget} whole PTO {risk.planningBudget === 1 ? 'day' : 'days'} earned by then, around your public holidays, work week and scheduled leave.</p>}
+              <div className="mt-1 pl-7">
                 <Button variant="quiet" size="sm" className="min-h-11" onClick={() => update({ ...prefs, dismissed: [...prefs.dismissed, risk.id] })} aria-label={`Dismiss ${compactDatesIn(risk.text)}`}>Dismiss</Button>
               </div>
-              {risk.canPlan && <p className="mt-1 pl-7 text-xs leading-5 text-muted">Plans up to {risk.planningBudget} whole PTO {risk.planningBudget === 1 ? 'day' : 'days'} once earned, reserving your scheduled leave. Check the optimizer&apos;s employer holidays and workweek.</p>}
             </li>
           ))}</ul>}
       {prefs.dismissed.length > 0 && <Button variant="quiet" size="sm" className="mt-2 min-h-11" onClick={() => update({ ...prefs, dismissed: [] })}>Show dismissed alerts</Button>}
@@ -154,7 +238,7 @@ export function ExpirationGuard({ policy, country, requests = EMPTY_REQUESTS, to
           <span aria-hidden="true" className="hidden text-muted group-open:inline">−</span>
         </summary>
         <div className="pb-2">
-          <p className="text-sm leading-6 text-muted">Download reminders before PTO expires. Import the file into your calendar to receive its alerts. Gapless does not send scheduled email or push notifications.</p>
+          <p className="text-sm leading-6 text-muted">Download reminders before PTO expires. Each one names the suggested dates above. Import the file into your calendar to receive its alerts. Gapless does not send scheduled email or push notifications.</p>
           <div className="mt-1 flex flex-wrap gap-x-5">
             {EXPIRATION_REMINDER_LEADS.map((lead) => <label key={lead} className="flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" className="h-4 w-4" checked={prefs.leads.includes(lead)} onChange={(event) => update({ ...prefs, leads: event.target.checked ? [...prefs.leads, lead] : prefs.leads.filter((value) => value !== lead) })} />{lead} days before</label>)}
           </div>
@@ -166,6 +250,19 @@ export function ExpirationGuard({ policy, country, requests = EMPTY_REQUESTS, to
         </div>
       </details>
       {message && <p role="status" className="mt-2 text-sm text-muted">{message}</p>}
+      {watchSearch !== undefined && validPolicy && (
+        <div className="mt-4">
+          <SubscribeFeed
+            planSearch={watchSearch}
+            path="/api/watch"
+            idPrefix={`${id}-watch`}
+            calendarName={WATCH_CALENDAR_NAME}
+            heading="Get these reminders in your calendar"
+            description="Subscribe once to get the 60, 30 and 7-day reminders and suggested days to use expiring PTO, updated against today's date."
+            caveat="Requests tracked on this device aren't included. After editing your policy, subscribe again. Anyone with the link can see the policy details in it."
+          />
+        </div>
+      )}
     </section>
   );
 }
