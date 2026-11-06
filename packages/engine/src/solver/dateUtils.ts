@@ -46,11 +46,15 @@ export function rangeISO(start: string, end: string): string[] {
   return out;
 }
 
-/** Full months elapsed from start to end, never negative. */
+/**
+ * Full months elapsed from start to end, never negative. A start on the 29th-31st completes a
+ * month on the last day of a shorter month (Oct 31 -> Nov 30 is one month).
+ */
 export function monthsElapsed(start: string, end: string): number {
   const a = parseISO(start);
   const b = parseISO(end);
   let months = (b.y - a.y) * 12 + (b.m - a.m);
-  if (b.d < a.d) months -= 1;
+  const lastDayOfEndMonth = new Date(Date.UTC(b.y, b.m, 0)).getUTCDate();
+  if (b.d < a.d && b.d < lastDayOfEndMonth) months -= 1;
   return Math.max(0, months);
 }

@@ -30,9 +30,16 @@ export function alarmDate(startISO: string, trigger: string): string | null {
   return addDaysISO(startISO, Math.floor(totalSeconds / 86400));
 }
 
+/** A "book now" event sits on every day after its book-by date; email it the first day, then weekly. */
+function lateNudgeDue(bookBy: string | undefined, today: string): boolean {
+  if (!bookBy) return true;
+  const daysLate = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${bookBy}T00:00:00Z`)) / 86_400_000);
+  return daysLate <= 0 || (daysLate - 1) % 7 === 0;
+}
+
 export function dueItems(ics: string, today: string): DueItem[] {
   const items: DueItem[] = [];
-  let event: { start?: string; summary?: string; description?: string; triggers: string[] } | null = null;
+  let event: { start?: string; bookBy?: string; summary?: string; description?: string; triggers: string[] } | null = null;
   let inAlarm = false;
   for (const line of unfold(ics)) {
     if (line === 'BEGIN:VEVENT') { event = { triggers: [] }; continue; }
@@ -40,8 +47,8 @@ export function dueItems(ics: string, today: string): DueItem[] {
     if (line === 'BEGIN:VALARM') { inAlarm = true; continue; }
     if (line === 'END:VALARM') { inAlarm = false; continue; }
     if (line === 'END:VEVENT') {
-      const { start, summary } = event;
-      if (start && summary && event.triggers.some((trigger) => alarmDate(start, trigger) === today)) {
+      const { start, summary, bookBy } = event;
+      if (start && summary && event.triggers.some((trigger) => alarmDate(start, trigger) === today) && lateNudgeDue(bookBy, today)) {
         items.push({ date: start, summary, description: event.description ?? '' });
       }
       event = null;
@@ -55,6 +62,8 @@ export function dueItems(ics: string, today: string): DueItem[] {
       if (name === 'TRIGGER' && !/VALUE=DATE-TIME/i.test(line.slice(0, colon))) event.triggers.push(value);
     } else if (name === 'DTSTART' && /^\d{8}/.test(value)) {
       event.start = `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
+    } else if (name === 'X-GAPLESS-BOOK-BY' && /^\d{8}$/.test(value)) {
+      event.bookBy = `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
     } else if (name === 'SUMMARY') event.summary = unescapeText(value);
     else if (name === 'DESCRIPTION') event.description = unescapeText(value);
   }

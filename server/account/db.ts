@@ -29,6 +29,11 @@ export interface AccountStore {
   takeEmailBudget(today: string, cap: number): Promise<boolean>;
   /** False when a sign-in link went to this address in the last two minutes. */
   takeLoginSlot(email: string, nowMs: number): Promise<boolean>;
+  /**
+   * Counts one use of `key` in a fixed window; false once `limit` uses fall in the current
+   * window. Keys are hashed before they are stored, so no address or IP is kept.
+   */
+  takeRateSlot(key: string, limit: number, windowMs: number, nowMs: number): Promise<boolean>;
 }
 
 const COLUMNS = 'id, email, plan_link, policy_link, reminders, last_reminded_on::text AS last_reminded_on';
@@ -49,6 +54,7 @@ export function neonStore(databaseUrl: string): AccountStore {
     await sql`CREATE TABLE IF NOT EXISTS gapless_mail_budget (day date PRIMARY KEY, sent integer NOT NULL DEFAULT 0)`;
     // Keyed by a hash, so asking for a sign-in link stores no address until the link is used.
     await sql`CREATE TABLE IF NOT EXISTS gapless_login_throttle (email_hash text PRIMARY KEY, sent_at timestamptz NOT NULL)`;
+    await sql`CREATE TABLE IF NOT EXISTS gapless_rate_limit (key_hash text PRIMARY KEY, window_start timestamptz NOT NULL, used integer NOT NULL)`;
   })().catch((error) => { ready = null; throw error; }));
   const one = (rows: unknown[]) => (rows[0] as AccountRow | undefined) ?? null;
 
@@ -105,6 +111,19 @@ export function neonStore(databaseUrl: string): AccountStore {
       const rows = await sql.query(`INSERT INTO gapless_login_throttle (email_hash, sent_at) VALUES ($1, to_timestamp($2 / 1000.0))
         ON CONFLICT (email_hash) DO UPDATE SET sent_at = EXCLUDED.sent_at
         WHERE gapless_login_throttle.sent_at < EXCLUDED.sent_at - interval '2 minutes' RETURNING email_hash`, [hash, nowMs]);
+      return rows.length > 0;
+    },
+    async takeRateSlot(key, limit, windowMs, nowMs) {
+      await schema();
+      const hash = createHash('sha256').update(key).digest('hex');
+      await sql.query(`DELETE FROM gapless_rate_limit WHERE window_start < to_timestamp($1 / 1000.0) - interval '2 days'`, [nowMs]);
+      // A new window starts once the old one is over; otherwise count up while under the limit.
+      const rows = await sql.query(`INSERT INTO gapless_rate_limit (key_hash, window_start, used) VALUES ($1, to_timestamp($2 / 1000.0), 1)
+        ON CONFLICT (key_hash) DO UPDATE SET
+          window_start = CASE WHEN gapless_rate_limit.window_start <= to_timestamp(($2 - $3) / 1000.0) THEN EXCLUDED.window_start ELSE gapless_rate_limit.window_start END,
+          used = CASE WHEN gapless_rate_limit.window_start <= to_timestamp(($2 - $3) / 1000.0) THEN 1 ELSE gapless_rate_limit.used + 1 END
+        WHERE gapless_rate_limit.window_start <= to_timestamp(($2 - $3) / 1000.0) OR gapless_rate_limit.used < $4
+        RETURNING used`, [hash, nowMs, windowMs, limit]);
       return rows.length > 0;
     },
   };

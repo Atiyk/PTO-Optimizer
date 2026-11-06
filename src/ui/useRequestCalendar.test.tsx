@@ -151,7 +151,7 @@ describe('personal request calendar', () => {
     { ...options, country: 'invalid' },
     { ...options, subdivision: 'GB-ENG' },
     { ...options, subdivision: 'US-' },
-    { ...options, altFridayStart: '2027-01-04' },
+    { ...options, altFridayStart: '2027-02-30' },
     { ...options, workWeek: [] as unknown as WorkWeek },
   ])('fails closed for invalid or excessive inputs without fetching: %o', (invalid) => {
     const { result } = renderHook(() => useRequestCalendar(invalid));

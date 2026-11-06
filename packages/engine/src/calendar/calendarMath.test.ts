@@ -173,6 +173,14 @@ describe('isAlternatingFridayOff (Phase 3: 9/80 compressed schedule primitive)',
     expect(isAlternatingFridayOff('2026-02-06', anchor)).toBe(false); // 5 weeks after anchor
   });
 
+  it('an anchor on another weekday means the Friday of that Monday-Sunday week', () => {
+    for (const day of ['2025-12-29', '2026-01-01', '2026-01-03', '2026-01-04']) {
+      expect(isAlternatingFridayOff('2026-01-02', day)).toBe(true);
+      expect(isAlternatingFridayOff('2026-01-09', day)).toBe(false);
+      expect(isAlternatingFridayOff('2026-01-16', day)).toBe(true);
+    }
+  });
+
   it('a date BEFORE the anchor still follows the same 14-day cadence', () => {
     expect(isAlternatingFridayOff('2025-12-19', anchor)).toBe(true); // 2 weeks before anchor
     expect(isAlternatingFridayOff('2025-12-26', anchor)).toBe(false); // 1 week before anchor

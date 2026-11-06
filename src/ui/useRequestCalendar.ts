@@ -4,7 +4,7 @@ import type { Holiday } from '@daysoff/engine/data/holidays';
 import { getConsumerHolidaysWithStatus, getConsumerSubdivisionCandidates } from '../personal/consumerHolidays';
 import { getStateHolidaysFallback } from '@daysoff/engine/data/usStateHolidays';
 import { isAlternatingFridayOff } from '@daysoff/engine/calendar/calendarMath';
-import { mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
+import { rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { DEFAULT_WORK_WEEK, type WorkWeek } from '@daysoff/engine/solver/types';
 import { readEmployerCalendar } from '../personal/employerCalendar';
 import type { RequestCalendar } from '../personal/requestLedger';
@@ -60,7 +60,7 @@ export function useRequestCalendar(options: RequestCalendarOptions): RequestCale
     && (!subdivision || validSubdivision(country, subdivision))
     && validRange(rangeStart, rangeEnd)
     && scheduleValid
-    && (!altFridayStart || (isValidISODate(altFridayStart) && mondayIndexedDow(altFridayStart) === 4));
+    && (!altFridayStart || isValidISODate(altFridayStart));
   const scopeKey = JSON.stringify([country, subdivision ?? '', rangeStart, rangeEnd]);
   const [loaded, setLoaded] = useState<LoadedCalendar | null>(null);
   const employer = useMemo(() => readEmployerCalendar(country, subdivision), [country, subdivision]);

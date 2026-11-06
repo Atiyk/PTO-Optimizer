@@ -26,6 +26,9 @@ Also stored, without your address:
   requested, so the same address can't be sent links over and over. Asking for a link does
   not create an account. Only using the link does.
 - A count of emails sent per day, to stay under the sending limit.
+- One-way hashes of the requesting IP address (for sign-in links, kept up to two days) and
+  of your account id (for forwarded-approval replies), each with a count, so one source
+  can't ask for more than five sign-in links an hour or five replies a day.
 
 ## Deleting
 

@@ -125,11 +125,18 @@ describe('generateICS reminders', () => {
     expect(ics30).toContain('DTSTART;VALUE=DATE:20261101'); // Dec 1 - 30 days
   });
 
+  it("uses the viewer's local date as today, like the planner on screen", () => {
+    const brk = makeBreak({ start: '2026-10-24', end: '2026-11-01' });
+    // 23:30 local on Oct 17 is already Oct 18 in UTC for anyone west of Greenwich; the download still says Oct 17.
+    const ics = generateICS([brk], () => false, new Date(2026, 9, 17, 23, 30), { enabled: true, leadDays: 14 });
+    expect(ics).toContain('DTSTART;VALUE=DATE:20261017');
+  });
+
   it('clamps the reminder to today rather than placing it in the past, when the break starts inside the lead-time window', () => {
     // today = 2026-10-18, break starts 2026-10-24 (6 days away) - naive leadDays=14 would be
     // 2026-10-10, nine days in the PAST. Must clamp to today, not that past date.
     const brk = makeBreak({ start: '2026-10-24', end: '2026-11-01' });
-    const ics = generateICS([brk], () => false, FIXED_NOW, { enabled: true, leadDays: 14 });
+    const ics = generateICS([brk], () => false, new Date(2026, 9, 18, 12), { enabled: true, leadDays: 14 }); // local Oct 18
     expect(ics).toContain('DTSTART;VALUE=DATE:20261018'); // today, not 20261010
     expect(ics).not.toContain('DTSTART;VALUE=DATE:20261010');
   });

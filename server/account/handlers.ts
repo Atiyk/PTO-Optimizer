@@ -27,6 +27,9 @@ const SESSION_TTL = 60 * 60 * 24 * 30;
 const LOGIN_TTL = 60 * 30;
 const UNSUBSCRIBE_TTL = 60 * 60 * 24 * 365;
 export const MAX_LINK_LENGTH = 4096;
+const LOGIN_LINKS_PER_IP_PER_HOUR = 5;
+const INBOUND_REPLIES_PER_ACCOUNT_PER_DAY = 5;
+const HOUR_MS = 60 * 60 * 1000;
 const EMAIL = /^[^\s@<>()",;:]{1,64}@[a-z0-9.-]{1,253}\.[a-z]{2,63}$/i;
 
 const SECURITY_HEADERS = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' };
@@ -37,11 +40,26 @@ function json(status: number, body: unknown, headers: Record<string, string> = {
   return new Response(JSON.stringify(body), { status, headers: all });
 }
 
+const esc = (text: string) => text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+
 function page(status: number, title: string, message: string, origin: string): Response {
-  const esc = (text: string) => text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title></head>
 <body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem;line-height:1.5"><h1 style="font-size:1.4rem">${esc(title)}</h1><p>${esc(message)}</p><p><a href="${esc(origin)}/">Back to Gapless</a></p></body></html>`;
   return new Response(html, { status, headers: { 'content-type': 'text/html; charset=utf-8', ...SECURITY_HEADERS } });
+}
+
+/** The sign-in link opens this page, and only its button signs in, so visiting a link someone
+ * else sent you (or a mail scanner prefetching it) never signs your browser into their account. */
+function confirmSignInPage(origin: string): Response {
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sign in to Gapless</title></head>
+<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem;line-height:1.5"><h1 style="font-size:1.4rem">Sign in to Gapless</h1><p>Only continue if you asked for this link yourself.</p>
+<form method="post"><button type="submit" style="font:inherit;padding:.6rem 1.2rem;cursor:pointer">Sign in</button></form><p><a href="${esc(origin)}/">Back to Gapless</a></p></body></html>`;
+  return new Response(html, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8', ...SECURITY_HEADERS } });
+}
+
+/** The caller's IP for rate limiting. On Vercel the edge sets x-real-ip and the first x-forwarded-for entry. */
+function clientIp(request: Request): string {
+  return request.headers.get('x-real-ip') ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
 }
 
 function redirect(location: string, cookies: string[] = []): Response {
@@ -151,15 +169,19 @@ export async function handleAccount(request: Request, deps: AccountDeps): Promis
     return request.method === 'POST' ? json(200, { ok: true }) : page(200, 'Reminder emails are off', 'You will not get any more reminder emails. Your saved plan stays in your account until you delete it.', origin);
   }
 
+  const verify = url.searchParams.get('verify');
+  if (verify !== null) {
+    const email = verifyToken(secret, 'login', verify, nowMs);
+    const next = url.searchParams.get('next');
+    if (!email) return redirect(`${origin}${landing(next, 'expired')}`);
+    if (request.method === 'GET') return confirmSignInPage(origin);
+    // The button posts from the page above; a form on another site carries a different Origin.
+    if (request.method !== 'POST' || request.headers.get('origin') !== url.origin) return json(403, { error: 'Forbidden.' });
+    const row = await deps.store().findOrCreate(email);
+    return redirect(`${origin}${landing(next, 'ok')}`, sessionCookies(signToken(secret, 'session', row.id, SESSION_TTL, nowMs)));
+  }
+
   if (request.method === 'GET') {
-    const verify = url.searchParams.get('verify');
-    if (verify !== null) {
-      const email = verifyToken(secret, 'login', verify, nowMs);
-      const next = url.searchParams.get('next');
-      if (!email) return redirect(`${origin}${landing(next, 'expired')}`);
-      const row = await deps.store().findOrCreate(email);
-      return redirect(`${origin}${landing(next, 'ok')}`, sessionCookies(signToken(secret, 'session', row.id, SESSION_TTL, nowMs)));
-    }
     const row = await currentAccount(request, deps);
     const stale = !row && readCookie(request, SIGNED_IN_COOKIE) !== null;
     return json(200, {
@@ -185,6 +207,9 @@ export async function handleAccount(request: Request, deps: AccountDeps): Promis
   if (body.action === 'login') {
     const email = normalizeEmail(body.email);
     if (!email) return json(400, { error: 'Enter a valid email address.' });
+    if (!(await deps.store().takeRateSlot(`login-ip:${clientIp(request)}`, LOGIN_LINKS_PER_IP_PER_HOUR, HOUR_MS, nowMs))) {
+      return json(429, { error: 'Too many sign-in links were asked for from here. Try again in an hour.' });
+    }
     // The answer is the same whether or not a link was sent, so it says nothing about who has an account.
     if (await deps.store().takeLoginSlot(email, nowMs)) {
       const next = normalizeLink(body.returnTo, false);
@@ -266,12 +291,12 @@ export async function handleRemind(request: Request, deps: AccountDeps): Promise
   return json(200, { day, checked, sent, failed, capped });
 }
 
-interface InboundMail { from: string | null; subject: string; text: string }
+interface InboundMail { from: string | null; envelopeFrom: string | null; subject: string; text: string; spf: string | null }
 
 /** CloudMailin's JSON format: envelope.from, headers (keys vary in case), plain. */
 export function readInbound(body: unknown): InboundMail | null {
   if (!body || typeof body !== 'object') return null;
-  const record = body as { envelope?: { from?: unknown }; headers?: Record<string, unknown>; plain?: unknown; html?: unknown };
+  const record = body as { envelope?: { from?: unknown; spf?: { result?: unknown } }; headers?: Record<string, unknown>; plain?: unknown; html?: unknown };
   const headers = Object.fromEntries(Object.entries(record.headers ?? {}).map(([key, value]) => [key.toLowerCase().replace(/_/g, '-'), value]));
   const header = (name: string) => {
     const value = headers[name];
@@ -281,21 +306,24 @@ export function readInbound(body: unknown): InboundMail | null {
     : typeof record.html === 'string' ? record.html : '';
   return {
     from: normalizeEmail(header('from')) ?? normalizeEmail(record.envelope?.from),
+    envelopeFrom: normalizeEmail(record.envelope?.from),
     subject: header('subject') ?? '',
     text: text.slice(0, MAX_APPROVAL_INPUT),
+    spf: typeof record.envelope?.spf?.result === 'string' ? record.envelope.spf.result.toLowerCase() : null,
   };
 }
 
 /** CloudMailin's multipart format names fields like "plain", "headers[From]" and "envelope[from]". */
 function multipartToInbound(form: FormData): Record<string, unknown> {
   const headers: Record<string, string> = {};
-  const envelope: Record<string, string> = {};
+  const envelope: Record<string, unknown> = {};
   let plain: string | undefined;
   let html: string | undefined;
   for (const [key, value] of form.entries()) {
     if (typeof value !== 'string') continue;
     const nested = /^(headers|envelope)\[([^\]]+)\]$/.exec(key);
     if (nested) (nested[1] === 'headers' ? headers : envelope)[nested[2]] = value;
+    else if (key === 'envelope[spf][result]') envelope.spf = { result: value };
     else if (key === 'plain') plain = value;
     else if (key === 'html') html = value;
   }
@@ -332,8 +360,18 @@ export async function handleInbound(request: Request, deps: AccountDeps): Promis
   if (!mail?.from || mail.from === config.gmailUser?.toLowerCase() || /(^|[.@])google\.com$/.test(mail.from.split('@')[1] ?? '')) {
     return json(200, { ignored: 'sender' });
   }
+  // The From header is easy to forge. CloudMailin checks SPF for the envelope sender, so mail
+  // that fails it, or whose envelope sender is on another domain than From (SPF would then
+  // vouch for the wrong domain), is dropped, and each account gets a few replies a day at most.
+  const domain = (address: string) => address.split('@')[1];
+  if (mail.spf === 'fail' || mail.spf === 'softfail' || (mail.envelopeFrom && domain(mail.envelopeFrom) !== domain(mail.from))) {
+    return json(200, { ignored: 'spf' });
+  }
   const row = await deps.store().byEmail(mail.from);
   if (!row) return json(200, { ignored: 'no account' });
+  if (!(await deps.store().takeRateSlot(`inbound:${row.id}`, INBOUND_REPLIES_PER_ACCOUNT_PER_DAY, 24 * HOUR_MS, (deps.now?.() ?? new Date()).getTime()))) {
+    return json(200, { ignored: 'daily limit' });
+  }
 
   const day = today(deps);
   const parsed = parseApprovalMessage(`${mail.subject}\n${mail.text}`, { today: day, requests: [] });

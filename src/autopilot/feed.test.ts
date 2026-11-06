@@ -63,9 +63,12 @@ describe('buildPlanFeedICS: calendar shape', () => {
 describe('buildPlanFeedICS: same events as the downloaded .ics', () => {
   it('PTO-day and book-by events are byte-identical to generateICS on the same day', () => {
     const result = feed();
-    const download = generateICS(result.plan.breaks, result.plan.isPtoDay, new Date(`${TODAY}T00:00:00Z`), { enabled: true, leadDays: 14 });
-    const body = (ics: string) => ics.slice(ics.indexOf('BEGIN:VEVENT'), ics.lastIndexOf('END:VEVENT'));
-    expect(result.ics).toContain(body(download));
+    // The download uses the viewer's local date, so it is made at local noon on TODAY; DTSTAMP
+    // (the moment of export) is the only line allowed to differ.
+    const [y, m, d] = TODAY.split('-').map(Number);
+    const download = generateICS(result.plan.breaks, result.plan.isPtoDay, new Date(y, m - 1, d, 12), { enabled: true, leadDays: 14 });
+    const body = (ics: string) => ics.slice(ics.indexOf('BEGIN:VEVENT'), ics.lastIndexOf('END:VEVENT')).replace(/^DTSTAMP:.*$/gm, 'DTSTAMP');
+    expect(body(result.ics)).toContain(body(download));
     expect(events(result.ics).filter((e) => prop(e, 'UID')!.startsWith('UID:pto-')).length).toBe(events(download).length);
   });
 
