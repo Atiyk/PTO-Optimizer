@@ -272,8 +272,15 @@ export const decideAgentDraft = defineCapability({
     const { invokeCapability } = (await import('../registry')) as unknown as {
       invokeCapability: (name: string, c: CapabilityContext, input: unknown) => Promise<unknown>;
     };
-    const result = await invokeCapability(d.capability, ctx, d.payload);
-    await db.update(drafts).set({ status: 'confirmed' }).where(eq(drafts.id, d.id));
-    return { status: 'confirmed' as const, result };
+    // Claim the draft before running it, so two concurrent confirms cannot both commit it.
+    const claimed = await db.update(drafts).set({ status: 'confirmed' }).where(and(eq(drafts.id, d.id), eq(drafts.status, 'open'))).returning({ id: drafts.id });
+    if (!claimed.length) throw new CapabilityError('conflict', 'This draft is already confirmed.');
+    try {
+      const result = await invokeCapability(d.capability, ctx, d.payload);
+      return { status: 'confirmed' as const, result };
+    } catch (e) {
+      await db.update(drafts).set({ status: 'open' }).where(eq(drafts.id, d.id));
+      throw e;
+    }
   },
 });

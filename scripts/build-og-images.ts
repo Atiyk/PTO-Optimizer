@@ -12,7 +12,7 @@
  * --tsconfig tsconfig.app.json scripts/build-og-images.ts`. Committed, like og-image.png
  * always was.
  */
-import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';

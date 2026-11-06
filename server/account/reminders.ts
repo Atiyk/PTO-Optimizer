@@ -11,7 +11,7 @@ function unfold(ics: string): string[] {
 }
 
 function unescapeText(text: string): string {
-  return text.replace(/\\n/gi, '\n').replace(/\\([,;\\])/g, '$1');
+  return text.replace(/\\([\\,;nN])/g, (_, c: string) => (c === 'n' || c === 'N' ? '\n' : c));
 }
 
 function addDaysISO(iso: string, days: number): string {

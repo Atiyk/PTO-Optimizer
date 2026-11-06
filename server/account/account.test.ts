@@ -168,6 +168,11 @@ describe('/api/account', () => {
 const POLICY = 'ak=fl&am=0&gd=2026-01-01&cc=5&cb=8&bao=2026-10-01&c=US';
 
 describe('reminder emails', () => {
+  it('unescapes ICS text in one pass, so an escaped backslash before "n" stays a backslash', () => {
+    const ics = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261210\r\nSUMMARY:C:\\\\new\\, home\\nnext\r\nBEGIN:VALARM\r\nTRIGGER:PT9H\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n';
+    expect(dueItems(ics, '2026-12-10')[0]?.summary).toBe('C:\\new, home\nnext');
+  });
+
   it('works out alarm days like a calendar app', () => {
     expect(alarmDate('2026-12-10', '-P6DT15H')).toBe('2026-12-03');
     expect(alarmDate('2026-12-10', 'PT9H')).toBe('2026-12-10');

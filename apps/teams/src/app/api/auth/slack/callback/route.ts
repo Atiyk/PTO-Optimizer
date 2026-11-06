@@ -5,6 +5,7 @@ import { cookieOptions, encodeIdentity, encodeSession, IDENTITY_COOKIE, IDENTITY
 import { membersForSlackUser } from '@/server/bootstrap';
 import { consumeRate } from '@/server/rateLimit';
 import { clientIp } from '@/lib/clientIp';
+import { safeNext } from '@/lib/safeNext';
 
 interface UserInfo {
   ok: boolean;
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
   const db = await getDb();
   const linked = await membersForSlackUser(db, info.sub);
   const nowSec = Math.floor(Date.now() / 1000);
-  const res = NextResponse.redirect(new URL(saved.next ?? (linked.length ? '/app' : '/onboarding'), base));
+  const res = NextResponse.redirect(new URL(safeNext(saved.next, base) ?? (linked.length ? '/app' : '/onboarding'), base));
   res.cookies.delete('dt_oidc');
   // Always keep a short-lived identity, so an invite link can attach this person to another org.
   res.cookies.set(

@@ -8,7 +8,7 @@ self.addEventListener('push', (event) => {
   let data = { title: 'Cover offer', body: 'You have a new cover offer.', url: '/m/offers', tag: 'cover' };
   try {
     data = { ...data, ...event.data.json() };
-  } catch (_) {}
+  } catch {}
   event.waitUntil(self.registration.showNotification(data.title, { body: data.body, tag: data.tag, data: { url: data.url }, icon: '/m/icon-192.png' }));
 });
 
