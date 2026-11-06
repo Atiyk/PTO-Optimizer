@@ -9,7 +9,8 @@ import { Button } from './Button';
 import { CountrySelect, SubdivisionSelect } from './CountrySelect';
 import { PtoTracker } from './PtoTracker';
 import { useRequestCalendar } from './useRequestCalendar';
-import { todayISO } from './useAppState';
+import { todayISO } from './today';
+import { addMonthsClamped } from './forecastPresets';
 import { DateListEditor } from './DateListEditor';
 import { Term } from './Term';
 import { track } from './analytics';
@@ -30,16 +31,6 @@ import { copyText } from './requestText';
 import { writePolicyStateToURL, type PolicyURLState } from './policyUrlState';
 
 const HORIZON_MONTHS = 18;
-
-function addMonthsISO(iso: string, months: number): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  const totalMonths = (y * 12 + (m - 1)) + months;
-  const ny = Math.floor(totalMonths / 12);
-  const nm = (totalMonths % 12) + 1;
-  const lastDay = new Date(Date.UTC(ny, nm, 0)).getUTCDate();
-  const nd = Math.min(d, lastDay);
-  return `${String(ny).padStart(4, '0')}-${String(nm).padStart(2, '0')}-${String(nd).padStart(2, '0')}`;
-}
 
 /**
  * Minimal field wrapper: label + a small <Term> hint next to the jargon word, per Stage 4A -
@@ -158,7 +149,7 @@ export function Policy() {
   const [balanceAsOf, setBalanceAsOf] = useState(d.balanceAsOf);
   const [plannedDays, setPlannedDays] = useState<string[]>(d.plannedDays);
   const [currentCarriedBalance, setCurrentCarriedBalance] = useState(d.currentCarriedBalance ?? 0);
-  const [forecastDate, setForecastDate] = useState(d.forecastDate ?? addMonthsISO(d.balanceAsOf, 3));
+  const [forecastDate, setForecastDate] = useState(d.forecastDate ?? addMonthsClamped(d.balanceAsOf, 3));
   const [saveMessage, setSaveMessage] = useState('');
   const ledger = useRequestLedger();
 
@@ -243,7 +234,7 @@ export function Policy() {
     return params.toString();
   }, [currentPolicyURLState, country]);
 
-  const horizonEnd = useMemo(() => addMonthsISO(balanceAsOf, HORIZON_MONTHS), [balanceAsOf]);
+  const horizonEnd = useMemo(() => addMonthsClamped(balanceAsOf, HORIZON_MONTHS), [balanceAsOf]);
   const projection = useMemo(() => forecastWithRequests(policy, horizonEnd, ledger.requests), [policy, horizonEnd, ledger.requests]);
   const selectedForecast = useMemo(() => forecastWithRequests(policy, forecastDate, ledger.requests), [policy, forecastDate, ledger.requests]);
   const series = projection?.confirmed.series ?? [];

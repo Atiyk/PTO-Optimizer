@@ -4,6 +4,8 @@
  * when one of its calendar alarms falls on `today`, so the email and the calendar always
  * agree, and nothing about the plan is computed twice.
  */
+import { formatShortWithYear } from '@daysoff/engine/calendar/dateFormat';
+
 export interface DueItem { date: string; summary: string; description: string }
 
 function unfold(ics: string): string[] {
@@ -70,17 +72,11 @@ export function dueItems(ics: string, today: string): DueItem[] {
   return items.sort((a, b) => a.date.localeCompare(b.date) || a.summary.localeCompare(b.summary));
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-function compact(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  return `${MONTHS[m - 1]} ${d}, ${y}`;
-}
-
 export interface DigestLinks { planUrl?: string; policyUrl?: string; unsubscribeUrl: string; accountUrl: string }
 
 export function reminderEmail(items: readonly DueItem[], links: DigestLinks): { subject: string; text: string } {
   const subject = items.length === 1 ? `Gapless reminder: ${items[0].summary}` : `Gapless: ${items.length} time-off reminders for today`;
-  const body = items.map((item) => `- ${item.summary} (${compact(item.date)})\n  ${item.description.replace(/\n+/g, ' ').trim()}`);
+  const body = items.map((item) => `- ${item.summary} (${formatShortWithYear(item.date)})\n  ${item.description.replace(/\n+/g, ' ').trim()}`);
   const open = [
     links.planUrl ? `Open your plan: ${links.planUrl}` : null,
     links.policyUrl ? `Open your policy: ${links.policyUrl}` : null,

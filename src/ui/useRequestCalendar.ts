@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { COUNTRIES, SUBDIVISION_NAMES } from '@daysoff/engine/data/countries';
+import { SUBDIVISION_NAMES } from '@daysoff/engine/data/countries';
 import type { Holiday } from '@daysoff/engine/data/holidays';
-import { getConsumerHolidaysWithStatus, getConsumerSubdivisionCandidates } from '../personal/consumerHolidays';
+import { getConsumerHolidaysWithStatus, getConsumerSubdivisionCandidates, validScope } from '../personal/consumerHolidays';
 import { getStateHolidaysFallback } from '@daysoff/engine/data/usStateHolidays';
 import { isAlternatingFridayOff } from '@daysoff/engine/calendar/calendarMath';
 import { rangeISO } from '@daysoff/engine/solver/dateUtils';
@@ -34,14 +34,7 @@ interface LoadedCalendar {
   degraded: boolean;
 }
 
-const COUNTRY_CODES = new Set(COUNTRIES.map(({ code }) => code));
 const US_SUBDIVISIONS = Object.keys(SUBDIVISION_NAMES).filter((code) => code.startsWith('US-'));
-
-function validRange(start: string, end: string): boolean {
-  if (!isValidISODate(start) || !isValidISODate(end) || end < start) return false;
-  const yearDifference = Number(end.slice(0, 4)) - Number(start.slice(0, 4));
-  return yearDifference < 10 || (yearDifference === 10 && end.slice(5) <= start.slice(5));
-}
 
 function validSubdivision(country: string, subdivision: string): boolean {
   return /^[A-Z0-9-]{1,16}$/.test(subdivision) && subdivision.startsWith(`${country}-`)
@@ -56,9 +49,7 @@ export function useRequestCalendar(options: RequestCalendarOptions): RequestCale
   const scheduleValid = Array.isArray(workWeek) && workWeek.length === 7 && workWeek.every((day) => typeof day === 'boolean');
   const scheduleKey = (scheduleValid ? workWeek : DEFAULT_WORK_WEEK).map((day) => day ? '1' : '0').join('');
   const resolvedWorkWeek = useMemo(() => [...scheduleKey].map((day) => day === '1') as WorkWeek, [scheduleKey]);
-  const inputValid = COUNTRY_CODES.has(country)
-    && (!subdivision || validSubdivision(country, subdivision))
-    && validRange(rangeStart, rangeEnd)
+  const inputValid = validScope(country, rangeStart, rangeEnd, subdivision)
     && scheduleValid
     && (!altFridayStart || isValidISODate(altFridayStart));
   const scopeKey = JSON.stringify([country, subdivision ?? '', rangeStart, rangeEnd]);

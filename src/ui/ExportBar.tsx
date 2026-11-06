@@ -10,6 +10,7 @@ import { DEFAULT_SITE_HOST } from './siteUrl';
 import { buttonClasses } from './Button';
 import { SubscribeFeed } from './SubscribeFeed';
 import { EmailReminders } from './EmailReminders';
+import { ordinal } from './scoreFormat';
 
 interface ExportBarProps {
   breaks: Break[];
@@ -43,21 +44,6 @@ export interface ActionResult {
    * started instead" error message, which was simply false for the two buttons (share
    * link, overlap link) that have no download fallback at all. */
   message: string;
-}
-
-function ordinal(n: number): string {
-  const rem100 = n % 100;
-  if (rem100 >= 11 && rem100 <= 13) return `${n}th`;
-  switch (n % 10) {
-    case 1:
-      return `${n}st`;
-    case 2:
-      return `${n}nd`;
-    case 3:
-      return `${n}rd`;
-    default:
-      return `${n}th`;
-  }
 }
 
 /**

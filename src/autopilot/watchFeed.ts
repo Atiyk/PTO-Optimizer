@@ -11,6 +11,8 @@ import { forecastWithRequests } from '../personal/forecast';
 import type { RequestCalendar } from '../personal/requestLedger';
 import { readPolicyStateFromURL, type PolicyURLState } from '../ui/policyUrlState';
 import { isValidISODate } from '../ui/urlState';
+import { compactDatesIn } from '../ui/compactDate';
+import { formatShortWithYear } from '@daysoff/engine/calendar/dateFormat';
 import { addOneDayICS, escapeText, foldLine, isoToICSDate } from '../ui/icsExport';
 import { PRODUCT_NAME } from '../brand';
 
@@ -114,20 +116,11 @@ function ascii(text: string): string {
   return text.replace(/[–—]/g, '-').replace(/…/g, '...').replace(/[^\x20-\x7e\n]/g, '');
 }
 
-function compact(iso: ISODate): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]} ${d}, ${y}`;
-}
-
-function compactIn(text: string): string {
-  return text.replace(/\b\d{4}-\d{2}-\d{2}\b/g, (iso) => (isValidISODate(iso) ? compact(iso) : iso));
-}
-
 function rescueDayDescription(plan: RescuePlan, holidayNote: string): string {
   const keep = plan.kind === 'cap' ? 'It makes room under your accrual cap'
     : plan.daysStillAtRisk > 0 ? `It keeps ${round(plan.daysRescued)} of ${round(plan.daysAtRisk)} days at risk`
       : `It keeps all ${round(plan.daysAtRisk)} days at risk`;
-  return `${rescueSuggestionText(plan)} ${keep} before ${compact(plan.deadline)}. This is a suggestion, not booked leave: request it with your employer.${holidayNote} Requests you track in Gapless on your device are not included.`;
+  return `${rescueSuggestionText(plan)} ${keep} before ${formatShortWithYear(plan.deadline)}. This is a suggestion, not booked leave: request it with your employer.${holidayNote} Requests you track in Gapless on your device are not included.`;
 }
 
 function round(value: number): string {
@@ -185,7 +178,7 @@ export function buildWatchFeedICS(policySearch: string, today: string, holidays:
   };
   for (const reminder of reminders) {
     const deadline = reminder.title.match(/\d{4}-\d{2}-\d{2}/)?.[0];
-    event(encodeURIComponent(reminder.id), reminder.date, deadline ? reminder.title.replace(deadline, compact(deadline)) : reminder.title, compactIn(reminder.description) + holidayNote, true);
+    event(encodeURIComponent(reminder.id), reminder.date, deadline ? reminder.title.replace(deadline, formatShortWithYear(deadline)) : reminder.title, compactDatesIn(reminder.description) + holidayNote, true);
   }
   for (const plan of [...plans.values()].sort((a, b) => a.deadline.localeCompare(b.deadline))) {
     for (const date of plan.ptoDates) {

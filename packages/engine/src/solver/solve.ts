@@ -352,14 +352,22 @@ interface CountDPTable {
 function buildCountDP(candidates: Candidate[], input: SolveInput, budgetMax: number, w: number, cMax: number): CountDPTable {
   const m = candidates.length;
   const minimumCost = candidates.reduce((minimum, candidate) => Math.min(minimum, candidate.cost), Infinity);
-  const dp: CellState[][][] = Array.from({ length: m + 1 }, (_, i) =>
-    Array.from({ length: budgetMax + 1 }, () =>
-      Array.from({ length: cMax + 1 }, (_, c) => (i === 0 && c === 0 ? EMPTY_CELL : UNREACHABLE)),
-    ),
-  );
-  const choice: ('skip' | 'take')[][][] = Array.from({ length: m + 1 }, () =>
-    Array.from({ length: budgetMax + 1 }, () => new Array(cMax + 1).fill('skip')),
-  );
+  // Plain loops and fill(): this table is most of a solve's time, and a callback per cell
+  // (Array.from) made allocating it cost more than filling it.
+  const dp: CellState[][][] = new Array(m + 1);
+  const choice: ('skip' | 'take')[][][] = new Array(m + 1);
+  for (let i = 0; i <= m; i++) {
+    const dpRow: CellState[][] = new Array(budgetMax + 1);
+    const choiceRow: ('skip' | 'take')[][] = new Array(budgetMax + 1);
+    for (let b = 0; b <= budgetMax; b++) {
+      const cells: CellState[] = new Array(cMax + 1).fill(UNREACHABLE);
+      if (i === 0) cells[0] = EMPTY_CELL;
+      dpRow[b] = cells;
+      choiceRow[b] = new Array(cMax + 1).fill('skip');
+    }
+    dp[i] = dpRow;
+    choice[i] = choiceRow;
+  }
 
   for (let i = 1; i <= m; i++) {
     const c = candidates[i - 1];
@@ -605,12 +613,18 @@ function solveDualWindow(candidates: Candidate[], input: SolveInput, w: number, 
   }
 
   const m = candidates.length;
-  const dp: CellState[][][] = Array.from({ length: m + 1 }, () =>
-    Array.from({ length: budget1Max + 1 }, () => new Array(budget2Max + 1).fill(EMPTY_CELL)),
-  );
-  const choice: ('skip' | 'take')[][][] = Array.from({ length: m + 1 }, () =>
-    Array.from({ length: budget1Max + 1 }, () => new Array(budget2Max + 1).fill('skip')),
-  );
+  const dp: CellState[][][] = new Array(m + 1);
+  const choice: ('skip' | 'take')[][][] = new Array(m + 1);
+  for (let i = 0; i <= m; i++) {
+    const dpRow: CellState[][] = new Array(budget1Max + 1);
+    const choiceRow: ('skip' | 'take')[][] = new Array(budget1Max + 1);
+    for (let b1 = 0; b1 <= budget1Max; b1++) {
+      dpRow[b1] = new Array(budget2Max + 1).fill(EMPTY_CELL);
+      choiceRow[b1] = new Array(budget2Max + 1).fill('skip');
+    }
+    dp[i] = dpRow;
+    choice[i] = choiceRow;
+  }
 
   for (let i = 1; i <= m; i++) {
     const c = candidates[i - 1];
