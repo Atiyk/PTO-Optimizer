@@ -16,14 +16,6 @@ export interface ColorTokens {
 
 // Values live in index.css (2026-11 "highlighted schedule": ink actions, one marker for days off).
 // Every pair is verified against the real stylesheet in tokens.test.ts / colorScheme.test.ts.
-/**
- * THE primary-action treatment - the accent's second of its three reserved uses (suggested
- * PTO, this, and focus rings). One button on the page gets this at a time; everything else
- * is a neutral, bordered secondary button.
- */
-export const ACCENT_BUTTON =
-  'bg-[var(--pto-bg)] text-white hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]';
-
 export const COLORS: ColorTokens = {
   ptoBg: 'bg-[var(--pto-bg)]',
   ptoBorder: 'border-[var(--pto-border)]',

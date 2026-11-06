@@ -169,7 +169,3 @@ export function requestConflicts(requests: readonly PtoRequest[]): { firstId: st
   }
   return conflicts;
 }
-
-export function tomorrowISO(now = new Date()): ISODate {
-  return addDays(now.toISOString().slice(0, 10), 1);
-}

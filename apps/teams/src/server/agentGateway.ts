@@ -179,7 +179,14 @@ export async function confirmDraftAsAgent(db: Db, auth: { actor: Actor; tokenId:
   if (!d || d.confirmationTokenHash !== hashToken(confirmationToken)) throw new CapabilityError('not_found', 'Draft not found.');
   if (d.status !== 'open') throw new CapabilityError('conflict', `This draft is already ${d.status}.`);
   if (d.expiresAt <= now) throw new CapabilityError('conflict', 'This draft has expired. Create it again.');
-  const result = await invokeCapability(d.capability as CapabilityName, { db, actor, now }, d.payload);
-  await db.update(drafts).set({ status: 'confirmed' }).where(eq(drafts.id, d.id));
-  return { status: 'done' as const, result };
+  // Claim the draft before running it, so two concurrent confirms cannot both commit it.
+  const claimed = await db.update(drafts).set({ status: 'confirmed' }).where(and(eq(drafts.id, d.id), eq(drafts.status, 'open'))).returning({ id: drafts.id });
+  if (!claimed.length) throw new CapabilityError('conflict', 'This draft is already confirmed.');
+  try {
+    const result = await invokeCapability(d.capability as CapabilityName, { db, actor, now }, d.payload);
+    return { status: 'done' as const, result };
+  } catch (e) {
+    await db.update(drafts).set({ status: 'open' }).where(eq(drafts.id, d.id));
+    throw e;
+  }
 }

@@ -223,6 +223,8 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
   let dtendProp: RawProp | null = null;
   let durationValue: string | null = null;
   let hasRRule = false;
+  // Depth inside a sub-component of the event (VALARM etc.): its DTSTART/DURATION are not the event's.
+  let subDepth = 0;
 
   function flushEvent(): void {
     if (!dtstartProp) return;
@@ -301,6 +303,7 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
       dtendProp = null;
       durationValue = null;
       hasRRule = false;
+      subDepth = 0;
       eventCount++;
       if (eventCount > MAX_IMPORT_EVENTS) {
         cappedAt = MAX_IMPORT_EVENTS;
@@ -315,6 +318,15 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
       continue;
     }
     if (!inEvent) continue;
+    if (prop.name === 'BEGIN') {
+      subDepth++;
+      continue;
+    }
+    if (prop.name === 'END') {
+      subDepth = Math.max(0, subDepth - 1);
+      continue;
+    }
+    if (subDepth > 0) continue;
 
     if (prop.name === 'DTSTART') dtstartProp = prop;
     else if (prop.name === 'DTEND') dtendProp = prop;

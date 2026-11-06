@@ -267,10 +267,10 @@ function documentAsOf(text: string, today: string, dayFirst: boolean): string | 
     const before = text.slice(Math.max(0, d.start - 40), d.start).toLowerCase();
     const near = before.slice(-28);
     let p = 9;
-    if (/\b(?:as\s*(?:of|at)|balances?\s+(?:date|on)|through|thru|effective)\s*[:\-]?\s*$/.test(near)) p = 1;
-    else if (/(?:period\s*(?:end(?:ing)?|end\s*date|to)|end\s*date|ending|to)\s*[:\-]?\s*$/.test(near)) p = 2;
+    if (/\b(?:as\s*(?:of|at)|balances?\s+(?:date|on)|through|thru|effective)\s*[:-]?\s*$/.test(near)) p = 1;
+    else if (/(?:period\s*(?:end(?:ing)?|end\s*date|to)|end\s*date|ending|to)\s*[:-]?\s*$/.test(near)) p = 2;
     else if (/[-–]\s*$/.test(near) && i > 0 && dates[i - 1].end >= d.start - 6 && /period|pay|dates?/.test(before)) p = 2;
-    else if (/(?:pay\s*(?:date|day)|check\s*date|advice\s*date|payment\s*date|deposit\s*date|date\s*paid|paid\s*on)\s*[:\-]?\s*$/.test(near)) p = 3;
+    else if (/(?:pay\s*(?:date|day)|check\s*date|advice\s*date|payment\s*date|deposit\s*date|date\s*paid|paid\s*on)\s*[:-]?\s*$/.test(near)) p = 3;
     if (p < 9 && (!best || p < best.p)) best = { iso: d.iso, p };
   }
   return best?.iso;
@@ -375,7 +375,7 @@ function stripDates(line: string, today: string, dayFirst: boolean): { text: str
   let asOf: string | undefined;
   for (const d of dates) {
     const near = line.slice(Math.max(0, d.start - 16), d.start).toLowerCase();
-    if (/\b(?:as\s*(?:of|at)|on|through|thru)\s*[:\-]?\s*$/.test(near) && plausibleAsOf(d.iso, today)) asOf = d.iso;
+    if (/\b(?:as\s*(?:of|at)|on|through|thru)\s*[:-]?\s*$/.test(near) && plausibleAsOf(d.iso, today)) asOf = d.iso;
   }
   return { text, dates, asOf };
 }

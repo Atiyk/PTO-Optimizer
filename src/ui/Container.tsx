@@ -12,10 +12,3 @@ import type { ReactNode } from 'react';
 export function Container({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <div className={`mx-auto w-full max-w-7xl ${className}`}>{children}</div>;
 }
-
-/** The one vertical gap between major page sections (calendar, legend, exports, break
- * cards, FAQ) - applied consistently instead of the mix of mt-2/mt-4/mt-6/mt-10 each
- * section used to pick independently. A tight caption directly under something it belongs
- * to (e.g. the calendar's own click-to-pin hint) is deliberately NOT a "section" and keeps
- * its own small gap - this constant is only for section-to-section rhythm. */
-export const SECTION_GAP = 'mt-8';

@@ -300,3 +300,17 @@ describe('parseICSBusyDays: time-zone aware event boundaries', () => {
     expect(parseICSBusyDays(ics).busyDays).toEqual(['2026-12-19', '2026-12-20']);
   });
 });
+
+describe('parseICSBusyDays: nested components (VALARM)', () => {
+  const alarm = (duration: string) => `BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-PT15M\r\nREPEAT:1\r\nDURATION:${duration}\r\nEND:VALARM`;
+
+  it("an alarm's DURATION does not become the all-day event's length", () => {
+    const ics = wrapCalendar(event(`DTSTART;VALUE=DATE:20270105\r\n${alarm('PT15M')}`));
+    expect(parseICSBusyDays(ics).busyDays).toEqual(['2027-01-05']);
+  });
+
+  it("an alarm's DURATION does not stretch a one-hour meeting into busy days", () => {
+    const ics = wrapCalendar(event(`DTSTART:20270105T090000Z\r\nDURATION:PT1H\r\n${alarm('P2D')}`));
+    expect(parseICSBusyDays(ics).busyDays).toEqual([]);
+  });
+});

@@ -55,7 +55,7 @@ Headings at most two lines (`text-wrap: balance` is global).
 - Depth: tone steps and hairlines. No shadow at rest; only floating things (menus, popovers,
   dialogs, the phone tab bar's top edge) may have one.
 - Layout: `Container` max 1280px, gutters 16px (phone) / 24px (sm+). App screens use a 32px
-  section rhythm (`SECTION_GAP`) with hairline rules; the landing page uses 80px (phone) / 112px
+  section rhythm (`mt-8`) with hairline rules; the landing page uses 80px (phone) / 112px
   (desktop) between sections. More space above a heading than below.
 - Touch targets ≥ 44px (`min-h-11`).
 

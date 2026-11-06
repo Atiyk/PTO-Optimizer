@@ -4,6 +4,7 @@ import { invokeCapability } from '@/capabilities/registry';
 import { CapabilityError } from '@/capabilities/errors';
 import { humanActorFromSession } from '@/lib/actor';
 import { SESSION_COOKIE } from '@/lib/session';
+import { csvCell } from '@/lib/csv';
 
 const FILES = ['ratio-checks', 'gaps', 'audit'] as const;
 
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
   const file = (FILES as readonly string[]).includes(q.get('file') ?? '') ? (q.get('file') as (typeof FILES)[number]) : 'ratio-checks';
   try {
     const r = await invokeCapability('getInspectorReport', { db, actor, now: new Date() }, { locationId: q.get('location') ?? '', from: q.get('from') ?? '', to: q.get('to') ?? '' });
-    const body = `"${r.site.name.replace(/"/g, '""')}, ${r.from} to ${r.to}. Generated ${r.generatedAt}. ${r.notice.replace(/"/g, '""')}"\n${r.files[`${file}.csv`] ?? ''}`;
+    const body = `${csvCell(`${r.site.name}, ${r.from} to ${r.to}. Generated ${r.generatedAt}. ${r.notice}`)}\n${r.files[`${file}.csv`] ?? ''}`;
     return new NextResponse(body, {
       headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="inspector-${file}-${r.from}-to-${r.to}.csv"`, 'cache-control': 'no-store' },
     });
