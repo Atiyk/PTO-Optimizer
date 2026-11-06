@@ -42,6 +42,15 @@ function memoryStore() {
     async dueForReminders(today) { return [...rows.values()].filter((row) => row.reminders && row.last_reminded_on !== today); },
     async markReminded(id, today) { rows.get(id)!.last_reminded_on = today; },
     async takeEmailBudget(_today, cap) { return ++budget <= cap; },
+    rates: new Map<string, { start: number; used: number }>(),
+    async takeRateSlot(key, limit, windowMs, nowMs) {
+      const rates = (this as unknown as { rates: Map<string, { start: number; used: number }> }).rates;
+      const r = rates.get(key);
+      if (!r || r.start <= nowMs - windowMs) { rates.set(key, { start: nowMs, used: 1 }); return true; }
+      if (r.used >= limit) return false;
+      r.used += 1;
+      return true;
+    },
     slots: new Map<string, number>(),
     async takeLoginSlot(email, nowMs) {
       const last = (this as unknown as { slots: Map<string, number> }).slots.get(email);
@@ -69,6 +78,9 @@ function setup(env: Record<string, string> = ENV) {
   return { deps, sent, rows };
 }
 
+/** Opening a sign-in link shows a confirm page; its button posts back to the same URL. */
+const confirmSignIn = (link: string, origin = 'https://gapless.example') => new Request(link, { method: 'POST', headers: { origin } });
+
 const post = (body: unknown, headers: Record<string, string> = {}) => new Request('https://gapless.example/api/account', {
   method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://gapless.example', ...headers }, body: JSON.stringify(body),
 });
@@ -76,7 +88,7 @@ const post = (body: unknown, headers: Record<string, string> = {}) => new Reques
 async function signIn(ctx: ReturnType<typeof setup>, email = 'me@example.com'): Promise<string> {
   await handleAccount(post({ action: 'login', email }), ctx.deps);
   const link = ctx.sent.at(-1)!.text.match(/https:\/\/\S+verify=\S+/)![0];
-  const res = await handleAccount(new Request(link), ctx.deps);
+  const res = await handleAccount(confirmSignIn(link), ctx.deps);
   return res.headers.getSetCookie().map((cookie) => cookie.split(';')[0]).join('; ');
 }
 
@@ -120,18 +132,38 @@ describe('/api/account', () => {
     expect(ctx.sent).toHaveLength(1);
     const link = ctx.sent[0].text.match(/https:\/\/\S+verify=\S+/)![0];
     expect(link.startsWith('https://gapless.example/api/account?verify=')).toBe(true);
-    const landing = await handleAccount(new Request(link), ctx.deps);
+    // Opening the link only shows a confirm page; it signs nothing in.
+    const opened = await handleAccount(new Request(link), ctx.deps);
+    expect(opened.status).toBe(200);
+    expect(opened.headers.getSetCookie()).toEqual([]);
+    expect(await opened.text()).toContain('<form method="post">');
+    expect(ctx.rows.size).toBe(0);
+    // A form on another site can't press the button for you.
+    expect((await handleAccount(confirmSignIn(link, 'https://evil.example'), ctx.deps)).status).toBe(403);
+    expect((await handleAccount(new Request(link, { method: 'POST' }), ctx.deps)).status).toBe(403);
+    const landing = await handleAccount(confirmSignIn(link), ctx.deps);
     expect(landing.status).toBe(303);
     expect(landing.headers.get('location')).toBe('https://gapless.example/pto/?signin=ok#account');
     // It lands back on the page the person started from, and only ever on this site.
     await handleAccount(post({ action: 'login', email: 'b@example.com', returnTo: 'https://evil.example/policy?c=US&signin=x' }), ctx.deps);
-    const back = await handleAccount(new Request(ctx.sent.at(-1)!.text.match(/https:\/\/\S+verify=\S+/)![0]), ctx.deps);
+    const back = await handleAccount(confirmSignIn(ctx.sent.at(-1)!.text.match(/https:\/\/\S+verify=\S+/)![0]), ctx.deps);
     expect(back.headers.get('location')).toBe('https://gapless.example/policy?c=US&signin=ok#account');
     const cookies = landing.headers.getSetCookie();
     expect(cookies[0]).toMatch(/^gapless_session=.+HttpOnly; Secure; SameSite=Lax/);
     expect(cookies[1]).toMatch(/^gapless_signed_in=1; Path=\/; Secure/);
     expect(cookies[1]).not.toContain('HttpOnly');
     expect(ctx.rows.size).toBe(2);
+  });
+
+  it('sends at most five sign-in links an hour from one IP address', async () => {
+    const ctx = setup();
+    const from = (ip: string, n: number) => handleAccount(post({ action: 'login', email: `p${n}@example.com` }, { 'x-forwarded-for': `${ip}, 10.0.0.1` }), ctx.deps);
+    for (let n = 0; n < 5; n++) expect((await from('203.0.113.7', n)).status).toBe(200);
+    expect((await from('203.0.113.7', 5)).status).toBe(429);
+    expect(ctx.sent).toHaveLength(5);
+    expect((await from('198.51.100.2', 6)).status).toBe(200); // another address is unaffected
+    ctx.deps.now = () => new Date(NOW.getTime() + 60 * 60 * 1000);
+    expect((await from('203.0.113.7', 7)).status).toBe(200); // and the hour resets
   });
 
   it('refuses cross-site and non-JSON posts', async () => {
@@ -171,6 +203,12 @@ describe('reminder emails', () => {
   it('unescapes ICS text in one pass, so an escaped backslash before "n" stays a backslash', () => {
     const ics = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261210\r\nSUMMARY:C:\\\\new\\, home\\nnext\r\nBEGIN:VALARM\r\nTRIGGER:PT9H\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n';
     expect(dueItems(ics, '2026-12-10')[0]?.summary).toBe('C:\\new, home\nnext');
+  });
+
+  it('emails a late "book now" item on its first late day and then weekly, not every day', () => {
+    const late = (today: string) => `BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nDTSTART;VALUE=DATE:${today.replace(/-/g, '')}\r\nSUMMARY:Request time off (book now)\r\nX-GAPLESS-BOOK-BY:20261201\r\nBEGIN:VALARM\r\nTRIGGER:PT9H\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`;
+    const days = Array.from({ length: 16 }, (_, i) => `2026-12-${String(2 + i).padStart(2, '0')}`);
+    expect(days.filter((day) => dueItems(late(day), day).length > 0)).toEqual(['2026-12-02', '2026-12-09', '2026-12-16']);
   });
 
   it('works out alarm days like a calendar app', () => {
@@ -233,6 +271,20 @@ describe('forward the approval', () => {
     expect(reply.to).toBe('me@example.com');
     expect(reply.text).toContain('December 21, 2026 to December 24, 2026');
     expect(reply.text).toContain("I'm out of the office");
+  });
+
+  it('drops mail that fails SPF and replies at most five times a day per account', async () => {
+    const ctx = setup();
+    await signIn(ctx);
+    const forged = { ...approval('me@example.com'), envelope: { from: 'me@example.com', spf: { result: 'fail', domain: 'example.com' } } };
+    expect(await (await handleInbound(inbound(forged), ctx.deps)).json()).toEqual({ ignored: 'spf' });
+    // SPF passing for the attacker's own envelope domain doesn't vouch for the From address.
+    const spoofed = { ...approval('me@example.com'), envelope: { from: 'bounce@attacker.example', spf: { result: 'pass' } } };
+    expect(await (await handleInbound(inbound(spoofed), ctx.deps)).json()).toEqual({ ignored: 'spf' });
+    const before = ctx.sent.length;
+    for (let n = 0; n < 5; n++) expect(await (await handleInbound(inbound(approval('me@example.com')), ctx.deps)).json()).toMatchObject({ replied: true });
+    expect(await (await handleInbound(inbound(approval('me@example.com')), ctx.deps)).json()).toEqual({ ignored: 'daily limit' });
+    expect(ctx.sent.length - before).toBe(5);
   });
 
   it('accepts the multipart format too', async () => {

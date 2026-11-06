@@ -6,7 +6,9 @@ import { webhookDeliveries } from '@/db/schema';
 import { GET as cronGet } from '@/app/api/cron/daily/route';
 import { buildOrg, humanActor, NOW, run } from '@/test/fixtures';
 import { freshDb } from '@/test/db';
-import { deliverDue, MAX_ATTEMPTS, RETRY_DELAYS_MS, scanExpiringBalances, setWebhookTransport, webhookUrlProblem } from './webhooks';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { deliverDue, MAX_ATTEMPTS, pinnedPost, RETRY_DELAYS_MS, scanExpiringBalances, setWebhookTransport, webhookUrlProblem } from './webhooks';
 
 /*
  * 5D: signed webhooks. A fake receiver records requests; the official Standard Webhooks
@@ -162,5 +164,25 @@ describe('webhooks (5D)', () => {
       delete process.env.CRON_SECRET;
     }
     expect((await cronGet(new Request('http://teams.test/api/cron/daily'))).status).toBe(503);
+  });
+});
+
+describe('pinned delivery (DNS rebinding)', () => {
+  it('connects only to the address that was checked, keeping the URL host name', async () => {
+    const server = createServer((req, res) => {
+      let body = '';
+      req.on('data', (c) => (body += c));
+      req.on('end', () => res.writeHead(204, { 'x-host': req.headers.host ?? '', 'x-body': body }).end());
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    const { port } = server.address() as AddressInfo;
+    try {
+      // `hooks.invalid` never resolves in DNS, so reaching the server proves the pinned address was used.
+      const res = await pinnedPost(`http://hooks.invalid:${port}/in`, ['127.0.0.1'], { 'content-type': 'application/json' }, '{"a":1}', AbortSignal.timeout(5000));
+      expect(res.status).toBe(204);
+      await expect(pinnedPost(`http://hooks.invalid:${port}/in`, [], {}, '', AbortSignal.timeout(5000))).rejects.toThrow(/did not resolve/);
+    } finally {
+      server.close();
+    }
   });
 });

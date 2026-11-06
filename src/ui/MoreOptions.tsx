@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import type { WorkWeek } from '@daysoff/engine/solver/types';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
-import { addDays, rangeISO } from '@daysoff/engine/solver/dateUtils';
+import { addDays, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
+import { formatShortWithYear } from '@daysoff/engine/calendar/dateFormat';
+import { isValidISODate } from './urlState';
 import { DateListEditor } from './DateListEditor';
 import { ImportCalendar } from './ImportCalendar';
 import { todayISO, type HolidayEntry } from './useAppState';
@@ -292,6 +294,12 @@ export function MoreOptions(props: MoreOptionsProps) {
               className={FIELD_CLASS}
             />
           </label>
+        )}
+        {props.altFridayEnabled && isValidISODate(props.altFridayStart) && mondayIndexedDow(props.altFridayStart) !== 4 && (
+          <p className={NOTE}>
+            That date isn&rsquo;t a Friday, so the plan counts from Friday,{' '}
+            {formatShortWithYear(addDays(props.altFridayStart, 4 - mondayIndexedDow(props.altFridayStart)))}, that week.
+          </p>
         )}
         <p className={NOTE}>
           For a plain 4-day week (off every Friday), just uncheck Friday in Work week above &mdash; this is only

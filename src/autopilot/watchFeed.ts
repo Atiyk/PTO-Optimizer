@@ -2,7 +2,7 @@ import { COUNTRIES, SUBDIVISION_NAMES } from '@daysoff/engine/data/countries';
 import type { Holiday } from '@daysoff/engine/data/holidays';
 import { getStateHolidaysFallback } from '@daysoff/engine/data/usStateHolidays';
 import { isAlternatingFridayOff } from '@daysoff/engine/calendar/calendarMath';
-import { addDays, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
+import { addDays, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { DEFAULT_WORK_WEEK, type ISODate } from '@daysoff/engine/solver/types';
 import type { AccrualMethod, CarryoverRule, PlanYear, TimeOffPolicy } from '../policy/model';
 import { EXPIRATION_REMINDER_LEADS, expirationReminders, expirationRisks } from '../personal/expiration';
@@ -96,7 +96,7 @@ function feedCalendar(state: PolicyURLState, start: ISODate, end: ISODate, holid
       for (const fallback of getStateHolidaysFallback(subdivision, year)) offDays.add(fallback.date);
     }
   }
-  if (state.altFridayStart && mondayIndexedDow(state.altFridayStart) === 4) {
+  if (state.altFridayStart) {
     for (const date of rangeISO(start, end)) if (isAlternatingFridayOff(date, state.altFridayStart)) offDays.add(date);
   }
   return {

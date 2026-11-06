@@ -164,11 +164,13 @@ export function computeBandSegments(weekDates: (string | null)[], runs: OffRun[]
  * pattern actually needs: true if `iso` is a Friday on the same 14-day cadence as
  * `anchorFriday`. `anchorFriday` doesn't need to be in-range itself - only which 14-day
  * bucket it falls in matters, which is why the modulo is taken on the raw day serial, not
- * on any particular range.
+ * on any particular range. An anchor that isn't a Friday (the date pickers accept any day)
+ * means the Friday of its Monday-Sunday week.
  */
 export function isAlternatingFridayOff(iso: string, anchorFriday: string): boolean {
   if (mondayIndexedDow(iso) !== 4) return false; // not a Friday
-  const diff = isoToSerial(iso) - isoToSerial(anchorFriday);
+  const anchor = isoToSerial(anchorFriday) + 4 - mondayIndexedDow(anchorFriday);
+  const diff = isoToSerial(iso) - anchor;
   return ((diff % 14) + 14) % 14 === 0;
 }
 

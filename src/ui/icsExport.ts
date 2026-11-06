@@ -51,10 +51,9 @@ export function dtstampNow(now: Date): string {
   return now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 }
 
-/** `now` as a UTC calendar-date ISO string, same convention as the rest of the date
- * arithmetic in this file (never the viewer's local date). */
-export function nowToISO(now: Date): string {
-  return `${String(now.getUTCFullYear()).padStart(4, '0')}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+/** `now` as the viewer's local calendar date, the same "today" the planner on screen uses. */
+export function localDateISO(now: Date): string {
+  return `${String(now.getFullYear()).padStart(4, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
 export interface ReminderOptions {
@@ -110,8 +109,9 @@ function displayAlarm(trigger: string, text: string): string[] {
  * break on its book-by date (break start minus the notice period, the same subtraction as
  * before), with display alarms 7 days before (only while that is still ahead of today) and
  * at 9:00 on the day. A break that hasn't started but whose book-by date has passed gets
- * its event on today, titled "book now". The title keeps the "Request time off: <range>"
- * lead so month views, which truncate, still say what to do.
+ * its event on today, titled "book now", and carries its book-by date in X-GAPLESS-BOOK-BY
+ * so the reminder email can nudge weekly instead of every day. The title keeps the
+ * "Request time off: <range>" lead so month views, which truncate, still say what to do.
  */
 export function bookByEventLines(breaks: Break[], todayIso: string, leadDays: number, dtstamp: string): string[] {
   const lines: string[] = [];
@@ -138,6 +138,7 @@ export function bookByEventLines(breaks: Break[], todayIso: string, leadDays: nu
     lines.push(foldLine(`SUMMARY:${escapeText(title)}`));
     lines.push(foldLine(`DESCRIPTION:${escapeText(description)}`));
     lines.push('TRANSP:TRANSPARENT');
+    if (late) lines.push(`X-GAPLESS-BOOK-BY:${isoToICSDate(bookBy)}`);
     if (addDays(eventIso, -7) >= todayIso) lines.push(...displayAlarm(ALARM_WEEK_BEFORE_9AM, title));
     lines.push(...displayAlarm(ALARM_ON_DAY_9AM, title));
     lines.push('END:VEVENT');
@@ -172,7 +173,9 @@ export function generateICS(
 
   const dtstamp = dtstampNow(now);
   lines.push(...ptoDayEventLines(breaks, isPtoDay, dtstamp));
-  if (reminderOptions.enabled) lines.push(...bookByEventLines(breaks, nowToISO(now), reminderOptions.leadDays, dtstamp));
+  // The download runs in the browser, so "today" is the viewer's local date, matching the plan
+  // on screen; the server feed passes its own day to bookByEventLines.
+  if (reminderOptions.enabled) lines.push(...bookByEventLines(breaks, localDateISO(now), reminderOptions.leadDays, dtstamp));
 
   lines.push('END:VCALENDAR');
   return lines.join('\r\n') + '\r\n';

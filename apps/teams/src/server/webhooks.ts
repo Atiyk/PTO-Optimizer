@@ -1,7 +1,9 @@
 import { createHmac, randomBytes } from 'node:crypto';
 import { openSecret } from '@/lib/secretBox';
 import { lookup } from 'node:dns/promises';
-import { BlockList, isIP } from 'node:net';
+import { request as httpRequest, type RequestOptions } from 'node:http';
+import { request as httpsRequest } from 'node:https';
+import { BlockList, isIP, type LookupFunction } from 'node:net';
 import { and, asc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { after } from 'next/server';
 import type { Db } from '@/db/client';
@@ -77,6 +79,30 @@ export function webhookUrlProblem(raw: string): string | null {
 export type Resolver = (host: string) => Promise<string[]>;
 const dnsResolver: Resolver = async (host) => (await lookup(host, { all: true })).map((a) => a.address);
 
+/**
+ * POST to `url` connecting only to `addrs`, the addresses that passed the private-address check,
+ * so a second DNS answer (rebinding) can't send the request somewhere else. TLS still checks
+ * the certificate against the URL's host name. Redirects are not followed.
+ */
+export function pinnedPost(url: string, addrs: string[], headers: Record<string, string>, body: string, signal: AbortSignal): Promise<{ status: number }> {
+  if (!addrs.length) return Promise.reject(new Error('Destination did not resolve; not sent.'));
+  const pinned: LookupFunction = (_host, options, cb) => {
+    const all = addrs.map((address) => ({ address, family: isIP(address) }));
+    if (options.all) (cb as unknown as (e: null, a: typeof all) => void)(null, all);
+    else cb(null, all[0]!.address, all[0]!.family);
+  };
+  const u = new URL(url);
+  const opts: RequestOptions = { method: 'POST', headers: { ...headers, 'content-length': String(Buffer.byteLength(body)) }, lookup: pinned, signal };
+  return new Promise((resolve, reject) => {
+    const req = (u.protocol === 'http:' ? httpRequest : httpsRequest)(u, opts, (res) => {
+      res.resume();
+      resolve({ status: res.statusCode ?? 0 });
+    });
+    req.on('error', (e) => reject(signal.aborted ? signal.reason : e));
+    req.end(body);
+  });
+}
+
 // ---------------------------------------------------------------------------------------------
 // Emitting
 
@@ -145,7 +171,7 @@ export async function deliverDue(db: Db, now: Date, opts: DeliverOptions = {}): 
     .orderBy(asc(webhookDeliveries.nextAttemptAt))
     .limit(opts.limit ?? 25);
   const tally = { delivered: 0, failed: 0, retrying: 0 };
-  const doFetch = opts.fetchImpl ?? transport.fetchImpl ?? fetch;
+  const injected = opts.fetchImpl ?? transport.fetchImpl;
   const resolve = opts.resolve ?? transport.resolve ?? dnsResolver;
 
   for (const { d, url, secret } of due) {
@@ -166,19 +192,17 @@ export async function deliverDue(db: Db, now: Date, opts: DeliverOptions = {}): 
       const devLocal = process.env.WEBHOOK_ALLOW_HTTP === '1' && (host === 'localhost' || host === '127.0.0.1');
       const addrs = isIP(host) ? [host] : devLocal ? [] : await resolve(host);
       if (!devLocal && addrs.some(isPrivateAddress)) throw new Error('Destination resolves to a private address; not sent.');
-      const res = await doFetch(url, {
-        method: 'POST',
-        redirect: 'manual',
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-        headers: {
-          'content-type': 'application/json',
-          'user-agent': 'DaysOffForTeams-Webhooks/1',
-          'webhook-id': d.id,
-          'webhook-timestamp': String(timestamp),
-          'webhook-signature': signWebhook(openSecret(secret), d.id, timestamp, body),
-        },
-        body,
-      });
+      const headers = {
+        'content-type': 'application/json',
+        'user-agent': 'DaysOffForTeams-Webhooks/1',
+        'webhook-id': d.id,
+        'webhook-timestamp': String(timestamp),
+        'webhook-signature': signWebhook(openSecret(secret), d.id, timestamp, body),
+      };
+      const signal = AbortSignal.timeout(TIMEOUT_MS);
+      const res = injected || devLocal
+        ? await (injected ?? fetch)(url, { method: 'POST', redirect: 'manual', signal, headers, body })
+        : await pinnedPost(url, addrs, headers, body, signal);
       code = res.status;
       if (res.status < 200 || res.status >= 300) error = `Receiver answered ${res.status}.`;
     } catch (e) {
