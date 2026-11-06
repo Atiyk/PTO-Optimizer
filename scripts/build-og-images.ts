@@ -21,6 +21,7 @@ import { rawHolidaysToHolidays } from '@daysoff/engine/data/holidays';
 import { solve } from '@daysoff/engine/solver/solve';
 import { bestPlacements, placementNote } from '../src/ui/sabbaticalData.ts';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import { addDays } from '@daysoff/engine/solver/dateUtils';
 import { logoMarkInner, LOGO_COLORS } from '../src/ui/logoMark.ts';
 import { PRODUCT_NAME } from '../src/brand.ts';
 
@@ -31,11 +32,6 @@ const outDir = resolve(projectRoot, 'public/og-images');
 function todayISO(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-}
-function addDays(iso: string, n: number): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d + n));
-  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`;
 }
 
 function loadUSHolidays(): ReturnType<typeof rawHolidaysToHolidays> {

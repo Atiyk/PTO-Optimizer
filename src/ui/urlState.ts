@@ -97,7 +97,7 @@ export function isValidISODate(s: string): boolean {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
 }
 
-function parseDateList(raw: string | null): string[] {
+export function parseDateList(raw: string | null): string[] {
   if (!raw || raw.length > 44_000) return [];
   const dates = raw
     .split(',')

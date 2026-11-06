@@ -20,7 +20,7 @@ import type { Break, SolveInput, WorkWeek } from '@daysoff/engine/solver/types';
 import { rawHolidaysToHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { getStateHolidaysFallback } from '@daysoff/engine/data/usStateHolidays';
 import { isAlternatingFridayOff } from '@daysoff/engine/calendar/calendarMath';
-import { mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
+import { isoToSerial, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { solveLegacyConsumer, type PlanningStyle } from '../planning/optimizer';
 import { solveWithPinFallback, type PlannerOutcome } from '../ui/pinPreview';
 import { readFullStateFromURL, readOverlapPayloadFromURL, isValidISODate } from '../ui/urlState';
@@ -51,7 +51,7 @@ export function defaultPlanRangeEnd(todayIso: string): string {
 export function defaultRangeEnd(todayIso: string): string {
   const year = Number(todayIso.slice(0, 4));
   const thisYearEnd = `${year}-12-31`;
-  const daysRemaining = rangeISO(todayIso, thisYearEnd).length - 1; // exclusive of today itself
+  const daysRemaining = isoToSerial(thisYearEnd) - isoToSerial(todayIso); // exclusive of today itself
   return daysRemaining > DEFAULT_RANGE_ROLLOVER_DAYS ? thisYearEnd : `${year + 1}-12-31`;
 }
 

@@ -21,6 +21,7 @@ import { alternativeForDate as alternativeForDateImpl } from './alternativeForDa
 import { track } from './analytics';
 import { validateInputs, isSupportedPlanningRange } from './validation';
 import { defaultRangeEnd, defaultPlanRangeEnd, holidayEntriesFor, stateHolidayCandidatesFor, altFridayOffDatesFor, effectiveOffDaysFor, mustIncludeDaysFor, effectiveBlackoutsFor, effectiveBudgetFor, policyAccrualFieldsFor, buildSolveInput, solvePlan, isSuggestedPtoDay, type HolidayEntry } from '../autopilot/planFromSearch';
+import { todayISO } from './today';
 
 export { defaultRangeEnd };
 export type { HolidayEntry };
@@ -30,10 +31,7 @@ export type { HolidayEntry };
  * unchecking the box for the first time doesn't default to either extreme. */
 const DEFAULT_MANUAL_BREAK_COUNT = 4;
 
-export function todayISO(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-}
+export { todayISO };
 
 function totalDaysOffOf(breaks: { totalDaysOff: number }[]): number {
   return breaks.reduce((s, b) => s + b.totalDaysOff, 0);

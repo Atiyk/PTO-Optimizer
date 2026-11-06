@@ -8,7 +8,7 @@ import { Button } from './Button';
 import { getPreloadedHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { getPrerenderedAt } from './prerenderedAt';
 import { geolocateCountry } from './geo';
-import { todayISO } from './useAppState';
+import { todayISO } from './today';
 import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { formatCardDateRange, formatLong, formatShort, formatShortWithYear } from '@daysoff/engine/calendar/dateFormat';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';

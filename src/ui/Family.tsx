@@ -15,7 +15,7 @@ import { CountrySelect } from './CountrySelect';
 import { Button } from './Button';
 import { getPrerenderedAt } from './prerenderedAt';
 import { geolocateCountry } from './geo';
-import { todayISO } from './useAppState';
+import { todayISO } from './today';
 import { weekStartForCountry } from './locale';
 import { copyText } from './requestText';
 import { downloadFamilyPtoICS } from './icsExport';

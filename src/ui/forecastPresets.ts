@@ -7,7 +7,7 @@ export interface ForecastPreset {
 }
 
 /** Anchored to the policy's balance as-of date, never to the viewer's clock. */
-function addMonthsClamped(iso: string, months: number): string {
+export function addMonthsClamped(iso: string, months: number): string {
   const [year, month, day] = iso.split('-').map(Number);
   const index = year * 12 + month - 1 + months;
   const targetYear = Math.floor(index / 12);

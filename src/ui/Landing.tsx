@@ -11,7 +11,7 @@ import { Container } from './Container';
 import { Button } from './Button';
 import { YearStrip } from './YearStrip';
 import { geolocateCountry } from './geo';
-import { todayISO } from './useAppState';
+import { todayISO } from './today';
 import { breakReason } from './breakReason';
 import { findBridges, nextHoliday, remainingHolidays, runLength } from './landingData';
 import { downloadHolidaysICS } from './icsExport';

@@ -1,6 +1,6 @@
 import type { WorkWeek } from '@daysoff/engine/solver/types';
-import { isValidISODate } from './urlState';
-import { todayISO } from './useAppState';
+import { isValidISODate, parseDateList } from './urlState';
+import { todayISO } from './today';
 
 /**
  * Stage 4A follow-through (PR-C): URL round-trip for every /policy control, using the same
@@ -74,12 +74,6 @@ function num(raw: string | null, fallback: number): number {
 
 function date(raw: string | null, fallback: string): string {
   return raw && isValidISODate(raw) ? raw : fallback;
-}
-
-function parseDateList(raw: string | null): string[] {
-  if (!raw || raw.length > 44_000) return [];
-  const dates = raw.split(',').map((s) => s.trim()).filter(isValidISODate);
-  return dates.length <= 4000 ? [...new Set(dates)] : [];
 }
 
 export function defaultPolicyURLState(): PolicyURLState {
