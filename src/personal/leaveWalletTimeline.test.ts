@@ -73,6 +73,29 @@ describe('exact-date wallet selectors', () => {
     expect(selectWalletBalancesAsOf(timeline, '2027-02-15')?.[0].confirmedBalance).not.toBe(-999);
   });
 
+  it('indexes reserved JavaScript property names without prototype mutation or lost events', () => {
+    const reserved = ['__proto__', 'constructor', 'toString'];
+    const banks: LeaveBank[] = reserved.map((id) => ({
+      ...legacyVacationBank(policy), id, name: id, requestIds: [],
+    }));
+    const timeline = projectWalletTimeline(banks, '2027-02-15');
+    expect(timeline).not.toBeNull();
+    expect(Object.getPrototypeOf(timeline!.nextEvents)).toBeNull();
+    expect(Object.keys(timeline!.nextEvents).sort()).toEqual([...reserved].sort());
+    for (const id of reserved) {
+      expect(Object.hasOwn(timeline!.nextEvents, id)).toBe(true);
+      expect(timeline!.nextEvents[id]?.effectiveDate).toBe('2027-01-15');
+    }
+    const next = selectWalletNextEvents(timeline!, '2027-01-15');
+    expect(next).not.toBeNull();
+    expect(Object.getPrototypeOf(next)).toBeNull();
+    for (const id of reserved) {
+      expect(Object.hasOwn(next, id)).toBe(true);
+      expect(next![id]?.effectiveDate).toBe('2027-02-15');
+    }
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
   it('finds next actual canonical event after an arbitrary as-of date', () => {
     const timeline = projectWalletTimeline([legacyVacationBank(policy, [approved])], '2027-02-15', [approved])!;
     expect(selectWalletNextEvents(timeline, '2027-01-01')?.vacation?.effectiveDate).toBe('2027-01-15');
