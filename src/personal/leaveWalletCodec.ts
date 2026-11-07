@@ -80,8 +80,15 @@ export function previewLeaveWalletImport(
     || !Array.isArray(requests) || requests.length > MAX_BANK_REQUEST_IDS) return null;
   const existingEnvelope = existing.length ? decodeLeaveWallet(encodeLeaveWallet({ version: 1, banks: [...existing] })) : null;
   if (existing.length && !existingEnvelope) return null;
+  // A duplicate or malformed live ledger cannot safely resolve imported links.
+  // Reject the entire preview rather than allowing a partial/ambiguous import.
+  const requestIds = new Set<string>();
+  for (const request of requests) {
+    if (!request || typeof request.id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(request.id)
+      || requestIds.has(request.id)) return null;
+    requestIds.add(request.id);
+  }
   const existingIds = new Set(existing.map((bank) => bank.id));
-  const requestIds = new Set(requests.map((request) => request.id));
   return {
     incoming,
     existing: existingEnvelope,
