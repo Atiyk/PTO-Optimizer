@@ -13,7 +13,7 @@ describe('bounded source-honest travel window evidence', () => {
     const x = travelWindowEvidence('2028-02-28', '2028-03-01', 'GB')!;
     expect(x.kind).toBe('generic-seasonal-heuristic');
     expect(x.sourceYear).toBeNull();
-    expect(x.caveat).toContain('not based on observed trips');
+    expect(x.caveat).toMatch(/not based on observed trips/i);
   });
   it('rejects invalid, reversed and oversized windows', () => {
     expect(travelWindowEvidence('2027-02-30', '2027-03-01', 'US')).toBeNull();
