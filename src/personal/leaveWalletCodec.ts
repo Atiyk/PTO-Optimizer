@@ -94,11 +94,17 @@ export function previewLeaveWalletImport(
 }
 
 /** Merge by default: retain every unrelated existing bank. Conflicting IDs require consent. */
-export function acceptLeaveWalletImport(preview: WalletImportPreview, replaceConflicts: boolean): LeaveBank[] | null {
+export function acceptLeaveWalletImport(preview: WalletImportPreview, replaceConflicts: boolean, currentBanks: readonly LeaveBank[]): LeaveBank[] | null {
   if (!preview || !Array.isArray(preview.unresolvedRequestIds) || preview.unresolvedRequestIds.length) return null;
   const incoming = decodeLeaveWallet(encodeLeaveWallet(preview.incoming));
   const existing = preview.existing ? decodeLeaveWallet(encodeLeaveWallet(preview.existing)) : null;
   if (!incoming || (preview.existing && !existing)) return null;
+  // Fail closed if the wallet changed since preview. The caller must re-read the
+  // current local state immediately before committing; do not persist a stale result.
+  const currentEncoded = encodeLeaveWallet({ version: 1, banks: [...currentBanks] });
+  const previewEncoded = existing ? encodeLeaveWallet(existing) : '';
+  if (!Array.isArray(currentBanks) || (currentBanks.length && !currentEncoded)
+    || (existing ? currentEncoded !== previewEncoded : currentBanks.length !== 0)) return null;
   const current = existing?.banks ?? [];
   const ids = new Set(incoming.banks.map((bank) => bank.id));
   if (!replaceConflicts && current.some((bank) => ids.has(bank.id))) return null;
@@ -107,7 +113,10 @@ export function acceptLeaveWalletImport(preview: WalletImportPreview, replaceCon
 }
 
 /** Destructive full replacement is separate and requires explicit confirmation. */
-export function replaceLeaveWalletFromImport(preview: WalletImportPreview, confirmFullReplacement: boolean): LeaveBank[] | null {
-  if (!confirmFullReplacement || !preview || preview.unresolvedRequestIds.length) return null;
+export function replaceLeaveWalletFromImport(preview: WalletImportPreview, confirmFullReplacement: boolean, currentBanks: readonly LeaveBank[]): LeaveBank[] | null {
+  if (!confirmFullReplacement || !preview || preview.unresolvedRequestIds.length || !Array.isArray(currentBanks)) return null;
+  const expected = preview.existing ? encodeLeaveWallet(preview.existing) : '';
+  const actual = currentBanks.length ? encodeLeaveWallet({ version: 1, banks: [...currentBanks] }) : '';
+  if ((currentBanks.length && !actual) || actual !== expected) return null;
   return decodeLeaveWallet(encodeLeaveWallet(preview.incoming))?.banks ?? null;
 }
