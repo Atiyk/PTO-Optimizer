@@ -20,7 +20,7 @@ export function applyDateConstraints(
   const output: RecommendationCandidate[] = [];
   for (const c of candidates) {
     if (!c || !validCalendarDate(c.start) || !validCalendarDate(c.end) || c.end < c.start) return null;
-    const blocked = [...hard].some(d => d >= c.start && d <= c.end);
+    const blocked = [...hard, ...(c.hardExcludedDates || [])].some(d => d >= c.start && d <= c.end);
     if (blocked) continue;
     output.push({
       ...c,
