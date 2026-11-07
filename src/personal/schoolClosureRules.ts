@@ -17,7 +17,7 @@ export function expandSchoolClosures(rules: readonly SchoolClosureRule[], start:
   for (const rule of rules) {
     if (!rule || !validCalendarDate(rule.start) || !validCalendarDate(rule.end) || rule.start > rule.end
       || (rule.weekdays !== undefined && (!Array.isArray(rule.weekdays) || rule.weekdays.length > 7
-        || rule.weekdays.some(d => !Number.isInteger(d) || d < 0 || d > 6)))) return null;
+        || rule.weekdays.some((d: number) => !Number.isInteger(d) || d < 0 || d > 6)))) return null;
     const lo = Math.max(first, Date.parse(rule.start + 'T00:00:00Z'));
     const hi = Math.min(last, Date.parse(rule.end + 'T00:00:00Z'));
     for (let t = lo; t <= hi; t += dayMs) {
