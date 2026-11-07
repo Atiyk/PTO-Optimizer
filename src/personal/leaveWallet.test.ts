@@ -44,6 +44,17 @@ function sickBank(): LeaveBank {
 }
 
 describe('consumer unified leave wallet (pure canonical projection)', () => {
+  it('preserves all legacy request IDs and fails closed beyond the wallet limit', () => {
+    const many = Array.from({ length: 301 }, (_, index) => ({
+      ...approved, id: 'legacy-' + index,
+    }));
+    const bank = legacyVacationBank(policy, many);
+    expect(bank.requestIds).toHaveLength(301);
+    expect(bank.requestIds.at(-1)).toBe('legacy-300');
+    expect(projectLeaveWallet([bank], '2027-02-15', many)).toBeNull();
+    expect(projectLeaveWallet([bank], '2027-02-15')).toBeNull();
+  });
+
   it('projects two independent banks and assigns legacy requests only to vacation', () => {
     const snapshot = projectLeaveWallet([
       legacyVacationBank(policy, [approved, tentative]), sickBank(),
