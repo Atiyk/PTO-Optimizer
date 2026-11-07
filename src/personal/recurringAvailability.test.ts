@@ -83,6 +83,24 @@ describe('recurring consumer work schedules', () => {
     expect(jointWindowFeasibility(a, b, 0, 0)?.ptoDaysB).toBe(0);
   });
 
+  it('rejects forged external windows, gaps, duplicate days and invalid boolean flags', () => {
+    const a = calendarAvailability({ start: '2027-01-04', end: '2027-01-06', schedule: standard, calendarPartial: false })!;
+    const b = calendarAvailability({ start: '2027-01-04', end: '2027-01-06', schedule: standard, calendarPartial: false })!;
+    expect(jointWindowFeasibility(a, b, 3, 3)?.possible).toBe(true);
+    const malformed = { ...a, days: a.days.map(d => ({ ...d })) };
+    malformed.days[1].date = '2027-02-30';
+    expect(jointWindowFeasibility(malformed, b, 3, 3)).toBeNull();
+    malformed.days[1].date = '2027-01-04';
+    expect(jointWindowFeasibility(malformed, b, 3, 3)).toBeNull();
+    malformed.days[1].date = '2027-01-07';
+    expect(jointWindowFeasibility(malformed, b, 3, 3)).toBeNull();
+    malformed.days[1].date = '2027-01-05';
+    malformed.days[1].reviewNeeded = 'false' as unknown as boolean;
+    expect(jointWindowFeasibility(malformed, b, 3, 3)).toBeNull();
+    expect(jointWindowFeasibility(a, b, 1.5, 3)).toBeNull();
+    expect(jointWindowFeasibility({ ...a, partial: 'false' as unknown as boolean }, b, 3, 3)).toBeNull();
+  });
+
   it('rejects invalid dates and cycle definitions rather than inventing a default', () => {
     expect(isScheduledWorkday({ kind: 'cycle', cycleAnchor: '2027-01-04', cycleWorking: [] }, '2027-01-05')).toBeNull();
     expect(calendarAvailability({ start: '2027-02-30', end: '2027-03-05', schedule: standard })).toBeNull();
