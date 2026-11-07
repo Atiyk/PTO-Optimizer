@@ -46,7 +46,10 @@ export function selectRecommendationAlternatives(candidates: readonly Recommenda
   const used: RecommendationCandidate[] = [];
   const output: RecommendationAlternative[] = [];
   for (const objective of objectives) {
-    const ranked = [...feasible].sort((a, b) => score(b, objective) - score(a, objective)
+    // A single interval cannot truthfully satisfy a multi-getaway objective.
+    // Omit that objective unless the candidate explicitly represents multiple getaways.
+    const eligible = objective === 'most-getaways' ? feasible.filter(c => c.getawayCount >= 2) : feasible;
+    const ranked = [...eligible].sort((a, b) => score(b, objective) - score(a, objective)
       || a.start.localeCompare(b.start) || a.end.localeCompare(b.end) || a.ptoDays - b.ptoDays);
     const winner = ranked.find(c => !used.some(other => c.start <= other.end && other.start <= c.end));
     if (!winner) continue;
