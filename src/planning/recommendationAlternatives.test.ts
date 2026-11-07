@@ -31,6 +31,15 @@ describe('deterministic consumer recommendation alternatives', () => {
     }
     expect(results.find(r => r.start === '2027-05-01')?.reviewDates).toEqual(['2027-05-03']);
   });
+  it('does not mislabel a single-break canonical candidate as a multi-getaway solution', () => {
+    const results = selectRecommendationAlternatives([
+      candidate('2027-04-01', 6, 1),
+      candidate('2027-05-01', 5, 1),
+      candidate('2027-06-01', 4, 1),
+      candidate('2027-07-01', 3, 1),
+    ], 4);
+    expect(results.some(r => r.objective === 'most-getaways')).toBe(false);
+  });
   it('returns distinct deterministic alternatives with factual explanation metadata', () => {
     const items = [candidate('2027-04-01', 12, 1), candidate('2027-05-01', 5, 4), candidate('2027-06-01', 9, 2), candidate('2027-07-01', 4, 1, 0)];
     const a = selectRecommendationAlternatives(items, 3);
