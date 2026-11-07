@@ -113,7 +113,7 @@ export function selectWalletBalancesAsOf(
   timeline: WalletTimeline,
   asOf: ISODate,
 ): WalletTimelinePoint[] | null {
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(asOf) || asOf > timeline.through) return null;
+  if (!validSelectorDate(asOf) || asOf > timeline.through) return null;
   const selected = timeline.points.filter((point) => point.date === asOf);
   if (!selected.length) return null;
   const bankIds = new Set<string>();
@@ -129,7 +129,7 @@ export function selectWalletNextEvents(
   timeline: WalletTimeline,
   after: ISODate,
 ): Record<string, WalletEvent | null> | null {
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(after) || after > timeline.through) return null;
+  if (!validSelectorDate(after) || after > timeline.through) return null;
   const next: Record<string, WalletEvent | null> = Object.create(null) as Record<string, WalletEvent | null>;
   for (const bankId of Object.keys(timeline.nextEvents)) next[bankId] = null;
   for (const event of timeline.events) {
