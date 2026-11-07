@@ -13,6 +13,8 @@ export interface LeaveWalletEnvelope {
 
 export interface WalletImportPreview {
   incoming: LeaveWalletEnvelope;
+  existing: LeaveWalletEnvelope | null;
+  removedBankIdsOnFullReplace: string[];
   addedBankIds: string[];
   replacedBankIds: string[];
   /** Import does not modify the request ledger; callers must preserve linked requests. */
@@ -76,10 +78,14 @@ export function previewLeaveWalletImport(
   const incoming = decodeLeaveWallet(raw);
   if (!incoming || !Array.isArray(existing) || existing.length > MAX_WALLET_BANKS
     || !Array.isArray(requests) || requests.length > MAX_BANK_REQUEST_IDS) return null;
+  const existingEnvelope = existing.length ? decodeLeaveWallet(encodeLeaveWallet({ version: 1, banks: [...existing] })) : null;
+  if (existing.length && !existingEnvelope) return null;
   const existingIds = new Set(existing.map((bank) => bank.id));
   const requestIds = new Set(requests.map((request) => request.id));
   return {
     incoming,
+    existing: existingEnvelope,
+    removedBankIdsOnFullReplace: existing.filter((bank) => !incoming.banks.some((next) => next.id === bank.id)).map((bank) => bank.id),
     addedBankIds: incoming.banks.filter((bank) => !existingIds.has(bank.id)).map((bank) => bank.id),
     replacedBankIds: incoming.banks.filter((bank) => existingIds.has(bank.id)).map((bank) => bank.id),
     unresolvedRequestIds: [...new Set(incoming.banks.flatMap((bank) => bank.requestIds))]
@@ -87,9 +93,21 @@ export function previewLeaveWalletImport(
   };
 }
 
-/** Explicit replacement requires an acknowledged preview and no missing request links. */
-export function acceptLeaveWalletImport(preview: WalletImportPreview, replaceExisting: boolean): LeaveBank[] | null {
-  if (!replaceExisting || preview.unresolvedRequestIds.length) return null;
-  const normalized = decodeLeaveWallet(encodeLeaveWallet(preview.incoming));
-  return normalized?.banks ?? null;
+/** Merge by default: retain every unrelated existing bank. Conflicting IDs require consent. */
+export function acceptLeaveWalletImport(preview: WalletImportPreview, replaceConflicts: boolean): LeaveBank[] | null {
+  if (!preview || !Array.isArray(preview.unresolvedRequestIds) || preview.unresolvedRequestIds.length) return null;
+  const incoming = decodeLeaveWallet(encodeLeaveWallet(preview.incoming));
+  const existing = preview.existing ? decodeLeaveWallet(encodeLeaveWallet(preview.existing)) : null;
+  if (!incoming || (preview.existing && !existing)) return null;
+  const current = existing?.banks ?? [];
+  const ids = new Set(incoming.banks.map((bank) => bank.id));
+  if (!replaceConflicts && current.some((bank) => ids.has(bank.id))) return null;
+  const merged = [...current.filter((bank) => !ids.has(bank.id)), ...incoming.banks];
+  return decodeLeaveWallet(encodeLeaveWallet({ version: 1, banks: merged }))?.banks ?? null;
+}
+
+/** Destructive full replacement is separate and requires explicit confirmation. */
+export function replaceLeaveWalletFromImport(preview: WalletImportPreview, confirmFullReplacement: boolean): LeaveBank[] | null {
+  if (!confirmFullReplacement || !preview || preview.unresolvedRequestIds.length) return null;
+  return decodeLeaveWallet(encodeLeaveWallet(preview.incoming))?.banks ?? null;
 }
