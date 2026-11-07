@@ -2,7 +2,7 @@ import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import type { SolveInput } from '@daysoff/engine/solver/types';
 import { isoToSerial, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { validCalendarDate } from '../personal/employerCalendar';
-import { solveConsumer } from './optimizer';
+import { solveConsumer, validatePtoDates } from './optimizer';
 import { selectRecommendationAlternatives, type RecommendationAlternative, type RecommendationCandidate } from './recommendationAlternatives';
 import type { ConstraintSet } from './constraintRecommendationAdapter';
 
@@ -50,8 +50,11 @@ export function selectCanonicalRecommendationAlternatives(
     const interval = rangeISO(brk.start, brk.end);
     if (interval.length === 0 || interval.length > 1096 || interval.some(d => hard.has(d))) continue;
     const cost = interval.filter(d => workWeek[mondayIndexedDow(d)] && !off.has(d)).length;
+    // A break from a multi-break solution is not automatically a feasible standalone plan.
+    // Recheck pinned dates, accrual timing, expiry/carryover and peak caps against
+    // this exact displayed interval; never present a replacement as independently funded.
     if (brk.totalDaysOff !== interval.length || brk.ptoCost !== cost
-      || cost > input.budget) continue;
+      || cost > input.budget || !validatePtoDates(canonicalInput, interval).valid) continue;
     verified.push({
       start: brk.start, end: brk.end,
       ptoDays: cost, breakDays: interval.length, getawayCount: 1,
