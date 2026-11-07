@@ -21,7 +21,7 @@ describe('private leave wallet transfer codec', () => {
     const preview = previewLeaveWalletImport(json, []);
     expect(preview?.addedBankIds).toEqual(['vacation']);
     expect(preview?.replacedBankIds).toEqual([]);
-    expect(preview && acceptLeaveWalletImport(preview, true)).toEqual([bank]);
+    expect(preview && acceptLeaveWalletImport(preview, true, [])).toEqual([bank]);
   });
 
   it('requires explicit replacement and refuses missing linked requests', () => {
@@ -29,8 +29,8 @@ describe('private leave wallet transfer codec', () => {
     const preview = previewLeaveWalletImport(encodeLeaveWallet({ version: 1, banks: [bank] }), [bank]);
     expect(preview?.replacedBankIds).toEqual(['vacation']);
     expect(preview?.unresolvedRequestIds).toEqual(['request-1']);
-    expect(preview && acceptLeaveWalletImport(preview, true)).toBeNull();
-    expect(preview && acceptLeaveWalletImport(preview, false)).toBeNull();
+    expect(preview && acceptLeaveWalletImport(preview, true, [bank])).toBeNull();
+    expect(preview && acceptLeaveWalletImport(preview, false, [bank])).toBeNull();
   });
 
   it('merges an imported sick bank without silently deleting an existing vacation bank', () => {
@@ -39,9 +39,9 @@ describe('private leave wallet transfer codec', () => {
       policy: { ...policy, payoutOnLeaving: 'doesnt' as const } };
     const preview = previewLeaveWalletImport(encodeLeaveWallet({ version: 1, banks: [sick] }), [vacation]);
     expect(preview?.removedBankIdsOnFullReplace).toEqual(['vacation']);
-    expect(preview && acceptLeaveWalletImport(preview, false)?.map((bank) => bank.id)).toEqual(['vacation', 'sick']);
-    expect(preview && replaceLeaveWalletFromImport(preview, false)).toBeNull();
-    expect(preview && replaceLeaveWalletFromImport(preview, true)?.map((bank) => bank.id)).toEqual(['sick']);
+    expect(preview && acceptLeaveWalletImport(preview, false, [vacation])?.map((bank) => bank.id)).toEqual(['vacation', 'sick']);
+    expect(preview && replaceLeaveWalletFromImport(preview, false, [vacation])).toBeNull();
+    expect(preview && replaceLeaveWalletFromImport(preview, true, [vacation])?.map((bank) => bank.id)).toEqual(['sick']);
   });
 
   it('requires conflict-specific consent but retains unrelated banks', () => {
@@ -49,8 +49,20 @@ describe('private leave wallet transfer codec', () => {
     const sick = { ...vacation, id: 'sick', category: 'sick' as const, name: 'Sick' };
     const changed = { ...vacation, name: 'Updated vacation' };
     const preview = previewLeaveWalletImport(encodeLeaveWallet({ version: 1, banks: [changed] }), [vacation, sick]);
-    expect(preview && acceptLeaveWalletImport(preview, false)).toBeNull();
+    expect(preview && acceptLeaveWalletImport(preview, false, [bank])).toBeNull();
     expect(preview && acceptLeaveWalletImport(preview, true)?.map((bank) => bank.id)).toEqual(['sick', 'vacation']);
+  });
+
+  it('refuses stale previews after any bank change, including unrelated additions', () => {
+    const vacation = legacyVacationBank(policy);
+    const sick = { ...vacation, id: 'sick', category: 'sick' as const, name: 'Sick' };
+    const raw = encodeLeaveWallet({ version: 1, banks: [sick] });
+    const preview = previewLeaveWalletImport(raw, [vacation]);
+    const changed = { ...vacation, policy: { ...policy, currentBalance: 9 } };
+    expect(preview && acceptLeaveWalletImport(preview, false, [changed])).toBeNull();
+    expect(preview && replaceLeaveWalletFromImport(preview, true, [changed])).toBeNull();
+    expect(preview && acceptLeaveWalletImport(preview, false, [vacation, sick])).toBeNull();
+    expect(preview && acceptLeaveWalletImport(preview, false, [vacation])?.map(b => b.id)).toEqual(['vacation', 'sick']);
   });
 
   it('rejects corrupt, oversized, duplicated and invalid-policy data', () => {
