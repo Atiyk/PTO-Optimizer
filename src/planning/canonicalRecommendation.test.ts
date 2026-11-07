@@ -37,6 +37,37 @@ describe('canonical recommendation source', () => {
     }
   });
 
+  it('never promotes a multi-break fragment into a standalone plan that omits pinned PTO', () => {
+    const required = ['2027-04-06', '2027-05-18'];
+    const result = selectCanonicalRecommendationAlternatives({
+      ...input, budget: 8, mustIncludeDays: required, breakCount: 2,
+    }, empty);
+    expect(result).not.toBeNull();
+    for (const candidate of result!) {
+      const days = rangeISO(candidate.start, candidate.end);
+      for (const date of required) expect(days).toContain(date);
+    }
+  });
+
+  it('validates accrual funding at actual spending dates for every standalone recommendation', () => {
+    const fundedInput: SolveInput = {
+      ...input, rangeStart: '2027-01-01', rangeEnd: '2027-08-31',
+      budget: 6, accrualPerMonth: 1, breakCount: 3,
+    };
+    const result = selectCanonicalRecommendationAlternatives(fundedInput, empty);
+    expect(result).not.toBeNull();
+    for (const candidate of result!) {
+      const pto = rangeISO(candidate.start, candidate.end)
+        .filter(d => DEFAULT_WORK_WEEK[mondayIndexedDow(d)]);
+      for (let i = 0; i < pto.length; i++) {
+        const date = pto[i];
+        const monthOffset = (Number(date.slice(0, 4)) - 2027) * 12
+          + Number(date.slice(5, 7)) - 1;
+        expect(i + 1).toBeLessThanOrEqual(monthOffset);
+      }
+    }
+  });
+
   it('fails closed on malformed ranges and non-day budget units', () => {
     expect(selectCanonicalRecommendationAlternatives({ ...input, rangeStart: '2027-02-30' }, empty)).toBeNull();
     expect(selectCanonicalRecommendationAlternatives({ ...input, budget: 1.5 }, empty)).toBeNull();
