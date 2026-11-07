@@ -9,7 +9,7 @@ export interface SchoolCoverageDay {
   adultBOff: boolean;
   /** Both adults are scheduled to work and neither has approved time off. */
   potentialCoverageGap: boolean;
-  /** Number of scheduled working adults who would need to request leave. */
+  /** Minimum number of adults who would need leave if one available adult can provide coverage; not a childcare assignment. */
   potentialPtoDays: 0 | 1 | 2;
 }
 export interface SchoolCoverageSummary {
@@ -33,7 +33,7 @@ export function schoolCoverage(a: AvailabilityWindow, b: AvailabilityWindow): Sc
     const potentialCoverageGap = schoolClosed && !adultAOff && !adultBOff;
     days.push({
       date: x.date, schoolClosed, adultAOff, adultBOff, potentialCoverageGap,
-      potentialPtoDays: potentialCoverageGap ? 2 : 0,
+      potentialPtoDays: potentialCoverageGap ? 1 : 0,
     });
   }
   return {
