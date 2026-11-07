@@ -70,6 +70,21 @@ export interface JointWindowFeasibility {
 const MAX_DAYS = 1096;
 const MAX_SOURCE_DATES = 4000;
 
+/** Treat supplied windows as untrusted input; do not price PTO from forged or gapped days. */
+function validExternalWindow(window: AvailabilityWindow): boolean {
+  if (window?.source !== 'explicit-calendar-inputs' || typeof window.partial !== 'boolean'
+    || !Array.isArray(window.days) || window.days.length === 0 || window.days.length > MAX_DAYS) return false;
+  return window.days.every((day, index) => {
+    if (!day || !validCalendarDate(day.date)
+      || typeof day.workday !== 'boolean' || typeof day.alreadyOff !== 'boolean'
+      || typeof day.hardBlocked !== 'boolean' || typeof day.reviewNeeded !== 'boolean'
+      || typeof day.schoolClosed !== 'boolean'
+      || (day.employerHoliday !== undefined && typeof day.employerHoliday !== 'boolean')
+      || (day.approvedLeave !== undefined && typeof day.approvedLeave !== 'boolean')) return false;
+    return index === 0 || isoToSerial(day.date) - isoToSerial(window.days[index - 1].date) === 1;
+  });
+}
+
 function uniqueDates(input: readonly string[] | undefined): Set<string> | null {
   if (input === undefined) return new Set();
   if (!Array.isArray(input) || input.length > MAX_SOURCE_DATES
@@ -142,9 +157,9 @@ export function jointWindowFeasibility(
   budgetA: number,
   budgetB: number,
 ): JointWindowFeasibility | null {
-  if (!a || !b || !Array.isArray(a.days) || !Array.isArray(b.days)
-    || a.days.length === 0 || a.days.length !== b.days.length
-    || a.days.length > MAX_DAYS || !Number.isInteger(budgetA) || !Number.isInteger(budgetB)
+  if (!validExternalWindow(a) || !validExternalWindow(b)
+    || a.days.length !== b.days.length
+    || !Number.isInteger(budgetA) || !Number.isInteger(budgetB)
     || budgetA < 0 || budgetB < 0 || budgetA > MAX_DAYS || budgetB > MAX_DAYS
     || a.days.some((day, i) => day.date !== b.days[i].date)) return null;
 
