@@ -57,7 +57,7 @@ export function projectWalletTimeline(
   if (!wallet) return null;
   const events: WalletEvent[] = [];
   const points: WalletTimelinePoint[] = [];
-  const nextEvents: Record<string, WalletEvent | null> = {};
+  const nextEvents: Record<string, WalletEvent | null> = Object.create(null) as Record<string, WalletEvent | null>;
   for (const snapshot of wallet.banks) {
     const bank = banks.find((candidate) => candidate.id === snapshot.id);
     if (!bank) return null;
