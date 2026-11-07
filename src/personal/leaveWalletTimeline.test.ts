@@ -88,6 +88,7 @@ describe('exact-date wallet selectors', () => {
     }
     const next = selectWalletNextEvents(timeline!, '2027-01-15');
     expect(next).not.toBeNull();
+    if (next === null) throw new Error('Expected next wallet events for reserved bank IDs');
     expect(Object.getPrototypeOf(next)).toBeNull();
     for (const id of reserved) {
       expect(Object.hasOwn(next, id)).toBe(true);
