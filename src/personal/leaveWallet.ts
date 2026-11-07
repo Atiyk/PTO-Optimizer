@@ -84,7 +84,8 @@ export function legacyVacationBank(
   return {
     version: 1, id: 'vacation', name: 'Vacation / PTO', category: 'vacation',
     policy,
-    requestIds: [...new Set(requests.map((r) => r.id))].slice(0, MAX_BANK_REQUEST_IDS),
+    // Preserve every legacy link; projection rejects oversized wallets rather than silently dropping requests.
+    requestIds: [...new Set(requests.map((r) => r.id))],
   };
 }
 
