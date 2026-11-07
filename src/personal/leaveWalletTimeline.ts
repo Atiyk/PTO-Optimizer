@@ -1,6 +1,6 @@
 import type { ISODate } from '@daysoff/engine/solver/types';
 import type { PolicyEvent } from '../policy/projection';
-import { forecastWithRequests } from './forecast';
+import { forecastWithRequests, validForecastDate } from './forecast';
 import { projectLeaveWallet, type LeaveBank } from './leaveWallet';
 import type { PtoRequest } from './requestLedger';
 
