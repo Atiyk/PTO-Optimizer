@@ -11,6 +11,9 @@ describe('schoolCoverage', () => {
     const result = schoolCoverage(a, b)!;
     expect(result.closureDays).toBe(3);
     expect(result.potentialGapDays).toBe(2);
+    expect(result.days[0].potentialPtoDays).toBe(1);
+    expect(result.days[1].potentialPtoDays).toBe(0);
+    expect(result.days[2].potentialPtoDays).toBe(1);
     expect(result.days[1].adultAOff).toBe(true);
     expect(result.days[1].potentialCoverageGap).toBe(false);
     expect(result.partial).toBe(false);
