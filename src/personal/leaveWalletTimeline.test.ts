@@ -67,6 +67,8 @@ describe('exact-date wallet selectors', () => {
     expect(asOf.find((point) => point.bankId === 'sick')?.confirmedBalance).toBe(6.5);
     expect(selectWalletBalancesAsOf(timeline, '2027-02-16')).toBeNull();
     expect(selectWalletBalancesAsOf(timeline, '2027-02-30')).toBeNull();
+    expect(selectWalletBalancesAsOf(timeline, '2027-2-15')).toBeNull();
+    expect(selectWalletBalancesAsOf(timeline, '2027-02-00')).toBeNull();
     asOf[0].confirmedBalance = -999;
     expect(selectWalletBalancesAsOf(timeline, '2027-02-15')?.[0].confirmedBalance).not.toBe(-999);
   });
@@ -77,5 +79,7 @@ describe('exact-date wallet selectors', () => {
     expect(selectWalletNextEvents(timeline, '2027-01-15')?.vacation?.effectiveDate).toBe('2027-01-20');
     expect(selectWalletNextEvents(timeline, '2027-02-15')?.vacation).toBeNull();
     expect(selectWalletNextEvents(timeline, '2027-02-30')).toBeNull();
+    expect(selectWalletNextEvents(timeline, '2027-02-00')).toBeNull();
+    expect(selectWalletNextEvents(timeline, '2027-1-15')).toBeNull();
   });
 });
