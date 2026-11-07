@@ -97,3 +97,40 @@ export function projectWalletTimeline(
   points.sort((a, b) => a.date.localeCompare(b.date) || a.bankId.localeCompare(b.bankId));
   return { through, events, points, nextEvents };
 }
+
+/**
+ * Read an exact date-only snapshot from an already projected timeline.
+ * Never interpolate a missing day or add balances across different units.
+ * Callers must project through the requested date first.
+ */
+export function selectWalletBalancesAsOf(
+  timeline: WalletTimeline,
+  asOf: ISODate,
+): WalletTimelinePoint[] | null {
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(asOf) || asOf > timeline.through) return null;
+  const selected = timeline.points.filter((point) => point.date === asOf);
+  if (!selected.length) return null;
+  const bankIds = new Set<string>();
+  for (const point of selected) {
+    if (bankIds.has(point.bankId)) return null;
+    bankIds.add(point.bankId);
+  }
+  return selected.map((point) => ({ ...point }));
+}
+
+/** The next *actual* canonical event strictly after a chosen date, per bank. */
+export function selectWalletNextEvents(
+  timeline: WalletTimeline,
+  after: ISODate,
+): Record<string, WalletEvent | null> | null {
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(after) || after > timeline.through) return null;
+  const next: Record<string, WalletEvent | null> = Object.create(null) as Record<string, WalletEvent | null>;
+  for (const bankId of Object.keys(timeline.nextEvents)) next[bankId] = null;
+  for (const event of timeline.events) {
+    if (event.effectiveDate <= after || event.category === 'opening') continue;
+    if (Object.prototype.hasOwnProperty.call(next, event.leaveBankId) && next[event.leaveBankId] === null) {
+      next[event.leaveBankId] = { ...event };
+    }
+  }
+  return next;
+}
