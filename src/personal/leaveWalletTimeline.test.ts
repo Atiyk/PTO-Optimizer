@@ -3,7 +3,7 @@ import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import type { TimeOffPolicy } from '../policy/model';
 import { createPtoRequest } from './requestLedger';
 import { legacyVacationBank, type LeaveBank } from './leaveWallet';
-import { projectWalletTimeline } from './leaveWalletTimeline';
+import { projectWalletTimeline, selectWalletBalancesAsOf, selectWalletNextEvents } from './leaveWalletTimeline';
 
 const policy: TimeOffPolicy = {
   unit: 'days', hoursPerDay: 8, currentBalance: 10, balanceAsOf: '2027-01-01',
@@ -49,5 +49,33 @@ describe('wallet timeline canonical selectors', () => {
     const bank = legacyVacationBank(policy, [approved]);
     expect(projectWalletTimeline([bank], '2027-02-30', [approved])).toBeNull();
     expect(projectWalletTimeline([bank, { ...bank, id: 'second' }], '2027-02-15', [approved])).toBeNull();
+  });
+});
+
+describe('exact-date wallet selectors', () => {
+  it('selects only the requested day without summing separate banks', () => {
+    const sick: LeaveBank = {
+      ...legacyVacationBank({ ...policy, currentBalance: 4, payoutOnLeaving: 'doesnt' }),
+      id: 'sick', name: 'Sick', category: 'sick', requestIds: [],
+    };
+    const timeline = projectWalletTimeline([legacyVacationBank(policy, [approved, pending]), sick], '2027-02-15', [approved, pending])!;
+    const asOf = selectWalletBalancesAsOf(timeline, '2027-02-15')!;
+    expect(asOf).toHaveLength(2);
+    expect(asOf.find((point) => point.bankId === 'vacation')).toMatchObject({
+      confirmedBalance: 10.5, tentativeBalance: 9.5,
+    });
+    expect(asOf.find((point) => point.bankId === 'sick')?.confirmedBalance).toBe(6.5);
+    expect(selectWalletBalancesAsOf(timeline, '2027-02-16')).toBeNull();
+    expect(selectWalletBalancesAsOf(timeline, '2027-02-30')).toBeNull();
+    asOf[0].confirmedBalance = -999;
+    expect(selectWalletBalancesAsOf(timeline, '2027-02-15')?.[0].confirmedBalance).not.toBe(-999);
+  });
+
+  it('finds next actual canonical event after an arbitrary as-of date', () => {
+    const timeline = projectWalletTimeline([legacyVacationBank(policy, [approved])], '2027-02-15', [approved])!;
+    expect(selectWalletNextEvents(timeline, '2027-01-01')?.vacation?.effectiveDate).toBe('2027-01-15');
+    expect(selectWalletNextEvents(timeline, '2027-01-15')?.vacation?.effectiveDate).toBe('2027-01-20');
+    expect(selectWalletNextEvents(timeline, '2027-02-15')?.vacation).toBeNull();
+    expect(selectWalletNextEvents(timeline, '2027-02-30')).toBeNull();
   });
 });
