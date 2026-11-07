@@ -116,7 +116,7 @@ export function projectLeaveWallet(
       || typeof bank.name !== 'string' || !bank.name.trim() || bank.name.length > 80
       || !CATEGORIES.includes(bank.category)
       || !Array.isArray(bank.requestIds) || bank.requestIds.length > MAX_BANK_REQUEST_IDS
-      || bank.requestIds.some((id) => typeof id !== 'string' || !BANK_ID.test(id))
+      || bank.requestIds.some((id: string) => typeof id !== 'string' || !BANK_ID.test(id))
       || !bank.policy || typeof bank.policy !== 'object') return null;
     bankIds.add(bank.id);
 
