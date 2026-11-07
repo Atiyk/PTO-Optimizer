@@ -49,8 +49,8 @@ describe('private leave wallet transfer codec', () => {
     const sick = { ...vacation, id: 'sick', category: 'sick' as const, name: 'Sick' };
     const changed = { ...vacation, name: 'Updated vacation' };
     const preview = previewLeaveWalletImport(encodeLeaveWallet({ version: 1, banks: [changed] }), [vacation, sick]);
-    expect(preview && acceptLeaveWalletImport(preview, false, [bank])).toBeNull();
-    expect(preview && acceptLeaveWalletImport(preview, true)?.map((bank) => bank.id)).toEqual(['sick', 'vacation']);
+    expect(preview && acceptLeaveWalletImport(preview, false, [vacation, sick])).toBeNull();
+    expect(preview && acceptLeaveWalletImport(preview, true, [vacation, sick])?.map((bank) => bank.id)).toEqual(['sick', 'vacation']);
   });
 
   it('refuses stale previews after any bank change, including unrelated additions', () => {
