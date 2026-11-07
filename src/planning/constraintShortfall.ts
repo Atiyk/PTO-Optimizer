@@ -1,5 +1,5 @@
 import { validCalendarDate } from '../personal/employerCalendar';
-import type { ConstraintSet } from '../personal/dateConstraints';
+import type { ConstraintSet } from './constraintRecommendationAdapter';
 
 /** Deterministic diagnostics only: never silently relax user hard exclusions. */
 export interface ConstraintShortfall {
