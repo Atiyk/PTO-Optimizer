@@ -21,6 +21,10 @@ export interface PersonalDayAvailability {
   workday: boolean;
   /** A scheduled workday that is already an observed employer holiday or approved PTO. */
   alreadyOff: boolean;
+  /** Employer-observed holiday, distinct from a submitted/approved leave request. */
+  employerHoliday?: boolean;
+  /** Explicit approved leave; never inferred from a generic already-off flag. */
+  approvedLeave?: boolean;
   /** User explicitly cannot request this working day. */
   hardBlocked: boolean;
   /** An imported busy event or tentative commitment requiring review. */
@@ -117,6 +121,8 @@ export function calendarAvailability(input: AvailabilityInputs): AvailabilityWin
       date,
       workday,
       alreadyOff: !workday || employer.has(date) || approved.has(date),
+      employerHoliday: employer.has(date),
+      approvedLeave: approved.has(date),
       hardBlocked: blocked.has(date),
       reviewNeeded: advisory.has(date),
       schoolClosed: school.has(date),
