@@ -77,6 +77,23 @@ describe('private leave wallet transfer codec', () => {
     expect(previewLeaveWalletImport(raw, [], [record])?.unresolvedRequestIds).toEqual([]);
   });
 
+
+  it('revalidates live linked requests at commit time and rejects ledger races', () => {
+    const bank = { ...legacyVacationBank(policy), requestIds: ['request-1'] };
+    const raw = encodeLeaveWallet({ version: 1, banks: [bank] });
+    const linked = { id: 'request-1' } as PtoRequest;
+    const preview = previewLeaveWalletImport(raw, [], [linked])!;
+    expect(preview.unresolvedRequestIds).toEqual([]);
+    expect(acceptLeaveWalletImport(preview, false, [])).toBeNull();
+    expect(acceptLeaveWalletImport(preview, false, [], [linked])).toEqual([bank]);
+    expect(acceptLeaveWalletImport(preview, false, [], [linked, { ...linked }])).toBeNull();
+    expect(replaceLeaveWalletFromImport(preview, true, [])).toBeNull();
+    expect(replaceLeaveWalletFromImport(preview, true, [], [linked])).toEqual([bank]);
+    // A forged preview flag cannot override a missing live request.
+    preview.unresolvedRequestIds = [];
+    expect(acceptLeaveWalletImport(preview, false, [], [])).toBeNull();
+  });
+
   it('rejects corrupt, oversized, duplicated and invalid-policy data', () => {
     expect(decodeLeaveWallet('{')).toBeNull();
     expect(decodeLeaveWallet('x'.repeat(MAX_WALLET_JSON_LENGTH + 1))).toBeNull();
