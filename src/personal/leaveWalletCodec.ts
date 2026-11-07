@@ -100,8 +100,20 @@ export function previewLeaveWalletImport(
   };
 }
 
+/** Recheck the live ledger at acceptance, not only at preview time. */
+function linkedRequestsStillResolve(banks: readonly LeaveBank[], requests: readonly PtoRequest[]): boolean {
+  if (!Array.isArray(requests) || requests.length > MAX_BANK_REQUEST_IDS) return false;
+  const ids = new Set<string>();
+  for (const request of requests) {
+    if (!request || typeof request.id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(request.id)
+      || ids.has(request.id)) return false;
+    ids.add(request.id);
+  }
+  return banks.every((bank) => bank.requestIds.every((id) => ids.has(id)));
+}
+
 /** Merge by default: retain every unrelated existing bank. Conflicting IDs require consent. */
-export function acceptLeaveWalletImport(preview: WalletImportPreview, replaceConflicts: boolean, currentBanks: readonly LeaveBank[]): LeaveBank[] | null {
+export function acceptLeaveWalletImport(preview: WalletImportPreview, replaceConflicts: boolean, currentBanks: readonly LeaveBank[], currentRequests: readonly PtoRequest[] = []): LeaveBank[] | null {
   if (!preview || !Array.isArray(preview.unresolvedRequestIds) || preview.unresolvedRequestIds.length) return null;
   const incoming = decodeLeaveWallet(encodeLeaveWallet(preview.incoming));
   const existing = preview.existing ? decodeLeaveWallet(encodeLeaveWallet(preview.existing)) : null;
@@ -117,14 +129,17 @@ export function acceptLeaveWalletImport(preview: WalletImportPreview, replaceCon
   const ids = new Set(incoming.banks.map((bank) => bank.id));
   if (!replaceConflicts && current.some((bank) => ids.has(bank.id))) return null;
   const merged = [...current.filter((bank) => !ids.has(bank.id)), ...incoming.banks];
+  if (!linkedRequestsStillResolve(merged, currentRequests)) return null;
   return decodeLeaveWallet(encodeLeaveWallet({ version: 1, banks: merged }))?.banks ?? null;
 }
 
 /** Destructive full replacement is separate and requires explicit confirmation. */
-export function replaceLeaveWalletFromImport(preview: WalletImportPreview, confirmFullReplacement: boolean, currentBanks: readonly LeaveBank[]): LeaveBank[] | null {
+export function replaceLeaveWalletFromImport(preview: WalletImportPreview, confirmFullReplacement: boolean, currentBanks: readonly LeaveBank[], currentRequests: readonly PtoRequest[] = []): LeaveBank[] | null {
   if (!confirmFullReplacement || !preview || preview.unresolvedRequestIds.length || !Array.isArray(currentBanks)) return null;
   const expected = preview.existing ? encodeLeaveWallet(preview.existing) : '';
   const actual = currentBanks.length ? encodeLeaveWallet({ version: 1, banks: [...currentBanks] }) : '';
   if ((currentBanks.length && !actual) || actual !== expected) return null;
-  return decodeLeaveWallet(encodeLeaveWallet(preview.incoming))?.banks ?? null;
+  const incoming = decodeLeaveWallet(encodeLeaveWallet(preview.incoming));
+  if (!incoming || !linkedRequestsStillResolve(incoming.banks, currentRequests)) return null;
+  return incoming.banks;
 }
