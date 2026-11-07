@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TimeOffPolicy } from '../policy/model';
+import type { PtoRequest } from './requestLedger';
 import { legacyVacationBank } from './leaveWallet';
 import {
   acceptLeaveWalletImport, decodeLeaveWallet, encodeLeaveWallet,
@@ -63,6 +64,17 @@ describe('private leave wallet transfer codec', () => {
     expect(preview && replaceLeaveWalletFromImport(preview, true, [changed])).toBeNull();
     expect(preview && acceptLeaveWalletImport(preview, false, [vacation, sick])).toBeNull();
     expect(preview && acceptLeaveWalletImport(preview, false, [vacation])?.map(b => b.id)).toEqual(['vacation', 'sick']);
+  });
+
+  it('fails import preview atomically for duplicate or malformed live request IDs', () => {
+    const bank = { ...legacyVacationBank(policy), requestIds: ['request-1'] };
+    const raw = encodeLeaveWallet({ version: 1, banks: [bank] });
+    const record = { id: 'request-1' } as PtoRequest;
+    expect(previewLeaveWalletImport(raw, [], [record, { ...record }])).toBeNull();
+    expect(previewLeaveWalletImport(raw, [], [{ id: '' } as PtoRequest])).toBeNull();
+    expect(previewLeaveWalletImport(raw, [], [null as unknown as PtoRequest])).toBeNull();
+    // Valid identifiers still allow the preview to resolve linked requests.
+    expect(previewLeaveWalletImport(raw, [], [record])?.unresolvedRequestIds).toEqual([]);
   });
 
   it('rejects corrupt, oversized, duplicated and invalid-policy data', () => {
