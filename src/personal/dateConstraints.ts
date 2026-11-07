@@ -25,7 +25,8 @@ export function constraintsFromAvailability(window: AvailabilityWindow): Constra
     if (day.hardBlocked) dates.push({ date: day.date, severity: 'hard-block', provenance: 'user-blackout', confidence });
     if (day.reviewNeeded) dates.push({ date: day.date, severity: 'review-needed', provenance: 'calendar-busy', confidence });
     if (day.schoolClosed) dates.push({ date: day.date, severity: 'context', provenance: 'school-closure', confidence });
-    if (day.alreadyOff && day.workday) dates.push({ date: day.date, severity: 'context', provenance: 'approved-leave', confidence });
+    if (day.employerHoliday) dates.push({ date: day.date, severity: 'context', provenance: 'employer-holiday', confidence });
+    if (day.approvedLeave) dates.push({ date: day.date, severity: 'context', provenance: 'approved-leave', confidence });
   }
   return { dates, partial: window.partial, missingSources: window.partial ? ['Calendar completeness unverified'] : [] };
 }
