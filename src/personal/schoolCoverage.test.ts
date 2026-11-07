@@ -22,6 +22,14 @@ describe('schoolCoverage', () => {
     const a = calendarAvailability({ start: '2028-02-29', end: '2028-02-29', schedule: weekly, schoolOffDays: ['2028-02-29'] })!;
     expect(schoolCoverage(a, a)?.partial).toBe(true);
   });
+  it('fails closed on forged, gapped, or malformed external coverage windows', () => {
+    const a = calendarAvailability({ start: '2028-01-03', end: '2028-01-05', schedule: weekly, schoolOffDays: ['2028-01-04'] })!;
+    const b = calendarAvailability({ start: '2028-01-03', end: '2028-01-05', schedule: weekly })!;
+    expect(schoolCoverage({ ...a, days: [a.days[0], a.days[2]] }, { ...b, days: [b.days[0], b.days[2]] })).toBeNull();
+    expect(schoolCoverage({ ...a, days: [{ ...a.days[0], workday: 'false' as unknown as boolean }, ...a.days.slice(1)] }, b)).toBeNull();
+    expect(schoolCoverage({ ...a, partial: 'false' as unknown as boolean }, b)).toBeNull();
+    expect(schoolCoverage({ ...a, days: [] }, { ...b, days: [] })).toBeNull();
+  });
   it('rejects mismatched date windows', () => {
     const a = calendarAvailability({ start: '2028-01-03', end: '2028-01-04', schedule: weekly })!;
     const b = calendarAvailability({ start: '2028-01-04', end: '2028-01-05', schedule: weekly })!;
