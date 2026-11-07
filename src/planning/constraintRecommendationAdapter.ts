@@ -1,4 +1,16 @@
-import type { ConstraintSet } from '../personal/dateConstraints';
+/** Structural calendar contract; calendar worker's DateAvailability is compatible.
+ * Keep this branch independently buildable until calendar integration lands.
+ */
+export interface ConstraintSet {
+  dates: Array<{
+    date: string;
+    severity: 'hard-block' | 'review-needed' | 'context';
+    provenance: 'user-blackout' | 'calendar-busy' | 'school-closure' | 'employer-holiday' | 'approved-leave';
+    confidence: 'explicit' | 'partial';
+  }>;
+  partial: boolean;
+  missingSources: string[];
+}
 import type { RecommendationCandidate } from './recommendationAlternatives';
 import { validCalendarDate } from '../personal/employerCalendar';
 
