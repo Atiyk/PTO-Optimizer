@@ -101,9 +101,10 @@ export function acceptLeaveWalletImport(preview: WalletImportPreview, replaceCon
   if (!incoming || (preview.existing && !existing)) return null;
   // Fail closed if the wallet changed since preview. The caller must re-read the
   // current local state immediately before committing; do not persist a stale result.
-  const currentEncoded = encodeLeaveWallet({ version: 1, banks: [...currentBanks] });
+  if (!Array.isArray(currentBanks)) return null;
+  const currentEncoded = currentBanks.length ? encodeLeaveWallet({ version: 1, banks: [...currentBanks] }) : '';
   const previewEncoded = existing ? encodeLeaveWallet(existing) : '';
-  if (!Array.isArray(currentBanks) || (currentBanks.length && !currentEncoded)
+  if ((currentBanks.length && !currentEncoded)
     || (existing ? currentEncoded !== previewEncoded : currentBanks.length !== 0)) return null;
   const current = existing?.banks ?? [];
   const ids = new Set(incoming.banks.map((bank) => bank.id));
