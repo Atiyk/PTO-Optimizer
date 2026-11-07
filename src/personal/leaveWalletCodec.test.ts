@@ -3,7 +3,7 @@ import type { TimeOffPolicy } from '../policy/model';
 import { legacyVacationBank } from './leaveWallet';
 import {
   acceptLeaveWalletImport, decodeLeaveWallet, encodeLeaveWallet,
-  MAX_WALLET_JSON_LENGTH, previewLeaveWalletImport,
+  MAX_WALLET_JSON_LENGTH, previewLeaveWalletImport, replaceLeaveWalletFromImport,
 } from './leaveWalletCodec';
 
 const policy: TimeOffPolicy = {
@@ -31,6 +31,26 @@ describe('private leave wallet transfer codec', () => {
     expect(preview?.unresolvedRequestIds).toEqual(['request-1']);
     expect(preview && acceptLeaveWalletImport(preview, true)).toBeNull();
     expect(preview && acceptLeaveWalletImport(preview, false)).toBeNull();
+  });
+
+  it('merges an imported sick bank without silently deleting an existing vacation bank', () => {
+    const vacation = legacyVacationBank(policy);
+    const sick = { ...vacation, id: 'sick', name: 'Sick', category: 'sick' as const,
+      policy: { ...policy, payoutOnLeaving: 'doesnt' as const } };
+    const preview = previewLeaveWalletImport(encodeLeaveWallet({ version: 1, banks: [sick] }), [vacation]);
+    expect(preview?.removedBankIdsOnFullReplace).toEqual(['vacation']);
+    expect(preview && acceptLeaveWalletImport(preview, false)?.map((bank) => bank.id)).toEqual(['vacation', 'sick']);
+    expect(preview && replaceLeaveWalletFromImport(preview, false)).toBeNull();
+    expect(preview && replaceLeaveWalletFromImport(preview, true)?.map((bank) => bank.id)).toEqual(['sick']);
+  });
+
+  it('requires conflict-specific consent but retains unrelated banks', () => {
+    const vacation = legacyVacationBank(policy);
+    const sick = { ...vacation, id: 'sick', category: 'sick' as const, name: 'Sick' };
+    const changed = { ...vacation, name: 'Updated vacation' };
+    const preview = previewLeaveWalletImport(encodeLeaveWallet({ version: 1, banks: [changed] }), [vacation, sick]);
+    expect(preview && acceptLeaveWalletImport(preview, false)).toBeNull();
+    expect(preview && acceptLeaveWalletImport(preview, true)?.map((bank) => bank.id)).toEqual(['sick', 'vacation']);
   });
 
   it('rejects corrupt, oversized, duplicated and invalid-policy data', () => {
