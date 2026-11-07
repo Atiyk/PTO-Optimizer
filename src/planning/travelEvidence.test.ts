@@ -46,7 +46,7 @@ describe('consumer travel evidence provenance', () => {
       value: 1.15,
     });
     expect(uk.source).toContain('no country-specific travel observations');
-    expect(uk.caveat).toContain('not based on observed trips');
+    expect(uk.caveat).toMatch(/not based on observed trips/i);
   });
 
   it('rejects malformed dates and countries', () => {
