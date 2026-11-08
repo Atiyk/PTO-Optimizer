@@ -6,6 +6,7 @@ export interface RecommendationCandidate {
   end: string;
   ptoDays: number;
   breakDays: number;
+  /** Legacy unverified hint; never evidence of multiple separate trips. */
   getawayCount: number;
   hardExcludedDates: readonly string[];
   reviewDates: readonly string[];
@@ -14,7 +15,7 @@ export interface RecommendationAlternative extends RecommendationCandidate {
   objective: 'longest-break' | 'most-getaways' | 'balanced' | 'constraint-fit';
   explanation: string;
 }
-const objectives = ['longest-break', 'most-getaways', 'balanced', 'constraint-fit'] as const;
+const objectives = ['longest-break', 'balanced', 'constraint-fit'] as const;
 function valid(c: RecommendationCandidate, budget: number): boolean {
   if (!c || !validCalendarDate(c.start) || !validCalendarDate(c.end) || c.start > c.end
     || !Array.isArray(c.hardExcludedDates) || !Array.isArray(c.reviewDates)
@@ -31,8 +32,7 @@ function valid(c: RecommendationCandidate, budget: number): boolean {
 function score(c: RecommendationCandidate, objective: typeof objectives[number]): number {
   switch (objective) {
     case 'longest-break': return c.breakDays * 100 - c.ptoDays;
-    case 'most-getaways': return c.getawayCount * 100 - c.ptoDays;
-    case 'balanced': return c.breakDays * 4 + c.getawayCount * 7 - c.ptoDays * 3 - c.reviewDates.length * 2;
+    case 'balanced': return c.breakDays * 4 - c.ptoDays * 3 - c.reviewDates.length * 2;
     case 'constraint-fit': return c.breakDays - c.ptoDays * 2 - c.reviewDates.length * 10;
   }
 }
@@ -46,10 +46,9 @@ export function selectRecommendationAlternatives(candidates: readonly Recommenda
   const used: RecommendationCandidate[] = [];
   const output: RecommendationAlternative[] = [];
   for (const objective of objectives) {
-    // A single interval cannot truthfully satisfy a multi-getaway objective.
-    // Omit that objective unless the candidate explicitly represents multiple getaways.
-    const eligible = objective === 'most-getaways' ? feasible.filter(c => c.getawayCount >= 2) : feasible;
-    const ranked = [...eligible].sort((a, b) => score(b, objective) - score(a, objective)
+    // The legacy single-interval shape cannot prove multiple separate getaways.
+    // Portfolio objectives must use canonicalPortfolio's verified segments.
+    const ranked = [...feasible].sort((a, b) => score(b, objective) - score(a, objective)
       || a.start.localeCompare(b.start) || a.end.localeCompare(b.end) || a.ptoDays - b.ptoDays);
     const winner = ranked.find(c => !used.some(other => c.start <= other.end && other.start <= c.end));
     if (!winner) continue;
