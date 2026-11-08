@@ -44,6 +44,20 @@ describe('whole-plan consumer recommendations', () => {
     }
   });
 
+  it('never downgrades the most-getaways label to a runner-up after objective collisions', () => {
+    const portfolios = selectCanonicalPortfolios(base, empty)!;
+    const getaway = portfolios.find(p => p.objective === 'most-getaways');
+    expect(getaway).toBeDefined();
+    expect(getaway!.getawayCount).toBeGreaterThanOrEqual(2);
+    expect(getaway!.getawayCount).toBe(Math.max(...portfolios.map(p => p.getawayCount)));
+    const longest = portfolios.find(p => p.objective === 'longest-break');
+    if (longest) {
+      expect(longest.longestBreakDays).toBe(Math.max(...portfolios.map(p => p.longestBreakDays)));
+    }
+    expect(new Set(portfolios.map(p => p.breaks.map(b => b.start + '/' + b.end).join('|'))).size)
+      .toBe(portfolios.length);
+  });
+
   it('passes hard blackouts to every solve, but only warns for soft events', () => {
     const constraint: ConstraintSet = { dates: [
       { date: '2027-04-02', severity: 'hard-block', provenance: 'user-blackout', confidence: 'explicit' },
