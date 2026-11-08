@@ -46,7 +46,7 @@ function serializeLedger(requests: readonly PtoRequest[]): string | null {
     if (!req || typeof req.id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(req.id)
       || seen.has(req.id) || !validRequestRange(req.start, req.end)
       || !Array.isArray(req.ptoDates) || req.ptoDates.length > 1096
-      || req.ptoDates.some(d => typeof d !== 'string' || !validCalendarDate(d) || d < req.start || d > req.end)
+      || req.ptoDates.some((d: string) => typeof d !== 'string' || !validCalendarDate(d) || d < req.start || d > req.end)
       || !Number.isInteger(req.ptoDays) || req.ptoDays !== new Set(req.ptoDates).size
       || !REQUEST_STATUSES.includes(req.status) || typeof req.note !== 'string' || req.note.length > 1000
       || typeof req.createdAt !== 'string' || Number.isNaN(Date.parse(req.createdAt))
