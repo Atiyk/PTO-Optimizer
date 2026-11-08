@@ -40,8 +40,8 @@ describe('deterministic consumer recommendation alternatives', () => {
     ], 4);
     expect(results.some(r => r.objective === 'most-getaways')).toBe(false);
   });
-  it('ignores unverified getaway counts even when callers fabricate large counts', () => {
-    const single = candidate('2027-08-01', 6, 999, 2);
+  it('ignores unverified getaway counts even when callers fabricate multi-trip counts', () => {
+    const single = candidate('2027-08-01', 6, 2, 2);
     const results = selectRecommendationAlternatives([single], 2);
     expect(results).toHaveLength(1);
     expect(results[0].objective).toBe('longest-break');
