@@ -51,7 +51,7 @@ describe('deterministic consumer recommendation alternatives', () => {
     const items = [candidate('2027-04-01', 12, 1), candidate('2027-05-01', 5, 4), candidate('2027-06-01', 9, 2), candidate('2027-07-01', 4, 1, 0)];
     const a = selectRecommendationAlternatives(items, 3);
     expect(a).toHaveLength(3);
-    expect(new Set(a.map(x => x.start)).size).toBe(4);
+    expect(new Set(a.map(x => x.start)).size).toBe(a.length);
     expect(selectRecommendationAlternatives(items, 3)).toEqual(a);
     expect(a[0].explanation).toContain('PTO days');
     expect(a.every(x => x.objective !== 'most-getaways')).toBe(true);
