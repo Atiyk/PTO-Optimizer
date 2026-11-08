@@ -35,7 +35,8 @@ interface Candidate extends Omit<CanonicalPortfolio, 'objective' | 'explanation'
 const MAX_RANGE_DAYS = 1096;
 const MAX_BUDGET = 1096;
 const MAX_CALENDAR_EVENTS = 10000;
-const objectives: PortfolioObjective[] = ['longest-break', 'most-getaways', 'balanced', 'constraint-fit'];
+// Reserve the getaway optimum first; other labels must never inherit a runner-up plan.
+const objectives: PortfolioObjective[] = ['most-getaways', 'longest-break', 'balanced', 'constraint-fit'];
 
 /**
  * Generate distinct, feasible multi-break portfolios with the unmodified consumer solver.
@@ -139,8 +140,10 @@ export function selectCanonicalPortfolios(input: SolveInput, constraints: Constr
       ? feasible.filter(candidate => candidate.getawayCount >= 2) : feasible;
     const ranked = [...eligible].sort((a, b) => score(b, objective) - score(a, objective)
       || a.ptoDays - b.ptoDays || a.key.localeCompare(b.key));
-    const chosen = ranked.find(candidate => !used.has(candidate.key));
-    if (!chosen) continue;
+    // A label describes this objective's actual optimum, not the next unused plan.
+    // When optima collide, omit the duplicate objective rather than mislabel a runner-up.
+    const chosen = ranked[0];
+    if (!chosen || used.has(chosen.key)) continue;
     used.add(chosen.key);
     const { key: _key, ...facts } = chosen;
     // A portfolio is a scenario, so different objectives may share dates; only
