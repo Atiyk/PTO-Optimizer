@@ -43,7 +43,7 @@ function serializeLedger(requests: readonly PtoRequest[]): string | null {
     status: PtoRequest['status']; note: string; createdAt: string; updatedAt: string;
   }> = [];
   for (const req of requests) {
-    if (!req || typeof req.id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(req.id)
+    if (!req || typeof req.id !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(req.id)
       || seen.has(req.id) || !validRequestRange(req.start, req.end)
       || !Array.isArray(req.ptoDates) || req.ptoDates.length > 1096
       || req.ptoDates.some((d: string) => typeof d !== 'string' || !validCalendarDate(d) || d < req.start || d > req.end)
