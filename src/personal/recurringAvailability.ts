@@ -71,7 +71,7 @@ const MAX_DAYS = 1096;
 const MAX_SOURCE_DATES = 4000;
 
 /** Treat supplied windows as untrusted input; do not price PTO from forged or gapped days. */
-function validExternalWindow(window: AvailabilityWindow): boolean {
+export function validExternalWindow(window: AvailabilityWindow): boolean {
   if (window?.source !== 'explicit-calendar-inputs' || typeof window.partial !== 'boolean'
     || !Array.isArray(window.days) || window.days.length === 0 || window.days.length > MAX_DAYS) return false;
   return window.days.every((day, index) => {
@@ -80,7 +80,8 @@ function validExternalWindow(window: AvailabilityWindow): boolean {
       || typeof day.hardBlocked !== 'boolean' || typeof day.reviewNeeded !== 'boolean'
       || typeof day.schoolClosed !== 'boolean'
       || (day.employerHoliday !== undefined && typeof day.employerHoliday !== 'boolean')
-      || (day.approvedLeave !== undefined && typeof day.approvedLeave !== 'boolean')) return false;
+      || (day.approvedLeave !== undefined && typeof day.approvedLeave !== 'boolean')
+      || day.alreadyOff !== (!day.workday || day.employerHoliday === true || day.approvedLeave === true)) return false;
     return index === 0 || isoToSerial(day.date) - isoToSerial(window.days[index - 1].date) === 1;
   });
 }
