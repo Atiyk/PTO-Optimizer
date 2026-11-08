@@ -42,6 +42,27 @@ function testStore(
 }
 
 describe('O versioned wallet import and live request ledger gate', () => {
+  it('accepts canonical 100-character legacy request IDs but rejects 101 characters', () => {
+    const longRequest = { ...request, id: 'r'.repeat(100) };
+    const longBank = legacyVacationBank(policy, [longRequest]);
+    const longRaw = encodeLeaveWallet({
+      version: 1, banks: [{ ...longBank, name: 'Imported vacation' }],
+    });
+    expect(longRaw).not.toBe('');
+    const { store, saves } = testStore([longRequest], [longBank]);
+    const prepared = prepareVersionedWalletImport(longRaw, store);
+    expect(prepared).not.toBeNull();
+    expect(prepared!.unresolvedRequestIds).toEqual([]);
+    expect(acceptVersionedWalletImport(prepared!, store, 'merge', true)).toBe(true);
+    expect(saves()).toBe(1);
+
+    const invalidRequest = { ...request, id: 'r'.repeat(101) };
+    const invalidBank = legacyVacationBank(policy, [invalidRequest]);
+    const invalidStore = testStore([invalidRequest], [invalidBank]);
+    expect(prepareVersionedWalletImport(raw, invalidStore.store)).toBeNull();
+    expect(invalidStore.saves()).toBe(0);
+  });
+
   it('rejects a same-ID approved-to-requested change without a revision update', () => {
     const { store, state, saves } = testStore();
     const prepared = prepareVersionedWalletImport(raw, store)!;
