@@ -1,6 +1,6 @@
 import type { LeaveBank } from './leaveWallet';
-import { MAX_WALLET_BANKS, MAX_BANK_REQUEST_IDS, projectLeaveWallet } from './leaveWallet';
-import type { PtoRequest } from './requestLedger';
+import { MAX_WALLET_BANKS, MAX_BANK_REQUEST_IDS, projectLeaveWallet, validWalletRequestId } from './leaveWallet';
+import { parseRequestLedger, type PtoRequest } from './requestLedger';
 
 /** Private, local-only transfer format. Never embed in plan URLs or telemetry. */
 export const LEAVE_WALLET_STORAGE_KEY = 'gapless.personal.leave-wallet.v1';
@@ -19,6 +19,8 @@ export interface WalletImportPreview {
   replacedBankIds: string[];
   /** Import does not modify the request ledger; callers must preserve linked requests. */
   unresolvedRequestIds: string[];
+  /** Private in-memory revision of the live request ledger at preview time. Excludes notes. */
+  requestLedgerSnapshot: string;
 }
 
 function normalize(value: unknown): LeaveWalletEnvelope | null {
@@ -69,6 +71,23 @@ export function decodeLeaveWallet(raw: string | null): LeaveWalletEnvelope | nul
   try { return normalize(JSON.parse(raw)); } catch { return null; }
 }
 
+/**
+ * Normalize with the existing ledger parser, reject partially corrupt ledgers,
+ * then snapshot only schedule/debit-relevant fields. No private notes or titles
+ * are stored in an import preview. Sorting makes record reordering harmless.
+ */
+function requestLedgerSnapshot(requests: readonly PtoRequest[]): string | null {
+  if (!Array.isArray(requests) || requests.length > MAX_BANK_REQUEST_IDS) return null;
+  try {
+    const parsed = parseRequestLedger(JSON.stringify({ version: 1, requests }));
+    if (parsed.length !== requests.length || parsed.some((r) => !validWalletRequestId(r.id))) return null;
+    return JSON.stringify(parsed.sort((a, b) => a.id.localeCompare(b.id)).map((r) => ({
+      id: r.id, start: r.start, end: r.end, ptoDates: r.ptoDates,
+      status: r.status, createdAt: r.createdAt, updatedAt: r.updatedAt,
+    })));
+  } catch { return null; }
+}
+
 /** Preview only. Never silently overwrite existing banks or request records. */
 export function previewLeaveWalletImport(
   raw: string,
@@ -80,14 +99,11 @@ export function previewLeaveWalletImport(
     || !Array.isArray(requests) || requests.length > MAX_BANK_REQUEST_IDS) return null;
   const existingEnvelope = existing.length ? decodeLeaveWallet(encodeLeaveWallet({ version: 1, banks: [...existing] })) : null;
   if (existing.length && !existingEnvelope) return null;
-  // A duplicate or malformed live ledger cannot safely resolve imported links.
-  // Reject the entire preview rather than allowing a partial/ambiguous import.
-  const requestIds = new Set<string>();
-  for (const request of requests) {
-    if (!request || typeof request.id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(request.id)
-      || requestIds.has(request.id)) return null;
-    requestIds.add(request.id);
-  }
+  // Reject malformed/duplicate records and snapshot statuses/dates at preview,
+  // not just IDs: an existing request may change while an import dialog is open.
+  const ledgerSnapshot = requestLedgerSnapshot(requests);
+  if (ledgerSnapshot === null) return null;
+  const requestIds = new Set(requests.map((request) => request.id));
   const existingIds = new Set(existing.map((bank) => bank.id));
   return {
     incoming,
@@ -97,18 +113,17 @@ export function previewLeaveWalletImport(
     replacedBankIds: incoming.banks.filter((bank) => existingIds.has(bank.id)).map((bank) => bank.id),
     unresolvedRequestIds: [...new Set(incoming.banks.flatMap((bank) => bank.requestIds))]
       .filter((id) => !requestIds.has(id)),
+    requestLedgerSnapshot: ledgerSnapshot,
   };
 }
 
 /** Recheck the live ledger at acceptance, not only at preview time. */
-function linkedRequestsStillResolve(banks: readonly LeaveBank[], requests: readonly PtoRequest[]): boolean {
-  if (!Array.isArray(requests) || requests.length > MAX_BANK_REQUEST_IDS) return false;
-  const ids = new Set<string>();
-  for (const request of requests) {
-    if (!request || typeof request.id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(request.id)
-      || ids.has(request.id)) return false;
-    ids.add(request.id);
-  }
+function linkedRequestsStillResolve(
+  banks: readonly LeaveBank[], requests: readonly PtoRequest[], expectedSnapshot: string,
+): boolean {
+  const actualSnapshot = requestLedgerSnapshot(requests);
+  if (actualSnapshot === null || actualSnapshot !== expectedSnapshot) return false;
+  const ids = new Set(requests.map((request) => request.id));
   return banks.every((bank) => bank.requestIds.every((id) => ids.has(id)));
 }
 
@@ -129,7 +144,7 @@ export function acceptLeaveWalletImport(preview: WalletImportPreview, replaceCon
   const ids = new Set(incoming.banks.map((bank) => bank.id));
   if (!replaceConflicts && current.some((bank) => ids.has(bank.id))) return null;
   const merged = [...current.filter((bank) => !ids.has(bank.id)), ...incoming.banks];
-  if (!linkedRequestsStillResolve(merged, currentRequests)) return null;
+  if (!linkedRequestsStillResolve(merged, currentRequests, preview.requestLedgerSnapshot)) return null;
   return decodeLeaveWallet(encodeLeaveWallet({ version: 1, banks: merged }))?.banks ?? null;
 }
 
@@ -140,6 +155,6 @@ export function replaceLeaveWalletFromImport(preview: WalletImportPreview, confi
   const actual = currentBanks.length ? encodeLeaveWallet({ version: 1, banks: [...currentBanks] }) : '';
   if ((currentBanks.length && !actual) || actual !== expected) return null;
   const incoming = decodeLeaveWallet(encodeLeaveWallet(preview.incoming));
-  if (!incoming || !linkedRequestsStillResolve(incoming.banks, currentRequests)) return null;
+  if (!incoming || !linkedRequestsStillResolve(incoming.banks, currentRequests, preview.requestLedgerSnapshot)) return null;
   return incoming.banks;
 }

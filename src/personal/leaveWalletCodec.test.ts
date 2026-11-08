@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import type { TimeOffPolicy } from '../policy/model';
-import type { PtoRequest } from './requestLedger';
+import { createPtoRequest, type PtoRequest } from './requestLedger';
 import { legacyVacationBank } from './leaveWallet';
 import {
   acceptLeaveWalletImport, decodeLeaveWallet, encodeLeaveWallet,
@@ -13,6 +14,15 @@ const policy: TimeOffPolicy = {
   planYear: { kind: 'calendar' }, carryover: { mode: 'all' },
   negativeBalanceAllowance: 0, payoutOnLeaving: 'not-sure', plannedDays: [],
 };
+
+const requestCalendar = { workWeek: DEFAULT_WORK_WEEK, offDays: [] };
+const requestNow = '2027-01-01T00:00:00.000Z';
+function linkedRequest(id: string = 'request-1'): PtoRequest {
+  return createPtoRequest(
+    { start: '2027-01-20', end: '2027-01-20', status: 'approved', note: 'PRIVATE' },
+    requestCalendar, id, requestNow,
+  )!;
+}
 
 describe('private leave wallet transfer codec', () => {
   it('roundtrips a versioned single-bank legacy adapter without altering its policy', () => {
@@ -69,7 +79,7 @@ describe('private leave wallet transfer codec', () => {
   it('fails import preview atomically for duplicate or malformed live request IDs', () => {
     const bank = { ...legacyVacationBank(policy), requestIds: ['request-1'] };
     const raw = encodeLeaveWallet({ version: 1, banks: [bank] });
-    const record = { id: 'request-1' } as PtoRequest;
+    const record = linkedRequest();
     expect(previewLeaveWalletImport(raw, [], [record, { ...record }])).toBeNull();
     expect(previewLeaveWalletImport(raw, [], [{ id: '' } as PtoRequest])).toBeNull();
     expect(previewLeaveWalletImport(raw, [], [null as unknown as PtoRequest])).toBeNull();
@@ -81,7 +91,7 @@ describe('private leave wallet transfer codec', () => {
   it('revalidates live linked requests at commit time and rejects ledger races', () => {
     const bank = { ...legacyVacationBank(policy), requestIds: ['request-1'] };
     const raw = encodeLeaveWallet({ version: 1, banks: [bank] });
-    const linked = { id: 'request-1' } as PtoRequest;
+    const linked = linkedRequest();
     const preview = previewLeaveWalletImport(raw, [], [linked])!;
     expect(preview.unresolvedRequestIds).toEqual([]);
     expect(acceptLeaveWalletImport(preview, false, [])).toBeNull();
@@ -92,6 +102,48 @@ describe('private leave wallet transfer codec', () => {
     // A forged preview flag cannot override a missing live request.
     preview.unresolvedRequestIds = [];
     expect(acceptLeaveWalletImport(preview, false, [], [])).toBeNull();
+  });
+
+  it('invalidates import acceptance when a same-ID request changes status or dates', () => {
+    const linked = linkedRequest();
+    const bank = { ...legacyVacationBank(policy), requestIds: [linked.id] };
+    const preview = previewLeaveWalletImport(encodeLeaveWallet({ version: 1, banks: [bank] }), [], [linked])!;
+    expect(preview).not.toBeNull();
+    expect(preview.requestLedgerSnapshot).not.toContain('PRIVATE');
+    expect(acceptLeaveWalletImport(preview, false, [], [linked])).toEqual([bank]);
+    expect(replaceLeaveWalletFromImport(preview, true, [], [linked])).toEqual([bank]);
+
+    const canceled = { ...linked, status: 'canceled' as const };
+    const shifted = { ...linked, start: '2027-01-21', end: '2027-01-21',
+      ptoDates: ['2027-01-21'] };
+    const newRevision = { ...linked, updatedAt: '2027-01-02T00:00:00.000Z' };
+    for (const stale of [canceled, shifted, newRevision]) {
+      expect(acceptLeaveWalletImport(preview, false, [], [stale])).toBeNull();
+      expect(replaceLeaveWalletFromImport(preview, true, [], [stale])).toBeNull();
+    }
+    // Reordering unrelated requests is harmless, but editing them invalidates the preview.
+    const unrelated = linkedRequest('other');
+    const anotherPreview = previewLeaveWalletImport(
+      encodeLeaveWallet({ version: 1, banks: [bank] }), [], [linked, unrelated],
+    )!;
+    expect(acceptLeaveWalletImport(anotherPreview, false, [], [unrelated, linked])).toEqual([bank]);
+    expect(acceptLeaveWalletImport(anotherPreview, false, [], [
+      linked, { ...unrelated, status: 'completed' },
+    ])).toBeNull();
+  });
+
+  it('roundtrips the full 100-character request-ledger ID range', () => {
+    const linked = linkedRequest('r'.repeat(100));
+    expect(linked).not.toBeNull();
+    const bank = { ...legacyVacationBank(policy), requestIds: [linked.id] };
+    const json = encodeLeaveWallet({ version: 1, banks: [bank] });
+    expect(json).not.toBe('');
+    const preview = previewLeaveWalletImport(json, [], [linked])!;
+    expect(preview?.unresolvedRequestIds).toEqual([]);
+    expect(acceptLeaveWalletImport(preview, false, [], [linked])).toEqual([bank]);
+    expect(encodeLeaveWallet({ version: 1, banks: [
+      { ...bank, requestIds: ['r'.repeat(101)] },
+    ] })).toBe('');
   });
 
   it('rejects corrupt, oversized, duplicated and invalid-policy data', () => {
