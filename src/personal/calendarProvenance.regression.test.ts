@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { calendarAvailability, jointWindowFeasibility } from './recurringAvailability';
+import { calendarAvailability, jointWindowFeasibility, type RepeatingWorkSchedule } from './recurringAvailability';
 import { schoolCoverage } from './schoolCoverage';
 
-const weekly = { kind: 'weekly' as const, weekly: [true, true, true, true, true, false, false] };
+const weekly: RepeatingWorkSchedule = { kind: 'weekly', weekly: [true, true, true, true, true, false, false] };
 const windowFor = (options: { employerOffDays?: string[]; approvedOffDays?: string[]; schoolOffDays?: string[] } = {}) =>
   calendarAvailability({ start: '2027-01-04', end: '2027-01-04', schedule: weekly, ...options })!;
 
