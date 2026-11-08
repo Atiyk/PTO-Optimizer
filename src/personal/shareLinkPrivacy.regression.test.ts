@@ -157,13 +157,15 @@ describe('signed-out link privacy and backward compatibility regressions', () =>
 describe('private calendar source integration and partner-link safety', () => {
   it('preserves hard versus review versus context without exporting private ICS event details', async () => {
     const { buildIntegratedCalendarEvidence } = await import('../integration/calendarEvidence');
-    const { calendarEvidenceToSolveInput } = await import('../integration/calendarToSolver');
+    const { hardExcludedDates } = await import('./dateConstraints');
+    const { solveConsumer } = await import('../planning/optimizer');
     const privateTitle = 'PRIVATE: medical visit';
     const privateAttendee = 'private-person@example.test';
     const evidence = buildIntegratedCalendarEvidence({
       start: '2028-02-28',
       end: '2028-03-03',
       schedule: { kind: 'weekly', weekly: DEFAULT_WORK_WEEK },
+      employerOffDays: ['2028-03-03'],
       calendarPartial: false,
     }, [{
       source: 'ics',
@@ -181,21 +183,23 @@ describe('private calendar source integration and partner-link safety', () => {
       expect.objectContaining({ date: '2028-02-29', severity: 'hard-block' }),
       expect.objectContaining({ date: '2028-03-01', severity: 'review-needed' }),
     ]));
-    const mapped = calendarEvidenceToSolveInput({
+    const hardDates = hardExcludedDates(evidence!.constraints);
+    expect(hardDates).toEqual(['2028-02-29']);
+    const result = solveConsumer({
       rangeStart: '2028-02-28', rangeEnd: '2028-03-03',
-      offDays: [], blackouts: [], budget: 2, w: 0, breakCount: 1,
-    }, evidence!);
-    expect(mapped).not.toBeNull();
-    expect(mapped?.blackouts).toContain('2028-02-29');
-    expect(mapped?.blackouts).not.toContain('2028-03-01');
-    expect(mapped?.blackouts).not.toContain('2028-03-02');
-    expect(mapped?.offDays).not.toContain('2028-03-01');
+      offDays: ['2028-03-03'], blackouts: hardDates,
+      workWeek: DEFAULT_WORK_WEEK, budget: 2, w: 0, breakCount: 1,
+    }).result;
+    expect(result.primary.flatMap(brk => brk.days)).not.toContain('2028-02-29');
+    expect(hardDates).not.toContain('2028-03-01');
+    expect(hardDates).not.toContain('2028-03-02');
 
     const alreadyOff = evidence!.availability.days
       .filter(day => day.alreadyOff).map(day => day.date);
+    expect(alreadyOff).toEqual(['2028-03-03']);
     const share = buildOverlapShareURL('https://gapless.example', '/pto', alreadyOff);
     expect(readOverlapPayloadFromURL(new URL(share).search)).toEqual(alreadyOff);
-    for (const output of [JSON.stringify(evidence), JSON.stringify(mapped), share]) {
+    for (const output of [JSON.stringify(evidence), JSON.stringify(result), share]) {
       expect(output).not.toContain(privateTitle);
       expect(output).not.toContain(privateAttendee);
     }
