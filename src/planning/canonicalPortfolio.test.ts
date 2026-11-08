@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { SolveInput } from '@daysoff/engine/solver/types';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
-import { mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
-import { selectCanonicalPortfolios } from './canonicalPortfolio';
+import { isoToSerial, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
+import { comparePortfolioMetrics, normalizePortfolioBreaks, selectCanonicalPortfolios } from './canonicalPortfolio';
 import type { ConstraintSet } from './constraintRecommendationAdapter';
 
 const base: SolveInput = {
@@ -24,6 +24,10 @@ describe('whole-plan consumer recommendations', () => {
     expect(several!.getawayCount).toBeGreaterThanOrEqual(2);
     for (const portfolio of portfolios!) {
       expect(portfolio.getawayCount).toBe(portfolio.breaks.length);
+      for (let i = 1; i < portfolio.breaks.length; i++) {
+        expect(isoToSerial(portfolio.breaks[i].start) - isoToSerial(portfolio.breaks[i - 1].end))
+          .toBeGreaterThan(1);
+      }
       expect(portfolio.travelSignal).toBe('not-used');
       expect(portfolio.ptoDays + portfolio.budgetRemaining).toBe(base.budget);
       const seen = new Set<string>();
@@ -93,6 +97,59 @@ describe('whole-plan consumer recommendations', () => {
         expect(index + 1).toBeLessThanOrEqual(elapsedMonths);
       });
     }
+  });
+
+  it('keeps primary objectives lexicographic even across a 1,096-day horizon', () => {
+    const moreGetaways = {
+      getawayCount: 3, longestBreakDays: 4, totalCalendarDays: 12,
+      ptoDays: 6, reviewDates: [] as string[],
+    };
+    const longerCalendar = {
+      getawayCount: 2, longestBreakDays: 8, totalCalendarDays: 1080,
+      ptoDays: 10, reviewDates: [] as string[],
+    };
+    expect(comparePortfolioMetrics(moreGetaways, longerCalendar, 'most-getaways'))
+      .toBeLessThan(0);
+    expect(comparePortfolioMetrics(longerCalendar, moreGetaways, 'longest-break'))
+      .toBeLessThan(0);
+    const longerSingle = { ...longerCalendar, getawayCount: 1, longestBreakDays: 5 };
+    const hugeSecondary = { ...moreGetaways, longestBreakDays: 4, totalCalendarDays: 1090 };
+    expect(comparePortfolioMetrics(longerSingle, hugeSecondary, 'longest-break'))
+      .toBeLessThan(0);
+    expect(comparePortfolioMetrics(moreGetaways, longerCalendar, 'most-getaways'))
+      .toBe(-comparePortfolioMetrics(longerCalendar, moreGetaways, 'most-getaways'));
+  });
+
+  it('counts adjacent solver break segments as one getaway, but rejects overlap', () => {
+    const pieces = [
+      { start: '2027-04-01', end: '2027-04-03', calendarDays: 3, ptoDays: 2 },
+      { start: '2027-04-04', end: '2027-04-05', calendarDays: 2, ptoDays: 1 },
+      { start: '2027-04-08', end: '2027-04-10', calendarDays: 3, ptoDays: 1 },
+    ];
+    expect(normalizePortfolioBreaks(pieces)).toEqual([
+      { start: '2027-04-01', end: '2027-04-05', calendarDays: 5, ptoDays: 3 }, pieces[2],
+    ]);
+    expect(normalizePortfolioBreaks([pieces[0], {
+      ...pieces[1], start: '2027-04-03', calendarDays: 3,
+    }])).toBeNull();
+    expect(normalizePortfolioBreaks(pieces)).toEqual(normalizePortfolioBreaks([...pieces].reverse()));
+  });
+
+  it('uses neutral free calendar dates for rotating-shift nonwork dates and honors notice', () => {
+    const shifts: SolveInput = {
+      ...base, rangeStart: '2027-04-01', rangeEnd: '2027-05-31',
+      budget: 7, workWeek: [true, true, true, true, true, true, true],
+      offDays: ['2027-04-03', '2027-04-04', '2027-04-10', '2027-04-11'],
+    };
+    const portfolios = selectCanonicalPortfolios(shifts, empty, { earliestNoticeDate: '2027-04-15' })!;
+    for (const portfolio of portfolios) {
+      expect(portfolio).not.toHaveProperty('freeWorkingDates');
+      for (const date of portfolio.freeCalendarDates) expect(shifts.offDays).toContain(date);
+      for (const brk of portfolio.breaks) expect(brk.start >= '2027-04-15').toBe(true);
+    }
+    expect(selectCanonicalPortfolios(shifts, empty, { earliestNoticeDate: '2027-02-30' })).toBeNull();
+    expect(selectCanonicalPortfolios({ ...shifts, mustIncludeDays: ['2027-04-08'] }, empty,
+      { earliestNoticeDate: '2027-04-15' })).toEqual([]);
   });
 
   it('fails closed on fractional wallet units, invalid dates and malformed constraints', () => {
