@@ -152,3 +152,72 @@ describe('signed-out link privacy and backward compatibility regressions', () =>
     expect(readOverlapPayloadFromURL('?' + params.toString())).toEqual([]);
   });
 });
+
+
+describe('private calendar source integration and partner-link safety', () => {
+  it('preserves hard versus review versus context without exporting private ICS event details', async () => {
+    const { buildIntegratedCalendarEvidence } = await import('../integration/calendarEvidence');
+    const { calendarEvidenceToSolveInput } = await import('../integration/calendarToSolver');
+    const privateTitle = 'PRIVATE: medical visit';
+    const privateAttendee = 'private-person@example.test';
+    const evidence = buildIntegratedCalendarEvidence({
+      start: '2028-02-28',
+      end: '2028-03-03',
+      schedule: { kind: 'weekly', weekly: DEFAULT_WORK_WEEK },
+      calendarPartial: false,
+    }, [{
+      source: 'ics',
+      completeness: 'complete',
+      events: [
+        { start: '2028-02-29', end: '2028-02-29', blocking: 'hard', title: privateTitle, attendee: privateAttendee },
+        { start: '2028-03-01', end: '2028-03-01', blocking: 'review', title: privateTitle },
+        { start: '2028-03-02', end: '2028-03-02', blocking: 'context', attendee: privateAttendee },
+      ] as never,
+    }]);
+    expect(evidence).not.toBeNull();
+    expect(evidence?.partial).toBe(false);
+    expect(evidence?.importedContextDates).toEqual(['2028-03-02']);
+    expect(evidence?.constraints.dates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ date: '2028-02-29', severity: 'hard-block' }),
+      expect.objectContaining({ date: '2028-03-01', severity: 'review-needed' }),
+    ]));
+    const mapped = calendarEvidenceToSolveInput({
+      rangeStart: '2028-02-28', rangeEnd: '2028-03-03',
+      offDays: [], blackouts: [], budget: 2, w: 0, breakCount: 1,
+    }, evidence!);
+    expect(mapped).not.toBeNull();
+    expect(mapped?.blackouts).toContain('2028-02-29');
+    expect(mapped?.blackouts).not.toContain('2028-03-01');
+    expect(mapped?.blackouts).not.toContain('2028-03-02');
+    expect(mapped?.offDays).not.toContain('2028-03-01');
+
+    const alreadyOff = evidence!.availability.days
+      .filter(day => day.alreadyOff).map(day => day.date);
+    const share = buildOverlapShareURL('https://gapless.example', '/pto', alreadyOff);
+    expect(readOverlapPayloadFromURL(new URL(share).search)).toEqual(alreadyOff);
+    for (const output of [JSON.stringify(evidence), JSON.stringify(mapped), share]) {
+      expect(output).not.toContain(privateTitle);
+      expect(output).not.toContain(privateAttendee);
+    }
+    expect([...new URL(share).searchParams.keys()]).toEqual(['ov']);
+  });
+
+  it('discloses truncated or partial calendar coverage without exposing ICS notes', async () => {
+    const { buildIntegratedCalendarEvidence } = await import('../integration/calendarEvidence');
+    const secret = 'SECRET salary / family detail';
+    const evidence = buildIntegratedCalendarEvidence({
+      start: '2028-03-10', end: '2028-03-13',
+      schedule: { kind: 'weekly', weekly: DEFAULT_WORK_WEEK },
+      calendarPartial: false,
+    }, [{
+      source: 'ics',
+      completeness: 'partial',
+      truncated: true,
+      events: [{ start: '2028-03-10', end: '2028-03-10', blocking: 'review', description: secret }] as never,
+    }]);
+    expect(evidence?.partial).toBe(true);
+    expect(evidence?.availability.days.find(day => day.date === '2028-03-10')?.reviewNeeded).toBe(true);
+    expect(evidence?.sourceWarnings).toContain('Calendar coverage is incomplete');
+    expect(JSON.stringify(evidence)).not.toContain(secret);
+  });
+});
