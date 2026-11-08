@@ -72,6 +72,10 @@ export interface LeaveWalletProjection {
 }
 
 const BANK_ID = /^[A-Za-z0-9_-]{1,64}$/;
+/** Match the existing request-ledger contract (which permits 100-character IDs). */
+export function validWalletRequestId(id: unknown): id is string {
+  return typeof id === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(id);
+}
 const CATEGORIES: readonly LeaveBankCategory[] = [
   'vacation', 'sick', 'personal', 'floating-holiday', 'comp-time', 'custom',
 ];
@@ -106,7 +110,7 @@ export function projectLeaveWallet(
   const requestOwners = new Set<string>();
   const requestById = new Map<string, PtoRequest>();
   for (const request of requests) {
-    if (!request || typeof request.id !== 'string' || requestById.has(request.id)) return null;
+    if (!request || !validWalletRequestId(request.id) || requestById.has(request.id)) return null;
     requestById.set(request.id, request);
   }
 
@@ -117,7 +121,7 @@ export function projectLeaveWallet(
       || typeof bank.name !== 'string' || !bank.name.trim() || bank.name.length > 80
       || !CATEGORIES.includes(bank.category)
       || !Array.isArray(bank.requestIds) || bank.requestIds.length > MAX_BANK_REQUEST_IDS
-      || bank.requestIds.some((id: string) => typeof id !== 'string' || !BANK_ID.test(id))
+      || bank.requestIds.some((id: string) => !validWalletRequestId(id))
       || !bank.policy || typeof bank.policy !== 'object') return null;
     bankIds.add(bank.id);
 

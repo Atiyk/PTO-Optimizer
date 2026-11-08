@@ -115,6 +115,18 @@ describe('consumer unified leave wallet (pure canonical projection)', () => {
     });
   });
 
+  it('preserves valid 100-character legacy request IDs without truncation or rejecting them', () => {
+    const id = 'r'.repeat(100);
+    const fullLength = createPtoRequest(
+      { start: '2027-01-20', end: '2027-01-20', status: 'approved' }, calendar, id,
+    )!;
+    expect(fullLength).not.toBeNull();
+    const bank = legacyVacationBank(policy, [fullLength]);
+    expect(bank.requestIds).toEqual([id]);
+    expect(projectLeaveWallet([bank], '2027-02-15', [fullLength])?.banks[0].linkedRequestCount).toBe(1);
+    expect(projectLeaveWallet([{ ...bank, requestIds: ['r'.repeat(101)] }], '2027-02-15')).toBeNull();
+  });
+
   it('rejects malformed bank ownership and future forecast dates before computing', () => {
     const bank = legacyVacationBank(policy, [approved]);
     expect(projectLeaveWallet([{ ...bank, id: '../unsafe' }], '2027-02-15', [approved])).toBeNull();
