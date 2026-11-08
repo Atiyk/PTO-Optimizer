@@ -40,12 +40,20 @@ describe('deterministic consumer recommendation alternatives', () => {
     ], 4);
     expect(results.some(r => r.objective === 'most-getaways')).toBe(false);
   });
+  it('ignores unverified getaway counts even when callers fabricate large counts', () => {
+    const single = candidate('2027-08-01', 6, 999, 2);
+    const results = selectRecommendationAlternatives([single], 2);
+    expect(results).toHaveLength(1);
+    expect(results[0].objective).toBe('longest-break');
+    expect(results.some(x => x.objective === 'most-getaways')).toBe(false);
+  });
   it('returns distinct deterministic alternatives with factual explanation metadata', () => {
     const items = [candidate('2027-04-01', 12, 1), candidate('2027-05-01', 5, 4), candidate('2027-06-01', 9, 2), candidate('2027-07-01', 4, 1, 0)];
     const a = selectRecommendationAlternatives(items, 3);
-    expect(a).toHaveLength(4);
+    expect(a).toHaveLength(3);
     expect(new Set(a.map(x => x.start)).size).toBe(4);
     expect(selectRecommendationAlternatives(items, 3)).toEqual(a);
     expect(a[0].explanation).toContain('PTO days');
+    expect(a.every(x => x.objective !== 'most-getaways')).toBe(true);
   });
 });
