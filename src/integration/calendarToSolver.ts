@@ -29,6 +29,15 @@ export function calendarEvidenceToSolveInput(input: SolveInput, evidence: Integr
   const recomputed = constraintsFromAvailability(a);
   if (!recomputed || JSON.stringify(recomputed) !== JSON.stringify(evidence.constraints)) return null;
 
+  // A date-specific calendar is authoritative for scheduled working days.
+  // Legacy offDays may add genuine holidays/approved leave, but must never
+  // silently turn a rotating-shift workday into a free day.
+  const explicitDays = new Map(a.days.map(day => [day.date, day]));
+  if (input.offDays.some(date => {
+    const day = explicitDays.get(date);
+    return day && day.workday && !day.employerHoliday && !day.approvedLeave;
+  })) return null;
+
   const off = new Set(input.offDays);
   const hard = new Set(input.blackouts ?? []);
   const startSerial = isoToSerial(input.rangeStart);
