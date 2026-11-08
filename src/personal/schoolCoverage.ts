@@ -1,6 +1,4 @@
-import type { AvailabilityWindow } from './recurringAvailability';
-import { validCalendarDate } from './employerCalendar';
-import { isoToSerial } from '@daysoff/engine/solver/dateUtils';
+import { validExternalWindow, type AvailabilityWindow } from './recurringAvailability';
 
 /** Date-only school coverage accounting. No assumption about who is responsible for childcare. */
 export interface SchoolCoverageDay {
@@ -21,17 +19,12 @@ export interface SchoolCoverageSummary {
 }
 /** Evaluates equal date windows; a gap is informational, not a childcare assignment. */
 export function schoolCoverage(a: AvailabilityWindow, b: AvailabilityWindow): SchoolCoverageSummary | null {
-  if (!a || !b || !Array.isArray(a.days) || !Array.isArray(b.days)
-    || a.days.length !== b.days.length || a.days.length === 0 || a.days.length > 1096
-    || typeof a.partial !== 'boolean' || typeof b.partial !== 'boolean') return null;
+  if (!validExternalWindow(a) || !validExternalWindow(b)
+    || a.days.length !== b.days.length) return null;
   const days: SchoolCoverageDay[] = [];
   for (let i = 0; i < a.days.length; i++) {
     const x = a.days[i], y = b.days[i];
-    if (!x || !y || x.date !== y.date || !validCalendarDate(x.date)
-      || typeof x.workday !== 'boolean' || typeof y.workday !== 'boolean'
-      || typeof x.alreadyOff !== 'boolean' || typeof y.alreadyOff !== 'boolean'
-      || typeof x.schoolClosed !== 'boolean' || typeof y.schoolClosed !== 'boolean'
-      || (i > 0 && isoToSerial(x.date) - isoToSerial(a.days[i - 1].date) !== 1)) return null;
+    if (x.date !== y.date) return null;
     const adultAOff = !x.workday || x.alreadyOff;
     const adultBOff = !y.workday || y.alreadyOff;
     const schoolClosed = x.schoolClosed || y.schoolClosed;
