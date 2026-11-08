@@ -55,6 +55,31 @@ describe('integration calendar-to-solver whole-day handoff', () => {
     expect(mapped.blackouts).not.toContain('2028-01-06');
   });
 
+  it('rejects legacy Sunday off-day when rotating schedule explicitly works Sunday', () => {
+    const evidence = buildIntegratedCalendarEvidence({
+      start: '2028-01-08', end: '2028-01-10',
+      schedule: { kind: 'cycle', cycleAnchor: '2028-01-08', cycleWorking: [false, true, true] },
+      calendarPartial: false,
+    }, [])!;
+    const original: SolveInput = {
+      rangeStart: '2028-01-08', rangeEnd: '2028-01-10', budget: 1,
+      offDays: ['2028-01-09'],
+    };
+    expect(calendarEvidenceToSolveInput(original, evidence)).toBeNull();
+    const valid = calendarEvidenceToSolveInput({ ...original, offDays: [] }, evidence)!;
+    expect(valid).not.toBeNull();
+    expect(valid.offDays).toContain('2028-01-08');
+    expect(valid.offDays).not.toContain('2028-01-09');
+    expect(validatePtoDates(valid, ['2028-01-09']).ptoDays).toEqual(['2028-01-09']);
+
+    const withHoliday = buildIntegratedCalendarEvidence({
+      start: '2028-01-08', end: '2028-01-10',
+      schedule: { kind: 'cycle', cycleAnchor: '2028-01-08', cycleWorking: [false, true, true] },
+      employerOffDays: ['2028-01-09'], calendarPartial: false,
+    }, [])!;
+    expect(calendarEvidenceToSolveInput(original, withHoliday)?.offDays).toContain('2028-01-09');
+  });
+
   it('fails closed on fractional budgets or manipulated source and date contracts', () => {
     const evidence = buildIntegratedCalendarEvidence({
       start: '2028-01-03', end: '2028-01-04',
