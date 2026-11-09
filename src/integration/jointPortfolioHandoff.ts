@@ -96,7 +96,11 @@ export function filterJointPortfolios(
     // Rebuild all outward-facing metadata from the verified date-only calendars.
     const safePortfolio: CanonicalPortfolio = {
       objective: portfolio.objective,
-      breaks: normalized,
+      // CanonicalPortfolio may originate from imported JSON. Whitelist break fields:
+      // normalizePortfolioBreaks preserves unknown enumerable keys via object spread.
+      breaks: normalized.map(brk => ({
+        start: brk.start, end: brk.end, calendarDays: brk.calendarDays, ptoDays: brk.ptoDays,
+      })),
       getawayCount: normalized.length,
       longestBreakDays: Math.max(...normalized.map(b => b.calendarDays)),
       totalCalendarDays: normalized.reduce((n, b) => n + b.calendarDays, 0),
