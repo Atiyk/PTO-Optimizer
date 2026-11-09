@@ -12,7 +12,7 @@ import { travelEvidenceFor } from '../planning/travelEvidence';
 const policy: TimeOffPolicy = {
   unit: 'days', hoursPerDay: 8, currentBalance: 5,
   balanceAsOf: '2027-01-01',
-  accrual: { kind: 'none' }, planYear: { kind: 'calendar' },
+  accrual: { kind: 'per-pay-period', amount: 1, frequency: 'monthly', payDateAnchor: '2028-01-15' }, planYear: { kind: 'calendar' },
   carryover: { mode: 'all' }, negativeBalanceAllowance: 0,
   payoutOnLeaving: 'not-sure', plannedDays: [],
 };
