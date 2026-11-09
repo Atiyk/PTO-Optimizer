@@ -150,9 +150,31 @@ export function selectJointFundedPortfolios(
     return null;
   const exclusions = new Set(mapped.blackouts ?? []);
   for (const day of adultB.availability.days) if (day.hardBlocked) exclusions.add(day.date);
+  // A solo-optimal portfolio may exhaust partner B's PTO even when a lower-ranked
+  // jointly affordable portfolio exists. Filter the WHOLE bounded candidate pool
+  // before objective winners are selected, not just the four displayed results.
+  const callerEligible = options.candidateEligible;
+  const smallerFundedBudget = Math.min(budgetA, budgetB);
+  const searchBudgets = [...new Set([
+    smallerFundedBudget, ...(options.additionalSearchBudgets ?? []),
+  ])].filter(n => n !== budgetA);
   const portfolios = selectCanonicalPortfolios({
     ...mapped, blackouts: [...exclusions].sort(),
-  }, adultA.constraints, options);
+  }, adultA.constraints, {
+    ...options, additionalSearchBudgets: searchBudgets,
+    candidateEligible: candidate => {
+      if (callerEligible && callerEligible(candidate) !== true) return false;
+      // A candidate is one REPLACEMENT SCENARIO. Validate aggregate A/B costs,
+      // hard blocks, provenance and dates before handing it a ranked objective.
+      const synthetic: CanonicalPortfolio = {
+        ...candidate, objective: 'balanced', explanation: '',
+      };
+      const assessed = filterJointPortfolios([synthetic], adultA.availability,
+        adultB.availability, budgetA, budgetB);
+      return Boolean(assessed && assessed.rejected === 0
+        && assessed.feasible.length + assessed.needsReview.length === 1);
+    },
+  });
   if (portfolios === null) return null;
   return filterJointPortfolios(portfolios, adultA.availability, adultB.availability, budgetA, budgetB);
 }

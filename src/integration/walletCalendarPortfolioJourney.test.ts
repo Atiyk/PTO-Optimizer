@@ -9,7 +9,8 @@ import { schoolCoverage } from '../personal/schoolCoverage';
 import { calendarEvidenceToSolveInput } from './calendarToSolver';
 import { selectCanonicalRecommendationAlternatives } from '../planning/canonicalRecommendation';
 import { travelEvidenceFor } from '../planning/travelEvidence';
-import { selectJointFundedPortfolios } from './jointPortfolioHandoff';
+import { filterJointPortfolios, selectJointFundedPortfolios } from './jointPortfolioHandoff';
+import { selectCanonicalPortfolios } from '../planning/canonicalPortfolio';
 
 const policy: TimeOffPolicy = {
   unit: 'days', hoursPerDay: 8, currentBalance: 5,
@@ -124,6 +125,45 @@ describe('integration: actual wallet -> rotating family calendar -> canonical po
       expect(option.portfolio.breaks.flatMap(brk => rangeISO(brk.start, brk.end))).not.toContain('2027-01-23');
     }
     expect(original.blackouts).toEqual([]);
+  });
+
+  it('recovers a jointly funded lower-ranked plan after the adult-A-only optimum exceeds B budget', () => {
+    const start = '2027-04-01', end = '2027-08-31';
+    const input: SolveInput = { rangeStart: start, rangeEnd: end, budget: 12,
+      offDays: [], blackouts: [], w: 0, breakCount: 3 };
+    const a = buildIntegratedCalendarEvidence({
+      start, end,
+      schedule: { kind: 'weekly', weekly: [true, true, true, true, true, false, false] },
+      calendarPartial: false,
+    }, [])!;
+    const b = buildIntegratedCalendarEvidence({
+      start, end,
+      schedule: { kind: 'weekly', weekly: [true, true, true, true, false, false, false] },
+      employerOffDays: ['2027-05-31'], hardBlockDays: ['2027-06-11'],
+      calendarPartial: false,
+    }, [])!;
+    const mapped = calendarEvidenceToSolveInput(input, a)!;
+    const solo = selectCanonicalPortfolios(mapped, a.constraints)!;
+    expect(solo.length).toBeGreaterThan(0);
+    const soloChecked = filterJointPortfolios(solo, a.availability, b.availability, 12, 3)!;
+    expect(soloChecked.rejected).toBeGreaterThan(0);
+    const joint = selectJointFundedPortfolios(input, a, b, 12, 3)!;
+    expect(joint).not.toBeNull();
+    const offered = [...joint.feasible, ...joint.needsReview];
+    expect(offered.length).toBeGreaterThan(0);
+    // The funded replacement was absent from the four adult-A-only winners.
+    const soloKeys = new Set(solo.map(p => p.breaks.map(brk => brk.start + '/' + brk.end).join('|')));
+    expect(offered.some(item =>
+      !soloKeys.has(item.portfolio.breaks.map(brk => brk.start + '/' + brk.end).join('|')))).toBe(true);
+    for (const item of offered) {
+      expect(item.ptoDaysA).toBeLessThanOrEqual(12);
+      expect(item.ptoDaysB).toBeLessThanOrEqual(3);
+      expect(item.portfolio.budgetRemaining).toBe(12 - item.ptoDaysA);
+      expect(item.portfolio.travelSignal).toBe('not-used');
+      expect(item.portfolio.breaks.flatMap(brk => rangeISO(brk.start, brk.end)))
+        .not.toContain('2027-06-11');
+    }
+    expect(input.blackouts).toEqual([]);
   });
 
   it('excludes partner-only blocks pre-solver and never exposes an unfunded joint portfolio', () => {
