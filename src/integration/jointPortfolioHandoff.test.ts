@@ -48,6 +48,27 @@ describe('joint whole-portfolio funding handoff', () => {
     expect(result.needsReview).toHaveLength(1);
     expect(result.needsReview[0].potentialSchoolCoverageGapDays).toBe(1);
   });
+  it('rejects adjacent fragments masquerading as two getaways', () => {
+    const a = calendarAvailability(base)!;
+    const b = calendarAvailability(base)!;
+    const adjacent: CanonicalPortfolio = {
+      ...portfolio,
+      breaks: [
+        { start: '2027-01-04', end: '2027-01-04', calendarDays: 1, ptoDays: 1 },
+        { start: '2027-01-05', end: '2027-01-05', calendarDays: 1, ptoDays: 1 },
+      ],
+    };
+    expect(filterJointPortfolios([adjacent], a, b, 2, 2)).toBeNull();
+  });
+  it('rejects forged aggregate counts, cost and explanation metadata', () => {
+    const a = calendarAvailability(base)!;
+    const b = calendarAvailability(base)!;
+    expect(filterJointPortfolios([{ ...portfolio, getawayCount: 3 }], a, b, 2, 2)).toBeNull();
+    expect(filterJointPortfolios([{ ...portfolio, ptoDays: 1 }], a, b, 2, 2)).toBeNull();
+    expect(filterJointPortfolios([{ ...portfolio, totalCalendarDays: 4 }], a, b, 2, 2)).toBeNull();
+    expect(filterJointPortfolios([{ ...portfolio, longestBreakDays: 3 }], a, b, 2, 2)).toBeNull();
+    expect(filterJointPortfolios([{ ...portfolio, travelSignal: 'live' as CanonicalPortfolio['travelSignal'] }], a, b, 2, 2)).toBeNull();
+  });
   it('fails closed when a portfolio break exceeds the known calendar window', () => {
     const a = calendarAvailability(base)!;
     const b = calendarAvailability(base)!;
