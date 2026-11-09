@@ -3,6 +3,7 @@ import type { CanonicalPortfolio } from '../planning/canonicalPortfolio';
 import type { AvailabilityWindow, JointWindowFeasibility } from '../personal/recurringAvailability';
 import { jointWindowFeasibility, validExternalWindow } from '../personal/recurringAvailability';
 import { schoolCoverage } from '../personal/schoolCoverage';
+import { validCalendarDate } from '../personal/employerCalendar';
 
 /** A portfolio is a replacement scenario, not a collection of independently funded suggestions. */
 export interface JointPortfolioResult {
@@ -52,12 +53,18 @@ export function filterJointPortfolios(
       || portfolio.travelSignal !== 'not-used'
       || typeof portfolio.explanation !== 'string'
       || !Array.isArray(portfolio.freeCalendarDates) || !Array.isArray(portfolio.reviewDates)
-      || typeof portfolio.partialCalendarEvidence !== 'boolean') return null;
+      || typeof portfolio.partialCalendarEvidence !== 'boolean'
+      || !['most-getaways', 'longest-break', 'balanced', 'constraint-fit'].includes(portfolio.objective)
+      || portfolio.freeCalendarDates.length > 1096 || portfolio.reviewDates.length > 1096
+      || !portfolio.freeCalendarDates.every(validCalendarDate)
+      || !portfolio.reviewDates.every(validCalendarDate)) return null;
     let totalA = 0;
     let totalB = 0;
     let gaps = 0;
     let review = Boolean(portfolio.partialCalendarEvidence);
     let impossible = false;
+    const reviewDates = new Set<string>();
+    const freeDates = new Set<string>();
     let previousEnd = '';
     for (const brk of normalized) {
       if (!brk || typeof brk.start !== 'string' || typeof brk.end !== 'string'
@@ -75,6 +82,8 @@ export function filterJointPortfolios(
       totalB += joint.ptoDaysB;
       gaps += coverage.potentialGapDays;
       review ||= joint.partial || joint.reviewDates.length > 0;
+      joint.reviewDates.forEach(date => reviewDates.add(date));
+      a.days.filter(day => day.alreadyOff).forEach(day => freeDates.add(day.date));
       previousEnd = brk.end;
     }
     // A plan's own PTO charge must be consistent with adult A's canonical calendar.
@@ -83,8 +92,24 @@ export function filterJointPortfolios(
       rejected++;
       continue;
     }
+    // Never pass through caller-controlled explanations, dates, or remaining balance.
+    // Rebuild all outward-facing metadata from the verified date-only calendars.
+    const safePortfolio: CanonicalPortfolio = {
+      objective: portfolio.objective,
+      breaks: normalized,
+      getawayCount: normalized.length,
+      longestBreakDays: Math.max(...normalized.map(b => b.calendarDays)),
+      totalCalendarDays: normalized.reduce((n, b) => n + b.calendarDays, 0),
+      ptoDays: totalA,
+      budgetRemaining: budgetA - totalA,
+      freeCalendarDates: [...freeDates].sort(),
+      reviewDates: [...reviewDates].sort(),
+      partialCalendarEvidence: review && (adultA.partial || adultB.partial),
+      travelSignal: 'not-used',
+      explanation: `${normalized.length} separate break(s), ${normalized.reduce((n, b) => n + b.calendarDays, 0)} calendar days using ${totalA} PTO days for adult A and ${totalB} for adult B. ${reviewDates.size} advisory date(s) need review. Travel demand was not used.`,
+    };
     const result: JointPortfolioResult = {
-      portfolio, ptoDaysA: totalA, ptoDaysB: totalB,
+      portfolio: safePortfolio, ptoDaysA: totalA, ptoDaysB: totalB,
       potentialSchoolCoverageGapDays: gaps,
       needsReview: review || gaps > 0,
     };
