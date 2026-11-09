@@ -86,6 +86,23 @@ describe('joint whole-portfolio funding handoff', () => {
     expect(JSON.stringify(output)).not.toContain('2027-01-08');
     expect(filterJointPortfolios([{ ...valid, reviewDates: ['invalid-date'] }], calendarAvailability(base)!, b, 2, 2)).toBeNull();
   });
+  it('does not leak unknown imported break properties into public recommendations', () => {
+    const a = calendarAvailability(base)!;
+    const b = calendarAvailability(base)!;
+    const injected = {
+      ...portfolio,
+      breaks: portfolio.breaks.map((brk, i) => ({
+        ...brk,
+        privateCalendarTitle: i === 0 ? 'SECRET_MEDICAL_EVENT' : 'SECRET_PARTNER_NAME',
+        nested: { contact: 'SECRET_CONTACT' },
+      })),
+    };
+    const result = filterJointPortfolios([injected], a, b, 2, 2)!;
+    expect(result.feasible).toHaveLength(1);
+    expect(result.feasible[0].portfolio.breaks).toEqual(portfolio.breaks);
+    expect(JSON.stringify(result)).not.toContain('SECRET_');
+    expect(JSON.stringify(result)).not.toContain('nested');
+  });
   it('fails closed when a portfolio break exceeds the known calendar window', () => {
     const a = calendarAvailability(base)!;
     const b = calendarAvailability(base)!;
