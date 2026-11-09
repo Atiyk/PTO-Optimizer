@@ -5,6 +5,7 @@ import type { TimeOffPolicy } from '../policy/model';
 import { legacyVacationBank, projectLeaveWallet } from '../personal/leaveWallet';
 import { buildIntegratedCalendarEvidence } from './calendarEvidence';
 import { jointWindowFeasibility } from '../personal/recurringAvailability';
+import { schoolCoverage } from '../personal/schoolCoverage';
 import { calendarEvidenceToSolveInput } from './calendarToSolver';
 import { selectCanonicalRecommendationAlternatives } from '../planning/canonicalRecommendation';
 import { travelEvidenceFor } from '../planning/travelEvidence';
@@ -72,6 +73,35 @@ describe('integration: actual wallet -> rotating family calendar -> canonical po
       expect(p.ptoDays).toBeLessThanOrEqual(Math.floor(firstBalance));
       expect(p.ptoDays).toBeGreaterThanOrEqual(0);
       expect(p.getawayCount).toBe(1);
+      // A solo recommendation is not automatically a feasible couple recommendation.
+      // Independently validate every proposed interval against BOTH actual calendars.
+      const daysA = a.availability.days.filter(d => d.date >= p.start && d.date <= p.end);
+      const daysB = b.availability.days.filter(d => d.date >= p.start && d.date <= p.end);
+      expect(daysA.length).toBe(dates.length);
+      expect(daysB.length).toBe(dates.length);
+      const candidateA = { ...a.availability, days: daysA };
+      const candidateB = { ...b.availability, days: daysB };
+      const couple = jointWindowFeasibility(candidateA, candidateB, firstBalance, secondBalance)!;
+      expect(couple).not.toBeNull();
+      expect(couple.ptoDaysA).toBeLessThanOrEqual(firstBalance);
+      expect(couple.ptoDaysB).toBeGreaterThanOrEqual(0);
+      const coverage = schoolCoverage(candidateA, candidateB)!;
+      expect(coverage).not.toBeNull();
+      expect(coverage.days.length).toBe(dates.length);
+      expect(coverage.potentialGapDays).toBe(coverage.days.filter(d => d.potentialCoverageGap).length);
+      // A partner-only hard conflict must veto joint feasibility, without altering
+      // the adult-A-only solver's recommendation or leaking calendar event titles.
+      const blockedB = { ...candidateB, days: candidateB.days.map((d, i) =>
+        i === 0 ? { ...d, hardBlocked: true } : d) };
+      const blocked = jointWindowFeasibility(candidateA, blockedB, firstBalance, secondBalance)!;
+      expect(blocked.possible).toBe(false);
+      expect(blocked.hardBlockDates).toContain(p.start);
+      // A separate partner PTO bank can be exhausted even when A is fully funded.
+      if (couple.ptoDaysB > 0) {
+        const unfunded = jointWindowFeasibility(candidateA, candidateB, firstBalance, 0)!;
+        expect(unfunded.possible).toBe(false);
+        expect(unfunded.ptoDaysB).toBe(couple.ptoDaysB);
+      }
     }
     expect(calendarEvidenceToSolveInput({ ...original, budget: firstBalance - 0.5 }, a)).toBeNull();
     const travel = travelEvidenceFor(portfolios[0].start, 'US')!;
