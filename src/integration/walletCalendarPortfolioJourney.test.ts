@@ -189,6 +189,11 @@ describe('integration: actual wallet -> rotating family calendar -> canonical po
     })!;
     expect(called).toBeGreaterThan(0);
     expect(sawPreRankingAdvisories).toBe(true);
+    // Ignore neither forged partner completeness nor missing advisory metadata.
+    expect(selectJointFundedPortfolios(input, a, { ...b, partial: true }, 7, 7)).toBeNull();
+    expect(selectJointFundedPortfolios(input, a, {
+      ...b, constraints: { ...b.constraints, dates: [] },
+    }, 7, 7)).toBeNull();
     expect(joint.feasible).toEqual([]);
     expect(joint.needsReview.length).toBeGreaterThan(0);
     for (const item of joint.needsReview) {

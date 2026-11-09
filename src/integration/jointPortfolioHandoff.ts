@@ -150,7 +150,12 @@ export function selectJointFundedPortfolios(
     || adultA.availability.days.some((day, index) => day.date !== adultB.availability.days[index].date))
     return null;
   const partnerConstraints = constraintsFromAvailability(adultB.availability);
-  if (!partnerConstraints) return null;
+  // Both partner evidence summaries must match the validated date-only facts.
+  // A stale or forged imported partial/constraints object must never silently
+  // override known completeness or omit advisory/hard dates.
+  if (!partnerConstraints || adultB.partial !== adultB.availability.partial
+    || JSON.stringify(partnerConstraints) !== JSON.stringify(adultB.constraints))
+    return null;
   const exclusions = new Set(mapped.blackouts ?? []);
   for (const day of adultB.availability.days) if (day.hardBlocked) exclusions.add(day.date);
 
