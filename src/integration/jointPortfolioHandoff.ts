@@ -1,3 +1,4 @@
+import { normalizePortfolioBreaks } from '../planning/canonicalPortfolio';
 import type { CanonicalPortfolio } from '../planning/canonicalPortfolio';
 import type { AvailabilityWindow, JointWindowFeasibility } from '../personal/recurringAvailability';
 import { jointWindowFeasibility, validExternalWindow } from '../personal/recurringAvailability';
@@ -40,13 +41,25 @@ export function filterJointPortfolios(
   for (const portfolio of portfolios) {
     if (!portfolio || !Array.isArray(portfolio.breaks) || !portfolio.breaks.length
       || portfolio.breaks.length > 1096) return null;
+    const normalized = normalizePortfolioBreaks(portfolio.breaks);
+    // Adjacent fragments are one continuous getaway; reject misleading metadata rather than silently relabeling it.
+    if (!normalized || normalized.length !== portfolio.breaks.length
+      || portfolio.getawayCount !== normalized.length
+      || portfolio.longestBreakDays !== Math.max(...normalized.map(b => b.calendarDays))
+      || portfolio.totalCalendarDays !== normalized.reduce((n, b) => n + b.calendarDays, 0)
+      || portfolio.ptoDays !== normalized.reduce((n, b) => n + b.ptoDays, 0)
+      || !Number.isInteger(portfolio.budgetRemaining) || portfolio.budgetRemaining < 0
+      || portfolio.travelSignal !== 'not-used'
+      || typeof portfolio.explanation !== 'string'
+      || !Array.isArray(portfolio.freeCalendarDates) || !Array.isArray(portfolio.reviewDates)
+      || typeof portfolio.partialCalendarEvidence !== 'boolean') return null;
     let totalA = 0;
     let totalB = 0;
     let gaps = 0;
     let review = Boolean(portfolio.partialCalendarEvidence);
     let impossible = false;
     let previousEnd = '';
-    for (const brk of portfolio.breaks) {
+    for (const brk of normalized) {
       if (!brk || typeof brk.start !== 'string' || typeof brk.end !== 'string'
         || brk.start > brk.end || brk.start <= previousEnd
         || brk.start < adultA.days[0].date
@@ -64,7 +77,9 @@ export function filterJointPortfolios(
       review ||= joint.partial || joint.reviewDates.length > 0;
       previousEnd = brk.end;
     }
-    if (impossible || totalA > budgetA || totalB > budgetB) {
+    // A plan's own PTO charge must be consistent with adult A's canonical calendar.
+    // A separate adult may have a different schedule or employer holidays.
+    if (totalA !== portfolio.ptoDays || impossible || totalA > budgetA || totalB > budgetB) {
       rejected++;
       continue;
     }
