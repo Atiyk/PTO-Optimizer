@@ -166,6 +166,39 @@ describe('integration: actual wallet -> rotating family calendar -> canonical po
     expect(input.blackouts).toEqual([]);
   });
 
+  it('includes partner-only advisory dates before ranking constraint-fit portfolios', () => {
+    const start = '2027-04-01', end = '2027-05-31';
+    const schedule = { kind: 'weekly' as const, weekly: [
+      true, true, true, true, true, false, false,
+    ] as [boolean, boolean, boolean, boolean, boolean, boolean, boolean] };
+    const input: SolveInput = { rangeStart: start, rangeEnd: end, budget: 7,
+      offDays: [], blackouts: [], w: 0, breakCount: 3 };
+    const a = buildIntegratedCalendarEvidence({ start, end, schedule, calendarPartial: false }, [])!;
+    const b = buildIntegratedCalendarEvidence({
+      start, end, schedule, calendarPartial: false,
+      advisoryBusyDays: rangeISO(start, end),
+    }, [])!;
+    let sawPreRankingAdvisories = false;
+    let called = 0;
+    const joint = selectJointFundedPortfolios(input, a, b, 7, 7, {
+      candidateEligible: candidate => {
+        called++;
+        if (candidate.reviewDates.length > 0) sawPreRankingAdvisories = true;
+        return true;
+      },
+    })!;
+    expect(called).toBeGreaterThan(0);
+    expect(sawPreRankingAdvisories).toBe(true);
+    expect(joint.feasible).toEqual([]);
+    expect(joint.needsReview.length).toBeGreaterThan(0);
+    for (const item of joint.needsReview) {
+      expect(item.portfolio.reviewDates.length).toBeGreaterThan(0);
+      expect(item.ptoDaysA).toBeLessThanOrEqual(7);
+      expect(item.ptoDaysB).toBeLessThanOrEqual(7);
+      expect(item.portfolio.travelSignal).toBe('not-used');
+    }
+  });
+
   it('excludes partner-only blocks pre-solver and never exposes an unfunded joint portfolio', () => {
     const start = '2027-04-01', end = '2027-08-31';
     const input: SolveInput = {
