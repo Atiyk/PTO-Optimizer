@@ -9,6 +9,7 @@ import { schoolCoverage } from '../personal/schoolCoverage';
 import { calendarEvidenceToSolveInput } from './calendarToSolver';
 import { selectCanonicalRecommendationAlternatives } from '../planning/canonicalRecommendation';
 import { travelEvidenceFor } from '../planning/travelEvidence';
+import { selectJointFundedPortfolios } from './jointPortfolioHandoff';
 
 const policy: TimeOffPolicy = {
   unit: 'days', hoursPerDay: 8, currentBalance: 5,
@@ -110,6 +111,56 @@ describe('integration: actual wallet -> rotating family calendar -> canonical po
     expect(travel.caveat).toMatch(/Not live demand/);
     const privateString = JSON.stringify({ first, second, a, b, joint, portfolios, travel });
     expect(privateString).not.toMatch(/PRIVATE CALENDAR TITLE|PRIVATE PLAN|PRIVATE APPOINTMENT/);
+
+    // The couple-facing route must FILTER canonical output, not merely
+    // calculate partner feasibility alongside adult A's solo suggestions.
+    const jointlyFunded = selectJointFundedPortfolios(original, a, b, firstBalance, secondBalance)!;
+    expect(jointlyFunded).not.toBeNull();
+    for (const option of [...jointlyFunded.feasible, ...jointlyFunded.needsReview]) {
+      expect(option.ptoDaysA).toBeLessThanOrEqual(firstBalance);
+      expect(option.ptoDaysB).toBeLessThanOrEqual(secondBalance);
+      expect(option.portfolio.ptoDays).toBe(option.ptoDaysA);
+      expect(option.portfolio.budgetRemaining).toBe(firstBalance - option.ptoDaysA);
+      expect(option.portfolio.breaks.flatMap(brk => rangeISO(brk.start, brk.end))).not.toContain('2027-01-23');
+    }
     expect(original.blackouts).toEqual([]);
+  });
+
+  it('excludes partner-only blocks pre-solver and never exposes an unfunded joint portfolio', () => {
+    const start = '2027-04-01', end = '2027-08-31';
+    const input: SolveInput = {
+      rangeStart: start, rangeEnd: end, budget: 12,
+      offDays: [], blackouts: [], w: 0, breakCount: 3,
+    };
+    const shared = {
+      start, end,
+      schedule: { kind: 'weekly' as const, weekly: [
+        true, true, true, true, true, false, false,
+      ] as [boolean, boolean, boolean, boolean, boolean, boolean, boolean] },
+      employerOffDays: ['2027-05-31', '2027-07-05'],
+      calendarPartial: false,
+    };
+    const a = buildIntegratedCalendarEvidence(shared, [])!;
+    const b = buildIntegratedCalendarEvidence(shared, [])!;
+    const available = selectJointFundedPortfolios(input, a, b, 12, 12)!;
+    expect(available).not.toBeNull();
+    expect(available.feasible.length + available.needsReview.length).toBeGreaterThan(0);
+    for (const item of [...available.feasible, ...available.needsReview]) {
+      expect(item.ptoDaysA).toBeLessThanOrEqual(12);
+      expect(item.ptoDaysB).toBeLessThanOrEqual(12);
+      expect(item.portfolio.travelSignal).toBe('not-used');
+    }
+    const allHard = buildIntegratedCalendarEvidence({
+      ...shared, hardBlockDays: rangeISO(start, end),
+    }, [])!;
+    const blocked = selectJointFundedPortfolios(input, a, allHard, 12, 12)!;
+    expect(blocked).not.toBeNull();
+    expect(blocked.feasible).toEqual([]);
+    expect(blocked.needsReview).toEqual([]);
+    const unfundedPartner = selectJointFundedPortfolios(input, a, b, 12, 0)!;
+    for (const item of [...unfundedPartner.feasible, ...unfundedPartner.needsReview])
+      expect(item.ptoDaysB).toBe(0);
+    expect(selectJointFundedPortfolios(input, a, b, 11, 12)).toBeNull();
+    expect(selectJointFundedPortfolios({ ...input, budget: 12.5 }, a, b, 12.5, 12)).toBeNull();
   });
 });

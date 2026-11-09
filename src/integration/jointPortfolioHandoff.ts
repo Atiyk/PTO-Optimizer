@@ -1,4 +1,8 @@
-import { normalizePortfolioBreaks } from '../planning/canonicalPortfolio';
+import type { SolveInput } from '@daysoff/engine/solver/types';
+import { normalizePortfolioBreaks, selectCanonicalPortfolios } from '../planning/canonicalPortfolio';
+import type { PortfolioOptions } from '../planning/canonicalPortfolio';
+import { calendarEvidenceToSolveInput } from './calendarToSolver';
+import type { IntegratedCalendarEvidence } from './calendarEvidence';
 import type { CanonicalPortfolio } from '../planning/canonicalPortfolio';
 import type { AvailabilityWindow, JointWindowFeasibility } from '../personal/recurringAvailability';
 import { jointWindowFeasibility, validExternalWindow } from '../personal/recurringAvailability';
@@ -120,4 +124,35 @@ export function filterJointPortfolios(
     (result.needsReview ? needsReview : feasible).push(result);
   }
   return { feasible, needsReview, rejected };
+}
+
+/**
+ * Consumer-facing typed route from wallet-funded inputs to partner-feasible portfolios.
+ * Apply both adults' hard exclusions BEFORE candidate generation, then independently
+ * reprice every whole portfolio with both verified calendars and wallet budgets.
+ * This is a pure handoff for the separately owned UI, not a UI integration.
+ */
+export function selectJointFundedPortfolios(
+  input: SolveInput,
+  adultA: IntegratedCalendarEvidence,
+  adultB: IntegratedCalendarEvidence,
+  budgetA: number,
+  budgetB: number,
+  options: PortfolioOptions = {},
+): JointPortfolioHandoff | null {
+  if (!input || !adultA || !adultB || !Number.isInteger(budgetA)
+    || !Number.isInteger(budgetB) || budgetA < 0 || budgetA > 1096
+    || budgetB < 0 || budgetB > 1096 || input.budget !== budgetA
+    || !validExternalWindow(adultB.availability)) return null;
+  const mapped = calendarEvidenceToSolveInput(input, adultA);
+  if (!mapped || adultA.availability.days.length !== adultB.availability.days.length
+    || adultA.availability.days.some((day, index) => day.date !== adultB.availability.days[index].date))
+    return null;
+  const exclusions = new Set(mapped.blackouts ?? []);
+  for (const day of adultB.availability.days) if (day.hardBlocked) exclusions.add(day.date);
+  const portfolios = selectCanonicalPortfolios({
+    ...mapped, blackouts: [...exclusions].sort(),
+  }, adultA.constraints, options);
+  if (portfolios === null) return null;
+  return filterJointPortfolios(portfolios, adultA.availability, adultB.availability, budgetA, budgetB);
 }
