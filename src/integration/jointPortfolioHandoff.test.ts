@@ -69,6 +69,23 @@ describe('joint whole-portfolio funding handoff', () => {
     expect(filterJointPortfolios([{ ...portfolio, longestBreakDays: 3 }], a, b, 2, 2)).toBeNull();
     expect(filterJointPortfolios([{ ...portfolio, travelSignal: 'live' as CanonicalPortfolio['travelSignal'] }], a, b, 2, 2)).toBeNull();
   });
+  it('recomputes public metadata rather than leaking caller-controlled text or fabricated balances', () => {
+    const a = calendarAvailability({ ...base, advisoryBusyDays: ['2027-01-04'], employerOffDays: ['2027-01-06'] })!;
+    const b = calendarAvailability(base)!;
+    const forged = { ...portfolio, ptoDays: 1, budgetRemaining: 999, explanation: 'PRIVATE CALENDAR TITLE', reviewDates: ['2027-01-08'], freeCalendarDates: ['2027-01-08'] };
+    const corrected = filterJointPortfolios([forged], a, b, 2, 2)!;
+    // Mismatched PTO is rejected, rather than displaying forged totals.
+    expect(corrected).toBeNull();
+    const valid = { ...portfolio, budgetRemaining: 999, explanation: 'PRIVATE CALENDAR TITLE', reviewDates: ['2027-01-08'], freeCalendarDates: ['2027-01-08'] };
+    const output = filterJointPortfolios([valid], calendarAvailability(base)!, b, 2, 2)!;
+    expect(output.feasible).toHaveLength(1);
+    expect(output.feasible[0].portfolio.budgetRemaining).toBe(0);
+    expect(output.feasible[0].portfolio.reviewDates).toEqual([]);
+    expect(output.feasible[0].portfolio.freeCalendarDates).toEqual([]);
+    expect(JSON.stringify(output)).not.toContain('PRIVATE CALENDAR TITLE');
+    expect(JSON.stringify(output)).not.toContain('2027-01-08');
+    expect(filterJointPortfolios([{ ...valid, reviewDates: ['invalid-date'] }], calendarAvailability(base)!, b, 2, 2)).toBeNull();
+  });
   it('fails closed when a portfolio break exceeds the known calendar window', () => {
     const a = calendarAvailability(base)!;
     const b = calendarAvailability(base)!;
