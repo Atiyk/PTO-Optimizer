@@ -69,7 +69,7 @@ describe('formatManagerEmailShort (Phase 4.3: leads with coverage, not the raw P
   it('mentions the quiet window in place of the generic closing line when the break is genuinely low-demand', () => {
     const quiet = makeBreak({ meanDemand: 0.7 });
     const email = formatManagerEmailShort(quiet, isPtoDay);
-    expect(email).toContain('quieter period for time-off requests');
+    expect(email).toContain('quieter period in the travel model');
     expect(email).not.toContain('Let me know if this works');
     const sentences = email.split(/(?<=[.?!])\s+/).filter(Boolean);
     expect(sentences).toHaveLength(3);
@@ -86,7 +86,7 @@ describe('formatManagerEmailDetailed', () => {
   it('states the same request-by deadline the break card itself shows, driven by the same noticePeriodDays', () => {
     const brk = makeBreak();
     const email = formatManagerEmailDetailed(brk, isPtoDay, 14, DEFAULT_WORK_WEEK);
-    const expectedDeadline = requestByDate(brk.start, 14, DEFAULT_WORK_WEEK);
+    const expectedDeadline = requestByDate(brk.start, 14, DEFAULT_WORK_WEEK)!;
     expect(email).toContain(formatShort(expectedDeadline));
     expect(email).toContain('14-day notice period');
   });
@@ -101,7 +101,7 @@ describe('formatManagerEmailDetailed', () => {
   it('adds the quiet-window mention on top of the standard content when the break is low-demand', () => {
     const quiet = makeBreak({ meanDemand: 0.7 });
     const email = formatManagerEmailDetailed(quiet, isPtoDay, 14, DEFAULT_WORK_WEEK);
-    expect(email).toContain('quieter period for time-off requests');
+    expect(email).toContain('quieter period in the travel model');
     expect(email).toContain('Let me know if this works');
   });
 
@@ -109,7 +109,7 @@ describe('formatManagerEmailDetailed', () => {
     const brk = makeBreak();
     const email = formatManagerEmailDetailed(brk, isPtoDay, 30, DEFAULT_WORK_WEEK);
     expect(email).toContain('30-day notice period');
-    const expectedDeadline = requestByDate(brk.start, 30, DEFAULT_WORK_WEEK);
+    const expectedDeadline = requestByDate(brk.start, 30, DEFAULT_WORK_WEEK)!;
     expect(email).toContain(formatShort(expectedDeadline));
   });
 });

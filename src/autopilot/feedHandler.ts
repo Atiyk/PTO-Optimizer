@@ -46,6 +46,17 @@ function textResponse(status: number, message: string, extra: Record<string, str
   });
 }
 
+function validHolidaySnapshot(data: unknown, country: string): data is unknown[] {
+  return Array.isArray(data) && data.every((holiday: unknown) => {
+    if (!holiday || typeof holiday !== 'object') return false;
+    const { date, name, countryCode, counties } = holiday as Record<string, unknown>;
+    return typeof date === 'string' && isValidISODate(date)
+      && typeof name === 'string' && name.trim() !== ''
+      && countryCode === country
+      && (counties === null || (Array.isArray(counties) && counties.every((region: unknown) => typeof region === 'string')));
+  });
+}
+
 export async function handleFeedRequest(request: Request, readHolidays: HolidayReader, now: Date = new Date()): Promise<Response> {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return textResponse(405, 'Method not allowed.', { allow: 'GET, HEAD' });
@@ -62,15 +73,15 @@ export async function handleFeedRequest(request: Request, readHolidays: HolidayR
   }
   const today = utcToday(now);
 
-  // Load only the country-years this plan needs (bounded by the app's own ten-year range
-  // check, and only for a known country code), then hand a synchronous lookup to the
-  // pure builder.
+  // Load the country-years this plan needs before solving. A missing snapshot is not
+  // equivalent to a valid snapshot containing no holidays.
   const state = planStateFromSearch(query, today);
   const loaded = new Map<string, unknown>();
   if (isValidISODate(state.rangeStart) && isValidISODate(state.rangeEnd) && !feedWorkloadAllowed(state)) {
     return textResponse(400, 'This plan is too large for a calendar feed. Download the .ics file instead.');
   }
-  if (isValidISODate(state.rangeStart) && isValidISODate(state.rangeEnd)) {
+  const explicitHolidayCoverage = 'sharedObservedHolidays' in state && Array.isArray(state.sharedObservedHolidays);
+  if (isValidISODate(state.rangeStart) && isValidISODate(state.rangeEnd) && !explicitHolidayCoverage) {
     const years = holidayYearsNeeded(state.country, state.rangeStart, state.rangeEnd);
     await Promise.all(years.map(async (year) => {
       try {
@@ -79,16 +90,20 @@ export async function handleFeedRequest(request: Request, readHolidays: HolidayR
         loaded.set(`${state.country}-${year}`, null);
       }
     }));
+    if (years.length === 0 || years.some((year) => !validHolidaySnapshot(loaded.get(`${state.country}-${year}`), state.country))) {
+      return textResponse(422, 'This country and date range lack complete holiday data for a calendar feed. Choose a covered range, or download an .ics file after checking the holidays in the planner.');
+    }
   }
 
   const result = buildPlanFeedICS(query, today, (country, year) => loaded.get(`${country}-${year}`) ?? null);
   if (!result.ok) return textResponse(result.status, result.message);
 
+  const privateSchedule = explicitHolidayCoverage || ['eh', 'bo', 'od', 'ov'].some((key) => url.searchParams.has(key));
   return new Response(request.method === 'HEAD' ? null : result.ics, {
     status: 200,
     headers: {
       'content-type': 'text/calendar; charset=utf-8',
-      'cache-control': FEED_CACHE_CONTROL,
+      'cache-control': privateSchedule ? 'private, no-store' : FEED_CACHE_CONTROL,
       'content-disposition': 'inline; filename="gapless-pto-plan.ics"',
       'x-content-type-options': 'nosniff',
     },

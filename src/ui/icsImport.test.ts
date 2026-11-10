@@ -99,6 +99,17 @@ describe('parseICSBusyDays: timed events - the 24-hour filter', () => {
 });
 
 describe('parseICSBusyDays: recurring events', () => {
+  it.each([
+    'RDATE;VALUE=DATE:20260112',
+    'EXDATE;VALUE=DATE:20260112',
+    'RECURRENCE-ID;VALUE=DATE:20260112',
+  ])('does not silently import an unsupported recurrence component %s', (property) => {
+    const ics = wrapCalendar(event(`DTSTART;VALUE=DATE:20260105\r\n${property}`));
+    const result = parseICSBusyDays(ics);
+    expect(result.busyDays).toEqual([]);
+    expect(result.skippedRecurring).toBe(1);
+  });
+
   it('a recurring event (RRULE present) is not expanded, and counted as skipped', () => {
     const ics = wrapCalendar(event('DTSTART;VALUE=DATE:20260105\r\nRRULE:FREQ=WEEKLY;COUNT=10'));
     const result = parseICSBusyDays(ics);

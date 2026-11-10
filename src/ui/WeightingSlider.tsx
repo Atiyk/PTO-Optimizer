@@ -3,7 +3,7 @@ import { InfoHint } from './InfoHint';
 /** UI density pass: moved off its own permanent line, into a hover/focus hint on the label -
  * still true, just no longer worth a fourth line of prose above the calendar on every load. */
 const TRAVEL_HINT =
-  "Not travelling? Set this toward 0 — this slider is about demand on your dates, not whether you're going anywhere. Outside the US this uses a rough seasonal estimate.";
+  "Not travelling? Set this toward 0 — this slider is about demand on your dates, not whether you're going anywhere. US estimates use 2025 airport checkpoint counts by calendar date. Other countries use generic seasonality. Current fares and passenger counts may differ.";
 
 // Captions for every step (0, 10, 20, ..., 100) of the weighting slider. The 0 and 100
 // wordings match the spec's own definitions verbatim; the rest fill in a legible gradient
@@ -14,12 +14,12 @@ const CAPTIONS: Record<number, string> = {
   20: 'mostly maximising days off',
   30: 'mostly maximising days off, with a light preference for quieter weeks',
   40: 'leaning toward days off, but weighing quieter weeks too',
-  50: 'equally balancing days off and quieter weeks',
+  50: 'weighing both days off and the travel estimate',
   60: 'leaning toward quieter weeks, but weighing days off too',
-  70: 'mostly minimising travel demand, with some weight on days off',
-  80: 'mostly minimising travel demand',
-  90: 'almost entirely minimising travel demand',
-  100: 'prioritise quieter travel periods',
+  70: 'mostly favoring quieter estimated periods, with some weight on days off',
+  80: 'mostly favoring quieter estimated periods',
+  90: 'strongly favoring quieter estimated periods',
+  100: 'prioritise quieter estimated periods',
 };
 
 interface WeightingSliderProps {
@@ -39,7 +39,7 @@ export function WeightingSlider({ value, onChange }: WeightingSliderProps) {
       </div>
       <div className="flex items-center justify-between gap-3 text-xs text-muted">
         <span>Most days off</span>
-        <span>Avoid busy travel periods</span>
+        <span>Favor quieter estimates</span>
       </div>
       <input
         type="range"

@@ -4,7 +4,7 @@
  * holiday lookup lives in src/autopilot so it is unit tested with the app.
  */
 import { rawHolidaysToHolidays, type Holiday } from '@daysoff/engine/data/holidays';
-import { handleFeedRequest, FEED_CACHE_CONTROL, type HolidayReader } from '../src/autopilot/feedHandler';
+import { handleFeedRequest, type HolidayReader } from '../src/autopilot/feedHandler';
 import { buildWatchFeedICS, watchFeedHolidayYears } from '../src/autopilot/watchFeed';
 import { loadHolidayFile } from './holidayData';
 
@@ -43,6 +43,6 @@ export async function handleWatch(request: Request, now: Date = new Date()): Pro
   if (!result.ok) return text(result.status, result.message);
   return new Response(request.method === 'HEAD' ? null : result.ics, {
     status: 200,
-    headers: { 'content-type': 'text/calendar; charset=utf-8', 'cache-control': FEED_CACHE_CONTROL, 'content-disposition': 'inline; filename="gapless-pto-expiry-watch.ics"', 'x-content-type-options': 'nosniff' },
+    headers: { 'content-type': 'text/calendar; charset=utf-8', 'cache-control': 'private, no-store', 'content-disposition': 'inline; filename="gapless-pto-expiry-watch.ics"', 'x-content-type-options': 'nosniff' },
   });
 }

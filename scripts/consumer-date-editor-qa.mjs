@@ -34,7 +34,8 @@ try {
         ? route.abort() : route.continue();
     });
     try {
-      await page.goto(origin + '/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15', { waitUntil: 'networkidle' });
+      await page.goto(origin + '/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15', { waitUntil: 'domcontentloaded' });
+      await page.locator('main[data-plan-ready="true"]').waitFor({ state: 'visible' });
       await page.getByRole('button', { name: /More options/ }).click();
       const blackout = page.locator('section').filter({ has: page.getByRole('heading', { name: "Days I can't take off", exact: true }) });
       const overlap = page.locator('section').filter({ has: page.getByRole('heading', { name: /Overlap days/ }) });

@@ -120,7 +120,7 @@ function rescueDayDescription(plan: RescuePlan, holidayNote: string): string {
   const keep = plan.kind === 'cap' ? 'It makes room under your accrual cap'
     : plan.daysStillAtRisk > 0 ? `It keeps ${round(plan.daysRescued)} of ${round(plan.daysAtRisk)} days at risk`
       : `It keeps all ${round(plan.daysAtRisk)} days at risk`;
-  return `${rescueSuggestionText(plan)} ${keep} before ${formatShortWithYear(plan.deadline)}. This is a suggestion, not booked leave: request it with your employer.${holidayNote} Requests you track in Gapless on your device are not included.`;
+  return `${rescueSuggestionText(plan)} ${keep} before ${formatShortWithYear(plan.deadline)}. This is a suggestion, not booked leave: request it with your employer.${holidayNote} Requests you track in Timebower on your device are not included.`;
 }
 
 function round(value: number): string {
@@ -137,20 +137,20 @@ export function buildWatchFeedICS(policySearch: string, today: string, holidays:
   if (typeof today !== 'string' || !isValidISODate(today)) return { ok: false, status: 400, message: 'Invalid date.' };
   const search = policySearch.startsWith('?') ? policySearch.slice(1) : policySearch;
   const params = new URLSearchParams(search);
-  if (!params.has('cb')) return { ok: false, status: 400, message: 'This link has no PTO balance. Open your policy in Gapless and copy the link again.' };
+  if (!params.has('cb')) return { ok: false, status: 400, message: 'This link has no PTO balance. Open your policy in Timebower and copy the link again.' };
   const country = params.get('c') ?? '';
   if (!COUNTRY_CODES.has(country)) return { ok: false, status: 400, message: 'This link has no supported country.' };
   const state = readPolicyStateFromURL(pinnedDefaults(search, today), country);
   const policy = policyFromURLState(state);
   if (forecastWithRequests(policy, policy.balanceAsOf) === null) {
-    return { ok: false, status: 400, message: 'This policy link has values Gapless cannot forecast. Open it in Gapless to fix them.' };
+    return { ok: false, status: 400, message: 'This policy link has values Timebower cannot forecast. Open it in Timebower to fix them.' };
   }
 
   const risks = expirationRisks(policy, country, [], today);
   // A hand-edited link (cb=1e308) forecasts, but no real balance is that large; refuse it
   // rather than print "Infinity days" into someone's calendar.
   if (risks.some((risk) => !Number.isFinite(risk.daysAtStake) || risk.daysAtStake > WATCH_FEED_MAX_DAYS_AT_STAKE)) {
-    return { ok: false, status: 400, message: 'This policy link has values Gapless cannot forecast. Open it in Gapless to fix them.' };
+    return { ok: false, status: 400, message: 'This policy link has values Timebower cannot forecast. Open it in Timebower to fix them.' };
   }
   const horizon = risks.reduce((latest, risk) => (risk.deadline > latest ? risk.deadline : latest), today);
   const { calendar, missingYears } = feedCalendar(state, today, horizon, holidays);

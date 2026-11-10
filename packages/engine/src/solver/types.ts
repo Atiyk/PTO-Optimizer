@@ -5,6 +5,12 @@ export type WorkWeek = [boolean, boolean, boolean, boolean, boolean, boolean, bo
 
 export const DEFAULT_WORK_WEEK: WorkWeek = [true, true, true, true, true, false, false];
 
+export function isValidWorkWeek(value: unknown): value is WorkWeek {
+  return Array.isArray(value) && value.length === 7
+    && Array.from(value).every((day) => typeof day === 'boolean')
+    && value.includes(true);
+}
+
 export interface SolveInput {
   /** Days already off for free: public holidays, company holidays, already-booked PTO. */
   offDays: ISODate[];

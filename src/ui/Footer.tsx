@@ -37,7 +37,6 @@ export function Footer({ onShowShortcuts }: FooterProps) {
         <div className="col-span-2 md:col-span-1 md:pr-8">
           <p className="text-white">
             <Logo size={28} tone="dark" />
-            <span className="sr-only">{PRODUCT_NAME}</span>
           </p>
           <p className="mt-3 max-w-xs text-[15px] leading-6 text-[#e4e9ee]">{TAGLINE}</p>
           <p className="mt-2 text-sm text-[#b3bfca]">Free, and every plan works without an account.</p>

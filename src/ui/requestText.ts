@@ -57,11 +57,9 @@ function specificsSentence(dates: string[], freeDays: number): string {
   return `All of this comes from my PTO balance: ${list}.`;
 }
 
-/** Phase 4.3: "mentioning low-demand windows when true" - told plainly, not hedged, since
- * it's a genuine point in the requester's favour (less likely to collide with a colleague's
- * request) and the recipient has no other way to know this without checking themselves. */
+/** Travel patterns and coworkers' availability are separate. */
 function quietWindowSentence(): string {
-  return `This falls in a quieter period for time-off requests, so it shouldn't conflict with coverage.`;
+  return `These dates fall in a quieter period in the travel model, and I can coordinate coverage separately.`;
 }
 
 const CLOSING_SENTENCE = `Let me know if this works, or if you'd like me to adjust the dates.`;
@@ -88,15 +86,16 @@ export function formatManagerEmailDetailed(
   isPtoDay: (iso: string) => boolean,
   noticePeriodDays: number,
   workWeek: WorkWeek,
+  offDays?: readonly string[],
 ): string {
   const dates = ptoDatesOf(brk, isPtoDay);
   const freeDays = Math.max(0, brk.totalDaysOff - dates.length);
   const sentence1 = coverageSentence(brk, dates.length);
   const sentence2 = specificsSentence(dates, freeDays);
-  const deadline = requestByDate(brk.start, noticePeriodDays, workWeek);
-  const sentence3 = `I'd like to confirm this by ${formatShort(deadline)} to stay within our ${noticePeriodDays}-day notice period.`;
+  const deadline = requestByDate(brk.start, noticePeriodDays, workWeek, offDays);
 
-  const sentences = [sentence1, sentence2, sentence3];
+  const sentences = [sentence1, sentence2];
+  if (deadline) sentences.push(`I'd like to confirm this by ${formatShort(deadline)} to stay within our ${noticePeriodDays}-day notice period.`);
   if (isQuietWindow(brk)) sentences.push(quietWindowSentence());
   sentences.push(CLOSING_SENTENCE);
   return sentences.join(' ');

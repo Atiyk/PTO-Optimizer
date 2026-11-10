@@ -16,6 +16,7 @@ import { breakReason } from './breakReason';
 import { findBridges, nextHoliday, remainingHolidays, runLength } from './landingData';
 import { downloadHolidaysICS } from './icsExport';
 import { copyText } from './requestText';
+import { buildPublicPlanLink } from './publicSharePrivacy';
 import { track } from './analytics';
 import { landingPlanHref, landingSearch, readLandingState, validLandingRange } from './landingState';
 import { solveConsumer } from '../planning/optimizer';
@@ -197,7 +198,7 @@ export function Landing() {
   const next = useMemo(() => validRange ? nextHoliday(periodStart, rangeEnd, holidays) : undefined, [validRange, periodStart, rangeEnd, holidays]);
   const bridges = useMemo(() => validRange ? findBridges(periodStart, rangeEnd, holidaySet) : [], [validRange, periodStart, rangeEnd, holidaySet]);
   const bridgeableDates = useMemo(() => new Set(upcoming.filter((entry) => entry.isBridgeable || entry.runLength >= 3).map((entry) => entry.holiday.date)), [upcoming]);
-  const href = validRange ? landingPlanHref(state, undefined, employer) : '/pto';
+  const href = validRange ? landingPlanHref(state) : '/pto';
   const countryName = COUNTRIES.find((entry) => entry.code === country)?.name ?? country;
   const emptyMessage = !validRange ? 'Your preview will appear once the planning dates are valid.'
     : loading ? 'Updating your holiday calendar…'
@@ -209,10 +210,10 @@ export function Landing() {
       {/* First screen: what this is, the sentence that drives it, the answer, the schedule. */}
       <Container className="px-4 pt-7 sm:px-6 sm:pt-12 lg:pt-14">
         <section aria-labelledby="landing-heading">
-          <h1 id="landing-heading" className="max-w-[17ch] text-[clamp(2.25rem,1rem+5vw,6rem)] leading-[0.92] type-display text-ink">More days off from the same PTO.</h1>
+          <h1 id="landing-heading" className="max-w-[17ch] text-[clamp(2.25rem,0.95rem+5vw,4.75rem)] leading-[1.04] type-display text-ink">More days off from the same PTO.</h1>
 
           <div className="mt-6 grid min-w-0 gap-x-14 gap-y-6 sm:mt-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-            <p className="min-w-0 text-[1.625rem] leading-[1.6] font-semibold type-condensed text-ink sm:text-[2.125rem] lg:col-start-1 lg:row-start-1">
+            <p className="min-w-0 text-[1.375rem] leading-[1.5] font-medium text-ink sm:text-[1.75rem] lg:col-start-1 lg:row-start-1">
               I have{' '}
               <input id="landing-budget" aria-label="PTO days available" type="number" inputMode="numeric" min={0} max={60} step={1}
                 className={`${INLINE_FIELD} w-[2.6em] text-center tabular-nums`} value={budget}
@@ -226,11 +227,11 @@ export function Landing() {
 
             <section aria-labelledby="landing-result" className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-1">
               {bestBreak ? <>
-                <h2 id="landing-result" className="text-[clamp(2.75rem,1.6rem+3.8vw,4.75rem)] leading-[0.95] type-display text-ink">
+                <h2 id="landing-result" className="text-[clamp(2.75rem,1.75rem+3vw,4.5rem)] leading-none tabular-nums type-display text-ink">
                   <span className="sr-only">Your plan: </span><span className="mark">{planDaysOff} days off</span>
                 </h2>
                 <p className="mt-3 text-xl font-semibold text-ink">from {plural(used, 'PTO day')} across {plural(breakCount, 'break')}</p>
-                <p className="mt-2 text-base text-muted">Longest: <strong className="font-semibold text-ink"><span className="whitespace-nowrap">{breakDates(bestBreak)}</span>, {bestBreak.totalDaysOff} days off for {plural(bestBreak.ptoCost, 'PTO day')}</strong>. {breakReason(bestBreak, (date) => holidayName.get(date))}</p>
+                <p className="mt-2 text-base text-muted">Longest: <strong className="font-semibold text-ink"><span className="tabular-nums">{breakDates(bestBreak)}</span>, {bestBreak.totalDaysOff} days off for {plural(bestBreak.ptoCost, 'PTO day')}</strong>. {breakReason(bestBreak, (date) => holidayName.get(date))}</p>
               </> : <>
                 <h2 id="landing-result" className="text-h2 font-bold type-condensed text-ink">Your recommended break</h2>
                 <p className="mt-2 text-base text-muted" role="status">{emptyMessage}</p>
@@ -276,7 +277,7 @@ export function Landing() {
         </section>
       </Container>
 
-      {/* What the rest of Gapless does, in the header's own structure: three ways to plan,
+      {/* What the rest of Timebower does, in the header's own structure: three ways to plan,
           then the tools that keep a plan true. Rows, not posters: each is one tap on a phone. */}
       <Container className="px-4 pt-20 sm:px-6 lg:pt-28">
         <section aria-labelledby="landing-tools">
@@ -324,7 +325,7 @@ export function Landing() {
                   <p className="text-lg font-semibold text-ink">{entry.holiday.name}</p>
                   <p className="text-sm text-muted">{entry.weekday}, {formatLong(entry.holiday.date)}{entry.isObserved ? ' · observed' : ''} · {entry.runLength >= 3 ? <span className="mark text-ink">{entry.runLength} calendar days off</span> : `${plural(entry.runLength, 'calendar day')} off`} before PTO</p>
                 </div>
-                <a href={landingPlanHref(state, bridge?.bridgeDate, employer)} className={`${LINK} col-start-2 text-sm sm:col-start-3 sm:justify-self-end`}>{bridge ? `Connect a ${runLength(bridge.combined)}-day break` : 'Plan around this holiday'} →</a>
+                <a href={landingPlanHref(state, bridge?.bridgeDate)} className={`${LINK} col-start-2 text-sm sm:col-start-3 sm:justify-self-end`}>{bridge ? `Connect a ${runLength(bridge.combined)}-day break` : 'Plan around this holiday'} →</a>
               </li>;
             })}
           </ol> : <p className="mt-8 rounded-[10px] bg-surface p-5 text-base text-muted">{loading ? 'Updating public holidays…' : calendar.degraded ? 'Holiday data could not be loaded. You can still use the planner with your own holiday dates.' : 'No upcoming observed holidays in this range. The planner can still help you make more of your weekends.'}</p>}
@@ -336,7 +337,7 @@ export function Landing() {
         <Container className="grid gap-x-16 gap-y-10 px-4 py-14 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:py-20">
           <div className="min-w-0">
             <h2 id="landing-how" className="max-w-[12ch] text-display-sm type-display text-ink">Same inputs, same plan.</h2>
-            <p className="mt-4 max-w-sm text-lg text-ink">Every setting lives in the link, so a plan reproduces exactly when you open it again or send it on.</p>
+            <p className="mt-4 max-w-sm text-lg text-ink">A shared link carries the scenario you choose to share. Private employer settings and tracked requests stay in your browser.</p>
           </div>
           <div className="grid min-w-0 gap-x-10 gap-y-8 sm:grid-cols-2">
             <div className="sm:col-span-2">
@@ -369,7 +370,11 @@ export function Landing() {
           <div className="flex min-w-0 flex-col items-start gap-3">
             <Button href={href}>See the full plan →</Button>
             <div className="flex flex-wrap items-center gap-x-3">
-              <Button variant="quiet" onClick={async () => { const copied = await copyText(new URL(href, window.location.origin).href); setCopyMessage(copied ? 'Link copied.' : 'Could not copy. You can copy the address from your browser.'); }}>Copy this PTO plan</Button>
+              <Button variant="quiet" onClick={async () => {
+                const url = new URL(href, window.location.origin);
+                const copied = await copyText(buildPublicPlanLink(url.href, url.search).url);
+                setCopyMessage(copied ? (customizedHolidays ? 'Public plan copied. Your employer holiday settings stay in this browser.' : 'Link copied.') : 'Could not copy the public plan link.');
+              }}>Copy this PTO plan</Button>
               {copyMessage && <span role="status" className="text-sm text-muted">{copyMessage}</span>}
             </div>
           </div>

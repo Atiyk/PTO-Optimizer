@@ -16,6 +16,7 @@ interface BreakCountSliderProps {
   breakCountRequested: number; // what was actually sent to the solver (0 while letSolverDecide)
   breakCountActual: number;
   budget: number;
+  pending?: boolean;
 }
 
 /** Position 1 and 7 get the spec's own wording; 2-6 are just their number - the fewest-to-
@@ -38,10 +39,10 @@ function caption(requested: number, actual: number, breaks: Break[], budget: num
   if (requested >= 1 && requested <= 6 && actual !== requested) {
     const breakWord = requested === 1 ? 'break' : 'breaks';
     const budgetWord = budget === 1 ? 'day' : 'days';
-    return `${requested} ${breakWord} isn't possible with ${budget} PTO ${budgetWord} — showing ${actual}`;
+    return `Found ${actual} of ${requested} requested ${breakWord} with ${budget} PTO ${budgetWord} and the current date settings.`;
   }
   if (actual === 0 || breaks.length === 0) {
-    return letSolverDecide ? 'Solver found no workable plan' : 'Not enough PTO days for a plan';
+    return 'The planner found no breaks for the current dates and settings.';
   }
   const avgLen = Math.round(breaks.reduce((s, b) => s + b.totalDaysOff, 0) / breaks.length);
   const dayWord = avgLen === 1 ? 'day' : 'days';
@@ -62,6 +63,7 @@ export function BreakCountSlider({
   breakCountRequested,
   breakCountActual,
   budget,
+  pending = false,
 }: BreakCountSliderProps) {
   return (
     <div className="flex flex-col gap-1">
@@ -107,7 +109,7 @@ export function BreakCountSlider({
           className={`h-11 w-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${letSolverDecide ? 'accent-slate-300' : ''}`}
         />
       </div>
-      <p className="-mt-1 text-sm tabular-nums text-muted">{caption(breakCountRequested, breakCountActual, breaks, budget, letSolverDecide)}</p>
+      <p className="-mt-1 text-sm tabular-nums text-muted">{pending ? 'Updating your plan…' : caption(breakCountRequested, breakCountActual, breaks, budget, letSolverDecide)}</p>
     </div>
   );
 }

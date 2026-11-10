@@ -1,4 +1,5 @@
 import { isValidISODate } from './urlState';
+import { isValidWorkWeek, type WorkWeek } from '@daysoff/engine/solver/types';
 /** More PTO days than exist in a decade - the solver itself handles any budget without a
  * fixed cap (see NOTES.md Phase 11/12), so this isn't a technical limit, just the line past
  * which a typed value is clearly not a real annual PTO balance (a stray extra digit, a
@@ -18,6 +19,7 @@ export interface ValidationInputs {
   budget: number;
   expiryEnabled: boolean;
   expiryDate: string;
+  workWeek?: WorkWeek;
 }
 
 /**
@@ -26,12 +28,13 @@ export interface ValidationInputs {
  * several can be true at once (e.g. a negative budget AND an inverted date range from the
  * same bad paste), and the UI shows all of them rather than hiding all-but-one.
  */
-export function validateInputs({ rangeStart, rangeEnd, budget, expiryEnabled, expiryDate }: ValidationInputs): string[] {
+export function validateInputs({ rangeStart, rangeEnd, budget, expiryEnabled, expiryDate, workWeek }: ValidationInputs): string[] {
   const issues: string[] = [];
 
   if (!isValidISODate(rangeStart) || !isValidISODate(rangeEnd)) issues.push('Choose valid planning start and end dates.');
   if (isValidISODate(rangeStart) && isValidISODate(rangeEnd) && rangeEnd >= rangeStart && !isSupportedPlanningRange(rangeStart, rangeEnd)) issues.push('Choose a planning window of ten years or less.');
   if (!Number.isFinite(budget)) issues.push('Enter a valid PTO balance.');
+  if (workWeek !== undefined && !isValidWorkWeek(workWeek)) issues.push('Choose at least one working day each week.');
   if (rangeEnd < rangeStart) {
     issues.push('End date is before the start date.');
   }

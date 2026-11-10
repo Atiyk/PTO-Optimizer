@@ -24,6 +24,7 @@ describe('server feed entry', () => {
     const res = await handleWatch(new Request(`https://x.test/api/watch?${POLICY}`), NOW);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/calendar');
+    expect(res.headers.get('cache-control')).toBe('private, no-store');
     const ics = await res.text();
     expect(ics).toContain('SUMMARY:Suggested: use expiring PTO');
     expect(ics).toContain('BEGIN:VALARM');

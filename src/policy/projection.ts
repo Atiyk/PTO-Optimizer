@@ -15,7 +15,7 @@ export type PolicyEvent =
   | { kind: 'forfeited'; date: ISODate; amount: number }
   | { kind: 'carried-days-expiring'; date: ISODate; amount: number }
   | { kind: 'waiting-period-ended'; date: ISODate }
-  | { kind: 'planned-day-taken'; date: ISODate };
+  | { kind: 'planned-day-taken'; date: ISODate; amount: number };
 
 /**
  * Projects a policy's balance day by day from `balanceAsOf` through `horizonEnd` (Stage 2B).
@@ -23,7 +23,7 @@ export type PolicyEvent =
  * rounding for display happens in the UI layer, never here. `unlimited` policies have no
  * balance to project — callers show narrative copy instead (acceptance scenario S5).
  */
-export function projectBalance(policy: TimeOffPolicy, horizonEnd: ISODate): { series: BalancePoint[]; events: PolicyEvent[]; validationError?: string } {
+export function projectBalance(policy: TimeOffPolicy, horizonEnd: ISODate, hourlySpend?: ReadonlyMap<ISODate, number>): { series: BalancePoint[]; events: PolicyEvent[]; validationError?: string } {
   if (policy.accrual.kind === 'unlimited') return { series: [], events: [] };
   const validationError = validateCurrentCarriedBalance(policy);
   if (validationError) return { series: [], events: [], validationError };
@@ -82,10 +82,10 @@ export function projectBalance(policy: TimeOffPolicy, horizonEnd: ISODate): { se
     }
 
     if (plannedSet.has(d)) {
-      const spend = policy.unit === 'hours' ? policy.hoursPerDay : 1;
+      const spend = policy.unit === 'hours' ? (hourlySpend?.get(d) ?? policy.hoursPerDay) : 1;
       carriedAmount = Math.max(0, carriedAmount - spend);
       balance = Math.max(balance - spend, -policy.negativeBalanceAllowance);
-      events.push({ kind: 'planned-day-taken', date: d });
+      events.push({ kind: 'planned-day-taken', date: d, amount: spend });
     }
 
     if (carriedExpiry === d && carriedAmount > 1e-9) {

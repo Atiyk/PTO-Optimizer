@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { useAppState } from './useAppState';
 import { App } from './App';
+import { readBrowserPlanSearch } from './urlState';
 import {
   defaultEmployerCalendar,
   EMPLOYER_STORAGE_PREFIX,
@@ -144,7 +145,37 @@ describe('employer calendar integrated with the live consumer state', () => {
     expect(result.current.effectiveOffDays).toContain('2027-12-24');
   });
 
-  it('keeps live edits and URL reproducibility when browser storage throws', async () => {
+  it('uses the local employer calendar for public links without shared holiday dates', async () => {
+    const saved = { ...defaultEmployerCalendar('US'), excluded: ['2027-12-24|Christmas Day'] };
+    expect(saveEmployerCalendar(saved)).toBe(true);
+    navigate('?c=US&s=2027-12-20&e=2027-12-31&b=4&sv=1');
+    const { result } = renderHook(() => useAppState());
+    await waitFor(() => expect(result.current.holidaysReady).toBe(true));
+    expect(result.current.holidayEntries[0]?.checked).toBe(false);
+    expect(result.current.hasSharedHolidaySnapshot).toBe(false);
+  });
+
+  it('protects the saved calendar while viewing an explicit shared snapshot', async () => {
+    const saved = { ...defaultEmployerCalendar('US'), custom: [{ date: '2027-12-29', name: 'Local holiday' }] };
+    expect(saveEmployerCalendar(saved)).toBe(true);
+    const before = localStorage.getItem(EMPLOYER_STORAGE_PREFIX + 'US');
+    navigate('?c=US&s=2027-12-20&e=2027-12-31&b=4&sv=1&ho=2027-12-27');
+    const initial = renderHook(() => useAppState());
+    expect(initial.result.current.effectiveOffDays).toContain('2027-12-27');
+    expect(initial.result.current.effectiveOffDays).not.toContain('2027-12-29');
+    expect(initial.result.current.canPin).toBe(false);
+    act(() => initial.result.current.saveEmployerHolidays());
+    act(() => initial.result.current.resetEmployerHolidays());
+    expect(localStorage.getItem(EMPLOYER_STORAGE_PREFIX + 'US')).toBe(before);
+    act(() => initial.result.current.restoreMyEmployerCalendar());
+    expect(initial.result.current.effectiveOffDays).toContain('2027-12-29');
+    initial.unmount();
+    const refreshed = renderHook(() => useAppState());
+    expect(refreshed.result.current.hasSharedHolidaySnapshot).toBe(false);
+    expect(refreshed.result.current.effectiveOffDays).toContain('2027-12-29');
+  });
+
+  it('keeps live edits in the private same-tab draft when browser storage throws', async () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('disabled'); });
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('disabled'); });
     const { result } = renderHook(() => useAppState());
@@ -153,7 +184,8 @@ describe('employer calendar integrated with the live consumer state', () => {
     act(() => result.current.saveEmployerHolidays());
     expect(result.current.effectiveOffDays).not.toContain('2027-12-24');
     expect(result.current.employerCalendarMessage).toContain('storage is unavailable');
-    expect(new URLSearchParams(window.location.search).has('eh')).toBe(true);
+    expect(new URLSearchParams(window.location.search).has('eh')).toBe(false);
+    expect(new URLSearchParams(readBrowserPlanSearch(window.location.search, window.history.state)).has('eh')).toBe(true);
   });
 });
 

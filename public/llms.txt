@@ -1,4 +1,4 @@
-# Gapless PTO Optimizer
+# Timebower
 
 > Free consumer planner for paid time off, public and employer-observed holidays, PTO policies and long breaks. Calculations depend on user-entered assumptions.
 

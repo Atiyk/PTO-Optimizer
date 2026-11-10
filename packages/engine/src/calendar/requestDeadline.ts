@@ -1,5 +1,5 @@
-import type { Break, WorkWeek } from '../solver/types';
-import { addDays, isoToSerial, mondayIndexedDow } from '../solver/dateUtils';
+import { isValidWorkWeek, type Break, type WorkWeek } from '../solver/types';
+import { addDays, isoToSerial, mondayIndexedDow, serialToISO } from '../solver/dateUtils';
 import { formatShort } from './dateFormat';
 
 const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -7,14 +7,17 @@ const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', '
 /**
  * Phase 4.1: a deadline landing on a day off is useless ("a deadline on a Saturday is
  * useless", per spec) - shifted back to the nearest working day per the user's own
- * workWeek. Already a working day -> returned unchanged.
+ * workWeek and observed days off. Returns null if the schedule has no working day.
  */
-export function nearestPrecedingWorkday(date: string, workWeek: WorkWeek): string {
-  let d = date;
-  while (!workWeek[mondayIndexedDow(d)]) {
-    d = addDays(d, -1);
+export function nearestPrecedingWorkday(date: string, workWeek: WorkWeek, offDays: readonly string[] = []): string | null {
+  if (!isValidWorkWeek(workWeek) || serialToISO(isoToSerial(date)) !== date) return null;
+  const off = new Set(offDays);
+  // At least one working day per week. Every skipped week must contain a distinct off day.
+  for (let offset = 0; offset < (off.size + 1) * 7; offset++) {
+    const day = addDays(date, -offset);
+    if (workWeek[mondayIndexedDow(day)] && !off.has(day)) return day;
   }
-  return d;
+  return null;
 }
 
 /**
@@ -24,9 +27,11 @@ export function nearestPrecedingWorkday(date: string, workWeek: WorkWeek): strin
  * from the SAME noticePeriodDays number (see useAppState.ts), which is what makes
  * agreement structural rather than something that could drift apart.
  */
-export function requestByDate(breakStart: string, noticePeriodDays: number, workWeek: WorkWeek): string {
+export function requestByDate(breakStart: string, noticePeriodDays: number, workWeek: WorkWeek, offDays: readonly string[] = []): string | null {
+  if (serialToISO(isoToSerial(breakStart)) !== breakStart
+    || !Number.isSafeInteger(noticePeriodDays) || noticePeriodDays < 0) return null;
   const raw = addDays(breakStart, -noticePeriodDays);
-  return nearestPrecedingWorkday(raw, workWeek);
+  return nearestPrecedingWorkday(raw, workWeek, offDays);
 }
 
 /** Exported (landing page): the countdown and holiday list both need a full weekday name -
@@ -42,8 +47,9 @@ export function weekdayName(iso: string): string {
  *    example ("Request this week - the notice window closes Friday").
  *  - otherwise: the plain "Request by <date> - N days from now" countdown.
  */
-export function requestByText(breakStart: string, noticePeriodDays: number, workWeek: WorkWeek, today: string): string {
-  const deadline = requestByDate(breakStart, noticePeriodDays, workWeek);
+export function requestByText(breakStart: string, noticePeriodDays: number, workWeek: WorkWeek, today: string, offDays: readonly string[] = []): string {
+  const deadline = requestByDate(breakStart, noticePeriodDays, workWeek, offDays);
+  if (!deadline) return 'Request deadline is unavailable for these dates and work schedule.';
   const daysUntil = isoToSerial(deadline) - isoToSerial(today);
   if (daysUntil <= 0) {
     return 'Request now — the notice window has already started.';

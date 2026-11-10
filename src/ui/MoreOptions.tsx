@@ -62,6 +62,7 @@ interface MoreOptionsProps {
   onRemoveBlackout: (d: string) => void;
 
   holidayEntries: HolidayEntry[];
+  sharedHolidaySnapshot?: boolean;
   onRemoveHoliday: (date: string, name: string) => void;
   onToggleStateHoliday: (date: string, name: string) => void;
   onAddCustomHoliday: (date: string, name: string) => void;
@@ -84,6 +85,7 @@ export function MoreOptions(props: MoreOptionsProps) {
   const [newHolidayDate, setNewHolidayDate] = useState('');
   const [newHolidayName, setNewHolidayName] = useState('');
   const [blockNextN, setBlockNextN] = useState(14);
+  const oneWorkday = props.workWeek.filter(Boolean).length === 1;
 
   return (
     // Flows by the width it is given (a container query): one column in the desktop
@@ -172,7 +174,7 @@ export function MoreOptions(props: MoreOptionsProps) {
               aria-label="Notice period in days"
               className={`${FIELD_CLASS} w-20`}
             />
-            days
+            calendar days
           </label>
           <Term id="notice-period">?</Term>
         </div>
@@ -263,6 +265,7 @@ export function MoreOptions(props: MoreOptionsProps) {
               <input
                 type="checkbox"
                 checked={props.workWeek[i]}
+                disabled={props.workWeek[i] && oneWorkday}
                 onChange={(e) => {
                   const next = [...props.workWeek] as WorkWeek;
                   next[i] = e.target.checked;
@@ -272,6 +275,7 @@ export function MoreOptions(props: MoreOptionsProps) {
             </label>
           ))}
         </div>
+        <p className={NOTE}>Keep at least one working day selected.</p>
       </section>
 
       <section>
@@ -346,76 +350,80 @@ export function MoreOptions(props: MoreOptionsProps) {
 
       <section className="@min-[36rem]:col-span-2">
         <h3 className={H4_CLASS}>My employer&apos;s holidays</h3>
-        <p className="mb-3 max-w-prose text-sm text-muted">We&apos;ve assumed your employer observes public holidays. Adjust these dates if your company follows a different calendar. Changes update your plan immediately.</p>
-        <div className="flex max-h-64 flex-col overflow-auto border-y border-line">
-          {props.holidayEntries.map((h) => (
-            <div key={`${h.date}-${h.name}`} className="flex min-h-11 items-center justify-between gap-2 border-b border-line text-sm text-ink last:border-b-0">
-              <label className="flex min-w-0 cursor-pointer items-center gap-2">
-                {(
-                  <input
-                    type="checkbox"
-                    checked={h.checked}
-                    onChange={() => (props.onToggleHoliday ?? props.onToggleStateHoliday)(h.date, h.name)}
-                  />
-                )}
-                <span className="truncate">
-                  {h.date} &mdash; {h.name}
-                  <span className="ml-1 text-xs text-muted">({h.source === 'state' ? 'regional' : h.source === 'custom' ? 'company' : 'national'})</span>
-                </span>
-              </label>
-              {h.source === 'custom' && <button
-                type="button"
-                aria-label={`Delete ${h.name}`}
-                onClick={() => props.onRemoveHoliday(h.date, h.name)}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[6px] text-muted hover:bg-surface-alt hover:text-ink"
-              >
-                &times;
-              </button>}
-            </div>
-          ))}
-          {props.holidayEntries.some((h) => h.source === 'state') && (
-            <p className={NOTE}>
-              Regional holidays are included by default. Uncheck any your employer does not observe.
-            </p>
-          )}
-          {props.holidayEntries.length === 0 && <span className="py-2 text-sm text-muted">None loaded yet.</span>}
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <input
-            type="date"
-            aria-label="Company holiday date"
-            value={newHolidayDate}
-            onChange={(e) => setNewHolidayDate(e.target.value)}
-            className={FIELD_CLASS}
-          />
-          <input
-            type="text"
-            placeholder="Holiday name"
-            aria-label="Company holiday name"
-            maxLength={160}
-            value={newHolidayName}
-            onChange={(e) => setNewHolidayName(e.target.value)}
-            className={`${FIELD_CLASS} w-40`}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              if (!newHolidayDate) return;
-              props.onAddCustomHoliday(newHolidayDate, newHolidayName || 'Company holiday');
-              setNewHolidayDate('');
-              setNewHolidayName('');
-            }}
-            className={buttonClasses('secondary', 'md')}
-          >
-            Add
-          </button>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-3">
-          <button type="button" onClick={props.onSaveEmployerHolidays} className={buttonClasses('secondary', 'md')}>Save employer calendar</button>
-          <button type="button" onClick={props.onResetEmployerHolidays} className={buttonClasses('quiet', 'md')}>Restore public holidays</button>
-        </div>
-        <p className="mt-2 text-sm text-muted">Saved calendars stay in this browser and apply only to this country and region.</p>
-        {props.employerCalendarMessage && <p role="status" className="mt-2 text-sm text-ink">{props.employerCalendarMessage}</p>}
+        <p className="mb-3 max-w-prose text-sm text-muted">{props.sharedHolidaySnapshot
+          ? 'These dates came from the shared plan. Switch to your saved calendar to edit employer holidays.'
+          : 'Adjust these dates if your company follows a different calendar. Changes update your plan immediately.'}</p>
+        <fieldset disabled={props.sharedHolidaySnapshot} className="min-w-0 border-0 p-0" aria-label="Employer holiday settings">
+          <div className="flex max-h-64 flex-col overflow-auto border-y border-line">
+            {props.holidayEntries.map((h) => (
+              <div key={`${h.date}-${h.name}`} className="flex min-h-11 items-center justify-between gap-2 border-b border-line text-sm text-ink last:border-b-0">
+                <label className="flex min-w-0 cursor-pointer items-center gap-2">
+                  {(
+                    <input
+                      type="checkbox"
+                      checked={h.checked}
+                      onChange={() => (props.onToggleHoliday ?? props.onToggleStateHoliday)(h.date, h.name)}
+                    />
+                  )}
+                  <span className="truncate">
+                    {h.date} &mdash; {h.name}
+                    <span className="ml-1 text-xs text-muted">({h.source === 'state' ? 'regional' : h.source === 'custom' ? 'company' : 'national'})</span>
+                  </span>
+                </label>
+                {h.source === 'custom' && <button
+                  type="button"
+                  aria-label={`Delete ${h.name}`}
+                  onClick={() => props.onRemoveHoliday(h.date, h.name)}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[6px] text-muted hover:bg-surface-alt hover:text-ink"
+                >
+                  &times;
+                </button>}
+              </div>
+            ))}
+            {props.holidayEntries.some((h) => h.source === 'state') && (
+              <p className={NOTE}>
+                Regional holidays are included by default. Uncheck any your employer does not observe.
+              </p>
+            )}
+            {props.holidayEntries.length === 0 && <span className="py-2 text-sm text-muted">None loaded yet.</span>}
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <input
+              type="date"
+              aria-label="Company holiday date"
+              value={newHolidayDate}
+              onChange={(e) => setNewHolidayDate(e.target.value)}
+              className={FIELD_CLASS}
+            />
+            <input
+              type="text"
+              placeholder="Holiday name"
+              aria-label="Company holiday name"
+              maxLength={160}
+              value={newHolidayName}
+              onChange={(e) => setNewHolidayName(e.target.value)}
+              className={`${FIELD_CLASS} w-40`}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (!newHolidayDate) return;
+                props.onAddCustomHoliday(newHolidayDate, newHolidayName || 'Company holiday');
+                setNewHolidayDate('');
+                setNewHolidayName('');
+              }}
+              className={buttonClasses('secondary', 'md')}
+            >
+              Add
+            </button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <button type="button" onClick={props.onSaveEmployerHolidays} className={buttonClasses('secondary', 'md')}>Save employer calendar</button>
+            <button type="button" onClick={props.onResetEmployerHolidays} className={buttonClasses('quiet', 'md')}>Restore public holidays</button>
+          </div>
+          <p className="mt-2 text-sm text-muted">Saved calendars stay in this browser and apply only to this country and region.</p>
+          {props.employerCalendarMessage && <p role="status" className="mt-2 text-sm text-ink">{props.employerCalendarMessage}</p>}
+        </fieldset>
       </section>
     </div>
     </div>

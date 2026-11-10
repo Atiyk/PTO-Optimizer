@@ -147,7 +147,6 @@ export function ImportSources({
 }) {
   const [pending, setPending] = useState<Pending>(null);
   const [icsError, setIcsError] = useState<string | null>(null);
-  const [icsNote, setIcsNote] = useState<string | null>(null);
   const [icsUrl, setIcsUrl] = useState('');
   const [fetching, setFetching] = useState(false);
   const [photoStatus, setPhotoStatus] = useState<{ kind: 'idle' } | { kind: 'reading'; message: string } | { kind: 'error'; message: string }>({ kind: 'idle' });
@@ -167,21 +166,22 @@ export function ImportSources({
 
   const acceptIcs = (text: string, source: string) => {
     const result = parseICSBusyDays(text);
+    if (result.skippedRecurring > 0 || result.cappedAt !== null) {
+      setIcsError(result.skippedRecurring > 0
+        ? 'This calendar contains repeating events that cannot be imported completely. Export individual dates from your school calendar or add the closure dates below.'
+        : 'This calendar has more events than can be imported completely. Export just the school year you need or add the closure dates below.');
+      return;
+    }
     if (result.busyDays.length === 0) {
       setIcsError('No all-day or multi-day events found in this calendar.');
       return;
     }
-    const notes = [
-      result.cappedAt !== null ? `Only the first ${result.cappedAt} events were read.` : '',
-      result.skippedRecurring > 0 ? `${result.skippedRecurring} repeating ${result.skippedRecurring === 1 ? 'event was' : 'events were'} skipped.` : '',
-    ].filter(Boolean).join(' ');
-    setIcsNote(notes || null);
     setPending({ source, heading: `Found ${datesToRuns(result.busyDays).length} date ranges in ${source}. Untick anything that isn't a day without school.`, candidates: icsCandidates(result.busyDays) });
   };
 
   const handleIcsFile = async (file: File) => {
     setIcsError(null);
-    setIcsNote(null);
+    setPending(null);
     try {
       if (file.size > MAX_IMPORT_FILE_BYTES) { setIcsError('This calendar file is too large to import.'); return; }
       acceptIcs(await file.text(), 'the calendar file');
@@ -194,7 +194,7 @@ export function ImportSources({
 
   const handleIcsUrl = async () => {
     setIcsError(null);
-    setIcsNote(null);
+    setPending(null);
     let url: URL;
     try {
       url = new URL(icsUrl.trim().replace(/^webcal:\/\//i, 'https://'));
@@ -257,7 +257,6 @@ export function ImportSources({
         </div>
         <p className="mt-1.5 text-xs leading-5 text-muted">Read in your browser. Many school sites block this; if so, download the file and upload it.</p>
         {icsError && <p role="alert" className="mt-2 text-sm font-semibold text-ink">{icsError}</p>}
-        {icsNote && <p className="mt-2 text-sm text-ink">{icsNote}</p>}
         {pending && pending.source !== 'photo' && pending.source !== 'paste' && (
           <FamilyConfirmList key={pending.candidates.map((c) => c.id).join()} heading={pending.heading} candidates={pending.candidates} onAdd={add} onDiscard={() => setPending(null)} />
         )}

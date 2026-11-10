@@ -16,7 +16,7 @@ import { bestPlacements, placementNote, type SabbaticalPlacement } from './sabba
 import { UnpaidIcon } from './DayCell';
 import { COLORS, HOLIDAY_DOT } from './colorScheme';
 import { weekStartForCountry } from './locale';
-import { readSabbaticalStateFromURL, writeSabbaticalStateToURL } from './sabbaticalUrlState';
+import { readSabbaticalStateFromURL, sabbaticalPlanSearch } from './sabbaticalUrlState';
 import { downloadSabbaticalICS } from './icsExport';
 import { copyCanvasImage, SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT } from './imageExport';
 import { copyText } from './requestText';
@@ -94,21 +94,17 @@ export function Sabbatical() {
     setSelectedStart(undefined);
   }
 
-  // Sync every control into the shareable URL - the same pattern useAppState.ts uses for
-  // /pto, so a /sabbatical link reproduces exactly this view for anyone.
+  const planSearch = selected ? sabbaticalPlanSearch({
+    country, lengthWeeks, eligibleFrom, ptoToAdd, unpaidWeeksToAdd, selectedStart: selected.start,
+  }) : null;
+
+  // Write only the scenario fields to the browser address and share link.
   useEffect(() => {
-    if (typeof window === 'undefined' || !selected) return;
+    if (typeof window === 'undefined' || planSearch === null) return;
     const url = new URL(window.location.href);
-    writeSabbaticalStateToURL(url.searchParams, {
-      country,
-      lengthWeeks,
-      eligibleFrom,
-      ptoToAdd,
-      unpaidWeeksToAdd,
-      selectedStart: selected.start,
-    });
-    window.history.replaceState(null, '', url);
-  }, [country, lengthWeeks, eligibleFrom, ptoToAdd, unpaidWeeksToAdd, selected]);
+    url.search = planSearch;
+    if (url.href !== window.location.href) window.history.replaceState(window.history.state, '', url);
+  }, [planSearch]);
 
   const coreSet = useMemo(() => {
     if (!selected) return new Set<string>();
@@ -322,7 +318,7 @@ export function Sabbatical() {
               )}
 
               {/* 4. Export: same actions as /pto (4B). */}
-              {selected && <SabbaticalExportRow placement={selected} lengthWeeks={lengthWeeks} unpaidWeeksToAdd={unpaidWeeksToAdd} />}
+              {selected && planSearch && <SabbaticalExportRow placement={selected} lengthWeeks={lengthWeeks} unpaidWeeksToAdd={unpaidWeeksToAdd} planSearch={planSearch} />}
 
               <p className="text-base text-muted">
                 Planning ordinary time off too? <a href="/pto" className="link-mark font-semibold">Plan time off &rarr;</a>
@@ -619,10 +615,12 @@ function SabbaticalExportRow({
   placement,
   lengthWeeks,
   unpaidWeeksToAdd,
+  planSearch,
 }: {
   placement: SabbaticalPlacement;
   lengthWeeks: number;
   unpaidWeeksToAdd: number;
+  planSearch: string;
 }) {
   const [message, setMessage] = useState<string | null>(null);
 
@@ -676,8 +674,10 @@ function SabbaticalExportRow({
         <Button
           variant="secondary"
           onClick={async () => {
-            const ok = await copyText(window.location.href);
-            flash(ok ? 'Copied!' : 'Could not copy - try selecting the address bar');
+            const link = new URL('/sabbatical', window.location.origin);
+            link.search = planSearch;
+            const ok = await copyText(link.href);
+            flash(ok ? 'Copied!' : 'Could not copy the plan link');
           }}
         >
           Copy link

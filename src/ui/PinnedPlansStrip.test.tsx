@@ -12,14 +12,14 @@ describe('PinnedPlansStrip (UI density pass: chips only - the Pin button/hint mo
     expect(html).toBe('');
   });
 
-  it('renders a pinned summary in the "Pinned: N days → M off · K breaks · Travel Pth" shape', () => {
+  it('renders a pinned summary in the "Pinned: N days → M off · K breaks" shape', () => {
     const html = renderToStaticMarkup(
       <PinnedPlansStrip summaries={[makeSummary()]} onRestore={() => {}} onRemove={() => {}} />,
     );
     expect(html).toContain('Pinned: 15 days');
     expect(html).toContain('32 off');
     expect(html).toContain('5 breaks');
-    expect(html).toContain('Travel 70th');
+    expect(html).not.toContain('Travel 70th');
     expect(html).toContain('restore');
   });
 

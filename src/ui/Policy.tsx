@@ -9,7 +9,7 @@ import { Button } from './Button';
 import { CountrySelect, SubdivisionSelect } from './CountrySelect';
 import { PtoTracker } from './PtoTracker';
 import { useRequestCalendar } from './useRequestCalendar';
-import { todayISO } from './today';
+import { useTodayISO } from './useTodayISO';
 import { addMonthsClamped } from './forecastPresets';
 import { DateListEditor } from './DateListEditor';
 import { Term } from './Term';
@@ -18,10 +18,11 @@ import { geolocateCountry } from './geo';
 import { forecastWithRequests } from '../personal/forecast';
 import { expirationRisks } from '../personal/expiration';
 import { compactDate, compactDatesIn } from './compactDate';
-import { initialPolicyPreferences, savePolicyPreferences, deletePolicyPreferences } from '../personal/policyPreferences';
+import { initialPolicyPreferences, readBrowserPolicyDraft, keepPrivatePolicyDraft, savePolicyPreferences, deletePolicyPreferences } from '../personal/policyPreferences';
 import { QuickForecast } from './QuickForecast';
 import { BalanceFromImage } from './BalanceFromImage';
 import { useRequestLedger } from './useRequestLedger';
+import { WalletTransfer } from './WalletTransfer';
 import { generateAlerts } from '../policy/alerts';
 import { generatePolicySummary } from '../policy/summary';
 import { generateHRQuestions, hrQuestionsMessage } from '../policy/hrQuestions';
@@ -31,6 +32,7 @@ import { copyText } from './requestText';
 import { writePolicyStateToURL, type PolicyURLState } from './policyUrlState';
 
 const HORIZON_MONTHS = 18;
+const WORKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
 /**
  * Minimal field wrapper: label + a small <Term> hint next to the jargon word, per Stage 4A -
@@ -101,12 +103,9 @@ function BalanceChart({ series, cap }: { series: { date: string; balance: number
  * chart) - this is the simple accrual/forfeiture timeline instead. */
 
 export function Policy() {
-  // Stage 4A follow-through (PR-C): every input below is read from the URL once on mount
-  // (readPolicyStateFromURL) and written back on every change (the useEffect further down),
-  // using the same conventions as src/ui/urlState.ts - a /policy link now reproduces the
-  // exact policy described, same as every /pto link already does.
+  // Hydrate older policy links once, then keep the personal draft in the browser.
   const initial = useMemo(
-    () => (typeof window === 'undefined' ? null : initialPolicyPreferences(window.location.search, geolocateCountry())),
+    () => (typeof window === 'undefined' ? null : initialPolicyPreferences(window.location.search, geolocateCountry(), readBrowserPolicyDraft())),
     [],
   );
   const d = useMemo(() => initial ?? initialPolicyPreferences('', geolocateCountry()), [initial]);
@@ -116,6 +115,7 @@ export function Policy() {
   const [trackerSubdivision, setTrackerSubdivision] = useState(d.subdivision);
   const [trackerAltFridayStart, setTrackerAltFridayStart] = useState(d.altFridayStart ?? '');
   const [trackerAltFridayEnabled, setTrackerAltFridayEnabled] = useState(Boolean(d.altFridayStart));
+  const [shiftMinutes, setShiftMinutes] = useState(d.shiftMinutes);
 
   const [accrualKind, setAccrualKind] = useState<AccrualMethod['kind']>(d.accrualKind);
   const [amount, setAmount] = useState(d.amount);
@@ -144,9 +144,12 @@ export function Policy() {
   const [negativeBalanceAllowance, setNegativeBalanceAllowance] = useState(d.negativeBalanceAllowance);
   const [payoutOnLeaving, setPayoutOnLeaving] = useState<TimeOffPolicy['payoutOnLeaving']>(d.payoutOnLeaving);
 
-  const [currentBalance, setCurrentBalance] = useState(d.currentBalance);
-  const needsBalance = currentBalance === 0;
+  const [enteredBalance, setEnteredBalance] = useState<number | null>(d.balanceEntered === false ? null : d.currentBalance);
+  const currentBalance = enteredBalance ?? 0;
+  const needsBalance = enteredBalance === null;
+  const editBalance = (value: string) => setEnteredBalance(value === '' ? null : Number(value));
   const [balanceAsOf, setBalanceAsOf] = useState(d.balanceAsOf);
+  const [balanceIncludesApprovedLeave, setBalanceIncludesApprovedLeave] = useState(d.balanceIncludesApprovedLeave ?? false);
   const [plannedDays, setPlannedDays] = useState<string[]>(d.plannedDays);
   const [currentCarriedBalance, setCurrentCarriedBalance] = useState(d.currentCarriedBalance ?? 0);
   const [forecastDate, setForecastDate] = useState(d.forecastDate ?? addMonthsClamped(d.balanceAsOf, 3));
@@ -194,13 +197,14 @@ export function Policy() {
       negativeBalanceAllowance,
       payoutOnLeaving,
       currentBalance,
+      balanceIncludesApprovedLeave,
       currentCarriedBalance,
       balanceAsOf,
       plannedDays,
     }),
     [
       unit, hoursPerDay, accrual, planYear, accrualCapEnabled, accrualKind, accrualCap, carryover,
-      waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance, payoutOnLeaving, currentBalance, currentCarriedBalance,
+      waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance, payoutOnLeaving, currentBalance, balanceIncludesApprovedLeave, currentCarriedBalance,
       balanceAsOf, plannedDays,
     ],
   );
@@ -210,29 +214,21 @@ export function Policy() {
     typicalWeeklyHours, expectedDaysPerYear, planYearKind, anniversaryStart, customResetDate,
     accrualCapEnabled, accrualCap, carryoverMode, carryoverCap, carryoverUseByEnabled,
     carryoverUseBy, waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance,
-    payoutOnLeaving, currentBalance, currentCarriedBalance, balanceAsOf, plannedDays, country, forecastDate,
+    payoutOnLeaving, currentBalance, balanceEntered: !needsBalance, balanceIncludesApprovedLeave, shiftMinutes, currentCarriedBalance, balanceAsOf, plannedDays, country, forecastDate,
     workWeek: trackerWorkWeek, subdivision: trackerSubdivision, altFridayStart: trackerAltFridayEnabled ? trackerAltFridayStart : undefined,
   }), [unit, hoursPerDay, accrualKind, amount, frequency, payDateAnchor, grantDate, hourlyRate,
     typicalWeeklyHours, expectedDaysPerYear, planYearKind, anniversaryStart, customResetDate,
     accrualCapEnabled, accrualCap, carryoverMode, carryoverCap, carryoverUseByEnabled,
     carryoverUseBy, waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance,
-    payoutOnLeaving, currentBalance, currentCarriedBalance, balanceAsOf, plannedDays, country, forecastDate,
+    payoutOnLeaving, currentBalance, needsBalance, balanceIncludesApprovedLeave, shiftMinutes, currentCarriedBalance, balanceAsOf, plannedDays, country, forecastDate,
     trackerWorkWeek, trackerSubdivision, trackerAltFridayEnabled, trackerAltFridayStart]);
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const url = new URL(window.location.href);
-    writePolicyStateToURL(url.searchParams, currentPolicyURLState);
-    window.history.replaceState(null, '', url);
-  }, [currentPolicyURLState]);
-
-  // Query string for the expiry watch feed: the same state the URL carries, with the
-  // country always present because the feed has no geolocation default.
-  const watchSearch = useMemo(() => {
+  // Private snapshot used for the browser draft, explicit save, and opt-in expiry feeds.
+  const privatePolicySearch = useMemo(() => {
     const params = new URLSearchParams();
     writePolicyStateToURL(params, currentPolicyURLState);
-    params.set('c', country);
     return params.toString();
-  }, [currentPolicyURLState, country]);
+  }, [currentPolicyURLState]);
+  useEffect(() => keepPrivatePolicyDraft(privatePolicySearch, country), [privatePolicySearch, country]);
 
   const horizonEnd = useMemo(() => addMonthsClamped(balanceAsOf, HORIZON_MONTHS), [balanceAsOf]);
   const projection = useMemo(() => forecastWithRequests(policy, horizonEnd, ledger.requests), [policy, horizonEnd, ledger.requests]);
@@ -242,7 +238,7 @@ export function Policy() {
   const alerts = useMemo(() => generateAlerts(policy, projection?.confirmed.events ?? [], balanceAsOf, country), [policy, projection, balanceAsOf, country]);
   const hrQuestions = useMemo(() => generateHRQuestions(policy), [policy]);
 
-  const [visitDate] = useState(todayISO);
+  const visitDate = useTodayISO();
   // The soonest PTO the policy will take away (forfeiture or expiring carryover; a cap is
   // a separate kind of loss). Shown beside the forecast figure itself, so a date picked just
   // before a reset can never read as "nothing expires" while the loss is a day away.
@@ -255,12 +251,17 @@ export function Policy() {
   const calendarEnd = forecastDate > `${visitYear + 2}-12-31` ? forecastDate : `${visitYear + 2}-12-31`;
   const trackerCalendar = useRequestCalendar({ country, subdivision: trackerSubdivision, rangeStart: calendarStart, rangeEnd: calendarEnd, workWeek: trackerWorkWeek, altFridayStart: trackerAltFridayEnabled ? trackerAltFridayStart : undefined });
 
+  const trackerShiftMinutes = unit === 'hours'
+    ? shiftMinutes ?? trackerWorkWeek.map(working => working ? Math.round(hoursPerDay * 60) : 0)
+    : undefined;
+  const pricedRequestCalendar = { ...trackerCalendar.calendar, shiftMinutes: trackerShiftMinutes };
+
   const decoded = useMemo(() => decodeParagraph(pastedText), [pastedText]);
   const decodedTerms = useMemo(() => uniqueMatchedTerms(decoded), [decoded]);
 
   const saveButtons = (
     <div className="mt-5 flex flex-wrap gap-x-2 gap-y-1 border-t border-line pt-3 text-sm">
-      <button type="button" className="inline-flex min-h-11 items-center px-1 font-semibold text-ink underline decoration-1 underline-offset-[0.22em] transition-colors duration-150 hover:decoration-2" onClick={() => { const params = new URLSearchParams(); writePolicyStateToURL(params, currentPolicyURLState); setSaveMessage(savePolicyPreferences(params.toString()) ? 'Policy saved in this browser.' : 'Browser storage is unavailable. Your forecast still works from this link.'); }}>Save policy in this browser</button>
+      <button type="button" className="inline-flex min-h-11 items-center px-1 font-semibold text-ink underline decoration-1 underline-offset-[0.22em] transition-colors duration-150 hover:decoration-2" onClick={() => { setSaveMessage(savePolicyPreferences(privatePolicySearch) ? 'Policy saved in this browser.' : 'Browser storage is unavailable. You can still use the forecast on this page.'); }}>Save policy in this browser</button>
       <button type="button" className="inline-flex min-h-11 items-center px-1 text-muted underline decoration-1 underline-offset-[0.22em] transition-colors duration-150 hover:decoration-2 hover:text-ink" onClick={() => setSaveMessage(deletePolicyPreferences() ? 'Saved policy deleted. Your current inputs stay on this page.' : 'Browser storage is unavailable.')}>Delete saved policy</button>
     </div>
   );
@@ -287,11 +288,11 @@ export function Policy() {
                 <p className="mt-1 text-sm text-muted">Use your real balance and employer rules. Full carryover at reset is assumed until you choose another rule.</p>
                 <div className="mt-5 grid gap-x-4 gap-y-4 sm:grid-cols-2">
                   <div className="flex min-w-0 flex-col gap-1">
-                    <Field label={`Current PTO balance (${unit})`}><input type="number" step="any" value={currentBalance} aria-describedby="current-balance-hint" onChange={event => setCurrentBalance(Number(event.target.value))} className={inputClass} /></Field>
-                    <p id="current-balance-hint" className="text-xs leading-5 text-muted">{currentBalance === 0 ? 'Starts at 0 until you enter yours: the number on your payslip or HR portal.' : 'From your payslip or HR portal, on the date beside it.'}</p>
+                    <Field label={`Current PTO balance (${unit})`}><input type="number" step="any" value={enteredBalance ?? ''} aria-describedby="current-balance-hint" onChange={event => editBalance(event.target.value)} className={inputClass} /></Field>
+                    <p id="current-balance-hint" className="text-xs leading-5 text-muted">{needsBalance ? 'Starts at 0 until you enter yours: the number on your payslip or HR portal.' : 'From your payslip or HR portal, on the date beside it.'}</p>
                   </div>
                   <Field label="Balance as-of date"><input type="date" value={balanceAsOf} onChange={event => setBalanceAsOf(event.target.value)} className={inputClass} /></Field>
-                  <BalanceFromImage unit={unit} hoursPerDay={hoursPerDay} today={visitDate} onUse={(balance, asOf) => { setCurrentBalance(balance); if (asOf) setBalanceAsOf(asOf); }} />
+                  <BalanceFromImage unit={unit} hoursPerDay={hoursPerDay} today={visitDate} onUse={(balance, asOf) => { setEnteredBalance(balance); if (asOf) setBalanceAsOf(asOf); }} />
                   <Field label="How PTO accrues"><select value={accrualKind} onChange={event => setAccrualKind(event.target.value as AccrualMethod['kind'])} className={selectClass}><option value="front-loaded">Granted all at once</option><option value="per-pay-period">Each pay period</option><option value="per-hour-worked">For each hour worked</option><option value="unlimited">Unlimited PTO</option></select></Field>
                   <Field label="Balance unit"><select value={unit} onChange={event => setUnit(event.target.value as 'days' | 'hours')} className={selectClass}><option value="days">Days</option><option value="hours">Hours</option></select></Field>
                   {(accrualKind === 'per-pay-period' || accrualKind === 'front-loaded') && <Field label={`${unit === 'hours' ? 'Hours' : 'Days'} earned each ${accrualKind === 'front-loaded' ? 'grant' : 'pay period'}`}><input type="number" min={0} step="any" value={amount} onChange={event => setAmount(Number(event.target.value))} className={inputClass} /></Field>}
@@ -509,7 +510,7 @@ export function Policy() {
                       </select>
                     </Field>
                     <Field label="Current balance">
-                      <input type="number" min={negativeBalanceAllowance * -1} step={0.5} value={currentBalance} onChange={(e) => setCurrentBalance(Number(e.target.value))} className={inputClass} />
+                      <input type="number" min={negativeBalanceAllowance * -1} step={0.5} value={enteredBalance ?? ''} onChange={(e) => editBalance(e.target.value)} className={inputClass} />
                     </Field>
                     <Field label="As of">
                       <input type="date" value={balanceAsOf} onChange={(e) => setBalanceAsOf(e.target.value)} className={inputClass} />
@@ -625,14 +626,15 @@ export function Policy() {
 
             <div className="contents lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:flex lg:flex-col lg:gap-4">
               <div className={`${needsBalance ? 'order-2' : 'order-1'} min-w-0 lg:order-none`}>
-                <QuickForecast policy={policy} requests={ledger.requests} upcomingLoss={upcomingLoss} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')} />
+                <QuickForecast policy={policy} balanceEntered={!needsBalance} requests={ledger.requests} upcomingLoss={upcomingLoss} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')} />
               </div>
               <div id="expiration" className="order-3 min-w-0 scroll-mt-24 lg:order-none">
-                <ExpirationGuard policy={policy} country={country} requests={ledger.requests} today={visitDate} holidayCalendar={trackerCalendar} subdivision={trackerSubdivision} watchSearch={watchSearch} onAlertViewed={() => track('expiration_alert_viewed')} onAlertAction={() => track('expiration_alert_action_taken')} />
+                <ExpirationGuard policy={policy} country={country} requests={ledger.requests} today={visitDate} holidayCalendar={trackerCalendar} subdivision={trackerSubdivision} watchSearch={needsBalance ? undefined : privatePolicySearch} onAlertViewed={() => track('expiration_alert_viewed')} onAlertAction={() => track('expiration_alert_action_taken')} />
               </div>
             </div>
             <div id="requests" className="order-4 mt-6 min-w-0 scroll-mt-24 lg:order-none lg:col-start-1 lg:row-start-2 lg:mt-4">
-              <PtoTracker today={visitDate} ledger={ledger} calendar={trackerCalendar.calendar} calendarReady={!trackerCalendar.loading && !trackerCalendar.degraded} calendarNotice={trackerCalendar.loading ? 'Loading your employer calendar…' : trackerCalendar.degraded ? 'Holiday data or a calendar input is unavailable. Check the calendar settings before adding or changing request dates.' : selectedForecast?.confirmed.balance === null || selectedForecast?.confirmed.balance === undefined ? undefined : `Projected balance on ${compactDate(forecastDate)}: ${new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(selectedForecast.confirmed.balance)} ${unit}. Approved requests you track here reduce it.`} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
+              <PtoTracker today={visitDate} ledger={ledger} calendar={pricedRequestCalendar} calendarReady={!trackerCalendar.loading && !trackerCalendar.degraded} calendarNotice={trackerCalendar.loading ? 'Loading your employer calendar…' : trackerCalendar.degraded ? 'Holiday data or a calendar input is unavailable. Check the calendar settings before adding or changing request dates.' : selectedForecast?.confirmed.balance === null || selectedForecast?.confirmed.balance === undefined ? undefined : `Projected balance on ${compactDate(forecastDate)}: ${new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(selectedForecast.confirmed.balance)} ${unit}. ${balanceIncludesApprovedLeave ? 'Approved leave already included in your balance is not deducted again.' : 'Approved requests you track here reduce it.'}`} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
+              <WalletTransfer policy={needsBalance ? undefined : policy} requests={ledger.requests} forecastDate={forecastDate} />
               <details className="group mt-3 rounded-[10px] border border-line bg-surface">
                 <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 font-semibold text-ink sm:px-6 [&::-webkit-details-marker]:hidden">
                   My request calendar and workweek
@@ -643,9 +645,37 @@ export function Policy() {
                     <CountrySelect country={country} onChangeCountry={code => { setCountry(code); setTrackerSubdivision(undefined); }} />
                     <SubdivisionSelect subdivisions={trackerCalendar.subdivisions} subdivision={trackerSubdivision} onChangeSubdivision={setTrackerSubdivision} />
                   </div>
-                  <fieldset className="mt-4"><legend className="text-sm font-semibold text-ink">Working days</legend><div className="mt-1 flex flex-wrap gap-x-4">{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((name, index) => <label key={name} className="flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" className="h-4 w-4" checked={trackerWorkWeek[index]} onChange={event => setTrackerWorkWeek(previous => previous.map((day, i) => i === index ? event.target.checked : day) as WorkWeek)} />{name}</label>)}</div></fieldset>
+                  <fieldset className="mt-4"><legend className="text-sm font-semibold text-ink">Working days</legend><div className="mt-1 flex flex-wrap gap-x-4">{WORKDAY_NAMES.map((name, index) => <label key={name} className="flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" className="h-4 w-4" checked={trackerWorkWeek[index]} disabled={trackerWorkWeek[index] && trackerWorkWeek.filter(Boolean).length === 1} onChange={event => setTrackerWorkWeek(previous => previous.map((day, i) => i === index ? event.target.checked : day) as WorkWeek)} />{name}</label>)}</div></fieldset>
                   <label className={`${checkRow} mt-2`}><input type="checkbox" className="h-4 w-4" checked={trackerAltFridayEnabled} onChange={event => setTrackerAltFridayEnabled(event.target.checked)} />Every other Friday off</label>
                   {trackerAltFridayEnabled && <label className="block max-w-xs text-sm font-semibold text-ink">First non-working Friday<input type="date" value={trackerAltFridayStart} onChange={event => setTrackerAltFridayStart(event.target.value)} className={`${inputClass} mt-1.5 block`} /></label>}
+                  {unit === 'hours' && (
+                    <div className="mt-2">
+                      <label className={checkRow}>
+                        <input type="checkbox" className="h-4 w-4" checked={shiftMinutes !== undefined}
+                          onChange={event => setShiftMinutes(event.target.checked ? WORKDAY_NAMES.map(() => Math.round(hoursPerDay * 60)) : undefined)} />
+                        Set hours for each weekday
+                      </label>
+                      {shiftMinutes && (
+                        <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                          {WORKDAY_NAMES.map((name, index) => trackerWorkWeek[index] && (
+                            <Field key={name} label={`${name} shift hours`}>
+                              <input type="number" className={inputClass} min={1 / 60} max={24} step="any"
+                                value={shiftMinutes[index] / 60}
+                                onChange={event => {
+                                  const minutes = Math.round(Number(event.target.value) * 60);
+                                  setShiftMinutes(current => current?.map((value, day) => day === index ? minutes : value));
+                                }} />
+                            </Field>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <label className={`${checkRow} mt-2`}>
+                    <input type="checkbox" className="h-4 w-4" checked={balanceIncludesApprovedLeave}
+                      onChange={event => setBalanceIncludesApprovedLeave(event.target.checked)} />
+                    My entered balance already deducts approved future leave
+                  </label>
                   <p className="mt-3 text-sm text-muted">Uses your saved employer holidays for this country and region. Adjust those in <a className="link-mark" href="/pto">the PTO planner</a>. To cover a later request, move the forecast date.</p>
                 </div>
               </details>

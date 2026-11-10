@@ -34,16 +34,17 @@ try {
     const entry = { width, checks: [] };
     results.push(entry);
     try {
-      await page.goto(new URL('/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15', origin).href, { waitUntil: 'networkidle' });
+      await page.goto(new URL('/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15', origin).href, { waitUntil: 'domcontentloaded' });
+      await page.locator('main[data-plan-ready="true"]').waitFor({ state: 'visible' });
       await page.evaluate(() => document.fonts.ready);
       const logo = page.getByRole('link', { name: /home/i }).first();
       if (!(await logo.isVisible())) throw new Error('Logo/home link not visible');
       if (await logo.getAttribute('aria-label') !== null) {
         throw new Error('Home brand link must derive its accessible name from visible text rather than an overriding aria-label');
       }
-      const labelledHome = page.getByRole('link', { name: /Gapless\s+PTO Optimizer\s+home/i });
+      const labelledHome = page.getByRole('link', { name: /Timebower\s+home/i });
       if (await labelledHome.count() !== 1) throw new Error('Visible wordmark and home accessible name mismatch');
-      entry.checks.push('Home accessible name includes visible Gapless PTO Optimizer wordmark');
+      entry.checks.push('Home accessible name includes visible Timebower wordmark');
       // 2026-11 IA: three destinations (Plan, My PTO, Learn); the header "Main" nav from
       // 768px up, a fixed bottom "Tools" tab bar below.
       const target = width >= 768

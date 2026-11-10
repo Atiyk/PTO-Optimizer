@@ -1,5 +1,3 @@
-import { ordinal } from './scoreFormat';
-
 export interface PinnedPlanSummary {
   budgetSpent: number;
   totalDaysOff: number;
@@ -16,8 +14,7 @@ interface PinnedPlansStripProps {
 function summaryText(s: PinnedPlanSummary): string {
   const dayWord = s.budgetSpent === 1 ? 'day' : 'days';
   const breakWord = s.breakCountActual === 1 ? 'break' : 'breaks';
-  const travel = s.travelPercentile !== null ? ` · Travel ${ordinal(s.travelPercentile)}` : '';
-  return `Pinned: ${s.budgetSpent} ${dayWord} → ${s.totalDaysOff} off · ${s.breakCountActual} ${breakWord}${travel}`;
+  return `Pinned: ${s.budgetSpent} ${dayWord} → ${s.totalDaysOff} off · ${s.breakCountActual} ${breakWord}`;
 }
 
 /**

@@ -1,7 +1,6 @@
 import { COUNTRIES } from '@daysoff/engine/data/countries';
 import { addDays, isoToSerial } from '@daysoff/engine/solver/dateUtils';
 import { isValidISODate } from './urlState';
-import { defaultEmployerCalendar, encodeEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
 
 export interface LandingState {
   country: string;
@@ -42,13 +41,11 @@ export function landingSearch(state: LandingState): string {
   return `?${params}`;
 }
 
-export function landingPlanHref(state: LandingState, pinnedDate?: string, employer = defaultEmployerCalendar(state.country)): string {
+export function landingPlanHref(state: LandingState, pinnedDate?: string): string {
   const params = new URLSearchParams({
     c: state.country, b: String(state.budget), s: state.rangeStart, e: state.rangeEnd,
     rv: '0', pv: '2', ps: 'balanced', mb: '3', w: '30', count: '3',
   });
-  const calendar: EmployerCalendar = employer.country === state.country && !employer.subdivision ? employer : defaultEmployerCalendar(state.country);
-  params.set('eh', encodeEmployerCalendar(calendar));
   if (pinnedDate && isValidISODate(pinnedDate)) params.set('p', pinnedDate);
   return `/pto?${params}`;
 }

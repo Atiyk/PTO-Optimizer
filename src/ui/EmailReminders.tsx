@@ -85,7 +85,7 @@ export function EmailReminders({ kind, search, initialStatus, enabled = BUILD_EN
       else if (data.account) setStatus({ ...status, account: data.account });
       if (done) setMessage(done);
     } catch {
-      setMessage('Couldn’t reach Gapless. Check your connection and try again.');
+      setMessage('Couldn’t reach Timebower. Check your connection and try again.');
     } finally {
       setBusy(false);
       setConfirmDelete(false);
@@ -99,7 +99,7 @@ export function EmailReminders({ kind, search, initialStatus, enabled = BUILD_EN
       {!account ? (
         <>
           <p className="max-w-prose text-sm text-muted">
-            Optional. Sign in with just your email and Gapless emails you {remindersText}. It stores your email, the links you save and when it last emailed you, and you can delete them in one click.
+            Optional. Sign in with just your email and Timebower emails you {remindersText}. It stores your email, the links you save and when it last emailed you, and you can delete them in one click.
           </p>
           <form
             className="flex min-w-0 flex-wrap gap-2 sm:flex-nowrap"
@@ -136,7 +136,7 @@ export function EmailReminders({ kind, search, initialStatus, enabled = BUILD_EN
           )}
           {status.features.inbound && status.inboundAddress && (
             <p className="max-w-prose text-sm text-muted">
-              Got an approval email? Forward it from {account.email} to <span className="font-semibold text-ink break-all">{status.inboundAddress}</span>. Gapless replies with the dates and an out-of-office message, and doesn’t keep the email.
+              Got an approval email? Forward it from {account.email} to <span className="font-semibold text-ink break-all">{status.inboundAddress}</span>. Timebower replies with the dates and an out-of-office message, and doesn’t keep the email.
             </p>
           )}
           <div className="flex flex-wrap gap-2">

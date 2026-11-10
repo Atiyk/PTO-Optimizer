@@ -28,14 +28,14 @@ describe('breakReason', () => {
     expect(breakReason(brk, holidayNameFor)).toBe('Bridges New Year’s Day — 2 PTO days for 1 day off.');
   });
 
-  it('reports quiet-week demand as a real, derived percentage, never a fabricated percentile', () => {
+  it('describes a quieter historical comparison and keeps the exact PTO trade', () => {
     const brk: Break = { ...BASE, tags: ['Low travel demand'], meanDemand: 0.7 };
-    expect(breakReason(brk, noHoliday)).toBe('Quiet travel week — about 30% less demand than an average day.');
+    expect(breakReason(brk, noHoliday)).toBe('1 PTO day for 4 days off — quieter in the historical travel comparison.');
   });
 
-  it('reports peak-week demand as a real, derived percentage, and still states the swap', () => {
+  it('describes a busier historical comparison and keeps the exact PTO trade', () => {
     const brk: Break = { ...BASE, tags: ['Peak travel'], meanDemand: 1.4 };
-    expect(breakReason(brk, noHoliday)).toBe('Busier travel week (about 40% above average) — 1 PTO day for 4 days off regardless.');
+    expect(breakReason(brk, noHoliday)).toBe('1 PTO day for 4 days off — busier in the historical travel comparison.');
   });
 
   it('does not invent percentages when demand metadata is invalid or contradicts its tag', () => {
@@ -73,7 +73,7 @@ describe('breakReason', () => {
 
   it('never fabricates a reason for a low-value (1.0x or worse) break - matches the existing lowValueExplanation copy', () => {
     const lowValue: Break = { ...BASE, multiplier: 1, totalDaysOff: 1, ptoCost: 1, tags: ['Low travel demand'], meanDemand: 0.7 };
-    expect(breakReason(lowValue, noHoliday)).toBe('No extra days off — 1 PTO day for 1 day off; lower travel demand is tagged for these dates.');
+    expect(breakReason(lowValue, noHoliday)).toBe('No extra days off — 1 PTO day for 1 day off; these dates look quieter in the historical comparison.');
 
     expect(breakReason(lowValue, noHoliday)).not.toMatch(/chosen|optimized|budget|unspent/i);
 

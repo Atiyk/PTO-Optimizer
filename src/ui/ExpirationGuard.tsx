@@ -12,9 +12,12 @@ import { Button } from './Button';
 import { SubscribeFeed } from './SubscribeFeed';
 import { EmailReminders } from './EmailReminders';
 
-const WATCH_CALENDAR_NAME = 'Gapless PTO Optimizer - PTO expiry watch';
 import { downloadReminderICS } from './icsExport';
 import { compactDate, compactDatesIn } from './compactDate';
+import { useTodayISO } from './useTodayISO';
+import { PRODUCT_NAME } from '../brand';
+
+const WATCH_CALENDAR_NAME = `${PRODUCT_NAME} - PTO expiry watch`;
 
 const PREFS_KEY = 'gapless.personal.expiration.v1';
 interface GuardPreferences { enabled: boolean; leads: ExpirationReminderLead[]; dismissed: string[] }
@@ -58,17 +61,15 @@ export interface ExpirationGuardProps {
   onAlertAction?: () => void;
 }
 
-const visitDateNow = () => new Date().toISOString().slice(0, 10);
-
 export function ExpirationGuard(props: ExpirationGuardProps) {
   return props.holidayCalendar ? <Guard {...props} holidayCalendar={props.holidayCalendar} /> : <GuardWithOwnCalendar {...props} />;
 }
 
 function GuardWithOwnCalendar(props: ExpirationGuardProps) {
-  const [visitDate] = useState(visitDateNow);
-  const year = Number((props.today ?? visitDate).slice(0, 4));
+  const today = useTodayISO(props.today);
+  const year = Number(today.slice(0, 4));
   const loaded = useRequestCalendar({ country: props.country, subdivision: props.subdivision, rangeStart: `${year}-01-01`, rangeEnd: `${year + 2}-12-31`, workWeek: DEFAULT_WORK_WEEK });
-  return <Guard {...props} holidayCalendar={loaded} />;
+  return <Guard {...props} today={today} holidayCalendar={loaded} />;
 }
 
 function RescueDetails({ plan, risk, calendarState, onAlertAction }: { plan: RescuePlan | undefined; risk: ExpirationRisk; calendarState: 'loading' | 'ready' | 'degraded'; onAlertAction?: () => void }) {
@@ -114,10 +115,10 @@ function RescueDetails({ plan, risk, calendarState, onAlertAction }: { plan: Res
 
 function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalendar, subdivision, watchSearch, onAlertViewed, onAlertAction }: ExpirationGuardProps & { holidayCalendar: GuardHolidayCalendar }) {
   const id = useId();
-  const [visitDate] = useState(visitDateNow);
-  const effectiveToday = today ?? visitDate;
+  const effectiveToday = useTodayISO(today);
   const [prefs, setPrefs] = useState(loadPreferences);
   const [message, setMessage] = useState('');
+  const [acceptedWatchSearch, setAcceptedWatchSearch] = useState<string>();
   const viewed = useRef(new Set<string>());
   const validPolicy = useMemo(() => forecastWithRequests(policy, policy.balanceAsOf) !== null, [policy]);
   const risks = useMemo(() => expirationRisks(policy, country, requests, effectiveToday), [policy, country, requests, effectiveToday]);
@@ -253,16 +254,25 @@ function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalen
       {message && <p role="status" className="mt-2 text-sm text-muted">{message}</p>}
       {watchSearch !== undefined && validPolicy && (
         <div className="mt-4">
-          <SubscribeFeed
-            planSearch={watchSearch}
-            path="/api/watch"
-            idPrefix={`${id}-watch`}
-            calendarName={WATCH_CALENDAR_NAME}
-            heading="Get these reminders in your calendar"
-            description="Subscribe once to get the 60, 30 and 7-day reminders and suggested days to use expiring PTO, recalculated from today's date when your calendar refreshes."
-            caveat="Requests tracked on this device aren't included. After editing your policy, subscribe again. Anyone with the link can see the policy details in it."
-          />
-          <div className="mt-4"><EmailReminders kind="policy" search={watchSearch} /></div>
+          {acceptedWatchSearch !== watchSearch ? (
+            <>
+              <p className="text-sm text-muted">Online reminders send the balance and policy you entered to the reminder service. Anyone with a calendar subscription link can read those details. You can download reminders above and keep your details on this device.</p>
+              <Button variant="secondary" className="mt-2" onClick={() => setAcceptedWatchSearch(watchSearch)}>Show online reminder options</Button>
+            </>
+          ) : (
+            <>
+              <SubscribeFeed
+                planSearch={watchSearch}
+                path="/api/watch"
+                idPrefix={`${id}-watch`}
+                calendarName={WATCH_CALENDAR_NAME}
+                heading="Get these reminders in your calendar"
+                description="Subscribe once to get the 60, 30 and 7-day reminders and suggested days to use expiring PTO, recalculated from today's date when your calendar refreshes."
+                caveat="Requests tracked on this device aren't included. After editing your policy, subscribe again. Anyone with the link can see the policy details in it."
+              />
+              <div className="mt-4"><EmailReminders kind="policy" search={watchSearch} /></div>
+            </>
+          )}
         </div>
       )}
     </section>

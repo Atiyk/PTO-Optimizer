@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { deletePolicyPreferences, initialPolicyPreferences, savePolicyPreferences } from './policyPreferences';
+import { deletePolicyPreferences, initialPolicyPreferences, keepPrivatePolicyDraft, savePolicyPreferences } from './policyPreferences';
 import { readPolicyStateFromURL, writePolicyStateToURL } from '../ui/policyUrlState';
 
 const KEY = 'gapless.personal.policy.v1';
@@ -51,6 +51,14 @@ describe('optional local policy preferences', () => {
     expect(deletePolicyPreferences()).toBe(true);
     expect(initialPolicyPreferences('', 'US').currentBalance).toBe(0);
     expect(window.location.search).toBe(search);
+  });
+  it('keeps recognized public route handoffs while removing private and arbitrary query data', () => {
+    window.history.replaceState(null, '', '/policy?cb=8&note=private&signin=ok&highlight=accrual#balance');
+    try {
+      keepPrivatePolicyDraft('c=US&cb=8', 'US');
+      expect(window.location.search).toBe('?c=US&signin=ok&highlight=accrual');
+      expect(window.location.hash).toBe('#balance');
+    } finally { window.history.replaceState(null, '', '/'); }
   });
   it('keeps legacy cb distinct from new car and handles malformed new parameters', () => {
     const state = readPolicyStateFromURL('?cb=80&car=24&u=1&hpd=8&fd=2027-04-01', 'US');

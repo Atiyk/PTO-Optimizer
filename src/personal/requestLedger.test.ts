@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
-import { calendarCoversRequest, createPtoRequest, initialRequestDate, parseRequestLedger, readRequestLedger, requestConflicts, requestDatesForScenario, requestPtoDates, REQUEST_STATUSES, REQUEST_TRANSITIONS, validRequestRange, writeRequestLedger, type PtoRequest, type RequestCalendar } from './requestLedger';
+import { calendarCoversRequest, createPtoRequest, initialRequestDate, parseRequestLedger, plannerRequestCommitments, readRequestLedger, requestConflicts, requestDatesForScenario, requestPtoDates, REQUEST_STATUSES, REQUEST_TRANSITIONS, validRequestRange, writeRequestLedger, type PtoRequest, type RequestCalendar } from './requestLedger';
 
 const calendar: RequestCalendar = { workWeek: DEFAULT_WORK_WEEK, offDays: ['2027-01-01', '2027-01-01'] };
 function request(id: string, start = '2027-01-01', end = '2027-01-05', status: PtoRequest['status'] = 'planned'): PtoRequest {
@@ -15,6 +15,17 @@ describe('personal PTO requests', () => {
   it('supports nonstandard workweeks and alternating Friday exceptions from the optimizer', () => {
     const nonstandard: RequestCalendar = { workWeek: [true, true, true, true, true, true, false], offDays: ['2027-01-08'] };
     expect(requestPtoDates('2027-01-08', '2027-01-10', nonstandard)).toEqual(['2027-01-09']);
+  });
+  it('records actual shifts and refuses a partial request that exceeds its shift', () => {
+    const schedule = { ...calendar, shiftMinutes: [540, 540, 540, 540, 480, 0, 0] };
+    const full = createPtoRequest({ start: '2027-01-07', end: '2027-01-08' }, schedule, 'full')!;
+    expect(full.ptoMinutes).toEqual({ '2027-01-07': 540, '2027-01-08': 480 });
+    const partial = createPtoRequest({ start: '2027-01-04', end: '2027-01-04', partialMinutes: 241 }, schedule, 'partial')!;
+    expect(partial.ptoMinutes).toEqual({ '2027-01-04': 241 });
+    expect(parseRequestLedger(JSON.stringify({ version: 1, requests: [partial, full] }))).toEqual([partial, full]);
+    expect(createPtoRequest({ start: '2027-01-04', end: '2027-01-04', partialMinutes: 541 }, schedule, 'large')).toBeNull();
+    expect(createPtoRequest({ start: '2027-01-04', end: '2027-01-05', partialMinutes: 241 }, schedule, 'range')).toBeNull();
+    expect(createPtoRequest({ start: '2027-01-04', end: '2027-01-04', partialMinutes: 241 }, calendar, 'unconfigured')).toBeNull();
   });
   it('rejects reversed, impossible and unbounded date ranges', () => {
     expect(validRequestRange('2027-02-30', '2027-03-02')).toBe(false);
@@ -60,6 +71,20 @@ describe('personal PTO requests', () => {
     const entries = [request('planned'), request('requested', '2027-01-06', '2027-01-06', 'requested')];
     expect(requestDatesForScenario(entries, '2026-12-31', '2027-01-31')).toEqual([]);
     expect(requestDatesForScenario(entries, '2026-12-31', '2027-01-31', true)).toEqual(['2027-01-04', '2027-01-05', '2027-01-06']);
+  });
+  it('reserves booked spans without recharging past, overlapping, tentative or out-of-range PTO', () => {
+    const entries = [
+      request('approved', '2027-01-03', '2027-01-06', 'approved'),
+      request('overlap', '2027-01-05', '2027-01-07', 'approved'),
+      request('completed', '2027-01-08', '2027-01-08', 'completed'),
+      request('tentative', '2027-01-11', '2027-01-12', 'requested'),
+      request('far', '2027-02-01', '2027-02-02', 'approved'),
+    ];
+    expect(plannerRequestCommitments(entries, '2027-01-04', '2027-01-31', '2027-01-04')).toEqual({
+      unavailableDates: ['2027-01-04', '2027-01-05', '2027-01-06', '2027-01-07', '2027-01-08'],
+      approvedPtoDays: 3,
+      hasHourlyBookings: false,
+    });
   });
   it('flags overlapping calendar ranges, including a shared weekend, without inactive requests', () => {
     const entries = [request('first', '2027-01-01', '2027-01-03'), request('second', '2027-01-03', '2027-01-05'), request('inactive', '2027-01-01', '2027-01-05', 'rejected')];

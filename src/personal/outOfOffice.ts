@@ -82,8 +82,7 @@ export function outOfOfficeMessage(
  * to a working day. Uses the engine's requestByDate, so it always agrees with the "Request
  * by" date on break cards and the .ics reminder for the same notice period.
  */
-export function submitByDate(start: ISODate, noticePeriodDays: number, workWeek: WorkWeek): ISODate {
+export function submitByDate(start: ISODate, noticePeriodDays: number, workWeek: WorkWeek, offDays: readonly ISODate[] = []): ISODate | null {
   const days = Number.isFinite(noticePeriodDays) && noticePeriodDays >= 0 ? Math.floor(noticePeriodDays) : DEFAULT_NOTICE_PERIOD_DAYS;
-  if (!workWeek.some(Boolean)) return addDays(start, -days);
-  return requestByDate(start, days, workWeek);
+  return requestByDate(start, days, workWeek, offDays);
 }

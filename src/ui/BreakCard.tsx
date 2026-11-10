@@ -5,11 +5,12 @@ import { formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
 import { requestByText, isContested } from '@daysoff/engine/calendar/requestDeadline';
 import { buttonClasses } from './Button';
 import { Chevron } from './Chevron';
+import { settleLedgerAction, type LedgerAction } from '../integration/browserWalletStore';
 
 interface BreakCardProps {
   brk: Break;
   /** Returns false when the request could not be added (the card then says so). */
-  onTrack?: (brk: Break) => boolean | void;
+  onTrack?: (brk: Break) => LedgerAction<boolean | void>;
   /** Lets the compact summary above the calendar link straight to this card. */
   anchorId?: string;
   /** 1-based, chronological - the same number its calendar badge shows (see
@@ -27,6 +28,7 @@ interface BreakCardProps {
   today: string;
   noticePeriodDays: number;
   workWeek: WorkWeek;
+  offDays?: readonly string[];
   /** UI density pass: whether the request tools (request-by line + copy dropdown) start
    * expanded. Only the first rendered card defaults to true, "so the pattern is
    * discoverable" - every other card starts collapsed to the compact summary row. */
@@ -173,6 +175,12 @@ function isLowValue(brk: Break): boolean {
   return brk.multiplier <= 1.0;
 }
 
+const travelTagLabels: Partial<Record<Break['tags'][number], string>> = {
+  'Peak travel': 'Busier travel estimate',
+  'Low travel demand': 'Quieter travel estimate',
+  Estimated: 'Seasonal estimate',
+};
+
 export function BreakCard({
   brk,
   index,
@@ -184,12 +192,14 @@ export function BreakCard({
   today,
   noticePeriodDays,
   workWeek,
+  offDays,
   defaultExpanded = false,
   onTrack,
   anchorId,
 }: BreakCardProps) {
   // Tracking confirms in place; the page no longer jumps to the tracker.
   const [tracked, setTracked] = useState<'yes' | 'no' | null>(null);
+  const [tracking, setTracking] = useState(false);
   // BUG FOUND: a plain `useState(defaultExpanded)` captures its initial value once, at
   // mount, and never again - but holidays load asynchronously (see useAppState.ts), so the
   // very first render solves without them, producing a different/smaller break set than
@@ -209,7 +219,7 @@ export function BreakCard({
   const dayWord = brk.totalDaysOff === 1 ? 'day' : 'days';
   const ptoWord = brk.ptoCost === 1 ? 'day' : 'days';
   const contested = isContested(brk);
-  const requestLine = requestByText(brk.start, noticePeriodDays, workWeek, today);
+  const requestLine = requestByText(brk.start, noticePeriodDays, workWeek, today, offDays);
 
   return (
     <div
@@ -245,11 +255,11 @@ export function BreakCard({
           </span>
           {brk.tags.map((tag) => (
             <span key={tag} className="rounded-[6px] bg-surface-alt px-2 py-0.5 text-xs font-medium text-ink">
-              {tag === 'Estimated' ? 'Travel demand estimated' : tag}
+              {travelTagLabels[tag] ?? tag}
             </span>
           ))}
           {contested && (
-            <span className="rounded-[6px] bg-surface-alt px-2 py-0.5 text-xs font-medium text-ink">Popular dates</span>
+            <span className="rounded-[6px] bg-surface-alt px-2 py-0.5 text-xs font-medium text-ink">Busier dates estimate</span>
           )}
         </p>
 
@@ -259,7 +269,7 @@ export function BreakCard({
         {/* Advice, not an error: the single most contested break in the plan. */}
         {isMostContested && (
           <p className="text-sm text-muted">
-            Estimated popular vacation dates based on public travel demand, not coworkers&apos; calendars.
+            This break falls in a busier period in the travel model. Your employer&apos;s availability is separate.
           </p>
         )}
 
@@ -267,7 +277,14 @@ export function BreakCard({
           {onTrack && tracked !== 'yes' && (
             <button
               type="button"
-              onClick={() => setTracked(onTrack(brk) === false ? 'no' : 'yes')}
+              disabled={tracking}
+              onClick={() => {
+                setTracking(true);
+                void settleLedgerAction(onTrack(brk), (ok) => {
+                  setTracked(ok === false ? 'no' : 'yes');
+                  setTracking(false);
+                });
+              }}
               className={buttonClasses('secondary', 'md', 'min-h-11 px-4')}
             >
               Track this PTO request
@@ -298,7 +315,7 @@ export function BreakCard({
                 options={[
                   { label: 'Copy date list', text: formatWorkingDaysList(brk, isPtoDay) },
                   { label: 'Copy email draft', text: formatManagerEmailShort(brk, isPtoDay) },
-                  { label: 'Copy detailed email draft', text: formatManagerEmailDetailed(brk, isPtoDay, noticePeriodDays, workWeek) },
+                  { label: 'Copy detailed email draft', text: formatManagerEmailDetailed(brk, isPtoDay, noticePeriodDays, workWeek, offDays) },
                 ]}
               />
               <button type="button" aria-expanded="true" onClick={() => setUserExpanded(false)} className={buttonClasses('quiet', 'md', 'min-h-11')}>

@@ -22,6 +22,8 @@ export interface RequestCalendarOptions {
 
 export interface RequestCalendarResult {
   calendar: RequestCalendar & { rangeStart: string; rangeEnd: string };
+  /** Names of the observed holiday entries only, for calendars that label their days. */
+  holidayNames: ReadonlyMap<string, string>;
   loading: boolean;
   degraded: boolean;
   subdivisions: string[];
@@ -46,7 +48,8 @@ function validSubdivision(country: string, subdivision: string): boolean {
  * are read without being saved or replaced; the existing holiday loader owns its cache. */
 export function useRequestCalendar(options: RequestCalendarOptions): RequestCalendarResult {
   const { country, subdivision, rangeStart, rangeEnd, workWeek, altFridayStart } = options;
-  const scheduleValid = Array.isArray(workWeek) && workWeek.length === 7 && workWeek.every((day) => typeof day === 'boolean');
+  const scheduleValid = Array.isArray(workWeek) && workWeek.length === 7
+    && workWeek.every((day) => typeof day === 'boolean') && workWeek.some(Boolean);
   const scheduleKey = (scheduleValid ? workWeek : DEFAULT_WORK_WEEK).map((day) => day ? '1' : '0').join('');
   const resolvedWorkWeek = useMemo(() => [...scheduleKey].map((day) => day === '1') as WorkWeek, [scheduleKey]);
   const inputValid = validScope(country, rangeStart, rangeEnd, subdivision)
@@ -101,20 +104,23 @@ export function useRequestCalendar(options: RequestCalendarOptions): RequestCale
   }, [country, subdivision, rangeStart, rangeEnd, scopeKey, inputValid]);
 
   const current = inputValid && loaded?.key === scopeKey ? loaded : null;
-  const offDays = useMemo(() => {
-    if (!current) return [];
+  const { offDays, holidayNames } = useMemo(() => {
+    const holidayNames = new Map<string, string>();
+    if (!current) return { offDays: [], holidayNames };
     const excluded = new Set(employer.excluded);
-    const dates = new Set<string>();
     for (const holiday of [...current.holidays, ...employer.custom]) {
       if (isValidISODate(holiday.date) && holiday.date >= rangeStart && holiday.date <= rangeEnd
-        && !excluded.has(`${holiday.date}|${holiday.name}`)) dates.add(holiday.date);
+        && !excluded.has(`${holiday.date}|${holiday.name}`) && !holidayNames.has(holiday.date)) {
+        holidayNames.set(holiday.date, holiday.name);
+      }
     }
+    const dates = new Set(holidayNames.keys());
     if (altFridayStart) {
       for (const date of rangeISO(rangeStart, rangeEnd)) {
         if (isAlternatingFridayOff(date, altFridayStart)) dates.add(date);
       }
     }
-    return [...dates].sort();
+    return { offDays: [...dates].sort(), holidayNames };
   }, [current, employer, rangeStart, rangeEnd, altFridayStart]);
 
   return {
@@ -122,6 +128,7 @@ export function useRequestCalendar(options: RequestCalendarOptions): RequestCale
       workWeek: resolvedWorkWeek, offDays,
       rangeStart: inputValid ? rangeStart : '', rangeEnd: inputValid ? rangeEnd : '',
     },
+    holidayNames,
     loading: inputValid && !current,
     degraded: !inputValid || (current?.degraded ?? false),
     subdivisions: current?.subdivisions ?? [],

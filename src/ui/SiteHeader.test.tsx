@@ -9,15 +9,14 @@ afterEach(cleanup);
 describe('SiteHeader (2026-11 information architecture)', () => {
   const html = renderToStaticMarkup(<SiteHeader active="pto" />);
 
-  it('uses one Gapless lockup whose accessible name keeps the full product name', () => {
-    expect(html).not.toContain('aria-label="Gapless PTO Optimizer, home"');
-    expect(html).toMatch(/>Gapless\s*<\/span>/);
-    expect(html).toMatch(/>PTO Optimizer\s*<\/span>/);
+  it('uses one Timebower lockup whose accessible name keeps the full product name', () => {
+    expect(html).not.toContain('aria-label="Timebower, home"');
+    expect(html).toMatch(/>Timebower\s*<\/span>/);
   });
 
   it('derives the home link name from visible brand text and an unobtrusive home cue', () => {
     const { getByRole } = render(<SiteHeader active="pto" />);
-    const home = getByRole('link', { name: /Gapless.*PTO Optimizer.*home/i });
+    const home = getByRole('link', { name: /Timebower.*home/i });
     expect(home.getAttribute('href')).toBe('/');
     expect(home.hasAttribute('aria-label')).toBe(false);
     expect(home.querySelector('.sr-only')?.textContent?.trim()).toBe('home');

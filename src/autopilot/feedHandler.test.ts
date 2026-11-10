@@ -25,10 +25,11 @@ describe('handleFeedRequest', () => {
     expect(spy.mock.calls.map(([c, y]) => `${c}-${y}`).sort()).toEqual(['US-2026', 'US-2027', 'US-2028']); // 2028: Jan 1 2028 is observed Dec 31 2027
   });
 
-  it('a failing reader degrades to no holidays, not a 500', async () => {
+  it('declines a feed when holiday data cannot be read', async () => {
     const res = await handleFeedRequest(new Request(URL_OK), async () => { throw new Error('disk'); }, NOW);
-    expect(res.status).toBe(200);
-    expect(await res.text()).not.toContain('Thanksgiving');
+    expect(res.status).toBe(422);
+    expect(await res.text()).toContain('lack complete holiday data');
+    expect(res.headers.get('cache-control')).toBe('no-store');
   });
 
   it('400 plain text for an invalid range', async () => {
@@ -70,8 +71,22 @@ describe('handleFeedRequest', () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it('still serves a three-year plan at the PTO limit', async () => {
-    const res = await handleFeedRequest(new Request('https://example.test/api/feed?c=US&s=2026-11-04&e=2029-11-03&b=80'), reader, NOW);
+  it('still serves a covered three-year plan at the PTO limit', async () => {
+    const res = await handleFeedRequest(new Request('https://example.test/api/feed?c=US&s=2026-01-01&e=2028-12-31&b=80'), reader, NOW);
     expect(res.status).toBe(200);
+  });
+
+  it('does not return a plan with missing or malformed holiday data', async () => {
+    const future = await handleFeedRequest(new Request('https://example.test/api/feed?c=US&s=2028-11-04&e=2029-11-03&b=10'), reader, NOW);
+    expect(future.status).toBe(422);
+    expect(await future.text()).toContain('Choose a covered range');
+    const malformed = await handleFeedRequest(new Request(URL_OK), async () => [{ date: 'invalid' }], NOW);
+    expect(malformed.status).toBe(422);
+  });
+
+  it('does not put legacy schedule-specific feed responses in a shared cache', async () => {
+    const res = await handleFeedRequest(new Request(`${URL_OK}&bo=2026-12-01`), reader, NOW);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('private, no-store');
   });
 });

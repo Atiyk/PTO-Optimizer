@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import shell from '../../index.html?raw';
 import { landingPlanHref, landingSearch, readLandingState, validLandingRange } from './landingState';
-import { defaultEmployerCalendar, encodeEmployerCalendar } from '../personal/employerCalendar';
 
 describe('homepage planning state', () => {
   const state = { country: 'GB', budget: 17, rangeStart: '2027-02-01', rangeEnd: '2028-02-29' };
@@ -12,7 +11,7 @@ describe('homepage planning state', () => {
 
   it('preserves the exact live preview inputs when opening the full planner', () => {
     const params = new URL(landingPlanHref(state, '2027-04-12'), 'https://example.test').searchParams;
-    expect(Object.fromEntries(params)).toEqual({ c: 'GB', b: '17', s: '2027-02-01', e: '2028-02-29', rv: '0', pv: '2', ps: 'balanced', mb: '3', w: '30', count: '3', p: '2027-04-12', eh: encodeEmployerCalendar(defaultEmployerCalendar('GB')) });
+    expect(Object.fromEntries(params)).toEqual({ c: 'GB', b: '17', s: '2027-02-01', e: '2028-02-29', rv: '0', pv: '2', ps: 'balanced', mb: '3', w: '30', count: '3', p: '2027-04-12' });
     expect(params.has('home')).toBe(false);
   });
 

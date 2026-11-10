@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addDays } from '@daysoff/engine/solver/dateUtils';
+import { requestByDate } from '@daysoff/engine/calendar/requestDeadline';
 import { buildPlanFeedICS, holidayEventLines, MAX_FEED_QUERY_LENGTH } from './feed';
 import type { HolidaySource } from './planFromSearch';
 import { diskHolidays } from './feedTestHolidays';
@@ -66,7 +67,9 @@ describe('buildPlanFeedICS: same events as the downloaded .ics', () => {
     // The download uses the viewer's local date, so it is made at local noon on TODAY; DTSTAMP
     // (the moment of export) is the only line allowed to differ.
     const [y, m, d] = TODAY.split('-').map(Number);
-    const download = generateICS(result.plan.breaks, result.plan.isPtoDay, new Date(y, m - 1, d, 12), { enabled: true, leadDays: 14 });
+    const download = generateICS(result.plan.breaks, result.plan.isPtoDay, new Date(y, m - 1, d, 12), {
+      enabled: true, leadDays: 14, workWeek: result.plan.state.workWeek, offDays: result.plan.solveInput.offDays,
+    });
     const body = (ics: string) => ics.slice(ics.indexOf('BEGIN:VEVENT'), ics.lastIndexOf('END:VEVENT')).replace(/^DTSTAMP:.*$/gm, 'DTSTAMP');
     expect(body(result.ics)).toContain(body(download));
     expect(events(result.ics).filter((e) => prop(e, 'UID')!.startsWith('UID:pto-')).length).toBe(events(download).length);
@@ -82,13 +85,13 @@ describe('buildPlanFeedICS: same events as the downloaded .ics', () => {
 });
 
 describe('F2 book-by events', () => {
-  it('one per future break, on break start minus the notice period from the link', () => {
+  it('one per future break, shifted to a working date from the link schedule', () => {
     const { ics, plan } = feed(`${SEARCH}&np=21`);
     const future = plan.breaks.filter((b) => b.start > TODAY);
     const reminders = events(ics).filter((e) => prop(e, 'UID')!.startsWith('UID:pto-reminder-'));
     expect(reminders.length).toBe(future.length);
     for (const brk of future) {
-      const bookBy = addDays(brk.start, -21);
+      const bookBy = requestByDate(brk.start, 21, plan.state.workWeek, plan.solveInput.offDays)!;
       const expected = (bookBy < TODAY ? TODAY : bookBy).replace(/-/g, '');
       expect(reminders.some((e) => prop(e, 'DTSTART') === `DTSTART;VALUE=DATE:${expected}`)).toBe(true);
     }
@@ -140,12 +143,13 @@ describe('holidays in the feed', () => {
     expect(ics).toContain('SUMMARY:Thanksgiving Day');
   });
 
-  it('honours the employer calendar carried in the link and escapes its text', () => {
+  it('honours the dates in a legacy employer calendar without exposing its labels', () => {
     const eh = encodeEmployerCalendar({ version: 1, country: 'US', excluded: ['2026-11-26|Thanksgiving Day'], custom: [{ date: '2026-12-24', name: 'Office closed; eve, "early"\\ off' }] });
     const { ics } = feed(`${SEARCH}&eh=${encodeURIComponent(eh)}`);
     expect(ics).not.toContain('UID:holiday-20261126-US');
     expect(ics).toContain('UID:holiday-20271125-US'); // only the excluded year's entry
-    expect(ics).toContain('SUMMARY:Office closed\\; eve\\, "early"\\\\ off');
+    expect(ics).toContain('SUMMARY:Employer-observed day off');
+    expect(ics).not.toContain('Office closed');
   });
 
   it('merges two holidays on one date into one event with a unique UID', () => {
@@ -160,10 +164,9 @@ describe('holidays in the feed', () => {
 
   it('folds a long holiday name', () => {
     const name = 'A very long company holiday name that keeps going well past the limit';
-    const eh = encodeEmployerCalendar({ version: 1, country: 'US', excluded: [], custom: [{ date: '2026-12-24', name }] });
-    const { ics } = feed(`${SEARCH}&eh=${encodeURIComponent(eh)}`);
-    expect(ics).toContain('\r\n ');
-    expect(ics.replace(/\r\n /g, '')).toContain(`SUMMARY:${name}`);
+    const lines = holidayEventLines([{ date: '2026-12-24', name, source: 'public', checked: true }], 'US', '20261104T000000Z');
+    expect(lines.join('\r\n')).toContain('\r\n ');
+    expect(lines.join('\r\n').replace(/\r\n /g, '')).toContain(`SUMMARY:${name}`);
   });
 });
 

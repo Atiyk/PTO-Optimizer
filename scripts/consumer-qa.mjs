@@ -42,7 +42,7 @@ try {
 }
 
 const routes = [
-  { name: 'home', path: '/', title: /Gapless PTO Optimizer/ },
+  { name: 'home', path: '/', title: label === 'before' ? /Gapless PTO Optimizer|Timebower/ : /Timebower/ },
   // Vite preview serves directory indexes at /pto/, whereas Vercel also maps the
   // clean /pto URL. A slashless preview URL silently falls back to the homepage.
   { name: 'pto', path: '/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15', title: /Plan your PTO/ },
@@ -59,9 +59,8 @@ const routes = [
 try {
   for (const width of [1440, 768, 375, 320]) {
     for (const route of routes) {
-      // Narrowest viewport: enforce overflow and reading-order checks on the
-      // Understand hub and guides, without changing legacy planner baselines.
-      if (width === 320 && !['home', 'pto', 'understand', 'guide-accrual', 'guide-carryover', 'guide-holidays', 'guide-payout'].includes(route.name)) continue;
+      // At 320 px cover each route affected by this batch and the learning routes.
+      if (width === 320 && !['home', 'pto', 'policy', 'family', 'sabbatical', 'understand', 'guide-accrual', 'guide-carryover', 'guide-holidays', 'guide-payout'].includes(route.name)) continue;
       const context = await browser.newContext({
         viewport: { width, height: 1000 },
         timezoneId: 'America/New_York',
@@ -97,7 +96,8 @@ try {
 
       const result = { route: route.name, width, runtimeErrors, failedSameOriginResponses };
       try {
-        await page.goto(new URL(route.path, baseUrl).href, { waitUntil: 'networkidle', timeout: 30000 });
+        await page.goto(new URL(route.path, baseUrl).href, { waitUntil: label === 'before' ? 'networkidle' : 'domcontentloaded', timeout: 30000 });
+        if (route.name === 'pto' && label !== 'before') await page.locator('main[data-plan-ready="true"]').waitFor({ state: 'visible' });
         await page.locator('#root').waitFor({ state: 'visible', timeout: 15000 });
         await page.evaluate(() => document.fonts.ready);
         // Allow asynchronous same-origin holiday loading and React effects to settle.
@@ -221,6 +221,7 @@ try {
           // Check that the local-only explanation uses actual recommended dates,
           // opens with keyboard-compatible native details, and stays readable at 320px.
           const explanation = page.locator('[data-testid="plan-explanation"]');
+          await explanation.waitFor({ state: 'visible', timeout: 15000 });
           result.planExplanationVisible = await explanation.isVisible();
           if (result.planExplanationVisible) {
             await explanation.locator('summary').click();

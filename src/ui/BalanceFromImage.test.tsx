@@ -18,6 +18,7 @@ vi.mock('./balanceOcr', () => ({
 }));
 
 import { Policy } from './Policy';
+import { readBrowserPolicyDraft } from '../personal/policyPreferences';
 import { BalanceFromImage } from './BalanceFromImage';
 import { valueInUnit } from './BalanceReader';
 
@@ -48,7 +49,7 @@ async function pickImage(file: File) {
 }
 
 describe('BalanceFromImage on the policy page', () => {
-  it('pick image -> candidates -> tap -> balance and as-of date land in the URL', async () => {
+  it('pick image -> candidates -> tap -> balance and as-of date stay in the private draft', async () => {
     render(<Policy />);
     await pickImage(png());
     const choice = await screen.findByRole('button', { name: /Vacation available · 12\.5 days · as of Nov 6/ });
@@ -56,11 +57,12 @@ describe('BalanceFromImage on the policy page', () => {
     // Sick leave is never offered.
     expect(screen.queryByRole('button', { name: /Sick/ })).toBeNull();
     // Nothing changed until the tap.
-    expect(new URLSearchParams(window.location.search).get('cb')).toBe('10');
+    expect(new URLSearchParams(String(readBrowserPolicyDraft())).get('cb')).toBe('10');
     fireEvent.click(choice);
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(String(readBrowserPolicyDraft()));
     expect(params.get('cb')).toBe('12.5');
     expect(params.get('bao')).toBe('2026-11-06');
+    expect(window.location.search).toBe('?c=US');
     expect((quick().getByLabelText('Current PTO balance (days)') as HTMLInputElement).value).toBe('12.5');
     expect((quick().getByLabelText('Balance as-of date') as HTMLInputElement).value).toBe('2026-11-06');
     expect(screen.getByText(/Balance set to 12\.5 days as of Nov 6, 2026/)).toBeTruthy();
@@ -72,9 +74,9 @@ describe('BalanceFromImage on the policy page', () => {
     await pickImage(png());
     const choice = await screen.findByRole('button', { name: /Vacation balance · 40 hours \(5 days at 8 h\/day\)/ });
     fireEvent.click(choice);
-    expect(new URLSearchParams(window.location.search).get('cb')).toBe('5');
+    expect(new URLSearchParams(String(readBrowserPolicyDraft())).get('cb')).toBe('5');
     // No as-of date in the text: the as-of date is left alone.
-    expect(new URLSearchParams(window.location.search).get('bao')).toBe('2026-10-01');
+    expect(new URLSearchParams(String(readBrowserPolicyDraft())).get('bao')).toBe('2026-10-01');
   });
 
   it('extracts live from pasted text without OCR', async () => {
@@ -84,8 +86,8 @@ describe('BalanceFromImage on the policy page', () => {
     fireEvent.change(quick().getByLabelText('Text from your payslip or HR page'), { target: { value: 'PTO remaining 7 days as of 10/31/2026' } });
     fireEvent.click(await screen.findByRole('button', { name: /PTO remaining · 7 days · as of Oct 31/ }));
     expect(ocr.calls).toBe(0);
-    expect(new URLSearchParams(window.location.search).get('cb')).toBe('7');
-    expect(new URLSearchParams(window.location.search).get('bao')).toBe('2026-10-31');
+    expect(new URLSearchParams(String(readBrowserPolicyDraft())).get('cb')).toBe('7');
+    expect(new URLSearchParams(String(readBrowserPolicyDraft())).get('bao')).toBe('2026-10-31');
   });
 
   it('has no submit or generate button', async () => {

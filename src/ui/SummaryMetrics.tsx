@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Scores } from '@daysoff/engine/solver/types';
-import { ordinal, travelLine } from './scoreFormat';
+import { intensityBand } from './scoreFormat';
 
 interface SummaryMetricsProps {
   budgetSpent: number;
@@ -49,38 +49,34 @@ function Fact({ figure, label, short, children }: { figure: string; label: strin
   );
 }
 
-function gloss(line: string): string {
-  return line.split(' · ')[1] ?? '';
-}
-
 function trimDecimal(n: number): string {
   return n.toFixed(2).replace(/\.?0+$/, '');
 }
 
 /**
- * The plan's quality in words, not opaque pills: what each PTO day buys, and where the two
- * percentile scores sit, each with the plain-language reading the scoreFormat bands derive
- * ("quieter than most weeks in your dates"). Same engine numbers as before; the counts
- * (PTO used, days off, breaks) are stated once, in the result line above.
+ * Keep the exact PTO arithmetic separate from broad travel model context.
+ * The internal travel percentile only selects an ordinal band for US history.
  */
 export function SummaryMetrics({ budgetSpent, totalDaysOff, breakCountActual, scores, travelBasis = 'estimate' }: SummaryMetricsProps) {
   const ratio = budgetSpent > 0 ? trimDecimal(totalDaysOff / budgetSpent) : null;
   const offWord = totalDaysOff === 1 ? 'day' : 'days';
   const ptoWord = budgetSpent === 1 ? 'day' : 'days';
   const breakWord = breakCountActual === 1 ? 'break' : 'breaks';
+  const travelFigure = scores
+    ? travelBasis === 'us' ? ['Busier', 'Typical', 'Quieter'][intensityBand(scores.travel.percentile)] : 'Seasonal'
+    : '—';
   return (
-    // Two facts, not three: the efficiency percentile only compares this plan with itself
-    // re-solved at other travel settings, so it lives in "Why this plan?" wording, not as a
-    // headline figure that reads like a ranking against every possible plan.
     <dl className="m-0 grid grid-cols-2 gap-x-4 border-t border-line pt-4 sm:gap-x-8">
       <Fact figure={ratio ? `${ratio}×` : '—'} label="Days off per PTO day" short="days off per PTO day">
         {ratio
           ? <>{totalDaysOff} {offWord} off for {budgetSpent} PTO {ptoWord} in {breakCountActual} {breakWord}. Each PTO day buys {ratio} days off, weekends and holidays included.</>
           : <>No PTO placed yet, so there is no return to show.</>}
       </Fact>
-      <Fact figure={scores ? ordinal(scores.travel.percentile) : '—'} label={travelBasis === 'us' ? 'Travel quietness' : 'Travel quietness (est.)'} short={travelBasis === 'us' ? 'travel quietness, higher is quieter' : 'travel quietness (estimate), higher is quieter'}>
+      <Fact figure={travelFigure} label="Travel estimate" short="travel estimate">
         {scores
-          ? <>Higher is quieter: {gloss(travelLine(scores))}. {travelBasis === 'us' ? 'Based on 2025 US airport checkpoint counts.' : 'A seasonal estimate; there is no travel data for this country.'}</>
+          ? travelBasis === 'us'
+            ? <>Relative comparison using 2025 US airport checkpoint counts. Current fares and travel volumes may differ.</>
+            : <>Generic seasonal estimate without country-specific travel observations.</>
           : <>Appears once the plan is solved.</>}
       </Fact>
     </dl>

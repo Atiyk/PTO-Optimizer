@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MoreOptions, blockNextNDays } from './MoreOptions';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 
@@ -86,6 +87,18 @@ describe('MoreOptions (Phase 3: consolidated "Days I can\'t take off")', () => {
     const html = renderToStaticMarkup(<MoreOptions {...baseProps} />);
     expect(html).toContain('Compressed schedule (9/80)');
     expect(html).toContain('Every other Friday off');
+  });
+
+  it('keeps the last working day selected while allowing another day to be added', () => {
+    const onChangeWorkWeek = vi.fn();
+    render(<MoreOptions {...baseProps} workWeek={[true, false, false, false, false, false, false]} onChangeWorkWeek={onChangeWorkWeek} />);
+    try {
+      const monday = screen.getByRole('checkbox', { name: 'Mon' }) as HTMLInputElement;
+      const tuesday = screen.getByRole('checkbox', { name: 'Tue' }) as HTMLInputElement;
+      expect(monday.disabled).toBe(true);
+      fireEvent.click(tuesday);
+      expect(onChangeWorkWeek).toHaveBeenCalledWith([true, true, false, false, false, false, false]);
+    } finally { cleanup(); }
   });
 
   it('wires the .ics import into the same blackout bulk-add handler as "Block the next N days"', () => {

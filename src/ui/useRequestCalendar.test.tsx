@@ -39,6 +39,7 @@ describe('personal request calendar', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.degraded).toBe(false);
     expect(result.current.calendar.offDays).toEqual(['2027-01-01']);
+    expect(result.current.holidayNames).toEqual(new Map([['2027-01-01', 'New Year']]));
     expect(result.current.calendar.rangeStart).toBe(options.rangeStart);
     expect(result.current.calendar.rangeEnd).toBe(options.rangeEnd);
     expect(result.current.subdivisions).toContain('US-CA');
@@ -53,9 +54,11 @@ describe('personal request calendar', () => {
     const { result, rerender } = renderHook((props: RequestCalendarOptions) => useRequestCalendar(props), { initialProps: { ...options, subdivision: 'US-CA' } as RequestCalendarOptions });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.calendar.offDays).toEqual(['2027-01-08', '2027-03-26', '2027-03-31']);
+    expect(result.current.holidayNames.get('2027-01-08')).toBe('Regional company day');
     rerender(options);
     expect(result.current.loading).toBe(true);
     expect(result.current.calendar.offDays).toEqual([]);
+    expect(result.current.holidayNames.size).toBe(0);
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.calendar.offDays).toEqual(['2027-01-07']);
     expect(write).not.toHaveBeenCalled();
@@ -153,6 +156,7 @@ describe('personal request calendar', () => {
     { ...options, subdivision: 'US-' },
     { ...options, altFridayStart: '2027-02-30' },
     { ...options, workWeek: [] as unknown as WorkWeek },
+    { ...options, workWeek: [false, false, false, false, false, false, false] as WorkWeek },
   ])('fails closed for invalid or excessive inputs without fetching: %o', (invalid) => {
     const { result } = renderHook(() => useRequestCalendar(invalid));
     expect(result.current.loading).toBe(false);

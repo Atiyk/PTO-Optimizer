@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { SolveInput } from '@daysoff/engine/solver/types';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { isoToSerial, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
-import { comparePortfolioMetrics, normalizePortfolioBreaks, selectCanonicalPortfolios } from './canonicalPortfolio';
+import { analyzeCanonicalPortfolios, comparePortfolioMetrics, normalizePortfolioBreaks, selectCanonicalPortfolios } from './canonicalPortfolio';
 import type { ConstraintSet } from './constraintRecommendationAdapter';
 
 const base: SolveInput = {
@@ -166,6 +166,33 @@ describe('whole-plan consumer recommendations', () => {
     expect(joint.every(p => p.travelSignal === 'not-used')).toBe(true);
     expect(new Set(joint.map(p => p.breaks.map(b => b.start + '/' + b.end).join('|'))).size).toBe(joint.length);
     expect(joint[0].breaks).not.toEqual(solo[0].breaks);
+  });
+
+  it('probes a later funded window when whole-plan eligibility rejects every initial portfolio', () => {
+    const input: SolveInput = {
+      rangeStart: '2027-01-01', rangeEnd: '2027-01-15', budget: 2,
+      offDays: [], w: 0, breakCount: 1,
+    };
+    const result = analyzeCanonicalPortfolios(input, empty, {
+      candidateEligible: candidate => candidate.breaks.every(break_ => break_.start >= '2027-01-08'),
+    });
+    expect(result?.portfolios).toEqual([
+      expect.objectContaining({ ptoDays: 1, budgetRemaining: 1, breaks: [
+        { start: '2027-01-08', end: '2027-01-10', ptoDays: 1, calendarDays: 3 },
+      ] }),
+    ]);
+    expect(result?.feasiblePlanCount).toBe(1);
+    expect(result?.shortfalls).toContainEqual(expect.objectContaining({ kind: 'one-plan-found' }));
+  });
+
+  it('reports missing evidence and no feasible plan without including private source descriptions', () => {
+    const result = analyzeCanonicalPortfolios({ ...base, budget: 0, mustIncludeDays: ['2027-04-01'] }, {
+      ...empty, partial: true, missingSources: ['Private event text'],
+    });
+    expect(result?.portfolios).toEqual([]);
+    expect(result?.feasiblePlanCount).toBe(0);
+    expect(result?.shortfalls.map(issue => issue.kind)).toEqual(['incomplete-calendar', 'no-feasible-plan']);
+    expect(JSON.stringify(result)).not.toContain('Private event text');
   });
 
   it('rejects invalid eligibility callbacks and unbounded solver probes', () => {

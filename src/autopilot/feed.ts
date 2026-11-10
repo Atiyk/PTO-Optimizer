@@ -90,8 +90,10 @@ export function buildPlanFeedICS(search: string, today: string, holidays: Holida
     'REFRESH-INTERVAL;VALUE=DURATION:PT12H',
     'X-PUBLISHED-TTL:PT12H',
     ...ptoDayEventLines(plan.breaks, plan.isPtoDay, dtstamp),
-    ...bookByEventLines(plan.breaks, today, plan.state.noticePeriodDays, dtstamp),
-    ...holidayEventLines(plan.holidayEntries, plan.state.country, dtstamp),
+    ...bookByEventLines(plan.breaks, today, plan.state.noticePeriodDays, dtstamp, plan.state.workWeek, plan.solveInput.offDays),
+    ...holidayEventLines(plan.holidayEntries.map((entry) => entry.source === 'custom'
+      ? { ...entry, name: 'Employer-observed day off' }
+      : entry), plan.state.country, dtstamp),
     'END:VCALENDAR',
   ];
   return { ok: true, ics: lines.join('\r\n') + '\r\n', plan };

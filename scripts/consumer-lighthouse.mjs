@@ -32,7 +32,7 @@ const variants = [
   { name: 'after', origin: validateUrl(values['current-url']) },
 ];
 const routes = [
-  { name: 'home', path: '/', title: /Gapless PTO Optimizer/ },
+  { name: 'home', path: '/', title: /Timebower/ },
   { name: 'pto', path: '/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15', title: /Plan your PTO/ },
   { name: 'policy', path: '/policy/', title: /Your Time-Off Policy/ },
   { name: 'sabbatical', path: '/sabbatical/', title: /Sabbatical Planning/ },
@@ -126,10 +126,13 @@ try {
         return ['http:', 'https:'].includes(url.protocol) && url.origin !== variant.origin ? requestRoute.abort() : requestRoute.continue();
       });
       try {
-        await page.goto(new URL(route.path, variant.origin).href, { waitUntil: 'networkidle', timeout: 30000 });
+        await page.goto(new URL(route.path, variant.origin).href, { waitUntil: variant.name === 'before' ? 'networkidle' : 'domcontentloaded', timeout: 30000 });
+        if (route.name === 'pto' && variant.name === 'after') await page.locator('main[data-plan-ready="true"]').waitFor({ state: 'visible' });
         await page.locator('#root').waitFor({ state: 'visible' });
         await page.evaluate(() => document.fonts.ready);
-        if (!route.title.test(await page.title())) throw new Error('The static server rendered the wrong route.');
+        const title = await page.title();
+        const validTitle = route.title.test(title) || (variant.name === 'before' && route.name === 'home' && /Gapless PTO Optimizer/.test(title));
+        if (!validTitle) throw new Error('The static server rendered the wrong route.');
         const scan = async (state) => {
           const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
           await json(resolve(outputDirectory, variant.name, `${route.name}-axe-${state}.json`), result);

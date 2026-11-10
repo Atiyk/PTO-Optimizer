@@ -24,8 +24,7 @@ export interface ParsedImportResult {
   /** Non-null, equal to MAX_IMPORT_EVENTS, when the file had more events than that and
    * parsing stopped early - the caller shows this plainly rather than silently truncating. */
   cappedAt: number | null;
-  /** Events with an RRULE are intentionally not expanded (see parseICSBusyDays' own
-   * comment) - counted here so the caller can mention they were skipped. */
+  /** Recurrence rules, dates and exceptions are skipped and counted for the caller. */
   skippedRecurring: number;
 }
 
@@ -199,7 +198,7 @@ function addBoundedDays(busy: Set<string>, first: string, last: string): void {
  * exactly the spec's filter: an all-day event counts regardless of length (even a single
  * day), but a timed event only counts when its REAL duration is at least 24 hours - a
  * 30-minute meeting, or even a long multi-hour one, is not a reason to block a day off.
- * Recurring events (RRULE present) are deliberately NOT expanded - a general recurrence
+ * Recurring events are deliberately NOT expanded - a general recurrence
  * engine is out of scope for one import feature (same judgment call as the 9/80 schedule
  * option elsewhere in this phase); they're counted and reported as skipped instead of
  * silently dropped or wrongly expanded.
@@ -222,16 +221,16 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
   let dtstartProp: RawProp | null = null;
   let dtendProp: RawProp | null = null;
   let durationValue: string | null = null;
-  let hasRRule = false;
+  let hasRecurrence = false;
   // Depth inside a sub-component of the event (VALARM etc.): its DTSTART/DURATION are not the event's.
   let subDepth = 0;
 
   function flushEvent(): void {
-    if (!dtstartProp) return;
-    if (hasRRule) {
+    if (hasRecurrence) {
       skippedRecurring++;
       return;
     }
+    if (!dtstartProp) return;
     const start = parseDateTimeValue(dtstartProp);
     if (!start) throw new IcsParseError('Calendar event has an invalid start date.');
 
@@ -302,7 +301,7 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
       dtstartProp = null;
       dtendProp = null;
       durationValue = null;
-      hasRRule = false;
+      hasRecurrence = false;
       subDepth = 0;
       eventCount++;
       if (eventCount > MAX_IMPORT_EVENTS) {
@@ -331,7 +330,7 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
     if (prop.name === 'DTSTART') dtstartProp = prop;
     else if (prop.name === 'DTEND') dtendProp = prop;
     else if (prop.name === 'DURATION') durationValue = prop.value;
-    else if (prop.name === 'RRULE') hasRRule = true;
+    else if (['RRULE', 'RDATE', 'EXDATE', 'EXRULE', 'RECURRENCE-ID'].includes(prop.name)) hasRecurrence = true;
   }
 
   if (inEvent && cappedAt === null) {

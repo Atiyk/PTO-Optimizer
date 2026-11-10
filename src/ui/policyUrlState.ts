@@ -46,6 +46,10 @@ export interface PolicyURLState {
   negativeBalanceAllowance: number;
   payoutOnLeaving: PayoutOnLeaving;
   currentBalance: number;
+  /** An explicit zero is a known balance. Omitted keeps legacy programmatic callers compatible. */
+  balanceEntered?: boolean;
+  balanceIncludesApprovedLeave?: boolean;
+  shiftMinutes?: readonly number[];
   balanceAsOf: string;
   plannedDays: string[];
   country: string;
@@ -103,6 +107,7 @@ export function defaultPolicyURLState(): PolicyURLState {
     negativeBalanceAllowance: 0,
     payoutOnLeaving: 'not-sure',
     currentBalance: 12,
+    balanceEntered: true,
     balanceAsOf: today,
     plannedDays: [],
     country: 'US',
@@ -112,6 +117,12 @@ export function defaultPolicyURLState(): PolicyURLState {
 export function readPolicyStateFromURL(search: string, defaultCountry: string): PolicyURLState {
   const params = new URLSearchParams(search);
   const d = defaultPolicyURLState();
+  const rawBalance = params.get('cb');
+  const rawShifts = params.get('shm');
+  const shiftMinutes = rawShifts?.split(',').map(Number);
+  const validShifts = rawShifts && /^\d{1,4}(,\d{1,4}){6}$/.test(rawShifts)
+    && shiftMinutes?.every(minutes => minutes >= 0 && minutes <= 1440);
+  const balanceEntered = rawBalance !== null && rawBalance.trim() !== '' && Number.isFinite(Number(rawBalance));
 
   return {
     ...(params.get('ww') && /^[01]{7}$/.test(params.get('ww')!) ? { workWeek: [...params.get('ww')!].map(value => value === '1') as WorkWeek } : {}),
@@ -142,7 +153,10 @@ export function readPolicyStateFromURL(search: string, defaultCountry: string): 
     payoutOnLeaving: PAYOUT_FROM_CODE[params.get('pol') ?? ''] ?? d.payoutOnLeaving,
     ...(params.has('fd') && isValidISODate(params.get('fd')!) ? { forecastDate: params.get('fd')! } : {}),
     ...(params.has('car') ? { currentCarriedBalance: num(params.get('car'), 0) } : {}),
-    currentBalance: num(params.get('cb'), d.currentBalance),
+    currentBalance: num(rawBalance, d.currentBalance),
+    balanceEntered,
+    ...(params.get('bap') === '1' ? { balanceIncludesApprovedLeave: true } : {}),
+    ...(validShifts ? { shiftMinutes } : {}),
     balanceAsOf: date(params.get('bao'), d.balanceAsOf),
     plannedDays: parseDateList(params.get('pd')),
     country: params.get('c') || defaultCountry,
@@ -239,7 +253,10 @@ export function writePolicyStateToURL(params: URLSearchParams, state: PolicyURLS
   else params.delete('fd');
   if (state.currentCarriedBalance) params.set('car', String(state.currentCarriedBalance));
   else params.delete('car');
-  params.set('cb', String(state.currentBalance));
+  if (state.balanceIncludesApprovedLeave) params.set('bap', '1'); else params.delete('bap');
+  if (state.shiftMinutes) params.set('shm', state.shiftMinutes.join(',')); else params.delete('shm');
+  if (state.balanceEntered !== false) params.set('cb', String(state.currentBalance));
+  else params.delete('cb');
   params.set('bao', state.balanceAsOf);
   if (state.plannedDays.length) params.set('pd', state.plannedDays.join(','));
   else params.delete('pd');

@@ -1,5 +1,13 @@
 # Gapless brand identity and logo (2026-11 overhaul)
 
+## Timebower identity
+
+The consumer wordmark is Timebower. Open Day is a rounded black calendar block with a detached square in its upper-right corner. Use the white mark and wordmark on the ink footer. Site surfaces, Signal Blue interaction colors, and Sea Glass calendar meaning follow the existing design tokens.
+
+The website uses Archivo Variable. Keep the landing headline compact, give the main result visual priority, and use tabular numerals where values change or align. Use iOS and Android system styles for a future native planner, with equivalent semantic text roles and platform text scaling.
+
+The original Gapless decisions below document the preceding identity.
+
 Owner of this file: the UX and brand overhaul thread (branch `claude/gapless-ux-brand-overhaul`).
 Supersedes the "Highlighted Schedule" identity (PR #114) and the "Marked" wordmark (draft PR
 #118, closed as superseded).
