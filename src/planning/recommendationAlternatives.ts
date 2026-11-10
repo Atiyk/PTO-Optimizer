@@ -43,13 +43,16 @@ export function selectRecommendationAlternatives(candidates: readonly Recommenda
   // Callers may supply imported or structurally typed JSON with extra enumerable
   // personal fields. Never pass them through to recommendation outputs. A
   // single continuous interval also never proves multiple separate getaways.
-  const feasible: RecommendationCandidate[] = candidates.filter(c => valid(c, budget)).map(c => ({
+  // Runtime array checks can widen the element type to any[] in TypeScript.
+  // Restore the declared narrow candidate contract before sanitizing.
+  const typedCandidates: readonly RecommendationCandidate[] = candidates;
+  const feasible: RecommendationCandidate[] = typedCandidates.filter(c => valid(c, budget)).map(c => ({
     start: c.start, end: c.end, ptoDays: c.ptoDays, breakDays: c.breakDays,
     getawayCount: 1,
     // Selected intervals contain NO verified hard exclusions. Caller blackouts
     // are private input and should not ride along in public recommendation data.
     hardExcludedDates: [],
-    reviewDates: [...new Set(c.reviewDates.filter(d => d >= c.start && d <= c.end))].sort(),
+    reviewDates: [...new Set(c.reviewDates.filter((d: string) => d >= c.start && d <= c.end))].sort(),
   }));
   const used: RecommendationCandidate[] = [];
   const output: RecommendationAlternative[] = [];
