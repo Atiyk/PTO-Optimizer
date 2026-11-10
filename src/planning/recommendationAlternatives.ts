@@ -38,10 +38,21 @@ function score(c: RecommendationCandidate, objective: typeof objectives[number])
 }
 /** Only ranks supplied, independently verified solver candidates; does not invent PTO plans. */
 export function selectRecommendationAlternatives(candidates: readonly RecommendationCandidate[], budget: number): RecommendationAlternative[] {
-  if (!Number.isInteger(budget) || budget < 0 || candidates.length > 10000) return [];
-  const feasible = candidates.filter(c => valid(c, budget)).map(c => ({
-    ...c,
-    reviewDates: [...new Set(c.reviewDates.filter(d => d >= c.start && d <= c.end))].sort(),
+  if (!Array.isArray(candidates) || !Number.isInteger(budget)
+    || budget < 0 || candidates.length > 10000) return [];
+  // Callers may supply imported or structurally typed JSON with extra enumerable
+  // personal fields. Never pass them through to recommendation outputs. A
+  // single continuous interval also never proves multiple separate getaways.
+  // Runtime array checks can widen the element type to any[] in TypeScript.
+  // Restore the declared narrow candidate contract before sanitizing.
+  const typedCandidates: readonly RecommendationCandidate[] = candidates;
+  const feasible: RecommendationCandidate[] = typedCandidates.filter(c => valid(c, budget)).map(c => ({
+    start: c.start, end: c.end, ptoDays: c.ptoDays, breakDays: c.breakDays,
+    getawayCount: 1,
+    // Selected intervals contain NO verified hard exclusions. Caller blackouts
+    // are private input and should not ride along in public recommendation data.
+    hardExcludedDates: [],
+    reviewDates: [...new Set(c.reviewDates.filter((d: string) => d >= c.start && d <= c.end))].sort(),
   }));
   const used: RecommendationCandidate[] = [];
   const output: RecommendationAlternative[] = [];

@@ -47,6 +47,28 @@ describe('deterministic consumer recommendation alternatives', () => {
     expect(results[0].objective).toBe('longest-break');
     expect(results.some(x => x.objective === 'most-getaways')).toBe(false);
   });
+  it('does not echo private imported fields or blackout dates into ranked recommendations', () => {
+    const injected = {
+      ...candidate('2027-09-01', 3, 2),
+      hardExcludedDates: ['2027-10-04'],
+      reviewDates: ['2027-08-01', '2027-09-02'],
+      personalNote: 'SECRET_MEDICAL_TITLE',
+      nested: { invitee: 'SECRET_FAMILY_CONTACT' },
+    };
+    const result = selectRecommendationAlternatives([injected], 2);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      start: '2027-09-01', end: '2027-09-03',
+      ptoDays: 2, breakDays: 3, getawayCount: 1,
+      hardExcludedDates: [], reviewDates: ['2027-09-02'],
+      objective: 'longest-break',
+      explanation: expect.stringContaining('3 calendar days away using 2 PTO days'),
+    });
+    expect(JSON.stringify(result)).not.toContain('SECRET_');
+    expect(JSON.stringify(result)).not.toContain('2027-10-04');
+    expect(selectRecommendationAlternatives({} as unknown as RecommendationCandidate[], 2)).toEqual([]);
+  });
+
   it('returns distinct deterministic alternatives with factual explanation metadata', () => {
     const items = [candidate('2027-04-01', 12, 1), candidate('2027-05-01', 5, 4), candidate('2027-06-01', 9, 2), candidate('2027-07-01', 4, 1, 0)];
     const a = selectRecommendationAlternatives(items, 3);
