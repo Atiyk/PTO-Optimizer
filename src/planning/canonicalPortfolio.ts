@@ -68,6 +68,10 @@ export function normalizePortfolioBreaks(breaks: readonly PortfolioBreak[]): Por
 export interface PortfolioOptions {
   /** First day permitted by an explicitly established employer notice policy. */
   earliestNoticeDate?: string;
+  /** Pure, bounded WHOLE candidate test before per-objective selection, never after winners. */
+  candidateEligible?: (candidate: Readonly<Omit<CanonicalPortfolio, 'objective' | 'explanation'>>) => boolean;
+  /** At most three smaller PTO budget probes; candidates are repriced under the original budget. */
+  additionalSearchBudgets?: readonly number[];
 }
 
 type PortfolioMetrics = Pick<CanonicalPortfolio,
@@ -116,6 +120,12 @@ export function selectCanonicalPortfolios(input: SolveInput, constraints: Constr
     || !Array.isArray(input.offDays) || !Array.isArray(input.blackouts ?? [])
     || !Array.isArray(input.mustIncludeDays ?? [])
     || (options.earliestNoticeDate !== undefined && !validCalendarDate(options.earliestNoticeDate))
+    || (options.candidateEligible !== undefined && typeof options.candidateEligible !== 'function')
+    || (options.additionalSearchBudgets !== undefined && (
+      !Array.isArray(options.additionalSearchBudgets)
+      || options.additionalSearchBudgets.length > 3
+      || !options.additionalSearchBudgets.every(n => Number.isInteger(n) && n >= 0 && n <= input.budget)
+    ))
     || !Number.isInteger(input.budget) || input.budget < 0 || input.budget > MAX_BUDGET
     || !validCalendarDate(input.rangeStart) || !validCalendarDate(input.rangeEnd)
     || input.rangeEnd < input.rangeStart
@@ -178,20 +188,42 @@ export function selectCanonicalPortfolios(input: SolveInput, constraints: Constr
     });
   }
 
-  for (const count of profiles) {
-    if (!Number.isInteger(count) || count < 0 || count > 7) continue;
-    const { result } = solveConsumer({ ...canonicalInput, breakCount: count });
-    addPlan(result.primary);
-    // Each engine alternative is a replacement INSIDE its original whole plan.
-    // Never add the alternative as an independent, unfunded vacation.
-    for (const replacement of result.alternatives.slice(0, 24)) {
-      const remaining = result.primary.filter(brk =>
-        brk.start !== replacement.replaces.start || brk.end !== replacement.replaces.end);
-      addPlan([...remaining, replacement]);
+  // Include bounded, lower-budget search passes for partner funding without
+  // modifying the legacy default call's solver work or altering its objective labels.
+  const searchBudgets = [...new Set([input.budget, ...(options.additionalSearchBudgets ?? [])])];
+  for (const searchBudget of searchBudgets) {
+    for (const count of profiles) {
+      if (!Number.isInteger(count) || count < 0 || count > 7) continue;
+      const { result } = solveConsumer({ ...canonicalInput, budget: searchBudget, breakCount: count });
+      addPlan(result.primary);
+      // Each engine alternative is a replacement INSIDE its original whole plan.
+      // Never add the alternative as an independent, unfunded vacation.
+      for (const replacement of result.alternatives.slice(0, 24)) {
+        const remaining = result.primary.filter(brk =>
+          brk.start !== replacement.replaces.start || brk.end !== replacement.replaces.end);
+        addPlan([...remaining, replacement]);
+      }
     }
   }
 
-  const feasible = [...candidates.values()];
+  // Filter candidates BEFORE choosing objective winners; filtering only the
+  // four output labels can starve lower-ranked but jointly affordable choices.
+  const feasible: Candidate[] = [];
+  for (const candidate of candidates.values()) {
+    if (!options.candidateEligible) { feasible.push(candidate); continue; }
+    let allowed: unknown;
+    try {
+      allowed = options.candidateEligible({
+        ...candidate, breaks: candidate.breaks.map(brk => ({ ...brk })),
+        freeCalendarDates: [...candidate.freeCalendarDates],
+        reviewDates: [...candidate.reviewDates],
+      });
+    } catch {
+      return null;
+    }
+    if (typeof allowed !== 'boolean') return null;
+    if (allowed) feasible.push(candidate);
+  }
   const output: CanonicalPortfolio[] = [];
   const used = new Set<string>();
   for (const objective of objectives) {

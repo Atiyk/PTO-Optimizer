@@ -152,6 +152,37 @@ describe('whole-plan consumer recommendations', () => {
       { earliestNoticeDate: '2027-04-15' })).toEqual([]);
   });
 
+  it('recovers a lower-ranked funded portfolio before objective selection', () => {
+    const solo = selectCanonicalPortfolios(base, empty)!;
+    expect(solo.length).toBeGreaterThan(0);
+    expect(solo[0].ptoDays).toBeGreaterThan(3);
+    const joint = selectCanonicalPortfolios(base, empty, {
+      additionalSearchBudgets: [3],
+      candidateEligible: candidate => candidate.ptoDays <= 3,
+    })!;
+    expect(joint).not.toBeNull();
+    expect(joint.length).toBeGreaterThan(0);
+    expect(joint.every(p => p.ptoDays <= 3 && p.budgetRemaining === base.budget - p.ptoDays)).toBe(true);
+    expect(joint.every(p => p.travelSignal === 'not-used')).toBe(true);
+    expect(new Set(joint.map(p => p.breaks.map(b => b.start + '/' + b.end).join('|'))).size).toBe(joint.length);
+    expect(joint[0].breaks).not.toEqual(solo[0].breaks);
+  });
+
+  it('rejects invalid eligibility callbacks and unbounded solver probes', () => {
+    expect(selectCanonicalPortfolios(base, empty, {
+      additionalSearchBudgets: [1, 2, 3, 4],
+    })).toBeNull();
+    expect(selectCanonicalPortfolios(base, empty, {
+      additionalSearchBudgets: [-1],
+    })).toBeNull();
+    expect(selectCanonicalPortfolios(base, empty, {
+      candidateEligible: (() => 'true') as unknown as () => boolean,
+    })).toBeNull();
+    expect(selectCanonicalPortfolios(base, empty, {
+      candidateEligible: () => { throw new Error('untrusted caller'); },
+    })).toBeNull();
+  });
+
   it('fails closed on fractional wallet units, invalid dates and malformed constraints', () => {
     expect(selectCanonicalPortfolios({ ...base, budget: 1.5 }, empty)).toBeNull();
     expect(selectCanonicalPortfolios({ ...base, rangeEnd: '2027-02-30' }, empty)).toBeNull();
