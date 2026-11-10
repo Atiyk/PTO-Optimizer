@@ -1,6 +1,6 @@
 import type { LeaveBank } from '../personal/leaveWallet';
 import type { PtoRequest } from '../personal/requestLedger';
-import { REQUEST_STATUSES, validRequestRange } from '../personal/requestLedger';
+import { REQUEST_STATUSES, parseRequestLedger, validRequestRange } from '../personal/requestLedger';
 import { validCalendarDate } from '../personal/employerCalendar';
 import {
   acceptLeaveWalletImport, encodeLeaveWallet, previewLeaveWalletImport,
@@ -40,8 +40,11 @@ function serializeLedger(requests: readonly PtoRequest[]): string | null {
   const seen = new Set<string>();
   const normalized: Array<{
     id: string; start: string; end: string; ptoDates: string[]; ptoDays: number;
+    ptoMinutes?: Readonly<Record<string, number>>; partialMinutes?: number;
     status: PtoRequest['status']; note: string; createdAt: string; updatedAt: string;
   }> = [];
+  const parsed = parseRequestLedger(JSON.stringify({ version: 1, requests }));
+  if (parsed.length !== requests.length) return null;
   for (const req of requests) {
     if (!req || typeof req.id !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(req.id)
       || seen.has(req.id) || !validRequestRange(req.start, req.end)
@@ -55,6 +58,7 @@ function serializeLedger(requests: readonly PtoRequest[]): string | null {
     normalized.push({
       id: req.id, start: req.start, end: req.end, ptoDates: [...req.ptoDates].sort(),
       ptoDays: req.ptoDays, status: req.status, note: req.note,
+      ptoMinutes: parsed[normalized.length].ptoMinutes, partialMinutes: req.partialMinutes,
       createdAt: req.createdAt, updatedAt: req.updatedAt,
     });
   }

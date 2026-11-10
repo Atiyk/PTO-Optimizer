@@ -94,7 +94,7 @@ export const PRACTICAL_GUIDES: readonly PracticalGuide[] = [
     mistakes: ['Assuming every public holiday is paid leave.', 'Using the holiday date instead of the observed closure.', 'Forgetting local or regional holidays.'],
     hrQuestions: ['Which holidays are paid days off for my team?', 'What is our substitute-day rule?', 'Do office and shift workers follow the same calendar?'],
     action: { href: '/pto', label: 'Adjust my employer holidays' },
-    caveat: 'Gapless starts with public holiday data. Your employer calendar is the final planning assumption.',
+    caveat: 'Timebower starts with public holiday data. Your employer calendar is the final planning assumption.',
   },
   {
     termId: 'notice-period',
@@ -174,7 +174,7 @@ export const PRACTICAL_GUIDES: readonly PracticalGuide[] = [
     mistakes: ['Treating pending as approved.', 'Leaving canceled requests in the confirmed forecast.', 'Deducting the same trip from both starting balance and future leave.'],
     hrQuestions: ['Where do I check approval status?', 'When is my balance actually deducted?', 'Can I change or cancel an approved request?'],
     action: { href: '/pto', label: 'Plan and track a request' },
-    caveat: 'Gapless is a personal tracker. It does not send requests to your employer or confirm approval.',
+    caveat: 'Timebower is a personal tracker. It does not send requests to your employer or confirm approval.',
   },
 ];
 

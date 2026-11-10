@@ -413,7 +413,7 @@ try {
     await noOverflow(recipient); await screenshot(recipient, '03-employer-calendar-reset-375.png');
   });
 
-  await check('Public Copy link and calendar subscriptions do not expose private titles without opt-in', async () => {
+  await check('Browser addresses, public copies and date-only calendar subscriptions omit private titles', async () => {
     const secret = 'PRIVATE_EMPLOYER_POLICY_TITLE';
     const page = await open(await mobileContext(), holidayPath);
     await moreOptions(page);
@@ -423,8 +423,13 @@ try {
     await holidays.getByRole('button', { name: 'Add', exact: true }).click();
     await holidays.getByRole('checkbox', { name: /PRIVATE_EMPLOYER_POLICY_TITLE/ }).waitFor();
     await eventually(async () => {
-      assert.ok(new URL(page.url()).searchParams.get('eh')?.includes(secret), 'Private local URL must still reproduce old full-state calendars.');
-    }, 'The private full-state URL should remain reproducible');
+      assert.equal(new URL(page.url()).searchParams.has('eh'), false);
+      assert.ok(!page.url().includes(secret));
+    }, 'The employer calendar must never appear in the browser address');
+    await page.reload({ waitUntil: 'networkidle' });
+    await moreOptions(page);
+    await holidaySection(page).getByRole('checkbox', { name: /PRIVATE_EMPLOYER_POLICY_TITLE/ }).waitFor();
+    assert.equal(new URL(page.url()).searchParams.has('eh'), false, 'A same-tab refresh should keep the private draft outside the address.');
     const subscriptions = page.getByRole('heading', { name: 'Keep this plan in your calendar', exact: true }).locator('..');
     assert.equal(await subscriptions.getByRole('link', { name: /Google Calendar/ }).count(), 0, 'No pre-consent Google URL may contain private names.');
     assert.equal(await subscriptions.getByRole('link', { name: /Outlook/ }).count(), 0, 'No pre-consent Outlook URL may contain private names.');
@@ -432,22 +437,35 @@ try {
     assert.equal(await subscriptions.getByLabel(/Or paste this link into any calendar app/).count(), 0, 'No private feed URL may be selectable before consent.');
     await page.getByRole('button', { name: 'Copy link', exact: true }).click();
     const shared = await clipboardText(page);
-    assert.equal(new URL(shared).searchParams.has('eh'), false, 'The actual clipboard link must exclude employer labels.');
+    const sharedParams = new URL(shared).searchParams;
+    assert.equal(sharedParams.get('sv'), '1');
+    for (const key of ['eh', 'ho', 'bo', 'od']) assert.equal(sharedParams.has(key), false, `Default clipboard link must exclude ${key}.`);
     assert.ok(!shared.includes(secret), 'Private employer name must never appear in the public clipboard.');
     assert.ok(!shared.includes('#'), 'Private browser fragments must not be copied.');
     const recipient = await open(await mobileContext(), shared);
     await moreOptions(recipient);
     assert.equal(await holidaySection(recipient).getByRole('checkbox', { name: /PRIVATE_EMPLOYER_POLICY_TITLE/ }).count(), 0,
       'Shared public URL must not restore the sender private title on the recipient.');
-    await subscriptions.getByRole('button', { name: /Share calendar details/ }).click();
+    await page.locator('summary').filter({ hasText: 'Share observed holiday dates' }).click();
+    await page.getByRole('button', { name: 'Copy link with holiday dates' }).click();
+    const optedIn = await clipboardText(page);
+    const optedInParams = new URL(optedIn).searchParams;
+    assert.ok(optedInParams.get('ho')?.split(',').includes('2027-12-30'));
+    assert.ok(!optedIn.includes(secret) && !optedInParams.has('eh'), 'Opt-in links share dates only.');
+    await recipient.goto(optedIn, { waitUntil: 'networkidle' });
+    await eventually(async () => assert.match(await recipient.locator('#day-2027-12-30').getAttribute('aria-label'), /Shared observed holiday/i),
+      'The recipient should reproduce the selected observed date without its original label');
+    await subscriptions.getByRole('button', { name: /Include observed holiday dates/ }).click();
     const google = new URL(await subscriptions.getByRole('link', { name: /Google Calendar/ }).getAttribute('href'));
     const cid = google.searchParams.get('cid');
-    assert.ok(cid && new URL(cid.replace(/^webcal:/, 'https:')).searchParams.get('eh')?.includes(secret),
-      'Google may receive custom names only after affirmative consent.');
+    const googleQuery = new URL(cid.replace(/^webcal:/, 'https:')).searchParams;
+    assert.equal(googleQuery.get('ho'), optedInParams.get('ho'));
+    assert.ok(!googleQuery.has('eh') && !cid.includes(secret), 'Google receives selected dates and never employer labels.');
     const outlook = new URL(await subscriptions.getByRole('link', { name: /Outlook/ }).getAttribute('href'));
     const outlookURL = outlook.searchParams.get('url');
-    assert.ok(outlookURL && new URL(outlookURL).searchParams.get('eh')?.includes(secret),
-      'Outlook may receive custom names only after affirmative consent.');
+    const outlookQuery = new URL(outlookURL).searchParams;
+    assert.equal(outlookQuery.get('ho'), optedInParams.get('ho'));
+    assert.ok(!outlookQuery.has('eh') && !outlookURL.includes(secret), 'Outlook receives selected dates and never employer labels.');
     await page.getByLabel('PTO days available', { exact: true }).fill('3');
     await eventually(async () => assert.equal(await subscriptions.getByRole('link', { name: /Google Calendar/ }).count(), 0),
       'Editing the plan must revoke consent for the old feed URL.');

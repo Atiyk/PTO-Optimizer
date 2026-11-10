@@ -4,6 +4,7 @@ import { PartnerPlanner } from './PartnerPlanner';
 import { readPartnerAvailability } from '../planning/partner';
 import { PtoTracker } from './PtoTracker';
 import { useRequestLedger } from './useRequestLedger';
+import { settleLedgerAction } from '../integration/browserWalletStore';
 import { track } from './analytics';
 import { useMemo, useRef, useState } from 'react';
 import { SiteHeader } from './SiteHeader';
@@ -37,7 +38,10 @@ import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { Container } from './Container';
 import { isContested, mostContestedBreakId } from '@daysoff/engine/calendar/requestDeadline';
 import { breakReason } from './breakReason';
-import { useAppState, todayISO } from './useAppState';
+import { useAppState } from './useAppState';
+import { useTodayISO } from './useTodayISO';
+import { readBrowserPlanSearch } from './urlState';
+import { PortfolioComparison } from '../planning/PortfolioComparison';
 import { useHasHover } from './useHasHover';
 
 export function App() {
@@ -47,9 +51,10 @@ export function App() {
   // inside it. See the button's own label below for the stated contents.
   const [optionsOpen, setOptionsOpen] = useState(false);
   const resultRef = useRef<HTMLElement>(null);
-  const state = useAppState();
   const ledger = useRequestLedger();
-  const partnerReceived = useMemo(() => readPartnerAvailability(typeof window === 'undefined' ? '' : window.location.search), []);
+  const today = useTodayISO();
+  const state = useAppState(ledger.requests, today);
+  const partnerReceived = useMemo(() => readPartnerAvailability(typeof window === 'undefined' ? '' : readBrowserPlanSearch(window.location.search, window.history.state)), []);
   const freeDays = useMemo(() => {
     if (state.validationIssues.length) return [];
     const off = new Set(state.effectiveOffDays);
@@ -59,10 +64,11 @@ export function App() {
   const requestCalendar = { workWeek: state.workWeek, offDays: state.effectiveOffDays, rangeStart: state.rangeStart, rangeEnd: state.rangeEnd };
   // Tracking confirms on the break itself ("Tracked"), without jumping down the page.
   const trackBreak = (brk: typeof state.breaks[number]) => {
-    if (!state.holidaysReady || state.holidaysDegraded) return false;
-    const action = ledger.addRequest({ start: brk.start, end: brk.end }, requestCalendar);
-    if (action.ok) track('request_tracking_started');
-    return action.ok;
+    if (state.planningPending || !state.holidaysReady || state.holidaysDegraded) return false;
+    return settleLedgerAction(ledger.addRequest({ start: brk.start, end: brk.end }, requestCalendar), (action) => {
+      if (action.ok) track('request_tracking_started');
+      return action.ok;
+    });
   };
   // The touch day sheet sets a day's state directly (take / never / let the planner
   // decide); the planner stores it as the same three-step pin cycle a click walks through.
@@ -89,7 +95,6 @@ export function App() {
     requestAnimationFrame(() => document.getElementById('partner-planner')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }));
   };
   const hasHover = useHasHover();
-  const today = todayISO();
 
   const previewRun = state.hoveredAlternative
     ? { start: state.hoveredAlternative.start, end: state.hoveredAlternative.end }
@@ -111,7 +116,7 @@ export function App() {
     onDownloadIcs: () => document.getElementById('shortcut-download-ics')?.click(),
   });
 
-  const plannable = !state.validationIssues.length && !state.solverIssue;
+  const plannable = !state.validationIssues.length && !state.solverIssue && !state.planningPending;
   const fieldLabel = 'text-sm font-semibold text-ink';
   const selectClass = 'select-ink w-full min-w-0 text-[15px] font-normal';
   const stylePreset = planningStyleSettings(state.planningStyle);
@@ -140,7 +145,7 @@ export function App() {
                 scores={state.scores}
                 budget={state.budget}
                 reserveDays={state.reserveDays}
-                canPin={state.canPin}
+                canPin={state.canPin && plannable}
                 onPin={state.pinPlan}
                 pinnedCount={state.pinnedPlans.length}
                 unlimitedPto={state.unlimitedPto}
@@ -157,6 +162,7 @@ export function App() {
                 scores={state.scores}
                 travelBasis={state.country === 'US' ? 'us' : 'estimate'}
               />
+              {state.planningPending && <p role="status" className="text-sm text-muted">Updating your plan. The previous result is shown while it calculates.</p>}
               {plannable && (
                 <PlanExplanation
                   breaks={state.breaks}
@@ -196,6 +202,31 @@ export function App() {
                     unlimitedPto={state.unlimitedPto}
                     onToggleUnlimitedPto={state.setUnlimitedPto}
                   />
+                  <p className="text-sm text-muted">This planner budgets full days. <a href="/policy" className="link-mark">Track and forecast hourly leave in My PTO</a>.</p>
+                  {state.hasSharedHolidaySnapshot && (
+                    <p className="text-sm text-muted">
+                      This plan uses the observed holiday dates its sender selected. Switch to your saved calendar to edit or pin the plan.{' '}
+                      <button type="button" className="link-mark min-h-11" onClick={state.restoreMyEmployerCalendar}>Use my saved calendar</button>
+                    </p>
+                  )}
+                  {state.hasTrackedRequests && (
+                    <div className="space-y-1 text-sm text-muted">
+                      {state.isSharedPlan && (
+                        <label className="flex min-h-11 items-center gap-2">
+                          <input type="checkbox" checked={state.applyTrackedRequests} onChange={event => state.setApplyTrackedRequests(event.target.checked)} />
+                          Apply my tracked requests to this shared plan
+                        </label>
+                      )}
+                      {state.applyTrackedRequests && <p>Tracked approved time off is excluded from new breaks on this device.</p>}
+                      {state.applyTrackedRequests && state.hasHourlyBookings && <p>This planner uses whole days. <a className="link-mark" href="/policy">My PTO</a> forecasts recorded hourly costs.</p>}
+                      {state.applyTrackedRequests && !state.unlimitedPto && state.approvedPtoDays > 0 && (
+                        <label className="flex min-h-11 items-center gap-2">
+                          <input type="checkbox" checked={state.reserveApprovedPto} onChange={event => state.setReserveApprovedPto(event.target.checked)} />
+                          Reserve {state.approvedPtoDays} approved PTO {state.approvedPtoDays === 1 ? 'day' : 'days'} from the entered budget
+                        </label>
+                      )}
+                    </div>
+                  )}
                 </section>
 
                 {/* Both sliders stay on screen at every width; never behind a disclosure. */}
@@ -215,6 +246,7 @@ export function App() {
                     breakCountRequested={state.breakCountRequested}
                     breakCountActual={state.breakCountActual}
                     budget={state.effectiveBudget}
+                    pending={state.planningPending}
                   />
                   <label className="flex flex-col gap-1.5">
                     <span className={fieldLabel}>Planning style</span>
@@ -280,6 +312,9 @@ export function App() {
                         />
                         Show alternatives on the calendar
                       </label>
+                      {state.showAlternatives && plannable && state.holidaysReady && (
+                        <PortfolioComparison input={state.solveInput} minimumBreakDays={state.minimumBreakDays} calendarIncomplete={state.holidaysDegraded} />
+                      )}
 
                       <MoreOptions
                         weekStartOverride={state.weekStartOverride}
@@ -318,6 +353,7 @@ export function App() {
                         onAddBlackouts={(dates) => state.setBlackouts(Array.from(new Set([...state.blackouts, ...dates])))}
                         onRemoveBlackout={(d) => state.setBlackouts(state.blackouts.filter((x) => x !== d))}
                         holidayEntries={state.holidayEntries}
+                        sharedHolidaySnapshot={state.hasSharedHolidaySnapshot}
                         onRemoveHoliday={state.removeHoliday}
                         onToggleStateHoliday={state.toggleStateHoliday}
                         onAddCustomHoliday={state.addCustomHoliday}
@@ -428,7 +464,7 @@ export function App() {
                     </ol>
                     {state.breaks.length > 1 && mostContestedIndex !== undefined && (
                       <p className="mt-2 max-w-prose text-sm text-muted">
-                        Break {mostContestedIndex} has the highest travel demand in this plan ({state.country === 'US' ? 'based on 2025 US airport checkpoint counts' : 'a seasonal estimate'}). It reflects public travel, not your coworkers&apos; plans.
+                        Break {mostContestedIndex} has the highest relative demand estimate among the breaks shown. The model uses {state.country === 'US' ? 'historical 2025 US airport checkpoint counts' : 'generic seasonality'}. It is a planning estimate.
                       </p>
                     )}
                   </>
@@ -481,12 +517,14 @@ export function App() {
                 <p className="mt-1 max-w-prose text-sm text-muted">
                   Why each break was chosen, when to ask for it, and a ready-made request. Public holidays are assumed observed; customize your employer calendar in More options.
                 </p>
-                {state.breaks.length > 0 ? (
+                {state.planningPending ? (
+                  <p className="mt-4 text-sm text-muted">Request tools will return when the updated plan is ready.</p>
+                ) : state.breaks.length > 0 ? (
                   <ul className="m-0 mt-4 flex list-none flex-col divide-y divide-line border-y border-line p-0">
                     {state.orderedBreaks.map(({ index, brk }) => (
                       <li key={brk.id} className="py-1">
                         <BreakCard
-                          onTrack={state.holidaysReady && !state.holidaysDegraded ? trackBreak : undefined}
+                          onTrack={plannable && state.holidaysReady && !state.holidaysDegraded ? trackBreak : undefined}
                           brk={brk}
                           index={index}
                           highlighted={state.highlightedBreakIds.has(brk.id) || state.hoveredBreakId === brk.id}
@@ -497,6 +535,7 @@ export function App() {
                           today={today}
                           noticePeriodDays={state.noticePeriodDays}
                           workWeek={state.workWeek}
+                          offDays={state.effectiveOffDays}
                           defaultExpanded={index === 1}
                           anchorId={`break-${index}`}
                         />
@@ -523,15 +562,18 @@ export function App() {
                   travelPercentile={state.scores?.travel.percentile ?? null}
                   efficiencyPercentile={state.scores?.efficiency.percentile ?? null}
                   noticePeriodDays={state.noticePeriodDays}
+                  workWeek={state.workWeek}
+                  offDays={state.effectiveOffDays}
+                  observedHolidayDates={state.holidaysReady && !state.holidaysDegraded ? state.holidayEntries.filter(holiday => holiday.checked).map(holiday => holiday.date) : undefined}
                   onPlanWithPartner={openPartnerPlanner}
                   planSearch={state.planSearch}
-                /> : <p role="status" className="text-sm text-muted">Check your planning inputs before exporting.</p>}
+                /> : <p role="status" className="text-sm text-muted">{state.planningPending ? 'Updating your plan…' : 'Check your planning inputs before exporting.'}</p>}
 
                 {plannable && state.holidaysReady && !state.holidaysDegraded && (
                   <PortraitShare breaks={state.breaks} rangeStart={state.rangeStart} rangeEnd={state.rangeEnd} holidayAssumption={state.employerCalendar.custom.length ? 'company' : state.employerCalendar.excluded.length ? 'customized' : 'public'} remainingBalance={state.unlimitedPto ? undefined : Math.max(0, state.budget - state.budgetSpent)} holidayNamesOf={brk => [...new Set(state.holidayEntries.filter(holiday => holiday.checked && holiday.date >= brk.start && holiday.date <= brk.end).map(holiday => holiday.source === 'custom' ? 'Company holiday' : holiday.name))]} />
                 )}
                 <div id="partner-planner" className="scroll-mt-16">
-                  {state.holidaysReady && !state.holidaysDegraded && !state.validationIssues.length ? <PartnerPlanner openKey={partnerOpenKey} breaks={state.breaks} freeDays={freeDays} input={state.solveInput} minimumBreakLength={state.minimumBreakDays} /> : <p role="status" className="text-sm text-muted">Partner planning will be available after your calendar loads with valid dates and holiday data.</p>}
+                  {state.holidaysReady && !state.holidaysDegraded && plannable ? <PartnerPlanner openKey={partnerOpenKey} breaks={state.breaks} freeDays={freeDays} input={state.solveInput} minimumBreakLength={state.minimumBreakDays} /> : <p role="status" className="text-sm text-muted">Partner planning will be available after your calendar loads with valid dates and holiday data.</p>}
                 </div>
               </section>
 

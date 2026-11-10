@@ -45,6 +45,11 @@ describe('nearestPrecedingWorkday', () => {
     // 2026-12-18 is a Friday, off in this work week - should shift to Thursday.
     expect(nearestPrecedingWorkday('2026-12-18', fourDayWeek)).toBe('2026-12-17');
   });
+
+  it('returns no deadline when there is no working day or the date is invalid', () => {
+    expect(nearestPrecedingWorkday('2026-12-18', [false, false, false, false, false, false, false])).toBeNull();
+    expect(nearestPrecedingWorkday('2026-02-30', DEFAULT_WORK_WEEK)).toBeNull();
+  });
 });
 
 describe('requestByDate', () => {
@@ -57,6 +62,10 @@ describe('requestByDate', () => {
   it('uses the exact same subtraction the .ics reminder uses (shared noticePeriodDays)', () => {
     // No weekend shift needed here: 2026-12-01 (Tue) - 14 = 2026-11-17 (Tue).
     expect(requestByDate('2026-12-01', 14, DEFAULT_WORK_WEEK)).toBe('2026-11-17');
+  });
+
+  it('shifts past employer holidays and alternate Fridays as well as weekends', () => {
+    expect(requestByDate('2026-12-19', 14, DEFAULT_WORK_WEEK, ['2026-12-03', '2026-12-04'])).toBe('2026-12-02');
   });
 });
 

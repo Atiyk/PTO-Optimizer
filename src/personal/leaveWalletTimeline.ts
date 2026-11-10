@@ -39,10 +39,10 @@ function classify(event: PolicyEvent): WalletEventCategory {
     case 'waiting-period-ended': return 'waiting-period-ended';
   }
 }
-function value(event: PolicyEvent, spend: number): number {
+function value(event: PolicyEvent): number {
   switch (event.kind) {
     case 'accrual-credited': return event.amount;
-    case 'planned-day-taken': return -spend;
+    case 'planned-day-taken': return -event.amount;
     case 'carryover-applied': return event.carried;
     case 'forfeited': case 'carried-days-expiring': return -event.amount;
     case 'cap-reached': return -event.lost;
@@ -64,7 +64,6 @@ export function projectWalletTimeline(
     const linked = requests.filter((request) => bank.requestIds.includes(request.id));
     const forecast = forecastWithRequests(bank.policy, through, linked);
     if (!forecast) return null;
-    const spend = bank.policy.unit === 'hours' ? bank.policy.hoursPerDay : 1;
     events.push({
       id: bank.id + ':opening:' + snapshot.asOf, leaveBankId: bank.id,
       effectiveDate: snapshot.asOf, category: 'opening',
@@ -74,7 +73,7 @@ export function projectWalletTimeline(
     forecast.confirmed.events.forEach((event, index) => {
       events.push({
         id: bank.id + ':' + event.date + ':' + index, leaveBankId: bank.id,
-        effectiveDate: event.date, category: classify(event), amount: value(event, spend),
+        effectiveDate: event.date, category: classify(event), amount: value(event),
         unit: snapshot.unit, sourceRef: 'policy:' + event.kind, provenance: 'policy-projection',
       });
     });

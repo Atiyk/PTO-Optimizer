@@ -37,9 +37,9 @@ export function selectCanonicalRecommendationAlternatives(
     .filter(d => d.severity === 'review-needed').map(d => d.date));
   const workWeek = input.workWeek ?? DEFAULT_WORK_WEEK;
   if (!Array.isArray(workWeek) || workWeek.length !== 7
-    || !workWeek.every(day => typeof day === 'boolean')) return null;
+    || !workWeek.every(day => typeof day === 'boolean') || !workWeek.some(Boolean)) return null;
 
-  const canonicalInput = { ...input, blackouts: [...hard] };
+  const canonicalInput = { ...input, blackouts: [...hard], w: 0 };
   const { result } = solveConsumer(canonicalInput);
   const off = new Set(input.offDays);
   const verified: RecommendationCandidate[] = [];

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Break } from '@daysoff/engine/solver/types';
+import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
 import type { DayCategory } from './types';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import { downloadICS } from './icsExport';
@@ -11,7 +11,7 @@ import { buttonClasses } from './Button';
 import { SubscribeFeed } from './SubscribeFeed';
 import { EmailReminders } from './EmailReminders';
 import { ordinal } from './scoreFormat';
-import { buildPublicPlanLink } from './publicSharePrivacy';
+import { buildPublicPlanLink, buildPublicPlanSearch, publicPlanOmissions } from './publicSharePrivacy';
 
 interface ExportBarProps {
   breaks: Break[];
@@ -28,12 +28,15 @@ interface ExportBarProps {
    * "Request by" date on every break card (see requestDeadline.ts), so this panel no
    * longer owns an independent 7/14/30 choice that could silently disagree with it. */
   noticePeriodDays: number;
+  workWeek?: WorkWeek;
+  offDays?: readonly string[];
   /** Opens the "Plan with someone" panel, where the person chooses which dates to share
    * and confirms them before any link is made (no link is copied from here). */
   onPlanWithPartner: () => void;
-  /** F1: this plan's own query string (useAppState's planSearch); shows the live calendar
-   * feed links when given. */
+  /** Internal source state. Must be converted to a public scenario before sharing. */
   planSearch?: string;
+  /** The checked holiday dates for this plan, when calendar coverage is known. */
+  observedHolidayDates?: readonly string[];
 }
 
 export interface ActionResult {
@@ -106,6 +109,19 @@ export function ExportBar(props: ExportBarProps) {
   const [remindersEnabled, setRemindersEnabled] = useState(true);
 
   const isOutOfRange = (iso: string) => iso < props.rangeStart || iso > props.rangeEnd;
+  const planSearch = props.planSearch;
+  const omissions = planSearch === undefined ? undefined : publicPlanOmissions(planSearch);
+  const observedDates = props.observedHolidayDates && [...new Set(props.observedHolidayDates)].sort();
+  const copyPlan = async (dates?: readonly string[]): Promise<ActionResult> => {
+    if (typeof window === 'undefined') return { ok: false, message: "Couldn't copy — try again" };
+    if (planSearch === undefined) return { ok: false, message: 'Plan link unavailable' };
+    const share = buildPublicPlanLink(window.location.href, planSearch, dates);
+    const ok = await copyText(share.url);
+    if (ok) track('URL shared');
+    return ok
+      ? { ok: true, message: share.omittedPrivateCalendar ? 'Copied (calendar omitted)' : 'Link copied' }
+      : { ok: false, message: "Couldn't copy — try again" };
+  };
 
   return (
     <div className="flex flex-col gap-3">
@@ -115,7 +131,11 @@ export function ExportBar(props: ExportBarProps) {
           label="Add to calendar (.ics)"
           variant="primary"
           onClick={async () => {
-            downloadICS(props.breaks, props.isSuggestedPto, { enabled: remindersEnabled, leadDays: props.noticePeriodDays });
+            const reminderOptions = {
+              enabled: remindersEnabled, leadDays: props.noticePeriodDays,
+              workWeek: props.workWeek, offDays: props.offDays,
+            };
+            downloadICS(props.breaks, props.isSuggestedPto, reminderOptions);
             track('ICS downloaded');
             return { ok: true, message: 'Downloaded' };
           }}
@@ -128,7 +148,6 @@ export function ExportBar(props: ExportBarProps) {
             const offWord = props.totalDaysOff === 1 ? 'day' : 'days';
             const headline = `${props.budgetSpent} PTO ${ptoWord} → ${props.totalDaysOff} ${offWord} off`;
             const subtitleParts: string[] = [];
-            if (props.travelPercentile !== null) subtitleParts.push(`Travel ${ordinal(props.travelPercentile)}`);
             if (props.efficiencyPercentile !== null) subtitleParts.push(`Efficiency ${ordinal(props.efficiencyPercentile)}`);
             const result = await copyShareImage({
               headline,
@@ -152,18 +171,7 @@ export function ExportBar(props: ExportBarProps) {
         <ActionButton
           id="shortcut-copy-link"
           label="Copy link"
-          onClick={async () => {
-            if (typeof window === 'undefined') return { ok: false, message: "Couldn't copy — try again" };
-            if (props.planSearch === undefined) return { ok: false, message: 'Plan link unavailable' };
-            // The live browser URL may contain private employer holiday names in eh.
-            // Only a deliberately constructed public link reaches the clipboard.
-            const share = buildPublicPlanLink(window.location.href, props.planSearch);
-            const ok = await copyText(share.url);
-            if (ok) track('URL shared');
-            return ok
-              ? { ok: true, message: share.omittedPrivateCalendar ? 'Copied (calendar omitted)' : 'Link copied' }
-              : { ok: false, message: "Couldn't copy — try again" };
-          }}
+          onClick={() => copyPlan()}
         />
         <button type="button" onClick={props.onPlanWithPartner} className={buttonClasses('secondary', 'md')}>
           Plan with a partner
@@ -183,11 +191,19 @@ export function ExportBar(props: ExportBarProps) {
           </span>
         )}
       </label>
-      {props.planSearch !== undefined && (
-        <p className="text-xs text-muted">Copied public plan links leave out employer-calendar overrides and private names. Recipients may have different holiday assumptions.</p>
+      {planSearch !== undefined && (
+        <p className="text-xs text-muted">Public plan links include the scenario budget and planning controls. Employer names, blackout dates, partner availability, tracked requests and private policy settings stay in this browser. A recipient’s result may differ.</p>
       )}
-      {props.planSearch !== undefined && <SubscribeFeed planSearch={props.planSearch} />}
-      {props.planSearch !== undefined && <EmailReminders kind="plan" search={props.planSearch} />}
+      {planSearch !== undefined && observedDates !== undefined && (
+        <details className="space-y-2 text-sm">
+          <summary className="cursor-pointer font-semibold text-ink">Share observed holiday dates</summary>
+          <p className="max-w-prose text-muted">Include the dates checked in this plan’s holiday calendar. Anyone with the link can see those dates. Employer names and holiday labels stay private.{omissions?.settings ? ' Private scheduling and policy settings are still omitted, so the result may differ.' : ''}</p>
+          <p className="max-w-prose break-words text-xs text-muted">{observedDates.length ? observedDates.join(', ') : 'No holidays are checked in this date range.'}</p>
+          <ActionButton label="Copy link with holiday dates" onClick={() => copyPlan(observedDates)} />
+        </details>
+      )}
+      {planSearch !== undefined && <SubscribeFeed planSearch={planSearch} observedHolidayDates={observedDates} />}
+      {planSearch !== undefined && <EmailReminders kind="plan" search={buildPublicPlanSearch(planSearch)} />}
     </div>
   );
 }

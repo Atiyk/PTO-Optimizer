@@ -41,9 +41,9 @@ try {
       if (await logo.getAttribute('aria-label') !== null) {
         throw new Error('Home brand link must derive its accessible name from visible text rather than an overriding aria-label');
       }
-      const labelledHome = page.getByRole('link', { name: /Gapless\s+PTO Optimizer\s+home/i });
+      const labelledHome = page.getByRole('link', { name: /Timebower\s+home/i });
       if (await labelledHome.count() !== 1) throw new Error('Visible wordmark and home accessible name mismatch');
-      entry.checks.push('Home accessible name includes visible Gapless PTO Optimizer wordmark');
+      entry.checks.push('Home accessible name includes visible Timebower wordmark');
       // 2026-11 IA: three destinations (Plan, My PTO, Learn); the header "Main" nav from
       // 768px up, a fixed bottom "Tools" tab bar below.
       const target = width >= 768

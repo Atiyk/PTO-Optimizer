@@ -12,7 +12,7 @@ describe('actual Copy link action protects private employer details', () => {
       excluded: ['2027-12-24|PRIVATE_POLICY_EXCLUSION'],
       custom: [{ date: '2027-12-27', name: 'PRIVATE_EMPLOYER_POLICY_TITLE' }],
     });
-    const search = 'c=US&s=2027-01-01&e=2027-12-31&b=12&eh=' + encodeURIComponent(raw);
+    const search = 'c=US&s=2027-01-01&e=2027-12-31&b=12&bo=2027-12-26&od=2027-12-28&eh=' + encodeURIComponent(raw);
     window.history.replaceState(null, '', '/pto?' + search + '#PRIVATE_FRAGMENT');
     const writeText = vi.fn(async (_text: string) => {});
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
@@ -21,14 +21,21 @@ describe('actual Copy link action protects private employer details', () => {
       rangeStart="2027-01-01" rangeEnd="2027-12-31" weekStart={1}
       budgetSpent={0} totalDaysOff={0} travelPercentile={null} efficiencyPercentile={null}
       noticePeriodDays={14} onPlanWithPartner={() => {}} planSearch={search}
+      observedHolidayDates={['2027-12-27', '2027-07-05']}
     />);
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy link' })); });
     expect(writeText).toHaveBeenCalledTimes(1);
     const copied = String(writeText.mock.calls[0][0]);
     const copiedURL = new URL(copied);
     expect(copiedURL.searchParams.get('b')).toBe('12');
-    expect(copied).not.toMatch(/PRIVATE_|eh=|#/);
+    expect(copied).not.toMatch(/PRIVATE_|[?&](eh|bo|od|ho)=|#/);
     expect(screen.getByRole('button', { name: /Copied \(calendar omitted\)/i })).toBeTruthy();
+    fireEvent.click(screen.getByText('Share observed holiday dates', { selector: 'summary' }));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy link with holiday dates' })); });
+    expect(writeText).toHaveBeenCalledTimes(2);
+    const optedIn = String(writeText.mock.calls[1][0]);
+    expect(new URL(optedIn).searchParams.get('ho')).toBe('2027-07-05,2027-12-27');
+    expect(optedIn).not.toMatch(/PRIVATE_|[?&](eh|bo|od)=|#/);
     window.history.replaceState(null, '', '/');
   });
 });

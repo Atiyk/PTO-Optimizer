@@ -78,6 +78,20 @@ describe('tracker employer calendar coverage', () => {
     fireEvent.click(screen.getByLabelText('Delete request 2027-01-01'));
     expect(saved()).toEqual([]);
   });
+  it('tracks a single partial day in exact hours and blocks a duration above the shift', () => {
+    render(<Harness coverage={{ ...calendar, shiftMinutes: [540, 540, 540, 540, 480, 0, 0] }} />);
+    fireEvent.change(addInputs().getByLabelText('Start date'), { target: { value: '2027-01-04' } });
+    fireEvent.change(addInputs().getByLabelText('End date'), { target: { value: '2027-01-04' } });
+    const input = addInputs().getByLabelText('Hours of partial-day PTO (optional)');
+    const button = addInputs().getByRole('button', { name: 'Track these dates' }) as HTMLButtonElement;
+    fireEvent.change(input, { target: { value: '10' } });
+    expect(button.disabled).toBe(true);
+    fireEvent.change(input, { target: { value: '4' } });
+    expect(button.disabled).toBe(false);
+    fireEvent.click(button);
+    expect(saved()[0]).toMatchObject({ partialMinutes: 240, ptoMinutes: { '2027-01-04': 240 } });
+    expect(screen.getByText('4 PTO hours')).toBeTruthy();
+  });
   it('keeps historical costs when status changes under a different ready employer calendar', () => {
     seed();
     render(<Harness coverage={{ workWeek: DEFAULT_WORK_WEEK, offDays: [], rangeStart: '2028-01-01', rangeEnd: '2028-12-31' }} />);

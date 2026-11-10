@@ -1,18 +1,7 @@
 import type { Break } from '@daysoff/engine/solver/types';
 
-/**
- * Phase 3 step 4: "UNDERSTAND WHY each recommendation is good" - one plain-language sentence
- * per break, visible on the card, not a tooltip. Every branch here is tied to a real,
- * already-computed field (brk.days/tags/meanDemand/multiplier/totalDaysOff/ptoCost) - never
- * a holiday name or a percentile the data doesn't actually have. In particular there is no
- * per-break travel percentile anywhere in the solver (only a whole-plan one, in Scores), so
- * the travel-demand branches below report meanDemand as a plain "% above/below an average
- * day" instead of a fabricated percentile.
- *
- * `holidayNameFor` is the same single-date lookup DayCell's tooltip already uses - scanning
- * every day of the break against it is the only truthful way to say "bridges X," since nothing
- * on Break itself names an adjacent holiday.
- */
+/** Explain the exact PTO trade first. Travel tags reflect an estimate for the
+ * dates, so they only qualify the context in broad terms. */
 export function breakReason(brk: Break, holidayNameFor: (iso: string) => string | undefined): string {
   const dayWord = brk.totalDaysOff === 1 ? 'day' : 'days';
   const ptoWord = brk.ptoCost === 1 ? 'day' : 'days';
@@ -23,7 +12,7 @@ export function breakReason(brk: Break, holidayNameFor: (iso: string) => string 
   // of a reason that would read as a sales pitch for a break that isn't actually a bargain.
   if (brk.multiplier <= 1) {
     if (brk.tags.includes('Estimated')) return `No extra days off — ${swap}; travel demand here is an estimate for this country.`;
-    if (brk.tags.includes('Low travel demand') && Number.isFinite(brk.meanDemand) && brk.meanDemand >= 0 && brk.meanDemand < 1) return `No extra days off — ${swap}; lower travel demand is tagged for these dates.`;
+    if (brk.tags.includes('Low travel demand') && Number.isFinite(brk.meanDemand) && brk.meanDemand >= 0 && brk.meanDemand < 1) return `No extra days off — ${swap}; these dates look quieter in the historical comparison.`;
     return `No extra days off — ${swap}.`;
   }
 
@@ -36,14 +25,10 @@ export function breakReason(brk: Break, holidayNameFor: (iso: string) => string 
     return `${swap} — travel demand here is an estimate for this country.`;
   }
   if (brk.tags.includes('Low travel demand') && Number.isFinite(brk.meanDemand) && brk.meanDemand >= 0 && brk.meanDemand < 1) {
-    const pct = Math.round((1 - brk.meanDemand) * 100);
-    return `Quiet travel week — about ${pct}% less demand than an average day.`;
+    return `${swap} — quieter in the historical travel comparison.`;
   }
   if (brk.tags.includes('Peak travel') && Number.isFinite(brk.meanDemand) && brk.meanDemand > 1) {
-    const pct = Math.round((brk.meanDemand - 1) * 100);
-    return `Busier travel week (about ${pct}% above average) — ${swap} regardless.`;
+    return `${swap} — busier in the historical travel comparison.`;
   }
-  // Invalid or contradictory demand metadata must not produce NaN%, negative percentages,
-  // or a claim about demand that the underlying numeric field does not support.
   return `Efficient swap — ${swap} (${brk.multiplier.toFixed(2)}x).`;
 }

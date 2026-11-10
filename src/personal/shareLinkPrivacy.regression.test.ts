@@ -4,9 +4,11 @@ import type { EmployerCalendar } from './employerCalendar';
 import { createPtoRequest, requestDatesForScenario } from './requestLedger';
 import {
   buildOverlapShareURL,
+  readBrowserPlanSearch,
   readFullStateFromURL,
   readOverlapPayloadFromURL,
   writeFullStateToURL,
+  writeBrowserPlanStateToURL,
   type WriteStateInput,
 } from '../ui/urlState';
 
@@ -50,6 +52,31 @@ function shareableState(overrides: Partial<WriteStateInput> = {}): WriteStateInp
 }
 
 describe('signed-out link privacy and backward compatibility regressions', () => {
+  it('preserves a legacy private draft in its history entry without serializing it into the address', () => {
+    const employerCalendar: EmployerCalendar = {
+      version: 1, country: 'US', excluded: [], custom: [{ date: '2027-12-24', name: 'Private shutdown' }],
+    };
+    const params = new URLSearchParams({ pp: 'legacy-partner-value', signin: 'ok', account_token: 'private' });
+    const local = shareableState({ employerCalendar, blackouts: ['2027-02-04'], overlapDays: ['2027-03-06'], noticePeriodDays: 21 });
+    const history = writeBrowserPlanStateToURL(params, local, { unrelated: 2 });
+    expect(params.has('eh')).toBe(false);
+    expect(params.has('pp')).toBe(false);
+    expect(params.has('bo')).toBe(false);
+    expect(params.has('od')).toBe(false);
+    expect(params.has('np')).toBe(false);
+    expect(params.has('account_token')).toBe(false);
+    expect(params.get('signin')).toBe('ok');
+    expect(history.unrelated).toBe(2);
+    const restored = readBrowserPlanSearch(params.toString(), history);
+    expect(new URLSearchParams(restored).get('pp')).toBe('legacy-partner-value');
+    expect(readFullStateFromURL(restored, recipientDefaults)).toMatchObject({
+      employerCalendar, blackouts: ['2027-02-04'], overlapDays: ['2027-03-06'], noticePeriodDays: 21,
+    });
+    expect(readFullStateFromURL(readBrowserPlanSearch(params.toString(), null), recipientDefaults).employerCalendar).toBeUndefined();
+    params.set('b', '10');
+    expect(readFullStateFromURL(readBrowserPlanSearch(params.toString(), history), recipientDefaults).employerCalendar).toBeUndefined();
+  });
+
   it('shares only date availability derived from a private approved request, never request metadata', () => {
     const privateNote = 'Private medical appointment - do not share';
     const privateId = 'private-request-identifier';

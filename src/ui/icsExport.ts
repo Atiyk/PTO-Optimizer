@@ -1,6 +1,7 @@
-import type { Break } from '@daysoff/engine/solver/types';
+import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
 import { parseISO, addDays } from '@daysoff/engine/solver/dateUtils';
 import { formatDateRange, formatCardDateRange, formatShort } from '@daysoff/engine/calendar/dateFormat';
+import { requestByDate } from '@daysoff/engine/calendar/requestDeadline';
 import type { Holiday } from '@daysoff/engine/data/holidays';
 import { PRODUCT_NAME } from '../brand';
 import { isValidISODate } from './urlState';
@@ -63,6 +64,8 @@ export interface ReminderOptions {
    * .ics reminder can never land on a different date than the "Request by" date shown on
    * each break card - "the request-by date must match the .ics reminder dates" per spec. */
   leadDays: number;
+  workWeek?: WorkWeek;
+  offDays?: readonly string[];
 }
 
 /** Disabled by default at this level, deliberately - the product default (on, 14 days) is a
@@ -113,11 +116,19 @@ function displayAlarm(trigger: string, text: string): string[] {
  * so the reminder email can nudge weekly instead of every day. The title keeps the
  * "Request time off: <range>" lead so month views, which truncate, still say what to do.
  */
-export function bookByEventLines(breaks: Break[], todayIso: string, leadDays: number, dtstamp: string): string[] {
+export function bookByEventLines(
+  breaks: Break[],
+  todayIso: string,
+  leadDays: number,
+  dtstamp: string,
+  workWeek?: WorkWeek,
+  offDays?: readonly string[],
+): string[] {
   const lines: string[] = [];
   for (const brk of breaks) {
     if (brk.start <= todayIso) continue; // already underway or past - nothing left to request
-    const bookBy = addDays(brk.start, -leadDays);
+    const bookBy = workWeek ? requestByDate(brk.start, leadDays, workWeek, offDays) : addDays(brk.start, -leadDays);
+    if (!bookBy) continue;
     const late = bookBy < todayIso;
     const eventIso = late ? todayIso : bookBy; // never place a reminder in the past
     const dateStart = isoToICSDate(eventIso);
@@ -175,7 +186,9 @@ export function generateICS(
   lines.push(...ptoDayEventLines(breaks, isPtoDay, dtstamp));
   // The download runs in the browser, so "today" is the viewer's local date, matching the plan
   // on screen; the server feed passes its own day to bookByEventLines.
-  if (reminderOptions.enabled) lines.push(...bookByEventLines(breaks, localDateISO(now), reminderOptions.leadDays, dtstamp));
+  if (reminderOptions.enabled) {
+    lines.push(...bookByEventLines(breaks, localDateISO(now), reminderOptions.leadDays, dtstamp, reminderOptions.workWeek, reminderOptions.offDays));
+  }
 
   lines.push('END:VCALENDAR');
   return lines.join('\r\n') + '\r\n';

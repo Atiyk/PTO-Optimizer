@@ -29,12 +29,27 @@ export interface CanonicalPortfolio {
   travelSignal: 'not-used';
   explanation: string;
 }
+export type PortfolioShortfallKind =
+  | 'no-feasible-plan'
+  | 'one-plan-found'
+  | 'shared-objective-winners'
+  | 'incomplete-calendar'
+  | 'bounded-search';
+
+export interface CanonicalPortfolioReport {
+  portfolios: CanonicalPortfolio[];
+  feasiblePlanCount: number;
+  shortfalls: Array<{ kind: PortfolioShortfallKind; message: string }>;
+}
+
 interface Candidate extends Omit<CanonicalPortfolio, 'objective' | 'explanation'> {
   key: string;
 }
 const MAX_RANGE_DAYS = 1096;
 const MAX_BUDGET = 1096;
 const MAX_CALENDAR_EVENTS = 10000;
+const MAX_FEASIBILITY_RETRIES = 2;
+const MAX_PLAN_REPLACEMENTS = 24;
 // Reserve the getaway optimum first; other labels must never inherit a runner-up plan.
 const objectives: PortfolioObjective[] = ['most-getaways', 'longest-break', 'balanced', 'constraint-fit'];
 
@@ -114,6 +129,11 @@ export function comparePortfolioMetrics(
  * Null = invalid input; [] = valid input but no independently feasible portfolios.
  */
 export function selectCanonicalPortfolios(input: SolveInput, constraints: ConstraintSet, options: PortfolioOptions = {}): CanonicalPortfolio[] | null {
+  return analyzeCanonicalPortfolios(input, constraints, options)?.portfolios ?? null;
+}
+
+/** Search diagnostics describe the candidates we found within a bounded search. */
+export function analyzeCanonicalPortfolios(input: SolveInput, constraints: ConstraintSet, options: PortfolioOptions = {}): CanonicalPortfolioReport | null {
   if (!input || !constraints || !Array.isArray(constraints.dates)
     || constraints.dates.length > MAX_CALENDAR_EVENTS
     || !Array.isArray(constraints.missingSources)
@@ -135,7 +155,7 @@ export function selectCanonicalPortfolios(input: SolveInput, constraints: Constr
       && ['hard-block', 'review-needed', 'context'].includes(d.severity))) return null;
   const workWeek = input.workWeek ?? DEFAULT_WORK_WEEK;
   if (!Array.isArray(workWeek) || workWeek.length !== 7
-    || !workWeek.every(day => typeof day === 'boolean')) return null;
+    || !workWeek.every(day => typeof day === 'boolean') || !workWeek.some(Boolean)) return null;
 
   const noticeExcluded = options.earliestNoticeDate
     ? rangeISO(input.rangeStart, input.rangeEnd).filter(date => date < options.earliestNoticeDate!) : [];
@@ -145,7 +165,16 @@ export function selectCanonicalPortfolios(input: SolveInput, constraints: Constr
   const review = new Set(constraints.dates.filter(d => d.severity === 'review-needed').map(d => d.date));
   const off = new Set(input.offDays);
   const canonicalInput: SolveInput = { ...input, blackouts: hard, w: 0 };
-  if (!validatePtoDates(canonicalInput, input.mustIncludeDays ?? []).valid) return [];
+  const partialCalendarEvidence = Boolean(constraints.partial || constraints.missingSources.length);
+  const shortfalls: CanonicalPortfolioReport['shortfalls'] = partialCalendarEvidence
+    ? [{ kind: 'incomplete-calendar', message: 'Some calendar sources are missing or incomplete. Check the dates before booking.' }]
+    : [];
+  if (!validatePtoDates(canonicalInput, input.mustIncludeDays ?? []).valid) {
+    return { portfolios: [], feasiblePlanCount: 0, shortfalls: [
+      ...shortfalls,
+      { kind: 'no-feasible-plan', message: 'Required dates cannot be funded or conflict with an unavailable date.' },
+    ] };
+  }
 
   const candidates = new Map<string, Candidate>();
   const profiles = [...new Set([1, 7, input.breakCount ?? 3, 3])];
@@ -183,7 +212,7 @@ export function selectCanonicalPortfolios(input: SolveInput, constraints: Constr
       ptoDays, budgetRemaining: input.budget - ptoDays,
       freeCalendarDates: selectedDates.filter(d => !workWeek[mondayIndexedDow(d)] || off.has(d)),
       reviewDates: [...review].filter(d => selected.has(d)).sort(),
-      partialCalendarEvidence: Boolean(constraints.partial || constraints.missingSources.length),
+      partialCalendarEvidence,
       travelSignal: 'not-used',
     });
   }
@@ -191,41 +220,66 @@ export function selectCanonicalPortfolios(input: SolveInput, constraints: Constr
   // Include bounded, lower-budget search passes for partner funding without
   // modifying the legacy default call's solver work or altering its objective labels.
   const searchBudgets = [...new Set([input.budget, ...(options.additionalSearchBudgets ?? [])])];
+  function search(searchBudget: number, count: number, excluded = hard): void {
+    const { result } = solveConsumer({
+      ...canonicalInput, budget: searchBudget, breakCount: count, blackouts: excluded,
+    });
+    addPlan(result.primary);
+    // Each engine alternative replaces a break inside its original funded plan.
+    for (const replacement of result.alternatives.slice(0, MAX_PLAN_REPLACEMENTS)) {
+      const remaining = result.primary.filter(brk =>
+        brk.start !== replacement.replaces.start || brk.end !== replacement.replaces.end);
+      addPlan([...remaining, replacement]);
+    }
+  }
   for (const searchBudget of searchBudgets) {
     for (const count of profiles) {
-      if (!Number.isInteger(count) || count < 0 || count > 7) continue;
-      const { result } = solveConsumer({ ...canonicalInput, budget: searchBudget, breakCount: count });
-      addPlan(result.primary);
-      // Each engine alternative is a replacement INSIDE its original whole plan.
-      // Never add the alternative as an independent, unfunded vacation.
-      for (const replacement of result.alternatives.slice(0, 24)) {
-        const remaining = result.primary.filter(brk =>
-          brk.start !== replacement.replaces.start || brk.end !== replacement.replaces.end);
-        addPlan([...remaining, replacement]);
-      }
+      if (Number.isInteger(count) && count >= 0 && count <= 7) search(searchBudget, count);
     }
   }
 
-  // Filter candidates BEFORE choosing objective winners; filtering only the
-  // four output labels can starve lower-ranked but jointly affordable choices.
+  // Filter before selecting objective winners. A caller's whole-plan test may
+  // eliminate the best-looking placements, so retain rejected candidates as
+  // deterministic anchors for a bounded second search.
   const feasible: Candidate[] = [];
-  for (const candidate of candidates.values()) {
-    if (!options.candidateEligible) { feasible.push(candidate); continue; }
-    let allowed: unknown;
-    try {
-      allowed = options.candidateEligible({
-        ...candidate, breaks: candidate.breaks.map(brk => ({ ...brk })),
-        freeCalendarDates: [...candidate.freeCalendarDates],
-        reviewDates: [...candidate.reviewDates],
-      });
-    } catch {
-      return null;
+  const rejected: Candidate[] = [];
+  const evaluated = new Set<string>();
+  function evaluateCandidates(): boolean {
+    for (const candidate of candidates.values()) {
+      if (evaluated.has(candidate.key)) continue;
+      evaluated.add(candidate.key);
+      if (!options.candidateEligible) { feasible.push(candidate); continue; }
+      let allowed: unknown;
+      try {
+        allowed = options.candidateEligible({
+          ...candidate, breaks: candidate.breaks.map(brk => ({ ...brk })),
+          freeCalendarDates: [...candidate.freeCalendarDates],
+          reviewDates: [...candidate.reviewDates],
+        });
+      } catch {
+        return false;
+      }
+      if (typeof allowed !== 'boolean') return false;
+      (allowed ? feasible : rejected).push(candidate);
     }
-    if (typeof allowed !== 'boolean') return null;
-    if (allowed) feasible.push(candidate);
+    return true;
+  }
+  if (!evaluateCandidates()) return null;
+  if (feasible.length === 0 && rejected.length > 0) {
+    const required = new Set(input.mustIncludeDays ?? []);
+    const retryBudget = Math.min(...searchBudgets);
+    const anchors = [...new Set(rejected.flatMap(candidate =>
+      candidate.breaks.map(brk => brk.start).filter(date => !required.has(date))))];
+    const preferredCount = input.breakCount ?? 3;
+    const retryCount = Number.isInteger(preferredCount) && preferredCount >= 0 && preferredCount <= 7 ? preferredCount : 3;
+    for (const anchor of anchors.slice(0, MAX_FEASIBILITY_RETRIES)) {
+      search(retryBudget, retryCount, [...hard, anchor]);
+      if (!evaluateCandidates()) return null;
+    }
   }
   const output: CanonicalPortfolio[] = [];
   const used = new Set<string>();
+  let sharedWinner = false;
   for (const objective of objectives) {
     const eligible = objective === 'most-getaways'
       ? feasible.filter(candidate => candidate.getawayCount >= 2) : feasible;
@@ -234,7 +288,8 @@ export function selectCanonicalPortfolios(input: SolveInput, constraints: Constr
     // A label describes this objective's actual optimum, not the next unused plan.
     // When optima collide, omit the duplicate objective rather than mislabel a runner-up.
     const chosen = ranked[0];
-    if (!chosen || used.has(chosen.key)) continue;
+    if (!chosen) continue;
+    if (used.has(chosen.key)) { sharedWinner = true; continue; }
     used.add(chosen.key);
     const { key: _key, ...facts } = chosen;
     // A portfolio is a scenario, so different objectives may share dates; only
@@ -247,11 +302,22 @@ export function selectCanonicalPortfolios(input: SolveInput, constraints: Constr
     };
     output.push({
       ...facts, objective,
-      explanation: reasons[objective] + ' ' + facts.getawayCount + ' separate break(s), ' + facts.totalCalendarDays
+      explanation: 'Best plan found for this objective. ' + reasons[objective] + ' ' + facts.getawayCount + ' separate break(s), ' + facts.totalCalendarDays
         + ' calendar days off using ' + facts.ptoDays + ' PTO days; '
         + facts.reviewDates.length + ' advisory date(s) need review. '
         + 'Travel demand did not influence this recommendation.',
     });
   }
-  return output;
+  if (output.length < 3) {
+    if (feasible.length === 0) {
+      shortfalls.push({ kind: 'no-feasible-plan', message: 'The search found no plan that fits the budget and dates. Review your constraints or widen the date range.' });
+    } else if (feasible.length === 1) {
+      shortfalls.push({ kind: 'one-plan-found', message: 'The search found one unique feasible plan for these settings.' });
+    } else if (sharedWinner) {
+      shortfalls.push({ kind: 'shared-objective-winners', message: 'Several objectives favor the same plan. Each distinct winner is shown once.' });
+    } else {
+      shortfalls.push({ kind: 'bounded-search', message: 'The search found fewer than three distinct objective winners.' });
+    }
+  }
+  return { portfolios: output, feasiblePlanCount: feasible.length, shortfalls };
 }

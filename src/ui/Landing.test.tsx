@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Landing } from './Landing';
 import type { Holiday } from '@daysoff/engine/data/holidays';
-import { defaultEmployerCalendar, decodeEmployerCalendar, saveEmployerCalendar } from '../personal/employerCalendar';
+import { defaultEmployerCalendar, saveEmployerCalendar } from '../personal/employerCalendar';
 
 const calendar = vi.hoisted(() => [
   { date: '2026-12-25', nominalDate: '2026-12-25', name: 'Christmas Day', countryCode: 'US', counties: null },
@@ -165,7 +165,7 @@ describe('live homepage planner', () => {
     expect(screen.getByText(/Preview assumes a Monday–Friday workweek/)).toBeTruthy();
   });
 
-  it('applies a saved employer calendar and reproduces it in the full-plan link without writing preferences', async () => {
+  it('applies the saved employer calendar without putting it in links or rewriting preferences', async () => {
     const employer = { ...defaultEmployerCalendar('US'), excluded: ['2026-12-25|Christmas Day'], custom: [{ date: '2026-11-20', name: 'Company day off' }] };
     expect(saveEmployerCalendar(employer)).toBe(true);
     const write = vi.spyOn(Storage.prototype, 'setItem');
@@ -174,11 +174,12 @@ describe('live homepage planner', () => {
     expect(screen.getAllByText('Company day off').length).toBeGreaterThan(0);
     expect(screen.getByText(/Your saved employer holiday calendar is applied/)).toBeTruthy();
     const link = screen.getAllByRole('link', { name: 'See the full plan →' })[0] as HTMLAnchorElement;
-    expect(decodeEmployerCalendar(new URL(link.href).searchParams.get('eh'))).toEqual(employer);
+    expect(new URL(link.href).searchParams.has('eh')).toBe(false);
     expect(write).not.toHaveBeenCalled();
     await act(async () => { fireEvent.change(screen.getByLabelText('Country'), { target: { value: 'GB' } }); });
     const otherCountryLink = screen.getAllByRole('link', { name: 'See the full plan →' })[0] as HTMLAnchorElement;
-    expect(decodeEmployerCalendar(new URL(otherCountryLink.href).searchParams.get('eh'))).toEqual(defaultEmployerCalendar('GB'));
+    expect(new URL(otherCountryLink.href).searchParams.has('eh')).toBe(false);
+    expect(new URL(otherCountryLink.href).searchParams.get('c')).toBe('GB');
     expect(screen.queryByText('Company day off')).toBeNull();
     expect(write).not.toHaveBeenCalled();
   });
@@ -188,6 +189,6 @@ describe('live homepage planner', () => {
     await act(async () => { render(<Landing />); });
     expect(screen.getByText(/from 15 PTO days across/)).toBeTruthy();
     const link = screen.getAllByRole('link', { name: 'See the full plan →' })[0] as HTMLAnchorElement;
-    expect(decodeEmployerCalendar(new URL(link.href).searchParams.get('eh'))).toEqual(defaultEmployerCalendar('US'));
+    expect(new URL(link.href).searchParams.has('eh')).toBe(false);
   });
 });

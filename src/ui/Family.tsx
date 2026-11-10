@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { getConsumerHolidaysWithStatus as getHolidaysWithStatus } from '../personal/consumerHolidays';
+import { initialPolicyPreferences } from '../personal/policyPreferences';
 import { buildSchoolCalendar } from '../personal/schoolCalendar';
 import { MAX_FAMILY_PTO, planFamilyTime, type FamilyPlanResult, type SchoolBreak, type FamilyBreakPlan } from '../personal/familyPlan';
 import { findDistrictPreset, presetLabels, presetOffDays } from '../content/schoolDistricts';
 import type { PartnerAvailability } from '../planning/partner';
-import { getPreloadedHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { addDays, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { formatCardDateRange, formatLong, formatShort, formatShortWithYear } from '@daysoff/engine/calendar/dateFormat';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
@@ -19,11 +18,12 @@ import { todayISO } from './today';
 import { weekStartForCountry } from './locale';
 import { copyText } from './requestText';
 import { downloadFamilyPtoICS } from './icsExport';
-import { buildFamilyShareURL, encodeDateRanges, MAX_FAMILY_DATES_PARAM, readFamilyStateFromURL, writeFamilyStateToURL } from './familyUrlState';
+import { buildFamilyShareURL, encodeDateRanges, MAX_FAMILY_DATES_PARAM, readFamilyBrowserState, writeFamilyBrowserState } from './familyUrlState';
 import { FamilyCalendar, FamilyLegend, type FamilyDayState } from './FamilyCalendar';
 import { DistrictPicker, ImportSources } from './FamilySources';
 import { FamilyShare } from './FamilyShare';
 import { FAMILY_FAQ_ITEMS } from './familyFaqItems';
+import { useRequestCalendar } from './useRequestCalendar';
 
 const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
 
@@ -33,8 +33,8 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
  * /family: plan PTO around school breaks. Modelled on /sabbatical - its own route, the same
  * holiday data and drawing language - answering two questions live, with no submit step:
  * which school breaks to take off for the most days with your kids within your PTO, and
- * which school days off are still uncovered. Every control round-trips through the URL
- * (familyUrlState.ts). School dates come from a sourced district preset and/or dates the
+ * which school days off are still uncovered. Only public inputs round-trip through the URL.
+ * School dates come from a sourced district preset and/or dates the
  * person adds (file, link, photo, pasted text, typed); everything is dates only.
  */
 export function Family() {
@@ -43,7 +43,7 @@ export function Family() {
   const search = typeof window !== 'undefined' ? window.location.search : '';
   // Read once at mount, like /sabbatical (SSR-safe: prerendering has an empty search).
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const initial = useMemo(() => readFamilyStateFromURL(search), []);
+  const initial = useMemo(() => readFamilyBrowserState(search, typeof window === 'undefined' ? undefined : window.history.state?.familyDraft), []);
   const received = { availability: initial.availability ?? null, invalid: initial.invalid.includes('pp') || initial.invalid.includes('search') };
 
   const [country, setCountry] = useState<string>(() => initial.country ?? geolocateCountry());
@@ -58,22 +58,31 @@ export function Family() {
 
   const end = addDays(start, 364);
 
-  const [holidayState, setHolidayState] = useState<{ holidays: Holiday[]; degraded: boolean }>(() => ({ holidays: getPreloadedHolidays(country), degraded: false }));
-  useEffect(() => {
-    let cancelled = false;
-    getHolidaysWithStatus(country, start, end).then((result) => { if (!cancelled) setHolidayState(result); });
-    return () => { cancelled = true; };
-  }, [country, start, end]);
+  const preferences = useMemo(() => initialPolicyPreferences('', country), [country]);
+  const savedSchedule = preferences.country === country ? preferences : undefined;
+  const savedWeek = savedSchedule?.workWeek;
+  const savedRegion = savedSchedule?.subdivision;
+  const { calendar, holidayNames, loading: workCalendarLoading, degraded: workCalendarDegraded } = useRequestCalendar({
+    country,
+    subdivision: savedRegion?.startsWith(`${country}-`) ? savedRegion : undefined,
+    rangeStart: start,
+    rangeEnd: end,
+    workWeek: savedWeek?.some(Boolean) ? savedWeek : DEFAULT_WORK_WEEK,
+    altFridayStart: savedSchedule?.altFridayStart,
+  });
 
-  // Every control in the link. pp (shared availability) is left exactly as received.
+  // Retain legacy and shared inputs in the history entry without leaving them in the address.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const url = new URL(window.location.href);
-    const skipped = writeFamilyStateToURL(url.searchParams, {
+    const { search: publicSearch, draft, skipped } = writeFamilyBrowserState({
       country, start, defaultStart: today, ptoBudget, districtId, customOffDays, excludedBreaks, availability: initial.availability ?? null, ask,
     });
     setSkippedParams((cur) => (cur.join() === skipped.join() ? cur : skipped));
-    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    const previous = window.history.state;
+    if (previous?.familyDraft === draft && url.search.slice(1) === publicSearch) return;
+    url.search = publicSearch;
+    window.history.replaceState({ ...previous, familyDraft: draft }, '', `${url.pathname}${url.search}${url.hash}`);
   }, [country, start, ptoBudget, districtId, customOffDays, excludedBreaks, ask, today, initial.availability]);
 
   const preset = districtId ? findDistrictPreset(districtId) : undefined;
@@ -88,11 +97,10 @@ export function Family() {
   }, [preset, customOffDays]);
   const schoolLabels = useMemo(() => (preset ? presetLabels(preset) : {}), [preset]);
 
-  const holidayNames = useMemo(() => new Map(holidayState.holidays.map((h) => [h.date, h.name])), [holidayState.holidays]);
-  const parentFreeDays = useMemo(
-    () => rangeISO(start, end).filter((d) => !DEFAULT_WORK_WEEK[mondayIndexedDow(d)] || holidayNames.has(d)),
-    [start, end, holidayNames],
-  );
+  const parentFreeDays = useMemo(() => {
+    const offDays = new Set(calendar.offDays);
+    return rangeISO(start, end).filter((date) => !calendar.workWeek[mondayIndexedDow(date)] || offDays.has(date));
+  }, [start, end, calendar.offDays, calendar.workWeek]);
   const parentFreeSet = useMemo(() => new Set(parentFreeDays), [parentFreeDays]);
   const otherAdultDays = received.availability?.days;
 
@@ -101,6 +109,7 @@ export function Family() {
     [start, end, schoolOffDays, schoolLabels, parentFreeDays, ptoBudget, otherAdultDays, excludedBreaks],
   );
 
+  const calendarReady = !workCalendarLoading && !workCalendarDegraded;
   const hasSchoolDates = schoolOffDays.length > 0;
   const hasBreaks = !!plan && plan.breaks.length > 0;
   const sdTooLong = skippedParams.includes('sd') || encodeDateRanges(customOffDays).length > MAX_FAMILY_DATES_PARAM;
@@ -111,12 +120,16 @@ export function Family() {
     setExcludedBreaks((cur) => (include ? cur.filter((x) => x !== id) : [...new Set([...cur, id])].sort()));
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const publicPlanLink = () => {
+    const { search } = writeFamilyBrowserState({ country, start, ptoBudget, customOffDays: [], excludedBreaks: [] });
+    return `${origin}/family${search ? `?${search}` : ''}`;
+  };
   // Shared links carry dates only, like the /pto partner link: never the sender's country,
   // so the person who opens one plans with their own country's holidays and weekends.
   const askLink = () => buildFamilyShareURL(origin, { customOffDays: [], ask: true });
-  const sendBackLink = () => buildFamilyShareURL(origin, { districtId, customOffDays });
+  const sendBackLink = () => buildFamilyShareURL(origin, { customOffDays: schoolOffDays });
   const shareLink = ({ includeSchool, availability }: { includeSchool: boolean; availability?: PartnerAvailability }) =>
-    buildFamilyShareURL(origin, { districtId: includeSchool ? districtId : undefined, customOffDays: includeSchool ? customOffDays : [], availability });
+    buildFamilyShareURL(origin, { customOffDays: includeSchool ? schoolOffDays : [], availability });
 
   const stepBtn = `flex h-11 w-11 shrink-0 items-center justify-center text-lg font-semibold text-ink transition-colors duration-150 hover:bg-surface-alt disabled:opacity-40 ${FOCUS}`;
   const numberInput = 'h-11 w-14 min-w-0 border-x border-line-strong bg-surface text-center text-base font-semibold text-ink [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
@@ -213,6 +226,15 @@ export function Family() {
                       </div>
                     </div>
                   </div>
+                  <p className="mt-3 text-xs leading-5 text-muted">
+                    {savedWeek?.some(Boolean) || savedSchedule?.altFridayStart ? 'Uses your saved work schedule and employer holidays for this calendar.' : 'Assumes you work Monday to Friday and uses employer holidays saved for this calendar.'}{' '}
+                    <a href="/policy#requests" className={`link-mark ${FOCUS}`}>Set and save your work schedule in My PTO.</a>
+                  </p>
+                  {(workCalendarLoading || workCalendarDegraded) && (
+                    <p role="status" className="mt-2 text-sm text-muted">
+                      {workCalendarLoading ? 'Updating observed holidays for this planning window…' : 'Some holiday data is unavailable. This plan may overestimate the PTO you need.'}
+                    </p>
+                  )}
                 </fieldset>
 
                 <fieldset className="min-w-0 border-t border-line pt-5">
@@ -236,12 +258,12 @@ export function Family() {
                       )}
                       {skippedParams.some((p) => p !== 'sd') && (
                         <p role="alert" className="mt-2 text-sm font-semibold text-error">
-                          Some of this plan is too large to fit in the link ({skippedParams.filter((p) => p !== 'sd').map((p) => (p === 'x' ? 'switched-off breaks' : p === 'pp' ? 'shared days' : p)).join(', ')}). The page still uses it, but a copied link won&apos;t.
+                          Some of this plan is too large to keep on reload ({skippedParams.filter((p) => p !== 'sd').map((p) => (p === 'x' ? 'switched-off breaks' : p === 'pp' ? 'shared days' : p)).join(', ')}). The page still uses it for this visit.
                         </p>
                       )}
                       {sdTooLong && (
                         <p role="alert" className="mt-2 text-sm font-semibold text-error">
-                          That&apos;s more added dates than a link can carry. The plan here uses all of them, but a copied link may not. Remove dates you don&apos;t need.
+                          That&apos;s more added dates than can be shared or kept on reload. The plan here uses them for this visit. Remove dates you don&apos;t need.
                         </p>
                       )}
                     </div>
@@ -291,13 +313,13 @@ export function Family() {
 
                   <section aria-labelledby="family-export-heading">
                     <h2 id="family-export-heading" className="text-h2 font-bold type-condensed text-ink">Keep it</h2>
-                    <ExportRow plan={plan} />
+                    <ExportRow plan={plan} calendarReady={calendarReady} publicPlanLink={publicPlanLink} />
                   </section>
 
                   <FamilyShare
                     schoolDayCount={schoolOffDays.length}
-                    availableDays={plan.gaps.filter((g) => g.cover === 'you-off' || g.cover === 'pto').map((g) => g.date)}
-                    freeDays={plan.gaps.filter((g) => g.cover === 'you-off').map((g) => g.date)}
+                    availableDays={calendarReady ? plan.gaps.filter((g) => g.cover === 'you-off' || g.cover === 'pto').map((g) => g.date) : []}
+                    freeDays={calendarReady ? plan.gaps.filter((g) => g.cover === 'you-off').map((g) => g.date) : []}
                     buildLink={shareLink}
                   />
                 </>
@@ -326,7 +348,7 @@ function EmptyResults({ hasSchoolDates }: { hasSchoolDates: boolean }) {
         <li>Or add the dates: upload the school&apos;s calendar file, take a photo of the printed calendar, paste the text, or type them.</li>
         <li>Or ask a co-parent to add them and send the link back.</li>
       </ul>
-      <p className="mt-3 text-sm text-muted">Everything stays in this page and its link. Nothing is uploaded or saved.</p>
+      <p className="mt-3 text-sm text-muted">School dates stay in this tab unless you choose to share them. Imported files stay on your device.</p>
     </section>
   );
 }
@@ -455,20 +477,20 @@ function UncoveredSection({ plan }: { plan: FamilyPlanResult }) {
   );
 }
 
-function ExportRow({ plan }: { plan: FamilyPlanResult }) {
+function ExportRow({ plan, calendarReady, publicPlanLink }: { plan: FamilyPlanResult; calendarReady: boolean; publicPlanLink: () => string }) {
   const [message, setMessage] = useState('');
   const chosen = plan.breaks
     .map((b, i) => ({ start: b.start, end: b.end, label: b.label, ptoDays: plan.plans[i].ptoDays }))
     .filter((b) => b.ptoDays.length > 0);
   return (
     <>
-      <p className="mt-1 max-w-2xl text-sm text-muted">The calendar file has one event per PTO day. The plan link reproduces this view, including your PTO number; to send only dates, use Share with family below.</p>
+      <p className="mt-1 max-w-2xl text-sm text-muted">The calendar file has one event per PTO day. The plan link includes your planning window, country and PTO budget. To include school dates or your availability, use Share with family below.</p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Button variant="secondary" disabled={chosen.length === 0} onClick={() => {
+        <Button variant="secondary" disabled={chosen.length === 0 || !calendarReady} onClick={() => {
           try { downloadFamilyPtoICS(chosen); setMessage('Calendar file downloaded.'); } catch { setMessage('Could not create the calendar file.'); }
         }}>Add my PTO to calendar (.ics)</Button>
         <Button variant="secondary" onClick={async () => {
-          const ok = await copyText(window.location.href);
+          const ok = await copyText(publicPlanLink());
           setMessage(ok ? 'Plan link copied.' : 'Could not copy. Try selecting the address bar.');
         }}>Copy plan link</Button>
         <span role="status" className="text-sm text-muted">{message}</span>

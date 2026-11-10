@@ -1,5 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { defaultEmployerCalendar, saveEmployerCalendar } from '../personal/employerCalendar';
+import { savePolicyPreferences } from '../personal/policyPreferences';
+import { decodeDateRanges, encodeDateRanges } from './familyUrlState';
 
 const copied: string[] = [];
 
@@ -7,8 +10,10 @@ vi.mock('./requestText', () => ({
   copyText: vi.fn(async (text: string) => { copied.push(text); return true; }),
 }));
 
-vi.mock('../personal/consumerHolidays', () => ({
+vi.mock('../personal/consumerHolidays', async (original) => ({
+  ...await original<typeof import('../personal/consumerHolidays')>(),
   getConsumerHolidaysWithStatus: vi.fn(async () => ({ holidays: [], degraded: false })),
+  getConsumerSubdivisionCandidates: vi.fn(async () => []),
 }));
 
 // A fixed, small preset so the plan is deterministic regardless of the shipped data.
@@ -51,10 +56,32 @@ const { FamilyConfirmList } = await import('./FamilyConfirmList');
 
 const go = (query: string) => window.history.replaceState(null, '', `/family?${query}`);
 
-beforeEach(() => { copied.length = 0; });
+beforeEach(() => { copied.length = 0; localStorage.clear(); });
 afterEach(() => { cleanup(); window.history.replaceState(null, '', '/'); });
 
 describe('Family planner', () => {
+  it('uses the saved workweek, alternate Fridays and observed employer holidays locally', async () => {
+    savePolicyPreferences('c=US&ww=0111110&afs=2026-11-20');
+    saveEmployerCalendar({
+      ...defaultEmployerCalendar('US'), custom: [{ date: '2026-11-17', name: 'Private company day' }],
+    });
+    const schoolDates = encodeDateRanges(['2026-11-16', '2026-11-17', '2026-11-20']);
+    go(`c=US&s=2026-11-02&pto=0&sd=${schoolDates}`);
+    render(<Family />);
+
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('3 days with your kids without using PTO.'));
+    expect(screen.getByText(/uses your saved work schedule/i)).toBeTruthy();
+    expect(screen.getByText(/observed holiday: Private company day/)).toBeTruthy();
+    expect(window.location.search).not.toMatch(/Private|ww=|afs=|eh=/i);
+
+    const country = screen.getByRole('combobox', { name: 'Country' });
+    fireEvent.focus(country);
+    fireEvent.change(country, { target: { value: 'Canada' } });
+    fireEvent.click(screen.getByRole('option', { name: 'Canada (CA)' }));
+    expect(screen.getByText(/assumes you work Monday to Friday/i)).toBeTruthy();
+    expect(screen.queryByText(/observed holiday: Private company day/)).toBeNull();
+  });
+
   it('renders a live plan from a district preset, with its source and the coverage caveat', () => {
     go('c=US&s=2026-11-02&d=test-district-2026-27&pto=10');
     render(<Family />);
@@ -77,19 +104,28 @@ describe('Family planner', () => {
     expect(screen.getByText(/include the weekends that join each break/)).toBeTruthy();
   });
 
-  it('switching a break off writes it to the URL and spends the PTO elsewhere', () => {
-    go('c=US&s=2026-11-02&d=test-district-2026-27&pto=3');
-    render(<Family />);
+  it('keeps break exclusions and district selection in this history entry across reloads', async () => {
+    go('c=US&s=2026-11-02&d=test-district-2026-27&pto=3&token=remove-me');
+    const view = render(<Family />);
     const toggle = screen.getByRole('switch', { name: /Include Winter recess/ }) as HTMLInputElement;
     expect(toggle.checked).toBe(true);
     fireEvent.click(toggle);
     expect(toggle.checked).toBe(false);
     const params = new URLSearchParams(window.location.search);
-    expect(params.get('x')).toBeTruthy();
+    expect([...params.keys()]).toEqual(['c', 's', 'pto']);
     expect(params.get('pto')).toBe('3');
-    expect(params.get('d')).toBe('test-district-2026-27');
-    fireEvent.click(toggle);
-    expect(new URLSearchParams(window.location.search).get('x')).toBeNull();
+    const draft = new URLSearchParams(window.history.state.familyDraft);
+    expect(draft.get('d')).toBe('test-district-2026-27');
+    expect(draft.get('x')).toBeTruthy();
+    view.unmount();
+    render(<Family />);
+    const restored = screen.getByRole<HTMLInputElement>('switch', { name: /Include Winter recess/ });
+    expect(restored.checked).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Copy plan link' }));
+    await waitFor(() => expect(copied).toHaveLength(1));
+    expect([...new URL(copied[0]).searchParams.keys()]).toEqual(['c', 's', 'pto']);
+    fireEvent.click(restored);
+    expect(new URLSearchParams(window.history.state.familyDraft).has('x')).toBe(false);
   });
 
   it('shows the ask=1 banner and copies a link with the dates and without the request flag', async () => {
@@ -104,7 +140,8 @@ describe('Family planner', () => {
     await waitFor(() => expect(copied).toHaveLength(1));
     const link = new URL(copied[0]);
     expect(link.pathname).toBe('/family');
-    expect(link.searchParams.get('d')).toBe('test-district-2026-27');
+    expect(link.searchParams.has('d')).toBe(false);
+    expect(decodeDateRanges(link.searchParams.get('sd')!)).toContain('2026-11-26');
     expect(link.searchParams.has('ask')).toBe(false);
     expect(link.searchParams.has('pto')).toBe(false);
     // Dates only: the helper's country never rides along.
@@ -122,13 +159,17 @@ describe('Family planner', () => {
     expect(boxes.map((b) => b.checked)).toEqual([true, false]);
     fireEvent.click(within(list).getByRole('button', { name: 'Add 1 checked date' }));
 
-    const sd = new URLSearchParams(window.location.search).get('sd');
+    const sd = new URLSearchParams(window.history.state.familyDraft).get('sd');
     expect(sd).toBeTruthy();
-    expect(window.location.search).not.toMatch(/Emma|Maple|recess|picture/i);
+    expect(window.location.search).not.toMatch(/sd=|Emma|Maple|recess|picture/i);
 
+    await waitFor(() => expect(screen.queryByText(/Updating observed holidays/)).toBeNull());
     fireEvent.click(screen.getByRole('button', { name: 'Share with family' }));
+    const copy = screen.getByRole<HTMLButtonElement>('button', { name: 'Copy family link' });
+    expect(copy.disabled).toBe(true);
+    fireEvent.click(screen.getByRole('checkbox', { name: /School closure dates/ }));
     fireEvent.click(screen.getByRole('checkbox', { name: /Days I.m with the kids/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Copy family link' }));
+    fireEvent.click(copy);
     await waitFor(() => expect(copied).toHaveLength(1));
     const link = new URL(copied[0]);
     expect(decodeURIComponent(copied[0])).not.toMatch(/Emma|Maple|recess|picture|Winter/i);
@@ -142,6 +183,8 @@ describe('Family planner', () => {
     render(<Family />);
     expect(screen.getByRole('heading', { name: 'Another adult shared their days' })).toBeTruthy();
     expect(screen.getByText(/They cover 4 school days off/)).toBeTruthy();
+    expect(new URLSearchParams(window.location.search).has('pp')).toBe(false);
+    expect(new URLSearchParams(window.history.state.familyDraft).get('pp')).toBe('1:p:20261228~20261231:-');
   });
 
   it('says when the other adult only shares days you already cover', () => {
@@ -154,6 +197,23 @@ describe('Family planner', () => {
     go('s=2026-11-02&sd=garbage');
     render(<Family />);
     expect(screen.getByRole('alert').textContent).toMatch(/school dates in this link couldn.t be read/);
+  });
+
+  it('blocks a recurring school import without accepting its partial date list', async () => {
+    go('c=US&s=2026-11-02');
+    render(<Family />);
+    const text = [
+      'BEGIN:VCALENDAR',
+      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20261120', 'END:VEVENT',
+      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20261127', 'RRULE:FREQ=WEEKLY;COUNT=3', 'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+    const file = Object.assign(new File([text], 'school.ics'), { text: async () => text });
+    fireEvent.change(screen.getByLabelText('Upload a school calendar file (.ics)'), { target: { files: [file] } });
+    expect(await screen.findByText(/repeating events that cannot be imported completely/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Add \d checked dates?/ })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Start with the school calendar' })).toBeTruthy();
+    expect(new URLSearchParams(window.location.search).has('sd')).toBe(false);
   });
 });
 

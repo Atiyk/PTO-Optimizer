@@ -21,7 +21,7 @@ export function FamilyShare({
   buildLink: (opts: { includeSchool: boolean; availability?: PartnerAvailability }) => string;
 }) {
   const [open, setOpen] = useState(false);
-  const [includeSchool, setIncludeSchool] = useState(true);
+  const [includeSchool, setIncludeSchool] = useState(false);
   const [includeAvailability, setIncludeAvailability] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [message, setMessage] = useState('');

@@ -186,9 +186,6 @@
     color: var(--text-primary);
     font-family: var(--font-sans);
     font-stretch: 100%;
-    /* Every number in this app is data that changes as inputs change; tabular figures stop
-       a counter or a column from jittering sideways while it does. */
-    font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -237,6 +234,10 @@
   :focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
+  }
+
+  input:is([type='number'], [type='date'], [type='time']) {
+    font-variant-numeric: tabular-nums;
   }
 
   input[type='range'] {

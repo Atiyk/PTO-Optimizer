@@ -47,6 +47,8 @@ export interface TimeOffPolicy {
   /** Display-only per P4 — never a legal claim about what an employer must do. */
   payoutOnLeaving: 'pays' | 'doesnt' | 'not-sure';
   currentBalance: number;
+  /** Some payroll systems already subtract approved future requests. */
+  balanceIncludesApprovedLeave?: boolean;
   /** Portion of currentBalance already carried from a prior plan year, in native units.
    * Not an additional balance. Only meaningful with a known future carryover.useByDate. */
   currentCarriedBalance?: number;

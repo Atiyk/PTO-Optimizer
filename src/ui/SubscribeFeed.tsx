@@ -5,7 +5,7 @@ import { FEED_CALENDAR_NAME, MAX_FEED_QUERY_LENGTH } from '../autopilot/feed';
 import { feedWorkloadAllowed } from '../autopilot/feedHandler';
 import { planStateFromSearch } from '../autopilot/planFromSearch';
 import { isValidISODate } from './urlState';
-import { employerLabelsWouldBeShared } from './publicSharePrivacy';
+import { buildPublicPlanSearch, publicPlanOmissions } from './publicSharePrivacy';
 
 export interface FeedLinks {
   https: string;
@@ -30,11 +30,12 @@ export function feedLinks(origin: string, planSearch: string, path = '/api/feed'
 }
 
 /**
- * F1: subscribe to this plan as a live calendar. Nothing to submit: the links are always
- * the current plan's, and the feed re-solves from the same link on every refresh.
+ * F1: subscribe to a fixed plan snapshot. The feed re-solves its own saved
+ * inputs on refresh, independently of later edits in the planner.
  */
 export interface SubscribeFeedProps {
   planSearch: string;
+  observedHolidayDates?: readonly string[];
   origin?: string;
   /** Feed endpoint; the expiry watch feed uses '/api/watch'. */
   path?: string;
@@ -47,8 +48,8 @@ export interface SubscribeFeedProps {
   idPrefix?: string;
 }
 
-const PLAN_DESCRIPTION = 'Subscribe once to see your PTO days, holidays and a “book by” reminder before each break, rebuilt from this link when your calendar refreshes (usually within a day).';
-const PLAN_CAVEAT = 'After editing the plan, subscribe again. Anyone with the link can see the plan.';
+const PLAN_DESCRIPTION = 'Subscribe to a fixed snapshot of these planning inputs. Your calendar app refreshes this link, including PTO days, holidays and “book by” reminders.';
+const PLAN_CAVEAT = 'After editing the plan, subscribe again to pick up your changes. Anyone with the link can see the snapshot.';
 
 /** Mirrors the /api/feed bound so the page never offers a link the function will refuse. */
 function tooLargeForFeed(query: string): boolean {
@@ -56,22 +57,29 @@ function tooLargeForFeed(query: string): boolean {
   return isValidISODate(state.rangeStart) && isValidISODate(state.rangeEnd) && !feedWorkloadAllowed(state);
 }
 
-export function SubscribeFeed({ planSearch, origin, path = '/api/feed', calendarName = FEED_CALENDAR_NAME, heading = 'Keep this plan in your calendar', description = PLAN_DESCRIPTION, caveat = PLAN_CAVEAT, idPrefix = 'subscribe-feed' }: SubscribeFeedProps) {
+export function SubscribeFeed({ planSearch, observedHolidayDates, origin, path = '/api/feed', calendarName = FEED_CALENDAR_NAME, heading = 'Keep this plan in your calendar', description = PLAN_DESCRIPTION, caveat = PLAN_CAVEAT, idPrefix = 'subscribe-feed' }: SubscribeFeedProps) {
   // The links name this deployment's origin and the visitor's current plan, neither of
   // which the prerendered HTML knows, and React keeps server attributes on hydration - so
   // they render only after mount, never with a build-time host or plan baked in.
   const [mountedOrigin, setMountedOrigin] = useState<string | null>(null);
   useEffect(() => setMountedOrigin(window.location.origin), []);
   const resolvedOrigin = origin ?? mountedOrigin;
-  // Subscription URLs leave this site (Apple, Google, Outlook or a copied feed).
-  // Do not even render private calendar names into those hrefs until informed consent.
-  // Consent belongs to the exact plan query: editing inputs resets the gate.
-  const [consentedQuery, setConsentedQuery] = useState<string | null>(null);
-  const privateCalendar = employerLabelsWouldBeShared(planSearch);
-  const sharingAllowed = !privateCalendar || consentedQuery === planSearch;
-  const links = resolvedOrigin && sharingAllowed ? feedLinks(resolvedOrigin, planSearch, path, calendarName) : null;
-  const query = planSearch.replace(/^\?/, '');
-  const tooLong = useMemo(() => query.length > MAX_FEED_QUERY_LENGTH || (path === '/api/feed' && tooLargeForFeed(query)), [query, path]);
+  // Subscription URLs leave this site. Only allowlisted plan fields, and observed
+  // dates expressly selected for this specific snapshot, reach providers.
+  const planFeed = path === '/api/feed';
+  const omissions = planFeed ? publicPlanOmissions(planSearch) : null;
+  const requiresChoice = Boolean(omissions?.calendar || omissions?.settings);
+  const datesKey = observedHolidayDates?.join(',');
+  const [choice, setChoice] = useState<{ mode: 'defaults' | 'dates' | null; source: string; dates: string | undefined }>(
+    () => ({ mode: null, source: planSearch, dates: datesKey }),
+  );
+  const samePlan = choice.source === planSearch && choice.dates === datesKey;
+  if (!samePlan) setChoice({ mode: null, source: planSearch, dates: datesKey });
+  const sharingAllowed = !requiresChoice || (samePlan && choice.mode !== null);
+  const shareObservedDates = samePlan && choice.mode === 'dates';
+  const query = planFeed ? buildPublicPlanSearch(planSearch, shareObservedDates ? observedHolidayDates : undefined) : planSearch.replace(/^\?/, '');
+  const links = resolvedOrigin && sharingAllowed ? feedLinks(resolvedOrigin, query, path, calendarName) : null;
+  const tooLong = useMemo(() => query.length > MAX_FEED_QUERY_LENGTH || (planFeed && tooLargeForFeed(query)), [query, planFeed]);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -81,16 +89,27 @@ export function SubscribeFeed({ planSearch, origin, path = '/api/feed', calendar
       <h3 id={`${idPrefix}-heading`} className="text-xl font-bold leading-6 text-ink type-condensed">{heading}</h3>
       {tooLong ? (
         <p className="max-w-prose text-sm text-muted">This plan is too large for a calendar subscription. Download the .ics file instead.</p>
-      ) : privateCalendar && !sharingAllowed ? (
+      ) : !sharingAllowed ? (
         <>
-          <p className="max-w-prose text-sm text-muted">Calendar subscription links include your custom employer holiday names and exclusions so the dates remain accurate. Apple, Google, Outlook, or anyone with the link may see them. Nothing is shared unless you choose to include them.</p>
-          <Button variant="secondary" onClick={() => setConsentedQuery(planSearch)}>
-            Share calendar details
-          </Button>
+          <p className="max-w-prose text-sm text-muted">Choose the holiday assumptions for this snapshot. Private calendar names, scheduling details, and policy settings stay here, so the subscription may differ from your personal plan.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => setChoice({ mode: 'defaults', source: planSearch, dates: datesKey })}>
+              Use public holidays
+            </Button>
+            {observedHolidayDates !== undefined && (
+              <Button variant="secondary" onClick={() => setChoice({ mode: 'dates', source: planSearch, dates: datesKey })}>
+                Include observed holiday dates
+              </Button>
+            )}
+          </div>
+          {observedHolidayDates !== undefined && (
+            <p className="max-w-prose text-xs text-muted">Only include these dates if you want them visible to anyone with the link and to your calendar provider.{datesKey ? ` Dates: ${observedHolidayDates.join(', ')}.` : ' No holidays are checked in this date range.'}</p>
+          )}
         </>
       ) : !links ? null : (
         <>
           <p className="max-w-prose text-sm text-muted">{description}</p>
+          {planFeed && <p className="max-w-prose text-xs text-muted">{shareObservedDates ? 'Uses your selected observed holiday dates, without their labels.' : 'Uses public holiday defaults.'}</p>}
           {caveat && <p className="max-w-prose text-xs leading-5 text-muted">{caveat}</p>}
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" href={links.webcal}>Apple Calendar</Button>

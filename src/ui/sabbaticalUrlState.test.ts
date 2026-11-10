@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readSabbaticalStateFromURL, writeSabbaticalStateToURL } from './sabbaticalUrlState';
+import { readSabbaticalStateFromURL, sabbaticalPlanSearch, writeSabbaticalStateToURL } from './sabbaticalUrlState';
 
 describe('readSabbaticalStateFromURL', () => {
   it('defaults every field when the query string is empty', () => {
@@ -62,4 +62,11 @@ it('ignores malformed sabbatical dates before calendar arithmetic', () => {
   const state = readSabbaticalStateFromURL('?s=garbage&sel=2027-02-30');
   expect(state.eligibleFrom).toBeUndefined();
   expect(state.selectedStart).toBeUndefined();
+});
+
+it('only writes the selected sabbatical scenario, without incidental query data', () => {
+  const state = readSabbaticalStateFromURL('?c=PRIVATE_COUNTRY&len=6&s=2026-11-02&sel=2026-12-21&token=PRIVATE_VALUE');
+  expect(state.country).toBeUndefined();
+  const query = sabbaticalPlanSearch({ ...state, country: 'DE', eligibleFrom: '2026-11-02', selectedStart: '2026-12-21' });
+  expect(query).toBe('c=DE&len=6&s=2026-11-02&pto=5&unpaid=0&sel=2026-12-21');
 });

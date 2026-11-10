@@ -22,7 +22,7 @@ import { solve } from '@daysoff/engine/solver/solve';
 import { bestPlacements, placementNote } from '../src/ui/sabbaticalData.ts';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { addDays } from '@daysoff/engine/solver/dateUtils';
-import { logoMarkInner, LOGO_COLORS } from '../src/ui/logoMark.ts';
+import { logoMarkInner } from '../src/ui/logoMark.ts';
 import { PRODUCT_NAME } from '../src/brand.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -47,8 +47,7 @@ function loadUSHolidays(): ReturnType<typeof rawHolidaysToHolidays> {
   return rawHolidaysToHolidays(raw);
 }
 
-// 2026-11 brand overhaul: "the line" (DESIGN.md) - cool paper, ink, Line indigo, the bridged-G
-// mark, and Archivo (embedded from public/fonts so the render never depends on system fonts).
+// Keep the card colors and Archivo consistent with the site.
 const ARCHIVO = readFileSync(resolve(projectRoot, 'public/fonts/archivo-latin-var.woff2')).toString('base64');
 
 function template(title: string, subtitle: string, detail: string): string {
@@ -59,13 +58,11 @@ function template(title: string, subtitle: string, detail: string): string {
     .brand { display: flex; align-items: center; gap: 14px; font-size: 30px; font-weight: 760; font-stretch: 88%; letter-spacing: -0.02em; margin-bottom: 40px; }
     .mark-icon { width: 44px; height: 44px; display: block; }
     .wm { font-size: 36px; letter-spacing: -0.035em; }
-    .desc { font-size: 22px; font-weight: 500; color: #536575; letter-spacing: 0; font-stretch: 100%; }
-    .sr { display: none; }
     h1 { font-size: 72px; font-weight: 760; font-stretch: 88%; line-height: 1.02; letter-spacing: -0.025em; margin: 0 0 24px; max-width: 1000px; }
     p { color: #536575; font-size: 28px; line-height: 1.4; margin: 0; max-width: 940px; }
     .detail { margin-top: 32px; font-size: 26px; font-weight: 600; align-self: flex-start; color: #1d4c88; border-top: 3px solid #245da6; padding-top: 14px; }
   </style></head><body>
-    <div class="brand"><svg class="mark-icon" viewBox="0 0 32 32">${logoMarkInner(LOGO_COLORS)}</svg><span class="wm">gapless</span><span class="desc">PTO Optimizer</span><span class="sr">${PRODUCT_NAME}</span></div>
+    <div class="brand"><svg class="mark-icon" viewBox="0 0 32 32">${logoMarkInner()}</svg><span class="wm">${PRODUCT_NAME}</span></div>
     <h1>${title}</h1>
     <p>${subtitle}</p>
     ${detail ? `<div class="detail">${detail}</div>` : ''}
@@ -100,7 +97,7 @@ async function main(): Promise<void> {
     'landing',
     template(
       'More days off from the same PTO.',
-      'Gapless finds where your PTO joins weekends and public holidays into the longest breaks.',
+      'Timebower finds where your PTO joins weekends and public holidays into the longest breaks.',
       nextHol ? `Free, and no account needed` : '',
     ),
   );

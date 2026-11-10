@@ -29,8 +29,8 @@ describe('brand', () => {
 
 
   it('defines the product name and its short form', () => {
-    expect(PRODUCT_NAME).toBe('Gapless PTO Optimizer');
-    expect(PRODUCT_SHORT_NAME).toBe('Gapless PTO');
+    expect(PRODUCT_NAME).toBe('Timebower');
+    expect(PRODUCT_SHORT_NAME).toBe('Timebower');
   });
 
   it('does not display the legacy product name anywhere in consumer sources', () => {
@@ -57,7 +57,7 @@ describe('brand', () => {
   it('publishes plain-language terms with an accurate privacy link', () => {
     const terms = SOURCES['../public/terms.html'];
     expect(terms).toContain('<h1>Terms of use</h1>');
-    expect(terms).toContain('Gapless does not provide legal, tax, financial, HR or employment advice.');
+    expect(terms).toContain('Timebower does not provide legal, tax, financial, HR or employment advice.');
     expect(terms).toContain('href="/privacy.html"');
     expect(terms).toContain('mailto:gaplessreminders@gmail.com?subject=Gapless%20Contact');
     expect(SOURCES['../public/privacy.html']).toContain('href="/terms.html"');

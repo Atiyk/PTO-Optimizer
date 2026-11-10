@@ -7,6 +7,7 @@ import { downloadICS } from './icsExport';
 import { Button } from './Button';
 import { PlusMinus } from './Chevron';
 import { track } from './analytics';
+import { readBrowserPlanSearch } from './urlState';
 
 export interface PartnerPlannerProps {
   breaks: Break[];
@@ -20,7 +21,7 @@ export interface PartnerPlannerProps {
 }
 
 export function PartnerPlanner({ breaks, freeDays, input, minimumBreakLength = 3, openKey = 0 }: PartnerPlannerProps) {
-  const [received] = useState(() => readPartnerAvailability(typeof window === 'undefined' ? '' : window.location.search));
+  const [received] = useState(() => readPartnerAvailability(typeof window === 'undefined' ? '' : readBrowserPlanSearch(window.location.search, window.history.state)));
   const [open, setOpen] = useState(!!received.availability || received.invalid);
   const [selected, setSelected] = useState<string[] | null>(null);
   const [includeFree, setIncludeFree] = useState(false);
@@ -73,7 +74,7 @@ export function PartnerPlanner({ breaks, freeDays, input, minimumBreakLength = 3
         {received.availability && <div className="border-t border-line pt-4">
           <h3 className="font-semibold text-ink">Here are the dates you can both take off.</h3>
           <p className="mt-1 text-sm text-muted">Your partner shared {received.availability.days.length} dates as {received.availability.status} availability, from {formatDateRange(received.availability.days[0], received.availability.days[received.availability.days.length - 1])}. Dates outside that selection are undisclosed.</p>
-          <p className="mt-1 text-sm text-muted">Proposed dates may still need employer approval. Gapless does not contact either employer.</p>
+          <p className="mt-1 text-sm text-muted">Proposed dates may still need employer approval. Timebower does not contact either employer.</p>
           <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-medium text-ink">
             <input type="checkbox" checked={prioritize} onChange={event => setPrioritize(event.target.checked)} />
             Prioritize days off together.

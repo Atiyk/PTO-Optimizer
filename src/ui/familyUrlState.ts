@@ -7,9 +7,9 @@ import { isValidISODate } from './urlState';
 /**
  * URL round-tripping for /family, same conventions as sabbaticalUrlState.ts: clamp numbers
  * on read, only write non-defaults, and leave `c`/`s` undefined when absent so the viewer's
- * own country and today take over. Dates only: no child, school or calendar names ever
- * enter the URL. A malformed param is reported in `invalid` and treated as absent rather
- * than throwing, so a damaged link still opens.
+ * own country and today take over. Private dates and district selections are read from
+ * legacy links or intentionally shared links, and then stay in the current history entry.
+ * A malformed param is reported in `invalid` and treated as absent.
  */
 export const DEFAULT_FAMILY_PTO = 10;
 export const MAX_FAMILY_DATES_PARAM = 1500;
@@ -20,6 +20,7 @@ const FIRST_RANGE = new RegExp(`^(\\d{8})\\.(${FIELD})$`);
 const NEXT_RANGE = new RegExp(`^(${FIELD})\\.(${FIELD})$`);
 const DISTRICT_ID = /^[a-z0-9][a-z0-9-]{0,79}$/;
 const COUNTRY = /^[A-Za-z]{2}$/;
+const FAMILY_DRAFT_PARAMS = ['d', 'sd', 'x', PARTNER_PARAM] as const;
 
 export interface FamilyURLState {
   country?: string;
@@ -149,6 +150,16 @@ export function readFamilyStateFromURL(search: string): FamilyURLState {
   return state;
 }
 
+/** An incoming share takes precedence over private state in the current history entry. */
+export function readFamilyBrowserState(search: string, draft: unknown): FamilyURLState {
+  const state = readFamilyStateFromURL(search);
+  if (typeof draft !== 'string' || state.invalid.includes('search')) return state;
+  const incoming = new URLSearchParams(search);
+  if (FAMILY_DRAFT_PARAMS.some((key) => incoming.has(key))) return state;
+  const { districtId, customOffDays, excludedBreaks, availability } = readFamilyStateFromURL(draft);
+  return { ...state, districtId, customOffDays, excludedBreaks, availability };
+}
+
 function setOrDelete(params: URLSearchParams, name: string, value: string | undefined): void {
   if (value === undefined || value === '') params.delete(name);
   else params.set(name, value);
@@ -178,6 +189,19 @@ export function writeFamilyStateToURL(params: URLSearchParams, state: FamilyURLW
   setOrDelete(params, PARTNER_PARAM, pp);
   setOrDelete(params, 'ask', state.ask ? '1' : undefined);
   return skipped;
+}
+
+/** Allowlist the address and keep private inputs in the same tab's history entry. */
+export function writeFamilyBrowserState(state: FamilyURLWriteState): { search: string; draft: string; skipped: string[] } {
+  const publicParams = new URLSearchParams();
+  const skipped = writeFamilyStateToURL(publicParams, state);
+  const draft = new URLSearchParams();
+  for (const key of FAMILY_DRAFT_PARAMS) {
+    const value = publicParams.get(key);
+    if (value !== null) draft.set(key, value);
+    publicParams.delete(key);
+  }
+  return { search: publicParams.toString(), draft: draft.toString(), skipped };
 }
 
 /**

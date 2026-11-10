@@ -3,7 +3,7 @@ import { isoToSerial } from '@daysoff/engine/solver/dateUtils';
 import { validateCurrentCarriedBalance, type TimeOffPolicy } from '../policy/model';
 import { projectBalance, type BalancePoint, type PolicyEvent } from '../policy/projection';
 import { isValidISODate } from '../ui/urlState';
-import { requestConflicts, requestDatesForScenario, type PtoRequest } from './requestLedger';
+import { isScheduledRequest, requestConflicts, requestDatesForScenario, type PtoRequest } from './requestLedger';
 
 export interface ForecastScenario {
   balance: number | null;
@@ -46,15 +46,27 @@ function validPolicy(policy: TimeOffPolicy): boolean {
 }
 
 function scenario(policy: TimeOffPolicy, through: ISODate, requests: readonly PtoRequest[], tentative: boolean): ForecastScenario {
-  const plannedDays = [...new Set([
-    ...policy.plannedDays.filter((date) => isValidISODate(date) && date > policy.balanceAsOf && date <= through),
-    ...requestDatesForScenario(requests, policy.balanceAsOf, through, tentative),
-  ])].sort();
-  const scenarioPolicy = { ...policy, plannedDays };
-  const { series, events } = projectBalance(scenarioPolicy, through);
-  const spend = policy.unit === 'hours' ? policy.hoursPerDay : 1;
+  const approvedAlreadyCharged = policy.balanceIncludesApprovedLeave
+    ? new Set(requestDatesForScenario(requests, policy.balanceAsOf, through)) : new Set<ISODate>();
+  const inForecast = (date: ISODate) => isValidISODate(date) && date > policy.balanceAsOf
+    && date <= through && !approvedAlreadyCharged.has(date);
+  const bookedHours = new Map<ISODate, number>();
+  for (const date of policy.plannedDays.filter(inForecast)) bookedHours.set(date, policy.hoursPerDay);
+  for (const request of requests) {
+    if (!isScheduledRequest(request, tentative)) continue;
+    for (const date of request.ptoDates.filter(inForecast)) {
+      const minutes = request.ptoMinutes?.[date];
+      const amount = minutes !== undefined && Number.isInteger(minutes) && minutes > 0 && minutes <= 1440
+        ? minutes / 60 : policy.hoursPerDay;
+      // No time-of-day overlap is stored. Treat overlapping records as one booking
+      // at the larger recorded amount rather than consuming both in full.
+      bookedHours.set(date, Math.max(bookedHours.get(date) ?? 0, amount));
+    }
+  }
+  const scenarioPolicy = { ...policy, plannedDays: [...bookedHours.keys()].sort() };
+  const { series, events } = projectBalance(scenarioPolicy, through, bookedHours);
   const accrued = events.reduce((sum, e) => sum + (e.kind === 'accrual-credited' ? e.amount : 0), 0);
-  const scheduled = events.filter((e) => e.kind === 'planned-day-taken').length * spend;
+  const scheduled = events.reduce((sum, e) => sum + (e.kind === 'planned-day-taken' ? e.amount : 0), 0);
   const expired = events.reduce((sum, e) => sum + (e.kind === 'forfeited' || e.kind === 'carried-days-expiring' ? e.amount : 0), 0);
   const lostAccrual = events.reduce((sum, e) => sum + (e.kind === 'cap-reached' ? e.lost : 0), 0);
   const projected = series[series.length - 1]?.balance ?? policy.currentBalance;
@@ -67,14 +79,15 @@ function scenario(policy: TimeOffPolicy, through: ISODate, requests: readonly Pt
     for (const event of events) eventsByDay.set(event.date, [...(eventsByDay.get(event.date) ?? []), event]);
     for (let i = 1; i < series.length; i++) {
       const daily = eventsByDay.get(series[i].date) ?? [];
-      if (!daily.some((e) => e.kind === 'planned-day-taken')) continue;
+      const debit = daily.find((e) => e.kind === 'planned-day-taken');
+      if (!debit) continue;
       let before = series[i - 1].balance;
       if (daily.some((e) => e.kind === 'reset')) {
         before = policy.carryover.mode === 'all' ? before
           : policy.carryover.mode === 'capped' ? Math.min(before, policy.carryover.cap ?? 0) : 0;
       }
       before += daily.reduce((sum, e) => sum + (e.kind === 'accrual-credited' ? e.amount : 0), 0);
-      unfunded += Math.max(0, spend - before - policy.negativeBalanceAllowance);
+      unfunded += Math.max(0, debit.amount - before - policy.negativeBalanceAllowance);
     }
   }
   return { balance, accrued, scheduled, expired, lostAccrual, unfunded, series, events, policy: scenarioPolicy };

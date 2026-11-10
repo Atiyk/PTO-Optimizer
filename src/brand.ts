@@ -7,7 +7,7 @@
  * Pure constants with no imports: safe for the browser bundle, the Node build scripts and
  * vite.config.ts alike.
  */
-export const PRODUCT_NAME = 'Gapless PTO Optimizer';
-/** For tight spaces: the header wordmark under 400px, the PWA icon label. */
-export const PRODUCT_SHORT_NAME = 'Gapless PTO';
+export const PRODUCT_NAME = 'Timebower';
+/** For tight spaces: the header wordmark and structured metadata. */
+export const PRODUCT_SHORT_NAME = 'Timebower';
 export const TAGLINE = 'Your year, planned around the time that’s yours.';

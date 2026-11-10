@@ -51,6 +51,23 @@ describe('date-specific forecast reuses the existing policy projection', () => {
     const policy = { ...base, unit: 'hours' as const, currentBalance: 40, hoursPerDay: 7.5 };
     expect(forecastWithRequests(policy, '2027-01-14', [approved('a', '2027-01-04', '2027-01-05')])!.confirmed).toMatchObject({ balance: 25, scheduled: 15 });
   });
+  it('charges 18 hours for two 9-hour shifts and flags a third as unfunded', () => {
+    const schedule = { ...calendar, shiftMinutes: [540, 540, 540, 540, 480, 0, 0] };
+    const build = (end: string, partialMinutes?: number) =>
+      createPtoRequest({ start: '2027-01-04', end, status: 'approved', partialMinutes }, schedule, 'booking')!;
+    const policy = { ...base, unit: 'hours' as const, currentBalance: 18 };
+    const forecast = (request: ReturnType<typeof build>) => forecastWithRequests(policy, '2027-01-14', [request])!.confirmed;
+    expect(forecast(build('2027-01-05'))).toMatchObject({ balance: 0, scheduled: 18, unfunded: 0 });
+    expect(forecast(build('2027-01-06'))).toMatchObject({ balance: 0, scheduled: 27, unfunded: 9 });
+    expect(forecast(build('2027-01-04', 240))).toMatchObject({ balance: 14, scheduled: 4, unfunded: 0 });
+  });
+  it('does not re-deduct an approval already reflected in the entered balance', () => {
+    const policy = { ...base, balanceIncludesApprovedLeave: true, plannedDays: ['2027-01-04', '2027-01-07'] };
+    const tentative = { ...approved('b', '2027-01-04', '2027-01-05'), status: 'requested' as const };
+    const result = forecastWithRequests(policy, '2027-01-14', [approved('a', '2027-01-04'), tentative])!;
+    expect(result.confirmed).toMatchObject({ balance: 9, scheduled: 1 });
+    expect(result.tentative).toMatchObject({ balance: 8, scheduled: 2 });
+  });
   it('reports a funding shortfall when the projection clamps the balance', () => {
     const policy = { ...base, currentBalance: 1 };
     const result = forecastWithRequests(policy, '2027-01-14', [approved('a', '2027-01-04', '2027-01-06')])!;

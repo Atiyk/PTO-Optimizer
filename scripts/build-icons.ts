@@ -3,7 +3,7 @@
  *
  *   public/favicon.svg              the mark (modern browsers)
  *   public/favicon.ico              16, 32 and 48 px PNGs in one .ico (legacy browsers)
- *   public/apple-touch-icon.png     180 px, opaque warm background (iOS adds its own mask)
+ *   public/apple-touch-icon.png     180 px, opaque light background (iOS adds its own mask)
  *   public/icons/icon-192.png       PWA icon, transparent around the mark
  *   public/icons/icon-512.png
  *   public/icons/icon-maskable-512.png  the mark inside the 80% safe zone on a solid background
@@ -23,12 +23,12 @@ const publicDir = resolve(__dirname, '..', 'public');
 
 /** An HTML page that draws the mark at `size` px, `inset` (0..0.5) padding on each side,
  * over `background` (or transparent). */
-function iconHtml(size: number, inset: number, background: string | null, radius = 0, tileRadius = 8): string {
+function iconHtml(size: number, inset: number, background: string | null): string {
   const markSize = Math.round(size * (1 - inset * 2));
   return `<!doctype html><html><head><style>
     html,body{margin:0;width:${size}px;height:${size}px;background:transparent}
-    .bg{width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;${background ? `background:${background};` : ''}border-radius:${radius}px}
-  </style></head><body><div class="bg"><svg xmlns="http://www.w3.org/2000/svg" width="${markSize}" height="${markSize}" viewBox="0 0 32 32">${logoMarkInner(LOGO_COLORS, tileRadius)}</svg></div></body></html>`;
+    .bg{width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;${background ? `background:${background};` : ''}}
+  </style></head><body><div class="bg"><svg xmlns="http://www.w3.org/2000/svg" width="${markSize}" height="${markSize}" viewBox="0 0 32 32">${logoMarkInner()}</svg></div></body></html>`;
 }
 
 /** Packs PNG images into one .ico (the format allows PNG payloads since Windows Vista). */
@@ -56,9 +56,9 @@ function buildIco(images: { size: number; png: Buffer }[]): Buffer {
 
 async function main(): Promise<void> {
   const browser = await chromium.launch(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {});
-  const render = async (size: number, inset: number, background: string | null, radius = 0, tileRadius = 8): Promise<Buffer> => {
+  const render = async (size: number, inset: number, background: string | null): Promise<Buffer> => {
     const page = await browser.newPage({ viewport: { width: size, height: size }, deviceScaleFactor: 1 });
-    await page.setContent(iconHtml(size, inset, background, radius, tileRadius));
+    await page.setContent(iconHtml(size, inset, background));
     const png = await page.screenshot({ omitBackground: background === null, type: 'png' });
     await page.close();
     return png;
@@ -68,12 +68,12 @@ async function main(): Promise<void> {
   writeFileSync(resolve(publicDir, 'favicon.svg'), logoSvgDocument(32) + '\n');
   const icoImages = await Promise.all([16, 32, 48].map(async (size) => ({ size, png: await render(size, 0, null) })));
   writeFileSync(resolve(publicDir, 'favicon.ico'), buildIco(icoImages));
-  // Full-bleed: iOS applies its own rounded mask, so the tile fills the square (no tile in a tile).
-  writeFileSync(resolve(publicDir, 'apple-touch-icon.png'), await render(180, 0, LOGO_COLORS.tile, 0, 0));
+  // iOS applies its own rounded mask to the opaque icon.
+  writeFileSync(resolve(publicDir, 'apple-touch-icon.png'), await render(180, 0.1, LOGO_COLORS.page));
   writeFileSync(resolve(publicDir, 'icons/icon-192.png'), await render(192, 0.06, null));
   writeFileSync(resolve(publicDir, 'icons/icon-512.png'), await render(512, 0.06, null));
   // Maskable: the platform may crop to a circle, so the mark stays inside the central 80%.
-  writeFileSync(resolve(publicDir, 'icons/icon-maskable-512.png'), await render(512, 0.1, LOGO_COLORS.tile, 0, 0));
+  writeFileSync(resolve(publicDir, 'icons/icon-maskable-512.png'), await render(512, 0.16, LOGO_COLORS.page));
   await browser.close();
   console.log('Icons written: favicon.svg, favicon.ico, apple-touch-icon.png, icons/icon-{192,512,maskable-512}.png');
 }

@@ -1,7 +1,8 @@
 import type { Break } from '@daysoff/engine/solver/types';
 import { formatDateRange } from '@daysoff/engine/calendar/dateFormat';
 import { copyCanvasImage, type ShareImageResult } from './imageExport';
-import { LOGO_COLORS, LOGO_GLYPH } from './logoMark';
+import { LOGO_COLORS, OPEN_DAY_BODY, OPEN_DAY_TILE } from './logoMark';
+import { PRODUCT_NAME } from '../brand';
 
 export const PORTRAIT_IMAGE_WIDTH = 1080;
 export const PORTRAIT_IMAGE_HEIGHT = 1350;
@@ -93,12 +94,16 @@ function wrapText(ctx: CanvasRenderingContext2D, value: string, x: number, y: nu
 
 function drawLogoMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
   const k = size / 32;
-  ctx.fillStyle = LOGO_COLORS.tile;
-  ctx.fillRect(x, y, size, size);
-  for (const [gx, gy, w, h, part] of LOGO_GLYPH) {
-    ctx.fillStyle = part === 'bridge' ? LOGO_COLORS.bridge : LOGO_COLORS.stroke;
-    ctx.fillRect(x + gx * k, y + gy * k, w * k, h * k);
-  }
+  const tile = OPEN_DAY_TILE;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(k, k);
+  ctx.fillStyle = LOGO_COLORS.ink;
+  ctx.fill(new Path2D(OPEN_DAY_BODY));
+  ctx.beginPath();
+  ctx.roundRect(tile.x, tile.y, tile.size, tile.size, tile.radius);
+  ctx.fill();
+  ctx.restore();
 }
 
 export function drawPortraitImage(ctx: CanvasRenderingContext2D, data: PortraitPlanData, includeBalance = false): void {
@@ -107,11 +112,11 @@ export function drawPortraitImage(ctx: CanvasRenderingContext2D, data: PortraitP
   ctx.fillRect(0, 0, PORTRAIT_IMAGE_WIDTH, PORTRAIT_IMAGE_HEIGHT);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
-  // The mark: the bridged G (src/ui/logoMark.ts), drawn at 56px from the same geometry.
+  // Draw the same Open Day geometry used by the header and favicon.
   drawLogoMark(ctx, 64, 62, 56);
   ctx.fillStyle = colors.ink;
   ctx.font = '760 42px Archivo Variable, system-ui, sans-serif';
-  ctx.fillText('gapless', 136, 104);
+  ctx.fillText(PRODUCT_NAME, 136, 104);
   ctx.font = '700 48px Archivo Variable, system-ui, sans-serif';
   ctx.fillText(fitText(ctx, text.title, 952), 64, 209);
   ctx.fillStyle = colors.muted;
@@ -167,7 +172,7 @@ export function renderPortraitCanvas(data: PortraitPlanData, includeBalance = fa
 }
 
 export async function copyPortraitImage(canvas: HTMLCanvasElement): Promise<ShareImageResult> {
-  return copyCanvasImage(canvas, 'gapless-time-off-portrait.png');
+  return copyCanvasImage(canvas, 'timebower-time-off-portrait.png');
 }
 
 export async function downloadPortraitImage(canvas: HTMLCanvasElement): Promise<boolean> {
@@ -177,7 +182,7 @@ export async function downloadPortraitImage(canvas: HTMLCanvasElement): Promise<
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'gapless-time-off-portrait.png';
+    link.download = 'timebower-time-off-portrait.png';
     document.body.appendChild(link);
     link.click();
     link.remove();

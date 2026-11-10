@@ -16,24 +16,25 @@ describe('SummaryMetrics', () => {
     expect(html).toContain('2.25×');
     expect(html).toContain('27 days off for 12 PTO days');
     expect(html).toContain('Each PTO day buys 2.25 days off');
-    // The travel percentile carries its band reading and says what it is based on; the
-    // efficiency percentile is no longer a headline figure (it only compares travel settings).
+    // Display only broad context and its source, even when the engine returns an internal percentile.
     expect(html).not.toContain('Efficiency percentile');
-    expect(html).toContain('Travel quietness (est.)');
-    expect(html).toContain('quieter than most weeks in your dates');
-    expect(html).toContain('seasonal estimate');
+    expect(html).toContain('Travel estimate');
+    expect(html).not.toContain('78th');
+    expect(html).toContain('Generic seasonal estimate');
     const us = renderToStaticMarkup(<SummaryMetrics budgetSpent={12} totalDaysOff={27} breakCountActual={3} scores={scores} travelBasis="us" />);
     expect(us).toContain('2025 US airport checkpoint counts');
+    expect(us).toContain('Quieter');
+    expect(us).not.toContain('78th');
   });
 
-  it('renders the raw counts and the ordinal percentiles', () => {
+  it('renders the raw counts without an unsupported ordinal', () => {
     const html = renderToStaticMarkup(
       <SummaryMetrics budgetSpent={12} totalDaysOff={33} breakCountActual={9} scores={scores} />,
     );
     expect(html).toContain('12');
     expect(html).toContain('33');
     expect(html).toContain('in 9 breaks');
-    expect(html).toContain('78th');
+    expect(html).not.toContain('78th');
     expect(html).not.toContain('91st');
   });
 

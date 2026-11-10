@@ -7,13 +7,12 @@
  * drift: the hook keeps its own memoization and state, and calls these for the work.
  *
  * What a server can't see, and so the feed doesn't use:
- * - a browser-saved employer calendar that is NOT in the link. The planner writes the
- *   employer calendar into the link (`eh`) whenever it encodes, so in practice the link
- *   carries it; without `eh` the feed uses the public-holiday defaults.
+ * - a browser-saved employer calendar. New public links either use public-holiday
+ *   defaults or carry an intentionally shared date-only snapshot (`sv=1&ho=...`).
+ *   The legacy named calendar parameter (`eh`) remains readable.
  * - the geolocated / country-landing-page default country (the link always carries `c`;
  *   without it the feed uses US).
- * - the Nager.Date live fallback for a country-year that has no committed
- *   public/holidays file: the feed treats that year as having no public holidays.
+ * - the browser's Nager.Date fallback. The feed checks committed holiday coverage.
  * - notes, request tracking, salary and imported calendars, which never enter the link.
  */
 import type { Break, SolveInput, WorkWeek } from '@daysoff/engine/solver/types';
@@ -90,7 +89,11 @@ export function stateHolidayCandidatesFor(withSubdivision: Holiday[], country: s
   return stateOnly;
 }
 
-export function holidayEntriesFor(nationalHolidays: Holiday[], stateHolidayCandidates: Holiday[], employerCalendar: EmployerCalendar, rangeStart: string, rangeEnd: string): HolidayEntry[] {
+export function holidayEntriesFor(nationalHolidays: Holiday[], stateHolidayCandidates: Holiday[], employerCalendar: EmployerCalendar, rangeStart: string, rangeEnd: string, sharedObservedHolidays?: readonly string[]): HolidayEntry[] {
+  if (sharedObservedHolidays !== undefined) {
+    return sharedObservedHolidays.filter(date => date >= rangeStart && date <= rangeEnd)
+      .map(date => ({ date, name: 'Shared observed holiday', source: 'custom', checked: true }));
+  }
   const excluded = new Set(employerCalendar.excluded);
   const entries = new Map<string, HolidayEntry>();
   for (const h of nationalHolidays) {
@@ -267,6 +270,7 @@ export interface PlanState {
   country: string;
   subdivision: string | undefined;
   employerCalendar: EmployerCalendar;
+  sharedObservedHolidays?: string[];
   planningVersion: 2 | undefined;
   planningStyle: PlanningStyle;
   minimumBreakDays: number;
@@ -308,6 +312,7 @@ export function planStateFromSearch(search: string, today: string, defaultCountr
     country,
     subdivision: initial.subdivision,
     employerCalendar: initial.employerCalendar ?? defaultEmployerCalendar(country, initial.subdivision),
+    sharedObservedHolidays: initial.sharedObservedHolidays,
     planningVersion: initial.planningVersion,
     planningStyle: initial.planningStyle ?? 'custom',
     minimumBreakDays: initial.minimumBreakDays ?? 0,
@@ -353,7 +358,8 @@ export type PlanFromSearchResult = SolvedPlan | { ok: false; issues: string[] };
 export function planFromSearch(search: string, today: string, holidays: HolidaySource): PlanFromSearchResult {
   if (!isValidISODate(today)) return { ok: false, issues: ['Invalid date.'] };
   const state = planStateFromSearch(search, today);
-  const issues = validateInputs({ rangeStart: state.rangeStart, rangeEnd: state.rangeEnd, budget: state.budget, expiryEnabled: state.expiryEnabled, expiryDate: state.expiryDate });
+  const validationInput = { rangeStart: state.rangeStart, rangeEnd: state.rangeEnd, budget: state.budget, expiryEnabled: state.expiryEnabled, expiryDate: state.expiryDate, workWeek: state.workWeek };
+  const issues = validateInputs(validationInput);
   if (issues.length) return { ok: false, issues };
 
   const { country, subdivision, rangeStart, rangeEnd } = state;
@@ -361,7 +367,7 @@ export function planFromSearch(search: string, today: string, holidays: HolidayS
   const stateCandidates = subdivision
     ? stateHolidayCandidatesFor(consumerHolidaysFromSource(holidays, country, rangeStart, rangeEnd, subdivision), country, subdivision, rangeStart, rangeEnd)
     : [];
-  const holidayEntries = holidayEntriesFor(national, stateCandidates, state.employerCalendar, rangeStart, rangeEnd);
+  const holidayEntries = holidayEntriesFor(national, stateCandidates, state.employerCalendar, rangeStart, rangeEnd, state.sharedObservedHolidays);
   const effectiveOffDays = effectiveOffDaysFor(holidayEntries, altFridayOffDatesFor(state.altFridayEnabled, state.altFridayStart, rangeStart, rangeEnd));
   const effectiveBlackouts = effectiveBlackoutsFor(state.blackouts, state.forced);
   const solveInput = buildSolveInput({

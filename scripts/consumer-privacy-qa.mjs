@@ -27,7 +27,7 @@ try {
       result.sections = (await page.getByRole('heading', { name: 'What stays in your browser' }).count()) === 1
         && (await page.getByRole('heading', { name: 'What happens when you share a plan' }).count()) === 1
         && (await page.getByRole('heading', { name: 'Lightweight usage analytics' }).count()) === 1;
-      result.mailto = (await page.getByRole('link', { name: 'Email Gapless' }).getAttribute('href'))
+      result.mailto = (await page.getByRole('link', { name: 'Email Timebower' }).getAttribute('href'))
         === 'mailto:gaplessreminders@gmail.com?subject=Gapless%20Contact';
       result.noFormerBrand = !(await page.locator('body').innerText()).includes('formerly Days Off');
       result.noOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1);
@@ -48,7 +48,7 @@ try {
       result.termsHeading = await page.getByRole('heading', { name: 'Terms of use', level: 1 }).count() === 1;
       result.termsLimitsVisible = await page.getByRole('heading', { name: 'Estimates, not professional advice' }).count() === 1;
       result.termsLinksPrivacy = await page.getByRole('link', { name: 'Privacy information' }).getAttribute('href') === '/privacy.html';
-      result.termsEmail = await page.getByRole('link', { name: 'Email Gapless' }).getAttribute('href') === 'mailto:gaplessreminders@gmail.com?subject=Gapless%20Contact';
+      result.termsEmail = await page.getByRole('link', { name: 'Email Timebower' }).getAttribute('href') === 'mailto:gaplessreminders@gmail.com?subject=Gapless%20Contact';
       result.termsNoOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
       result.status = result.status === 'passed' && result.termsStatusOK && result.termsHeading &&
         result.termsLimitsVisible && result.termsLinksPrivacy && result.termsEmail && result.termsNoOverflow

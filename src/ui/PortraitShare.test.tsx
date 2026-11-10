@@ -8,10 +8,13 @@ vi.mock('./portraitExport', async importOriginal => ({
   copyPortraitImage: actions.copy,
   downloadPortraitImage: actions.download,
 }));
-afterEach(() => { cleanup(); vi.restoreAllMocks(); actions.copy.mockReset(); actions.download.mockReset(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); actions.copy.mockReset(); actions.download.mockReset(); });
 
 function renderShare() {
+  vi.stubGlobal('Path2D', class MockPath2D {});
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    save: vi.fn(), restore: vi.fn(), translate: vi.fn(), scale: vi.fn(),
+    fill: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(),
     fillRect: vi.fn(), strokeRect: vi.fn(), fillText: vi.fn(), measureText: () => ({ width: 100 }),
   } as unknown as CanvasRenderingContext2D);
   return render(<PortraitShare rangeStart="2027-01-01" rangeEnd="2027-12-31" breaks={[{ start: '2027-07-03', end: '2027-07-11', ptoCost: 4, totalDaysOff: 9 }]} holidayAssumption="public" remainingBalance={98123.75} />);

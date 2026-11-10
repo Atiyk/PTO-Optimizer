@@ -13,6 +13,7 @@ interface PlanSlidersProps {
   breakCountRequested: number;
   breakCountActual: number;
   budget: number;
+  pending?: boolean;
 }
 
 /**
@@ -37,6 +38,7 @@ export function PlanSliders({
   breakCountRequested,
   breakCountActual,
   budget,
+  pending,
 }: PlanSlidersProps) {
   return (
     <>
@@ -53,6 +55,7 @@ export function PlanSliders({
           breakCountRequested={breakCountRequested}
           breakCountActual={breakCountActual}
           budget={budget}
+          pending={pending}
         />
       </div>
     </>

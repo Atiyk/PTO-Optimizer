@@ -5,11 +5,11 @@
   <meta name="referrer" content="no-referrer">
   <meta name="viewport" content="width=device-width,initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f8fafc">
-  <meta name="description" content="How Gapless handles local PTO settings, planning links, analytics, holiday lookups and feedback.">
+  <meta name="description" content="How Timebower handles local PTO settings, planning links, analytics, holiday lookups and feedback.">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="alternate icon" href="/favicon.ico">
   <link rel="preload" href="/fonts/archivo-latin-var.woff2" as="font" type="font/woff2" crossorigin>
-  <title>Privacy and your data — Gapless PTO Optimizer</title>
+  <title>Privacy and your data — Timebower</title>
   <style>
     @font-face{font-family:'Archivo Variable';src:url('/fonts/archivo-latin-var.woff2') format('woff2-variations'),url('/fonts/archivo-latin-var.woff2') format('woff2');font-style:normal;font-weight:400 800;font-stretch:75% 100%;font-display:swap}
     :root{color-scheme:light;--page:#f8fafc;--paper:#fff;--alt:#f1f4f6;--ink:#1b2935;--muted:#536575;--line:#dce3ea;--line-strong:#75838f;--mark:#245da6;--ease:cubic-bezier(.23,1,.32,1)}
@@ -72,13 +72,13 @@
 <body>
   <a class="skip" href="#main-content">Skip to main content</a>
   <header><div class="shell">
-    <a href="/" class="brand"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#245da6"/><path d="M24.5 16A8.5 8.5 0 0 0 21.46 9.49" stroke="#8fd6ca" fill="none" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21.46 9.49A8.5 8.5 0 1 0 24.5 16H17" stroke="#ffffff" fill="none" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><strong>Gapless</strong> <small>PTO Optimizer</small></span></a>
+    <a href="/" class="brand"><img src="/favicon.svg" width="28" height="28" alt=""><strong>Timebower</strong></a>
     <nav class="nav" aria-label="Quick links"><a href="/sabbatical">Sabbatical</a><a href="/policy">My PTO</a><a href="/glossary">Learn</a><a href="/pto" class="cta">Plan PTO</a></nav>
   </div></header>
   <main id="main-content" class="shell" tabindex="-1">
     <h1>Your time off is personal. Your planning should be, too.</h1>
     <p class="lede">This page explains what stays in your browser, what a shared link reveals, and how basic site analytics and holiday lookups work.</p>
-    <div class="trust"><strong>Most planning runs on your device.</strong><p>No account is required. Calendar subscriptions and optional email reminders send your plan link to Gapless&rsquo;s server, which builds the calendar or email from it. If you sign in for reminders, Gapless stores your email address, the plan or policy links you save, and when it last emailed you. Personal PTO records are not uploaded or synced between devices.</p></div>
+    <div class="trust"><strong>Most planning runs on your device.</strong><p>No account is required. Calendar subscriptions and optional email reminders send your plan link to Timebower&rsquo;s server, which builds the calendar or email from it. If you sign in for reminders, Timebower stores your email address, the plan or policy links you save, and when it last emailed you. Personal PTO records are not uploaded or synced between devices.</p></div>
     <div class="content">
       <nav class="toc" aria-label="On this page"><span>On this page</span>
         <a href="#local">Saved information</a><a href="#sharing">Shared links</a><a href="#email">Email reminders</a><a href="#analytics">Analytics</a>
@@ -86,30 +86,30 @@
       </nav>
       <div class="sections">
         <section id="local"><h2>What stays in your browser</h2>
-          <p>Balance settings, employer calendars, and tracked PTO requests are saved locally in your browser when you use the relevant features. The planner and its calculations work without a user account. These records are not automatically synchronized across browsers or devices.</p>
-          <p>Downloaded calendar files and share images are generated on your device. We do not automatically upload them. A calendar subscription is different: your calendar app (Google, Apple or Microsoft) keeps the subscription link and asks Gapless&rsquo;s server for the latest calendar each time it refreshes.</p>
+          <p>Private planner and policy drafts stay in the current browser tab. If you save a policy or employer calendar or track a PTO request, the record is stored in your browser. The planner works without an account. These records are not automatically synchronized across devices.</p>
+          <p>Downloaded calendar files and share images are generated on your device. We do not automatically upload them. A calendar subscription is different: your calendar app (Google, Apple or Microsoft) keeps the subscription link and asks Timebower&rsquo;s server for the latest calendar each time it refreshes.</p>
         </section>
         <section id="subscriptions"><h2>Calendar subscriptions</h2>
-          <p>When you subscribe to a plan or expiry calendar, your calendar app (and its provider, such as Google, Apple or Microsoft) keeps the subscription link and fetches it regularly. Gapless&rsquo;s server rebuilds the calendar from the settings in that link each time; it does not store the link. Anyone with the link can see those settings.</p>
+          <p>Your calendar app and its provider keep the subscription link and fetch it regularly. A plan subscription uses the settings you shared at the time you subscribed. Subscribe again after editing the plan. An expiry subscription uses the policy you explicitly include and recalculates against the current date. Anyone with either link can read the settings it contains.</p>
         </section>
         <section id="sharing"><h2>What happens when you share a plan</h2>
-          <p>A planning or policy URL may encode dates, PTO balances, employer holidays, and other chosen settings. Anyone with that link can read those settings. Opening the URL also sends it to the hosting provider as part of a normal web request. We do not put personal request notes or tracker approval statuses in shared planning URLs.</p>
+          <p>A new public planner link includes the scenario dates, PTO budget and public planning controls. Employer names, private calendar settings, tracked requests and personal policy details stay in your browser by default. If you choose to share observed holiday dates, the link includes those dates without employer labels. Legacy links and policy links you explicitly create for reminders may carry additional details. Opening any link sends its contents to the hosting provider as part of the normal web request.</p>
           <p><strong>Before sharing:</strong> check the dates, URL and any balance-visibility controls. You can choose not to share any plan or export.</p>
         </section>
         <section id="email"><h2>If you turn on email reminders</h2>
-          <p>Signing in is optional and only adds reminder emails and forwarding. Gapless emails you a one-time sign-in link; asking for a link does not create an account. Once you sign in, it stores your email address, the plan or policy link you choose to save, whether reminders are on, and the date of the last reminder. Your notice period, balance and planned days are inside those links, exactly as in a link you share.</p>
-          <p>Emails are sent through Gmail. If you forward an approval email to Gapless, it passes through CloudMailin, is read once to write a reply to your own address, and is not stored. Every reminder has a link to stop reminders, and “Delete my account” removes everything at once. Reminder emails are best-effort and can be skipped on days the site reaches its email limit.</p>
+          <p>Signing in is optional and only adds reminder emails and forwarding. Timebower emails you a one-time sign-in link; asking for a link does not create an account. Once you sign in, it stores your email address, the plan or policy link you choose to save, whether reminders are on, and the date of the last reminder. A plan reminder can use a public scenario snapshot. A policy reminder can contain your balance and policy assumptions when you explicitly choose to send those settings.</p>
+          <p>Emails are sent through Gmail. If you forward an approval email to Timebower, it passes through CloudMailin, is read once to write a reply to your own address, and is not stored. Every reminder has a link to stop reminders, and “Delete my account” removes everything at once. Reminder emails are best-effort and can be skipped on days the site reaches its email limit.</p>
         </section>
         <section id="analytics"><h2>Lightweight usage analytics</h2>
           <p>We use <a href="https://vercel.com/analytics" target="_blank" rel="noopener noreferrer">Vercel Web Analytics</a> and <a href="https://plausible.io" target="_blank" rel="noopener noreferrer">Plausible</a> to understand aggregate page visits and feature interactions. The analytics integration strips query strings and URL fragments from reported page URLs and does not intentionally send PTO balances, request details or policy values as event properties.</p>
-          <p>Analytics providers may receive browser and device information and approximate location as part of operating their services. Gapless suppresses analytics for incoming referrer URLs containing query parameters or fragments, and uses a no-referrer policy for outgoing links.</p>
+          <p>Analytics providers may receive browser and device information and approximate location as part of operating their services. Timebower suppresses analytics for incoming referrer URLs containing query parameters or fragments, and uses a no-referrer policy for outgoing links.</p>
         </section>
         <section id="holidays"><h2>Where holiday information comes from</h2>
-          <p>Gapless first uses holiday data served with the site. When a requested country and year are not available locally, the app may request public holiday information from <a href="https://date.nager.at" target="_blank" rel="noopener noreferrer">Nager.Date</a>. That lookup uses the country and year, not your PTO balance, tracked requests, or notes.</p>
+          <p>Timebower first uses holiday data served with the site. When a requested country and year are not available locally, the app may request public holiday information from <a href="https://date.nager.at" target="_blank" rel="noopener noreferrer">Nager.Date</a>. That lookup uses the country and year, not your PTO balance, tracked requests, or notes.</p>
         </section>
         <section id="control"><h2>Your choices and controls</h2>
           <ul>
-            <li>Use Gapless without signing in. Sign in only if you want reminder emails, and delete your account in one click.</li>
+            <li>Use Timebower without signing in. Sign in only if you want reminder emails, and delete your account in one click.</li>
             <li>Delete saved PTO requests, policy settings, or employer-calendar preferences with the controls provided where you entered them.</li>
             <li>Clear this site's browser storage if you want to remove local settings and records from that browser.</li>
             <li>Avoid including private details in any URL, exported file or email you send to someone else.</li>
@@ -117,13 +117,13 @@
           <p class="note">Clearing browser storage does not retract a plan link or file you previously shared with someone else. See our <a href="/terms.html">Terms of use</a> for limits on the planner’s estimates.</p>
         </section>
         <section id="feedback"><h2>Questions or feedback?</h2>
-          <p>Write to Gapless directly. There is no support form to fill out. Please don't include private PTO notes, salary information, or sensitive records in your email.</p>
-          <p class="contact-row"><a class="contact" href="mailto:gaplessreminders@gmail.com?subject=Gapless%20Contact">Email Gapless</a> <a class="contact quiet" href="mailto:gaplessreminders@gmail.com?subject=Gapless%20Bug%20Report&amp;body=What%20happened%3F%0A%0A%0AWhat%20did%20you%20expect%20to%20happen%3F%0A%0A%0ASteps%20to%20reproduce%20(optional)%3A%0A1.%20%0A%0ADevice%20and%20browser%20(optional)%3A%0A">Report a bug</a></p>
+          <p>Write to Timebower directly. There is no support form to fill out. Please don't include private PTO notes, salary information, or sensitive records in your email.</p>
+          <p class="contact-row"><a class="contact" href="mailto:gaplessreminders@gmail.com?subject=Gapless%20Contact">Email Timebower</a> <a class="contact quiet" href="mailto:gaplessreminders@gmail.com?subject=Gapless%20Bug%20Report&amp;body=What%20happened%3F%0A%0A%0AWhat%20did%20you%20expect%20to%20happen%3F%0A%0A%0ASteps%20to%20reproduce%20(optional)%3A%0A1.%20%0A%0ADevice%20and%20browser%20(optional)%3A%0A">Report a bug</a></p>
           <p class="note">gaplessreminders@gmail.com</p>
         </section>
       </div>
     </div>
   </main>
-  <footer><div class="shell"><span>Gapless PTO Optimizer · Privacy information updated November 5, 2026</span><a href="/">Back to planning</a></div></footer>
+  <footer><div class="shell"><span>Timebower · Privacy information updated November 5, 2026</span><a href="/">Back to planning</a></div></footer>
 </body>
 </html>

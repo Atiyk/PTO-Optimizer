@@ -48,11 +48,11 @@ export function FamilyLegend({ showOtherAdult }: { showOtherAdult: boolean }) {
       </li>
       <li className="flex min-h-7 items-center gap-2">
         <span aria-hidden="true" className={`${swatch} bg-surface-alt`} />
-        Your other days off (weekends)
+        Your other scheduled days off
       </li>
       <li className="flex min-h-7 items-center gap-2">
         <span aria-hidden="true" className={`${swatch} relative border border-line`}><span className={`absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${HOLIDAY_DOT}`} /></span>
-        Public holiday
+        Observed holiday
       </li>
     </ul>
   );
@@ -102,14 +102,13 @@ export function FamilyCalendar({
                 const state = stateFor(iso);
                 const holidayName = holidayNameFor(iso);
                 const label = labelFor(iso);
-                const isWeekend = mondayIndexedDow(iso) >= 5;
                 const fill =
                   state === 'pto' ? `${COLORS.ptoBg} border ${COLORS.ptoBorder} text-white font-bold`
                     : state === 'together' ? 'bg-mark border-b-[3px] border-accent font-semibold text-ink'
                       : state === 'other-adult' ? 'border-2 border-ink bg-surface font-semibold text-ink'
                         : state === 'uncovered' ? 'border border-dashed border-ink bg-surface font-bold text-ink'
-                          : isWeekend || state === 'free' ? 'bg-surface-alt text-muted' : 'text-ink';
-                const words = [`${MONTH_NAMES[mo - 1]} ${Number(iso.slice(8))}`, STATE_WORDS[state], label ?? '', holidayName ? `public holiday: ${holidayName}` : '', iso === today ? 'today' : ''].filter(Boolean).join(', ');
+                          : state === 'free' ? 'bg-surface-alt text-muted' : 'text-ink';
+                const words = [`${MONTH_NAMES[mo - 1]} ${Number(iso.slice(8))}`, STATE_WORDS[state], label ?? '', holidayName ? `observed holiday: ${holidayName}` : '', iso === today ? 'today' : ''].filter(Boolean).join(', ');
                 return (
                   <span
                     key={iso}

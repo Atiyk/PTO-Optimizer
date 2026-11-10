@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildPortraitText, drawPortraitImage, PORTRAIT_IMAGE_HEIGHT, PORTRAIT_IMAGE_WIDTH, renderPortraitCanvas, type PortraitPlanData } from './portraitExport';
 
 const data: PortraitPlanData = {
@@ -7,9 +7,16 @@ const data: PortraitPlanData = {
   holidayNamesOf: () => ['Independence Day'], remainingBalance: 98123.75, siteUrl: 'gapless.example',
 };
 
+const drawingMethods = () => ({
+  save: vi.fn(), restore: vi.fn(), translate: vi.fn(), scale: vi.fn(),
+  fill: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(),
+});
+
 describe('portrait share image', () => {
+  beforeEach(() => vi.stubGlobal('Path2D', class MockPath2D {}));
+  afterEach(() => vi.unstubAllGlobals());
   it('uses the requested 1080 × 1350 portrait dimensions', () => {
-    const context = { fillRect: vi.fn(), strokeRect: vi.fn(), fillText: vi.fn(), measureText: () => ({ width: 100 }) };
+    const context = { ...drawingMethods(), fillRect: vi.fn(), strokeRect: vi.fn(), fillText: vi.fn(), measureText: () => ({ width: 100 }) };
     const canvas = { width: 0, height: 0, getContext: () => context };
     const spy = vi.spyOn(document, 'createElement').mockReturnValueOnce(canvas as unknown as HTMLCanvasElement);
     expect(renderPortraitCanvas(data)).toMatchObject({ width: 1080, height: 1350 });
@@ -21,7 +28,7 @@ describe('portrait share image', () => {
     expect(buildPortraitText(data).balance).toBeNull();
     expect(JSON.stringify(buildPortraitText(data))).not.toContain('98123.75');
     const fillText = vi.fn();
-    const context = { fillRect: vi.fn(), strokeRect: vi.fn(), fillText, measureText: () => ({ width: 100 }) } as unknown as CanvasRenderingContext2D;
+    const context = { ...drawingMethods(), fillRect: vi.fn(), strokeRect: vi.fn(), fillText, measureText: () => ({ width: 100 }) } as unknown as CanvasRenderingContext2D;
     drawPortraitImage(context, data);
     expect(fillText.mock.calls.map(call => call[0]).join(' ')).not.toContain('98123.75');
     drawPortraitImage(context, data, true);
@@ -47,7 +54,7 @@ describe('portrait share image', () => {
 
   it('uses years on cross-year dates and never hides overflow behind canvas bounds', () => {
     const fillText = vi.fn();
-    const context = { fillRect: vi.fn(), strokeRect: vi.fn(), fillText, measureText: (value: string) => ({ width: value.length * 15 }) } as unknown as CanvasRenderingContext2D;
+    const context = { ...drawingMethods(), fillRect: vi.fn(), strokeRect: vi.fn(), fillText, measureText: (value: string) => ({ width: value.length * 15 }) } as unknown as CanvasRenderingContext2D;
     const crossYear = { ...data, rangeStart: '2026-12-01', breaks: Array.from({ length: 4 }, () => ({ start: '2026-12-28', end: '2027-01-03', ptoCost: 4, totalDaysOff: 7 })), holidayNamesOf: () => ['An unusually long holiday name '.repeat(15)] };
     const text = buildPortraitText(crossYear);
     expect(text.title).toBe('My time-off plan');

@@ -71,11 +71,11 @@ export function writeSliderStateToURL(params: URLSearchParams, state: SliderURLS
 }
 
 // ---------------------------------------------------------------------------------------
-// Full app state encoding (Phase 1A: shareable URL).
+// Full app state encoding (legacy read and private in-memory serialization).
 //
-// The solver is deterministic, so encoding every input it reads - plus the few UI-only
-// settings a recipient needs to see the same calendar - means the same URL reproduces the
-// same plan for anyone, at any time. Two fields are NOT safe to omit even when they equal
+// The private codec retains every planner input, including employer settings. Public
+// copies and the address bar each apply a separate policy before serializing. Two
+// scenario fields are NOT safe to omit even when they equal
 // "the default," because their default is relative to the viewer, not a fixed constant:
 //   - rangeStart/rangeEnd default to "today" through "Dec 31 this year" - omitting them
 //     would silently re-anchor to a different today days or years later.
@@ -111,7 +111,7 @@ function encodeDateList(dates: string[]): string {
 }
 
 function parseWorkWeek(raw: string | null): WorkWeek | undefined {
-  if (!raw || raw.length !== 7 || !/^[01]{7}$/.test(raw)) return undefined;
+  if (!raw || raw.length !== 7 || !/^[01]{7}$/.test(raw) || !raw.includes('1')) return undefined;
   return raw.split('').map((c) => c === '1') as unknown as WorkWeek;
 }
 
@@ -124,6 +124,9 @@ export interface FullURLState {
   planningStyle?: PlanningStyle;
   minimumBreakDays?: number;
   employerCalendar?: EmployerCalendar;
+  publicShareVersion?: 1;
+  /** Observed dates intentionally shared by the sender, without employer labels. */
+  sharedObservedHolidays?: string[];
   country?: string;
   subdivision?: string;
   rangeStart: string;
@@ -189,7 +192,14 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
   const country = params.get('c') || defaults.country;
   const subdivision = params.get('sd') || undefined;
   const sharedCalendar = decodeEmployerCalendar(params.get('eh'));
-  const employerCalendar = sharedCalendar && employerScope(sharedCalendar.country, sharedCalendar.subdivision) === employerScope(country, subdivision) ? sharedCalendar : undefined;
+  const publicShareVersion = params.get('sv') === '1' ? 1 : undefined;
+  const holidayDates = publicShareVersion ? params.get('ho') : null;
+  const sharedObservedHolidays = holidayDates !== null && (
+    holidayDates === '' || (holidayDates.length <= 44_000 && holidayDates.split(',').every(isValidISODate))
+  ) ? parseDateList(holidayDates).filter(date => date >= rangeStart && date <= rangeEnd) : undefined;
+  const employerCalendar = publicShareVersion === undefined && sharedCalendar
+    && employerScope(sharedCalendar.country, sharedCalendar.subdivision) === employerScope(country, subdivision)
+    ? sharedCalendar : undefined;
 
   const wsRaw = params.get('ws');
   const weekStartOverride: WeekStart | 'auto' = wsRaw === '0' ? 0 : wsRaw === '1' ? 1 : 'auto';
@@ -238,6 +248,8 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
     country,
     subdivision,
     ...(employerCalendar ? { employerCalendar } : {}),
+    ...(publicShareVersion ? { publicShareVersion } : {}),
+    ...(sharedObservedHolidays !== undefined ? { sharedObservedHolidays } : {}),
     rangeStart,
     rangeEnd,
     budget,
@@ -272,6 +284,8 @@ export interface WriteStateInput {
   planningStyle?: PlanningStyle;
   minimumBreakDays?: number;
   employerCalendar?: EmployerCalendar;
+  publicShareVersion?: 1;
+  sharedObservedHolidays?: readonly string[];
   country: string;
   subdivision: string | undefined;
   rangeStart: string;
@@ -300,7 +314,9 @@ export interface WriteStateInput {
   peakCapMaxDays: number;
 }
 
-/** Writes the full app state into `params` in place. `country`/`rangeStart`/`rangeEnd` are
+/** Writes private in-memory plan state into `params` in place. For browser addresses,
+ * call writeBrowserPlanStateToURL; for public links, pass the query to the public
+ * allowlist. `country`/`rangeStart`/`rangeEnd` are
  * always written (see module doc); everything else is omitted when it's at its stable,
  * viewer-independent default, to keep the URL readable. */
 export function writeFullStateToURL(params: URLSearchParams, state: WriteStateInput): void {
@@ -313,6 +329,13 @@ export function writeFullStateToURL(params: URLSearchParams, state: WriteStateIn
   const calendar = state.employerCalendar ? encodeEmployerCalendar(state.employerCalendar) : '';
   if (calendar) params.set('eh', calendar);
   else params.delete('eh');
+  if (state.publicShareVersion === 1 || state.sharedObservedHolidays !== undefined) params.set('sv', '1');
+  else params.delete('sv');
+  if (state.sharedObservedHolidays !== undefined) {
+    params.set('ho', encodeDateList([...new Set(state.sharedObservedHolidays)].sort()));
+  } else {
+    params.delete('ho');
+  }
 
   params.set('c', state.country);
   params.set('s', state.rangeStart);
@@ -400,6 +423,66 @@ export function writeFullStateToURL(params: URLSearchParams, state: WriteStateIn
   // 'ov' (partner-overlap payload) is a one-shot input signal consumed on load, never part
   // of ongoing state - always stripped once the app re-derives the URL from its own state.
   params.delete('ov');
+}
+
+const PRIVATE_PLAN_KEYS = new Set([
+  'eh', 'sv', 'ho', 'pp', 'ov', 'od', 'bo', 'r',
+  'ac', 'am', 'ex', 'xd', 'cc', 'np', 'pc', 'pcs', 'pce', 'pcm', 'up',
+]);
+const PRIVATE_PLAN_HISTORY_KEY = 'gaplessPrivatePlanV1';
+
+function publicPlanFingerprint(params: URLSearchParams): string {
+  const publicParams = new URLSearchParams(params);
+  publicParams.delete('signin');
+  publicParams.delete('jp');
+  publicParams.sort();
+  return publicParams.toString();
+}
+
+function browserHistoryRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown> : {};
+}
+
+/** Restore a draft from the current history entry after refresh. An incoming link
+ * has its own history entry, and explicit URL fields always take precedence. */
+export function readBrowserPlanSearch(search: string, historyState: unknown): string {
+  const params = new URLSearchParams(search);
+  const draft = browserHistoryRecord(browserHistoryRecord(historyState)[PRIVATE_PLAN_HISTORY_KEY]);
+  if (typeof draft.privateSearch !== 'string' || draft.privateSearch.length > 180_000
+    || draft.publicSearch !== publicPlanFingerprint(params)) return search;
+  for (const [key, value] of new URLSearchParams(draft.privateSearch)) {
+    if (PRIVATE_PLAN_KEYS.has(key) && !params.has(key)) params.set(key, value);
+  }
+  return params.toString();
+}
+
+/** Write public controls into the address bar and private draft state into the
+ * current history entry. Does not overwrite a saved employer profile. */
+export function writeBrowserPlanStateToURL(params: URLSearchParams, state: WriteStateInput, historyState: unknown): Record<string, unknown> {
+  const previous = new URLSearchParams(readBrowserPlanSearch(params.toString(), historyState));
+  const full = new URLSearchParams();
+  writeFullStateToURL(full, state);
+  const draft = new URLSearchParams();
+  for (const key of [...params.keys()]) params.delete(key);
+  for (const [key, value] of full) {
+    if (key === 'c' && !/^[A-Z]{2}$/.test(value)) continue;
+    if (key === 'sd' && !/^[A-Z0-9-]{1,16}$/.test(value)) continue;
+    (PRIVATE_PLAN_KEYS.has(key) ? draft : params).set(key, value);
+  }
+  // The recipient's incoming partner payload remains usable after refresh. The
+  // current overlap date state has already consumed the legacy ov payload.
+  for (const key of ['pp', 'ov']) {
+    const value = previous.get(key);
+    if (value && value.length <= 12_000) draft.set(key, value);
+  }
+  const signin = previous.get('signin');
+  if (signin === 'ok' || signin === 'expired') params.set('signin', signin);
+  if (previous.get('jp') === '0') params.set('jp', '0');
+  return {
+    ...browserHistoryRecord(historyState),
+    [PRIVATE_PLAN_HISTORY_KEY]: { publicSearch: publicPlanFingerprint(params), privateSearch: draft.toString() },
+  };
 }
 
 // ---------------------------------------------------------------------------------------

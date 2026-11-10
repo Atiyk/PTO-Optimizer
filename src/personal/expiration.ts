@@ -80,8 +80,8 @@ function suggestionText(parts: readonly ReminderSuggestion[] | undefined, remind
   return ` Suggested: take ${joined}.`;
 }
 
-const DOWNLOAD_NOTE = 'Based on your entered policy and approved leave when exported. Recheck your balance and employer policy in Gapless; this calendar file does not update automatically.';
-const FEED_NOTE = 'Based on the policy in your Gapless link, rechecked against today each time your calendar refreshes. Requests you track in Gapless on your device are not included; recheck your balance and employer policy.';
+const DOWNLOAD_NOTE = 'Based on your entered policy and approved leave when exported. Recheck your balance and employer policy in Timebower; this calendar file does not update automatically.';
+const FEED_NOTE = 'Based on the policy in your Timebower link, rechecked against today each time your calendar refreshes. Requests you track in Timebower on your device are not included; recheck your balance and employer policy.';
 
 /** Reminders are calendar events, never promises of email or background push delivery.
  * `suggestions` maps a risk id to its rescue plan's breaks, so each reminder says which

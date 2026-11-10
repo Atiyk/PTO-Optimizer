@@ -42,7 +42,7 @@ try {
 }
 
 const routes = [
-  { name: 'home', path: '/', title: /Gapless PTO Optimizer/ },
+  { name: 'home', path: '/', title: label === 'before' ? /Gapless PTO Optimizer|Timebower/ : /Timebower/ },
   // Vite preview serves directory indexes at /pto/, whereas Vercel also maps the
   // clean /pto URL. A slashless preview URL silently falls back to the homepage.
   { name: 'pto', path: '/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15', title: /Plan your PTO/ },
@@ -59,9 +59,8 @@ const routes = [
 try {
   for (const width of [1440, 768, 375, 320]) {
     for (const route of routes) {
-      // Narrowest viewport: enforce overflow and reading-order checks on the
-      // Understand hub and guides, without changing legacy planner baselines.
-      if (width === 320 && !['home', 'pto', 'understand', 'guide-accrual', 'guide-carryover', 'guide-holidays', 'guide-payout'].includes(route.name)) continue;
+      // At 320 px cover each route affected by this batch and the learning routes.
+      if (width === 320 && !['home', 'pto', 'policy', 'family', 'understand', 'guide-accrual', 'guide-carryover', 'guide-holidays', 'guide-payout'].includes(route.name)) continue;
       const context = await browser.newContext({
         viewport: { width, height: 1000 },
         timezoneId: 'America/New_York',

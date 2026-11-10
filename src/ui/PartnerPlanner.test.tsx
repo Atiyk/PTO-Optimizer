@@ -42,7 +42,7 @@ describe('partner planner controls', () => {
     const original = JSON.stringify(input);
     render(<PartnerPlanner breaks={[brk]} freeDays={[]} input={input} />);
     expect(screen.getByText(/Choose one of these alternatives/)).toBeTruthy();
-    expect(screen.getByText(/Gapless does not contact either employer/)).toBeTruthy();
+    expect(screen.getByText(/Timebower does not contact either employer/)).toBeTruthy();
     expect(JSON.stringify(input)).toBe(original);
     fireEvent.click(screen.getByRole('checkbox', { name: 'Prioritize days off together.' }));
     expect(new URLSearchParams(window.location.search).get('jp')).toBe('0');

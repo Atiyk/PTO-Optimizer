@@ -8,6 +8,7 @@ import { Button, buttonClasses } from './Button';
 import { Callout } from './Callout';
 import { downloadOutOfOfficeICS } from './icsExport';
 import { copyText } from './requestText';
+import { settleLedgerAction } from '../integration/browserWalletStore';
 
 const wrapButton = 'min-h-11 h-auto! whitespace-normal! py-2 text-left';
 
@@ -56,6 +57,7 @@ export function ApprovalAssistant({ ledger, calendar, today, locale, onStatusCha
   const [confirmed, setConfirmed] = useState<Confirmed | null>(null);
   const [oooDraft, setOooDraft] = useState('');
   const [copyStatus, setCopyStatus] = useState('');
+  const [saving, setSaving] = useState(false);
   const doneRef = useRef<HTMLHeadingElement>(null);
   const effectiveLocale = locale ?? browserLocale();
 
@@ -71,12 +73,16 @@ export function ApprovalAssistant({ ledger, calendar, today, locale, onStatusCha
   function confirm() {
     if (!result || !matched || result.decision === 'unclear') return;
     const status = result.decision;
-    if (!ledger.updateRequest(matched.id, { status }, calendar)) return;
-    setConfirmed({ request: { ...matched, status }, status });
-    setOooDraft(status === 'approved' ? outOfOfficeMessage(matched, calendar) : '');
-    setCopyStatus('');
-    setText('');
-    onStatusChanged?.();
+    setSaving(true);
+    void settleLedgerAction(ledger.updateRequest(matched.id, { status }, calendar, matched.updatedAt), (saved) => {
+      setSaving(false);
+      if (!saved) return;
+      setConfirmed({ request: { ...matched, status }, status });
+      setOooDraft(status === 'approved' ? outOfOfficeMessage(matched, calendar) : '');
+      setCopyStatus('');
+      setText('');
+      onStatusChanged?.();
+    });
   }
 
   const found = result?.dateRanges.map((r) => rangeText(r.start, r.end)).join(', ');
@@ -92,7 +98,7 @@ export function ApprovalAssistant({ ledger, calendar, today, locale, onStatusCha
         <p>Matches your {matched.status} request {requestLabel(matched)}.</p>
         {evidence}
         {cautions(result).map((c) => <p key={c} className="mt-1 text-sm text-ink">{c}</p>)}
-        <Button className={`mt-3 ${wrapButton}`} onClick={confirm}>{result.decision === 'approved' ? 'Mark as approved' : 'Mark as rejected'}</Button>
+        <Button className={`mt-3 ${wrapButton}`} disabled={saving} onClick={confirm}>{result.decision === 'approved' ? 'Mark as approved' : 'Mark as rejected'}</Button>
       </Callout>
     );
   } else if (result && result.decision !== 'unclear') {

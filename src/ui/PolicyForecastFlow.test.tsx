@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { Policy } from './Policy';
-import { readPolicyStateFromURL, writePolicyStateToURL } from './policyUrlState';
-import { initialPolicyPreferences, savePolicyPreferences } from '../personal/policyPreferences';
+import { initialPolicyPreferences, readBrowserPolicyDraft, savePolicyPreferences } from '../personal/policyPreferences';
 
 const INITIAL_SEARCH = '?c=US&cb=10&bao=2027-01-01&ak=pp&am=1&fq=m&pda=2027-01-15&cm=a&ace=0&fd=2027-03-15';
 const quickInputs = () => within(screen.getByRole('region', { name: 'Quick balance forecast' }));
@@ -29,19 +28,18 @@ describe('quick policy forecast in the real consumer page', () => {
     expect(quickInputs().queryByRole('button', { name: /generate|calculate/i })).toBeNull();
   });
 
-  it('updates the selected forecast date live and reproduces fd/car inputs from a URL', () => {
+  it('opens legacy fd/car inputs, scrubs private URL values and restores the same-tab draft', () => {
     window.history.replaceState(null, '', '/policy?c=US&cb=12&bao=2027-02-01&ak=fl&am=0&gd=2027-01-01&cm=a&ace=0&cue=1&cub=2027-03-31&car=3&fd=2027-04-01');
-    render(<Policy />);
+    const first = render(<Policy />);
     expectForecast('9 days');
     fireEvent.change(screen.getByLabelText('Forecast my balance on'), { target: { value: '2027-03-01' } });
     expectForecast('12 days');
-    const params = new URLSearchParams(window.location.search);
-    expect(params.get('fd')).toBe('2027-03-01');
-    expect(params.get('car')).toBe('3');
-    const state = readPolicyStateFromURL(window.location.search, 'US');
-    const replay = new URLSearchParams();
-    writePolicyStateToURL(replay, state);
-    expect(readPolicyStateFromURL(replay.toString(), 'US')).toMatchObject({ forecastDate: '2027-03-01', currentCarriedBalance: 3, currentBalance: 12 });
+    expect(window.location.search).toBe('?c=US');
+    expect(initialPolicyPreferences(window.location.search, 'US', readBrowserPolicyDraft())).toMatchObject({ forecastDate: '2027-03-01', currentCarriedBalance: 3, currentBalance: 12 });
+    first.unmount();
+    render(<Policy />);
+    expectForecast('12 days');
+    expect((screen.getByLabelText('Forecast my balance on') as HTMLInputElement).value).toBe('2027-03-01');
   });
 
   it('keeps advanced policy controls collapsed while preserving access to them', () => {
@@ -55,7 +53,8 @@ describe('quick policy forecast in the real consumer page', () => {
     fireEvent.click(screen.getByText('Advanced policy options and explanation'));
     expect(advanced().open).toBe(true);
     fireEvent.change(options.getByLabelText('Can your balance go negative?'), { target: { value: '2' } });
-    expect(new URLSearchParams(window.location.search).get('nba')).toBe('2');
+    expect(window.location.search).toBe('?c=US');
+    expect(initialPolicyPreferences(window.location.search, 'US', readBrowserPolicyDraft()).negativeBalanceAllowance).toBe(2);
   });
 
   it('saves an optional local policy and restores it on a clean revisit', () => {
@@ -93,7 +92,8 @@ describe('quick policy forecast in the real consumer page', () => {
     fireEvent.change(quickInputs().getByLabelText('How PTO accrues'), { target: { value: 'unlimited' } });
     expect(forecastOutput().getByText(/Unlimited PTO has no banked balance to forecast/)).toBeTruthy();
     expect(forecastOutput().queryByText(/Estimated available PTO on/)).toBeNull();
-    expect(new URLSearchParams(window.location.search).get('ak')).toBe('ul');
+    expect(window.location.search).toBe('?c=US');
+    expect(initialPolicyPreferences(window.location.search, 'US', readBrowserPolicyDraft()).accrualKind).toBe('unlimited');
   });
 
   it('labels hourly accrual in the hours unit expected by the shared policy model', () => {
@@ -114,10 +114,20 @@ describe('quick policy forecast in the real consumer page', () => {
     expect(screen.getByText('Expected expiration').nextElementSibling?.textContent).toBe('0 days');
   });
 
-  it('labels the zero starting balance until the visitor enters theirs', () => {
+  it('distinguishes an explicitly entered zero from an empty field, including legacy links', () => {
     window.history.replaceState(null, '', '/policy?c=US&cb=0&bao=2030-01-01&ak=pp&am=1&fq=m&pda=2030-01-15&cm=a&ace=0&fd=2030-03-15');
-    render(<Policy />);
+    const first = render(<Policy />);
+    const input = quickInputs().getByLabelText('Current PTO balance (days)') as HTMLInputElement;
+    expect(input.value).toBe('0');
+    expect(forecastOutput().queryByText('Current balance (not entered yet)')).toBeNull();
+    fireEvent.change(input, { target: { value: '' } });
     expect(screen.getByText(/Starts at 0 until you enter yours/)).toBeTruthy();
     expect(forecastOutput().getByText('Current balance (not entered yet)')).toBeTruthy();
+    fireEvent.change(input, { target: { value: '0' } });
+    expect(forecastOutput().queryByText('Current balance (not entered yet)')).toBeNull();
+    first.unmount();
+    render(<Policy />);
+    expect((quickInputs().getByLabelText('Current PTO balance (days)') as HTMLInputElement).value).toBe('0');
+    expect(forecastOutput().queryByText('Current balance (not entered yet)')).toBeNull();
   });
 });

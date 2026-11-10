@@ -14,22 +14,22 @@ export const ITEMS: FAQItem[] = [
   {
     question: 'How does it choose which days to take?',
     answer:
-      "Holidays and weekends are fixed; the tool finds runs of consecutive days off that a small number of PTO days can bridge, then picks the best non-overlapping combination within your budget. It solves for the best overall set of breaks rather than picking the best single break and repeating - that's what lets it beat planning it by hand.",
+      "Holidays and weekends are fixed; the tool finds runs of consecutive days off that a small number of PTO days can bridge, then compares non-overlapping combinations within your budget to find a good set of breaks.",
   },
   {
     question: 'What do the two sliders do?',
     answer:
-      'The first trades total days off against travel demand. The second sets how many separate breaks you want, from one long stretch to as many as the calendar allows.',
+      'The first weighs total days off and a rough travel estimate when choosing dates. The second sets how many separate breaks you want, from one long stretch to as many as the calendar allows.',
   },
   {
     question: 'Where does the travel data come from?',
     answer:
-      'Daily US TSA checkpoint counts from 2025, public domain, linked below. They measure how many people flew, not ticket prices, and are lined up with your dates by calendar date. Because they are not realigned by weekday, day-to-day differences in other years are approximate. Other countries use a simple seasonal estimate (late December, July and August, and March to April count as busier), labelled as an estimate. It does not predict fares.',
+      'The US comparison uses public TSA checkpoint counts from 2025 matched by calendar date. Weekdays and travel patterns can shift in other years. Other countries use a generic seasonal estimate without local observations. Current fares and passenger counts may differ from both estimates.',
   },
   {
     question: 'Why are the suggestions all near holidays?',
     answer:
-      'Because holidays are the only free days adjacent to workdays, so bridging them is mathematically the most efficient use of PTO. Those are also the busiest and most expensive weeks to travel, which is what the weighting slider exists to let you trade away.',
+      'A holiday or regular day off can stretch a break without using extra PTO. The travel slider lets you give more weight to dates that look quieter in the model.',
   },
   {
     question: 'My company’s holidays are different.',

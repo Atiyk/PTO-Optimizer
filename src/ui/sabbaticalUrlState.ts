@@ -33,8 +33,9 @@ function clampedInt(value: string | null, min: number, max: number, fallback: nu
 
 export function readSabbaticalStateFromURL(search: string): SabbaticalURLState {
   const params = new URLSearchParams(search);
+  const country = params.get('c');
   return {
-    country: params.get('c') ?? undefined,
+    country: country && /^[A-Z]{2}$/.test(country) ? country : undefined,
     lengthWeeks: clampedInt(params.get('len'), 1, 52, DEFAULT_LENGTH_WEEKS),
     eligibleFrom: params.get('s') && isValidISODate(params.get('s')!) ? params.get('s')! : undefined,
     ptoToAdd: clampedInt(params.get('pto'), 0, 15, DEFAULT_PTO_TO_ADD),
@@ -43,14 +44,19 @@ export function readSabbaticalStateFromURL(search: string): SabbaticalURLState {
   };
 }
 
-export function writeSabbaticalStateToURL(
-  params: URLSearchParams,
-  state: { country: string; lengthWeeks: number; eligibleFrom: string; ptoToAdd: number; unpaidWeeksToAdd: number; selectedStart: string },
-): void {
+type SabbaticalPlanInput = Required<SabbaticalURLState>;
+
+export function writeSabbaticalStateToURL(params: URLSearchParams, state: SabbaticalPlanInput): void {
   params.set('c', state.country);
   params.set('len', String(state.lengthWeeks));
   params.set('s', state.eligibleFrom);
   params.set('pto', String(state.ptoToAdd));
   params.set('unpaid', String(state.unpaidWeeksToAdd));
   params.set('sel', state.selectedStart);
+}
+
+export function sabbaticalPlanSearch(state: SabbaticalPlanInput): string {
+  const params = new URLSearchParams();
+  writeSabbaticalStateToURL(params, state);
+  return params.toString();
 }
