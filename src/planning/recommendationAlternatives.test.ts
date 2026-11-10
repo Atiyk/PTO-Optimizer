@@ -49,7 +49,7 @@ describe('deterministic consumer recommendation alternatives', () => {
   });
   it('does not echo private imported fields or blackout dates into ranked recommendations', () => {
     const injected = {
-      ...candidate('2027-09-01', 3, 77),
+      ...candidate('2027-09-01', 3, 2),
       hardExcludedDates: ['2027-10-04'],
       reviewDates: ['2027-08-01', '2027-09-02'],
       personalNote: 'SECRET_MEDICAL_TITLE',
