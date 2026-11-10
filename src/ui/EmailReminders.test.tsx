@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { encodeEmployerCalendar } from '../personal/employerCalendar';
 import { EmailReminders, type AccountStatus } from './EmailReminders';
 
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); window.history.replaceState(null, '', '/'); });
 
 const ON: AccountStatus = { features: { accounts: true, inbound: true }, inboundAddress: 'abc123@cloudmailin.net', account: null };
 
@@ -71,6 +71,7 @@ describe('private employer calendar reminder consent', () => {
     const fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({ account: null }), { status: 200 }));
     vi.stubGlobal('fetch', fetchSpy);
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    window.history.replaceState(null, '', '/pto?' + privateQuery);
     render(<EmailReminders kind="plan" search={privateQuery} enabled initialStatus={ON} />);
     expect(screen.getByText(/private reminder link includes custom employer calendar names/i)).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'owner@example.com' } });
