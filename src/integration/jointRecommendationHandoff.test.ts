@@ -34,6 +34,34 @@ describe('couple-facing canonical handoff', () => {
     expect(result.needsReview[0].potentialSchoolCoverageGapDays).toBe(1);
     expect(result.needsReview[0].feasibility.reviewDates).toEqual(['2027-01-04']);
   });
+  it('strips imported recommendation secrets and refuses forged PTO or date metadata', () => {
+    const a = calendarAvailability(base)!;
+    const b = calendarAvailability(base)!;
+    const imported = {
+      ...candidate('2027-01-04'),
+      explanation: 'PRIVATE_MEDICAL_CALENDAR_TITLE',
+      privateNote: 'PRIVATE_PARTNER_CONTACT',
+      nested: { email: 'PRIVATE_EMAIL' },
+      reviewDates: ['2027-01-06'],
+    };
+    const output = filterJointRecommendations([imported], a, b, 3, 3)!;
+    expect(output.feasible).toHaveLength(1);
+    expect(output.feasible[0].recommendation).toEqual({
+      start: '2027-01-04', end: '2027-01-04',
+      ptoDays: 1, breakDays: 1, getawayCount: 1,
+      hardExcludedDates: [], reviewDates: [], objective: 'balanced',
+      explanation: expect.stringContaining('1 PTO days for adult A'),
+    });
+    expect(JSON.stringify(output)).not.toContain('PRIVATE_');
+    expect(JSON.stringify(output)).not.toContain('2027-01-06');
+    expect(filterJointRecommendations([{ ...imported, ptoDays: 0 }], a, b, 3, 3)).toBeNull();
+    expect(filterJointRecommendations([{ ...imported, breakDays: 2 }], a, b, 3, 3)).toBeNull();
+    expect(filterJointRecommendations([{ ...imported, getawayCount: 2 }], a, b, 3, 3)).toBeNull();
+    expect(filterJointRecommendations([{ ...imported, objective: 'most-getaways' }], a, b, 3, 3)).toBeNull();
+    expect(filterJointRecommendations([{ ...imported, hardExcludedDates: ['2027-01-04'] }], a, b, 3, 3)).toBeNull();
+    expect(filterJointRecommendations([{ ...imported, reviewDates: ['not-a-date'] }], a, b, 3, 3)).toBeNull();
+  });
+
   it('rejects forged provenance and incomplete candidate dates rather than claiming funded results', () => {
     const a = calendarAvailability(base)!;
     const b = calendarAvailability(base)!;
