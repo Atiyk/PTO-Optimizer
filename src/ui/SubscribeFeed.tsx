@@ -5,6 +5,7 @@ import { FEED_CALENDAR_NAME, MAX_FEED_QUERY_LENGTH } from '../autopilot/feed';
 import { feedWorkloadAllowed } from '../autopilot/feedHandler';
 import { planStateFromSearch } from '../autopilot/planFromSearch';
 import { isValidISODate } from './urlState';
+import { employerLabelsWouldBeShared } from './publicSharePrivacy';
 
 export interface FeedLinks {
   https: string;
@@ -62,7 +63,13 @@ export function SubscribeFeed({ planSearch, origin, path = '/api/feed', calendar
   const [mountedOrigin, setMountedOrigin] = useState<string | null>(null);
   useEffect(() => setMountedOrigin(window.location.origin), []);
   const resolvedOrigin = origin ?? mountedOrigin;
-  const links = resolvedOrigin ? feedLinks(resolvedOrigin, planSearch, path, calendarName) : null;
+  // Subscription URLs leave this site (Apple, Google, Outlook or a copied feed).
+  // Do not even render private calendar names into those hrefs until informed consent.
+  // Consent belongs to the exact plan query: editing inputs resets the gate.
+  const [consentedQuery, setConsentedQuery] = useState<string | null>(null);
+  const privateCalendar = employerLabelsWouldBeShared(planSearch);
+  const sharingAllowed = !privateCalendar || consentedQuery === planSearch;
+  const links = resolvedOrigin && sharingAllowed ? feedLinks(resolvedOrigin, planSearch, path, calendarName) : null;
   const query = planSearch.replace(/^\?/, '');
   const tooLong = useMemo(() => query.length > MAX_FEED_QUERY_LENGTH || (path === '/api/feed' && tooLargeForFeed(query)), [query, path]);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
@@ -74,6 +81,13 @@ export function SubscribeFeed({ planSearch, origin, path = '/api/feed', calendar
       <h3 id={`${idPrefix}-heading`} className="text-xl font-bold leading-6 text-ink type-condensed">{heading}</h3>
       {tooLong ? (
         <p className="max-w-prose text-sm text-muted">This plan is too large for a calendar subscription. Download the .ics file instead.</p>
+      ) : privateCalendar && !sharingAllowed ? (
+        <>
+          <p className="max-w-prose text-sm text-muted">Calendar subscription links include your custom employer holiday names and exclusions so the dates remain accurate. Apple, Google, Outlook, or anyone with the link may see them. Nothing is shared unless you choose to include them.</p>
+          <Button variant="secondary" onClick={() => setConsentedQuery(planSearch)}>
+            Include employer calendar details in subscription links
+          </Button>
+        </>
       ) : !links ? null : (
         <>
           <p className="max-w-prose text-sm text-muted">{description}</p>

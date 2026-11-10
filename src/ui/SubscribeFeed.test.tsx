@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { encodeEmployerCalendar } from '../personal/employerCalendar';
 import { SubscribeFeed, feedLinks } from './SubscribeFeed';
 
 afterEach(cleanup);
@@ -54,5 +55,33 @@ describe('SubscribeFeed', () => {
     render(<SubscribeFeed planSearch="c=US&s=2026-11-04&e=2027-12-31&b=120" origin={ORIGIN} />);
     expect(screen.queryByRole('link', { name: 'Apple Calendar' })).toBeNull();
     expect(screen.getByText(/too large for a calendar subscription/)).toBeTruthy();
+  });
+});
+
+describe('private employer calendar subscriptions', () => {
+  const privatePayload = encodeEmployerCalendar({
+    version: 1, country: 'US', excluded: ['2027-12-24|PRIVATE_POLICY_EXCLUSION'],
+    custom: [{ date: '2027-12-27', name: 'PRIVATE_EMPLOYER_POLICY_TITLE' }],
+  });
+  const privateQuery = SEARCH + '&eh=' + encodeURIComponent(privatePayload);
+
+  it('hides all external provider and copyable URLs until explicit informed opt-in', () => {
+    const { rerender } = render(<SubscribeFeed planSearch={privateQuery} origin={ORIGIN} />);
+    expect(screen.getByText(/Nothing is shared unless you choose/i)).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Apple Calendar' })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Google Calendar/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Outlook/ })).toBeNull();
+    expect(screen.queryByLabelText(/paste this link/i)).toBeNull();
+    expect(document.body.textContent).not.toContain('PRIVATE_EMPLOYER_POLICY_TITLE');
+    fireEvent.click(screen.getByRole('button', { name: /Include employer calendar details/i }));
+    const google = screen.getByRole('link', { name: /Google Calendar/ });
+    const outlook = screen.getByRole('link', { name: /Outlook/ });
+    const external = new URL(outlook.getAttribute('href')!);
+    expect(external.searchParams.get('url')).toContain('eh=');
+    expect(new URL(google.getAttribute('href')!).searchParams.get('cid')).toContain('eh=');
+    expect((screen.getByLabelText(/paste this link/i) as HTMLInputElement).value).toContain('eh=');
+    rerender(<SubscribeFeed planSearch={privateQuery + '&w=10'} origin={ORIGIN} />);
+    expect(screen.queryByRole('link', { name: /Google Calendar/ })).toBeNull();
+    expect(screen.queryByLabelText(/paste this link/i)).toBeNull();
   });
 });
