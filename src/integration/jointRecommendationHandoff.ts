@@ -52,7 +52,7 @@ export function filterJointRecommendations(
       || recommendation.reviewDates.length > 1096
       || !recommendation.hardExcludedDates.every(validCalendarDate)
       || !recommendation.reviewDates.every(validCalendarDate)
-      || recommendation.hardExcludedDates.some(date =>
+      || recommendation.hardExcludedDates.some((date: string) =>
         date >= recommendation.start && date <= recommendation.end)
       || typeof recommendation.explanation !== 'string') return null;
     const a = { ...adultA, days: adultA.days.filter(d => d.date >= recommendation.start && d.date <= recommendation.end) };
