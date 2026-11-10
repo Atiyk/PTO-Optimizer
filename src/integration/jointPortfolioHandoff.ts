@@ -180,10 +180,20 @@ export function selectJointFundedPortfolios(
   // jointly affordable portfolio exists. Filter the WHOLE bounded candidate pool
   // before objective winners are selected, not just the four displayed results.
   const callerEligible = options.candidateEligible;
+  // A valid caller may supply up to three budget probes. We must reserve a slot
+  // for B's independent funding cap without creating four additional solves
+  // (which the bounded canonical selector deliberately rejects). Reject an
+  // untrusted non-array rather than throwing when spreading it.
+  if (options.additionalSearchBudgets !== undefined
+    && (!Array.isArray(options.additionalSearchBudgets)
+      || options.additionalSearchBudgets.length > 3
+      || !options.additionalSearchBudgets.every(n =>
+        Number.isInteger(n) && n >= 0 && n <= budgetA))) return null;
+  const callerProbes = options.additionalSearchBudgets ?? [];
   const smallerFundedBudget = Math.min(budgetA, budgetB);
   const searchBudgets = [...new Set([
-    smallerFundedBudget, ...(options.additionalSearchBudgets ?? []),
-  ])].filter(n => n !== budgetA);
+    smallerFundedBudget, ...callerProbes,
+  ])].filter(n => n !== budgetA).slice(0, 3);
   const portfolios = selectCanonicalPortfolios({
     ...mapped, blackouts: [...exclusions].sort(),
   }, jointConstraints, {

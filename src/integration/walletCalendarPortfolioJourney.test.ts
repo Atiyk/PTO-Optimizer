@@ -163,6 +163,17 @@ describe('integration: actual wallet -> rotating family calendar -> canonical po
       expect(item.portfolio.breaks.flatMap(brk => rangeISO(brk.start, brk.end)))
         .not.toContain('2027-06-11');
     }
+    // Three valid caller budget probes plus the mandatory partner-funding probe
+    // must not overflow the canonical selector's 3-extra-solve safety limit.
+    const bounded = selectJointFundedPortfolios(input, a, b, 12, 3, {
+      additionalSearchBudgets: [1, 2, 4],
+    })!;
+    expect(bounded).not.toBeNull();
+    for (const item of [...bounded.feasible, ...bounded.needsReview])
+      expect(item.ptoDaysB).toBeLessThanOrEqual(3);
+    expect(selectJointFundedPortfolios(input, a, b, 12, 3, {
+      additionalSearchBudgets: {} as unknown as number[],
+    })).toBeNull();
     expect(input.blackouts).toEqual([]);
   });
 
