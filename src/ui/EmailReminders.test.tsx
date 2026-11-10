@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { encodeEmployerCalendar } from '../personal/employerCalendar';
 import { EmailReminders, type AccountStatus } from './EmailReminders';
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); window.history.replaceState(null, '', '/'); });
 
 const ON: AccountStatus = { features: { accounts: true, inbound: true }, inboundAddress: 'abc123@cloudmailin.net', account: null };
 
@@ -57,5 +58,51 @@ describe('EmailReminders', () => {
   it('says when emails follow an older saved link', () => {
     render(<EmailReminders kind="policy" search="c=US&cb=9" enabled initialStatus={{ ...ON, account: { email: 'me@example.com', planLink: null, policyLink: '/policy?c=US&cb=8', reminders: true } }} />);
     expect(screen.getByText(/saved earlier/)).toBeTruthy();
+  });
+});
+
+describe('private employer calendar reminder consent', () => {
+  const privateQuery = 'b=20&eh=' + encodeURIComponent(encodeEmployerCalendar({
+    version: 1, country: 'US', excluded: [],
+    custom: [{ date: '2027-12-27', name: 'PRIVATE_EMPLOYER_POLICY_TITLE' }],
+  }));
+
+  it('never sends a private return URL during sign-in until the user confirms disclosure', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({ account: null }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchSpy);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    window.history.replaceState(null, '', '/pto?' + privateQuery);
+    render(<EmailReminders kind="plan" search={privateQuery} enabled initialStatus={ON} />);
+    expect(screen.getByText(/private reminder link includes custom employer calendar names/i)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'owner@example.com' } });
+    const form = screen.getByRole('button', { name: 'Email me a sign-in link' }).closest('form');
+    expect(form).not.toBeNull();
+    fireEvent.submit(form!);
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    fireEvent.submit(form!);
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    const body = JSON.parse(String(fetchSpy.mock.calls[0][1].body));
+    expect(body).toMatchObject({ action: 'login', email: 'owner@example.com' });
+    expect(body.returnTo).toContain('eh=');
+  });
+
+  it('does not save a private plan reminder link after declined consent', async () => {
+    const account = { email: 'owner@example.com', planLink: null, policyLink: null, reminders: false };
+    const fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({ account }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchSpy);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<EmailReminders kind="plan" search={privateQuery} enabled initialStatus={{ ...ON, account }} />);
+    const toggle = screen.getByRole('checkbox');
+    fireEvent.click(toggle);
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    fireEvent.click(toggle);
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    const body = JSON.parse(String(fetchSpy.mock.calls[0][1].body));
+    expect(body).toMatchObject({ action: 'save', reminders: true });
+    expect(body.planLink).toContain('eh=');
   });
 });

@@ -371,7 +371,7 @@ try {
     await noOverflow(main); await forecastRegion(main).screenshot({ path: resolve(out, '02-approved-forecast-375.png') });
   });
 
-  await check('Employer calendar saves, resets, and shared defaults never overwrite recipient preferences', async () => {
+  await check('Employer calendar saves, resets, and public share preserves recipient preferences', async () => {
     const recipientContext = await mobileContext();
     const recipient = await open(recipientContext, holidayPath);
     await eventually(async () => assert.match(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Public holidays should load');
@@ -387,9 +387,9 @@ try {
     const sender = await open(await mobileContext(), holidayPath);
     await sender.getByRole('button', { name: 'Copy link', exact: true }).click();
     const sharedDefault = await clipboardText(sender);
-    assert.ok(new URL(sharedDefault).searchParams.has('eh'));
+    assert.equal(new URL(sharedDefault).searchParams.has('eh'), false, 'Copied public plans must not expose employer calendar overrides.');
     await recipient.goto(sharedDefault, { waitUntil: 'networkidle' });
-    await eventually(async () => assert.match(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Explicit shared defaults must outrank local exclusions');
+    await eventually(async () => assert.doesNotMatch(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Public plans must preserve the recipient saved holiday exclusions.');
     assert.equal(await recipient.evaluate(() => localStorage.getItem('gapless.employer.v1:US:')), saved);
     await recipient.goto(new URL(holidayPath, origin).href, { waitUntil: 'networkidle' });
     await eventually(async () => assert.doesNotMatch(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Opening a share must not persist someone else’s preferences');
@@ -411,6 +411,53 @@ try {
       assert.doesNotMatch(await recipient.locator('#day-2027-12-30').getAttribute('aria-label'), /QA company closure 2027/);
     }, 'Reset must remove saved exceptions');
     await noOverflow(recipient); await screenshot(recipient, '03-employer-calendar-reset-375.png');
+  });
+
+  await check('Public Copy link and calendar subscriptions do not expose private titles without opt-in', async () => {
+    const secret = 'PRIVATE_EMPLOYER_POLICY_TITLE';
+    const page = await open(await mobileContext(), holidayPath);
+    await moreOptions(page);
+    const holidays = holidaySection(page);
+    await holidays.getByLabel('Company holiday date', { exact: true }).fill('2027-12-30');
+    await holidays.getByLabel('Company holiday name', { exact: true }).fill(secret);
+    await holidays.getByRole('button', { name: 'Add', exact: true }).click();
+    await holidays.getByRole('checkbox', { name: /PRIVATE_EMPLOYER_POLICY_TITLE/ }).waitFor();
+    await eventually(async () => {
+      assert.ok(new URL(page.url()).searchParams.get('eh')?.includes(secret), 'Private local URL must still reproduce old full-state calendars.');
+    }, 'The private full-state URL should remain reproducible');
+    const subscriptions = page.getByRole('heading', { name: 'Keep this plan in your calendar', exact: true }).locator('..');
+    assert.equal(await subscriptions.getByRole('link', { name: /Google Calendar/ }).count(), 0, 'No pre-consent Google URL may contain private names.');
+    assert.equal(await subscriptions.getByRole('link', { name: /Outlook/ }).count(), 0, 'No pre-consent Outlook URL may contain private names.');
+    assert.equal(await subscriptions.getByRole('link', { name: /Apple Calendar/ }).count(), 0, 'No pre-consent webcal URL may contain private names.');
+    assert.equal(await subscriptions.getByLabel(/Or paste this link into any calendar app/).count(), 0, 'No private feed URL may be selectable before consent.');
+    await page.getByRole('button', { name: 'Copy link', exact: true }).click();
+    const shared = await clipboardText(page);
+    assert.equal(new URL(shared).searchParams.has('eh'), false, 'The actual clipboard link must exclude employer labels.');
+    assert.ok(!shared.includes(secret), 'Private employer name must never appear in the public clipboard.');
+    assert.ok(!shared.includes('#'), 'Private browser fragments must not be copied.');
+    const recipient = await open(await mobileContext(), shared);
+    await moreOptions(recipient);
+    assert.equal(await holidaySection(recipient).getByRole('checkbox', { name: /PRIVATE_EMPLOYER_POLICY_TITLE/ }).count(), 0,
+      'Shared public URL must not restore the sender private title on the recipient.');
+    await subscriptions.getByRole('button', { name: /Share calendar details/ }).click();
+    const google = new URL(await subscriptions.getByRole('link', { name: /Google Calendar/ }).getAttribute('href'));
+    const cid = google.searchParams.get('cid');
+    assert.ok(cid && new URL(cid.replace(/^webcal:/, 'https:')).searchParams.get('eh')?.includes(secret),
+      'Google may receive custom names only after affirmative consent.');
+    const outlook = new URL(await subscriptions.getByRole('link', { name: /Outlook/ }).getAttribute('href'));
+    const outlookURL = outlook.searchParams.get('url');
+    assert.ok(outlookURL && new URL(outlookURL).searchParams.get('eh')?.includes(secret),
+      'Outlook may receive custom names only after affirmative consent.');
+    await page.getByLabel('PTO days available', { exact: true }).fill('3');
+    await eventually(async () => assert.equal(await subscriptions.getByRole('link', { name: /Google Calendar/ }).count(), 0),
+      'Editing the plan must revoke consent for the old feed URL.');
+    for (const width of [375, 320, 768, 1440]) {
+      await page.setViewportSize({ width, height: 812 });
+      await noOverflow(page);
+      await screenshot(page, `privacy-public-share-${width}.png`);
+    }
+    await page.close();
+    await recipient.close();
   });
 
   await check('Expiration risk uses the real deadline, exports reminders, and persists dismissal controls', async () => {
