@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import type { MarginalValue } from '@daysoff/engine/solver/marginalValue';
 import { COLORS, HOLIDAY_DOT, TEXT_MUTED, TEXT_PRIMARY, BAND_TEXT } from './colorScheme';
 import { buttonClasses } from './Button';
@@ -202,10 +202,12 @@ export function DayCell({
 
   const primaryAction = isAlternative ? onSwapAlternative : () => onToggle(date);
 
-  const handleClick = () => {
+  const handleClick = (event: ReactMouseEvent<HTMLButtonElement>) => {
     if (isOutOfRange) return; // no interaction at all - there's nothing here to toggle
-    if (hasHover) {
+    // Native button activation from the keyboard has no pointer click count.
+    if (hasHover || event.detail === 0) {
       primaryAction?.();
+      if (event.detail === 0) setTooltipOpen(false);
       return;
     }
     // Touch: tap only inspects - a real toggle needs the explicit button in the tooltip,
@@ -214,12 +216,6 @@ export function DayCell({
   };
 
   const handleKeyDown = (e: ReactKeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      primaryAction?.();
-      setTooltipOpen(false);
-      return;
-    }
     const direction =
       e.key === 'ArrowLeft' ? 'left' : e.key === 'ArrowRight' ? 'right' : e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : e.key === 'Home' ? 'home' : e.key === 'End' ? 'end' : null;
     if (direction && onArrowKey) {

@@ -153,7 +153,7 @@ function mountTouchDay(overrides: {
 describe('DayCell coarse-pointer disclosure', () => {
   it('opens a usable action for an ordinary day with no tooltip, without silently changing the plan', () => {
     const { day, onToggle } = mountTouchDay();
-    fireEvent.click(day);
+    fireEvent.click(day, { detail: 1 });
     expect(onToggle).not.toHaveBeenCalled();
     expect(day.getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByRole('group', { name: 'Actions for July 4' })).toBeTruthy();
@@ -171,7 +171,7 @@ describe('DayCell coarse-pointer disclosure', () => {
 
   it('offers an action on holidays even without a marginal value', () => {
     const { day, onToggle } = mountTouchDay({ category: 'public-holiday', holidayName: 'Independence Day' });
-    fireEvent.click(day);
+    fireEvent.click(day, { detail: 1 });
     expect(screen.getByText('Independence Day')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Change this day' }));
     expect(onToggle).toHaveBeenCalledTimes(1);
@@ -179,7 +179,7 @@ describe('DayCell coarse-pointer disclosure', () => {
 
   it('offers the alternative swap on touch without requiring a marginal tooltip', () => {
     const { day, onToggle, onSwapAlternative } = mountTouchDay({ isAlternative: true });
-    fireEvent.click(day);
+    fireEvent.click(day, { detail: 1 });
     fireEvent.click(screen.getByRole('button', { name: 'Swap this in' }));
     expect(onSwapAlternative).toHaveBeenCalledTimes(1);
     expect(onToggle).not.toHaveBeenCalled();
@@ -193,23 +193,25 @@ describe('DayCell coarse-pointer disclosure', () => {
     expect(onToggle).not.toHaveBeenCalled();
   });
 
-  it('supports keyboard Enter and Space without requiring a touch disclosure', () => {
+  it('applies the native keyboard click once and closes a previously opened touch disclosure', () => {
     const { day, onToggle } = mountTouchDay();
-    fireEvent.keyDown(day, { key: 'Enter' });
+    fireEvent.click(day, { detail: 1 });
     fireEvent.keyDown(day, { key: ' ' });
-    expect(onToggle).toHaveBeenCalledTimes(2);
+    fireEvent.click(day, { detail: 0 });
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onToggle).toHaveBeenCalledWith('2026-07-04');
     expect(screen.queryByRole('group')).toBeNull();
   });
 
   it('dismisses touch details on Close, Escape, and outside pointer interaction', () => {
     const { day, onToggle } = mountTouchDay();
-    fireEvent.click(day);
+    fireEvent.click(day, { detail: 1 });
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.queryByRole('group')).toBeNull();
-    fireEvent.click(day);
+    fireEvent.click(day, { detail: 1 });
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('group')).toBeNull();
-    fireEvent.click(day);
+    fireEvent.click(day, { detail: 1 });
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole('group')).toBeNull();
     expect(onToggle).not.toHaveBeenCalled();

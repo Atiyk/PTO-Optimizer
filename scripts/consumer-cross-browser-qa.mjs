@@ -38,7 +38,7 @@ for (const [name, engine] of Object.entries({ firefox, webkit })) {
     });
     page.on('pageerror', (error) => result.errors.push(error.message));
     await page.clock.setFixedTime(new Date('2026-11-10T17:00:00Z'));
-    await page.goto(new URL('/?home=1&c=US&b=15&s=2026-11-10&e=2027-11-09', base));
+    await page.goto(new URL('/?home=1&c=US&b=15&s=2026-11-10&e=2027-11-09', base).href);
     await page.getByRole('link', { name: /Timebower.*home/ }).waitFor();
     const budget = page.getByRole('spinbutton', { name: 'PTO days available' });
     await budget.fill('12');
@@ -68,7 +68,7 @@ for (const [name, engine] of Object.entries({ firefox, webkit })) {
 
     // The static fixture serves the real planner at the directory index.
     link.pathname = '/pto/';
-    await page.goto(link, { waitUntil: 'domcontentloaded' });
+    await page.goto(link.href, { waitUntil: 'domcontentloaded' });
     await page.locator('main[data-plan-ready="true"]').waitFor({ state: 'visible' });
     await page.getByRole('heading', { name: 'Your time off' }).waitFor();
     await page.getByRole('heading', { name: 'Your complete plan' }).waitFor();
@@ -86,7 +86,7 @@ for (const [name, engine] of Object.entries({ firefox, webkit })) {
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
     result.checks.push('recipient planner route, mobile reflow and local calendar-file preview');
 
-    await page.goto(new URL('/policy/', base));
+    await page.goto(new URL('/policy/', base).href);
     const currentBalance = page.getByRole('spinbutton', { name: 'Current PTO balance (days)' });
     await currentBalance.fill('0');
     await currentBalance.press('Tab');
