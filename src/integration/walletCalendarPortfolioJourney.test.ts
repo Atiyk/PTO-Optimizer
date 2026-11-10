@@ -9,7 +9,8 @@ import { schoolCoverage } from '../personal/schoolCoverage';
 import { calendarEvidenceToSolveInput } from './calendarToSolver';
 import { selectCanonicalRecommendationAlternatives } from '../planning/canonicalRecommendation';
 import { travelEvidenceFor } from '../planning/travelEvidence';
-import { selectJointFundedPortfolios } from './jointPortfolioHandoff';
+import { filterJointPortfolios, selectJointFundedPortfolios } from './jointPortfolioHandoff';
+import { selectCanonicalPortfolios } from '../planning/canonicalPortfolio';
 
 const policy: TimeOffPolicy = {
   unit: 'days', hoursPerDay: 8, currentBalance: 5,
@@ -124,6 +125,94 @@ describe('integration: actual wallet -> rotating family calendar -> canonical po
       expect(option.portfolio.breaks.flatMap(brk => rangeISO(brk.start, brk.end))).not.toContain('2027-01-23');
     }
     expect(original.blackouts).toEqual([]);
+  });
+
+  it('recovers a jointly funded lower-ranked plan after the adult-A-only optimum exceeds B budget', () => {
+    const start = '2027-04-01', end = '2027-08-31';
+    const input: SolveInput = { rangeStart: start, rangeEnd: end, budget: 12,
+      offDays: [], blackouts: [], w: 0, breakCount: 3 };
+    const a = buildIntegratedCalendarEvidence({
+      start, end,
+      schedule: { kind: 'weekly', weekly: [true, true, true, true, true, false, false] },
+      calendarPartial: false,
+    }, [])!;
+    const b = buildIntegratedCalendarEvidence({
+      start, end,
+      schedule: { kind: 'weekly', weekly: [true, true, true, true, false, false, false] },
+      employerOffDays: ['2027-05-31'], hardBlockDays: ['2027-06-11'],
+      calendarPartial: false,
+    }, [])!;
+    const mapped = calendarEvidenceToSolveInput(input, a)!;
+    const solo = selectCanonicalPortfolios(mapped, a.constraints)!;
+    expect(solo.length).toBeGreaterThan(0);
+    const soloChecked = filterJointPortfolios(solo, a.availability, b.availability, 12, 3)!;
+    expect(soloChecked.rejected).toBeGreaterThan(0);
+    const joint = selectJointFundedPortfolios(input, a, b, 12, 3)!;
+    expect(joint).not.toBeNull();
+    const offered = [...joint.feasible, ...joint.needsReview];
+    expect(offered.length).toBeGreaterThan(0);
+    // The funded replacement was absent from the four adult-A-only winners.
+    const soloKeys = new Set(solo.map(p => p.breaks.map(brk => brk.start + '/' + brk.end).join('|')));
+    expect(offered.some(item =>
+      !soloKeys.has(item.portfolio.breaks.map(brk => brk.start + '/' + brk.end).join('|')))).toBe(true);
+    for (const item of offered) {
+      expect(item.ptoDaysA).toBeLessThanOrEqual(12);
+      expect(item.ptoDaysB).toBeLessThanOrEqual(3);
+      expect(item.portfolio.budgetRemaining).toBe(12 - item.ptoDaysA);
+      expect(item.portfolio.travelSignal).toBe('not-used');
+      expect(item.portfolio.breaks.flatMap(brk => rangeISO(brk.start, brk.end)))
+        .not.toContain('2027-06-11');
+    }
+    // Three valid caller budget probes plus the mandatory partner-funding probe
+    // must not overflow the canonical selector's 3-extra-solve safety limit.
+    const bounded = selectJointFundedPortfolios(input, a, b, 12, 3, {
+      additionalSearchBudgets: [1, 2, 4],
+    })!;
+    expect(bounded).not.toBeNull();
+    for (const item of [...bounded.feasible, ...bounded.needsReview])
+      expect(item.ptoDaysB).toBeLessThanOrEqual(3);
+    expect(selectJointFundedPortfolios(input, a, b, 12, 3, {
+      additionalSearchBudgets: {} as unknown as number[],
+    })).toBeNull();
+    expect(input.blackouts).toEqual([]);
+  });
+
+  it('includes partner-only advisory dates before ranking constraint-fit portfolios', () => {
+    const start = '2027-04-01', end = '2027-05-31';
+    const schedule = { kind: 'weekly' as const, weekly: [
+      true, true, true, true, true, false, false,
+    ] as [boolean, boolean, boolean, boolean, boolean, boolean, boolean] };
+    const input: SolveInput = { rangeStart: start, rangeEnd: end, budget: 7,
+      offDays: [], blackouts: [], w: 0, breakCount: 3 };
+    const a = buildIntegratedCalendarEvidence({ start, end, schedule, calendarPartial: false }, [])!;
+    const b = buildIntegratedCalendarEvidence({
+      start, end, schedule, calendarPartial: false,
+      advisoryBusyDays: rangeISO(start, end),
+    }, [])!;
+    let sawPreRankingAdvisories = false;
+    let called = 0;
+    const joint = selectJointFundedPortfolios(input, a, b, 7, 7, {
+      candidateEligible: candidate => {
+        called++;
+        if (candidate.reviewDates.length > 0) sawPreRankingAdvisories = true;
+        return true;
+      },
+    })!;
+    expect(called).toBeGreaterThan(0);
+    expect(sawPreRankingAdvisories).toBe(true);
+    // Ignore neither forged partner completeness nor missing advisory metadata.
+    expect(selectJointFundedPortfolios(input, a, { ...b, partial: true }, 7, 7)).toBeNull();
+    expect(selectJointFundedPortfolios(input, a, {
+      ...b, constraints: { ...b.constraints, dates: [] },
+    }, 7, 7)).toBeNull();
+    expect(joint.feasible).toEqual([]);
+    expect(joint.needsReview.length).toBeGreaterThan(0);
+    for (const item of joint.needsReview) {
+      expect(item.portfolio.reviewDates.length).toBeGreaterThan(0);
+      expect(item.ptoDaysA).toBeLessThanOrEqual(7);
+      expect(item.ptoDaysB).toBeLessThanOrEqual(7);
+      expect(item.portfolio.travelSignal).toBe('not-used');
+    }
   });
 
   it('excludes partner-only blocks pre-solver and never exposes an unfunded joint portfolio', () => {

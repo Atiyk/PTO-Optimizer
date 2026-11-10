@@ -7,6 +7,7 @@ import type { CanonicalPortfolio } from '../planning/canonicalPortfolio';
 import type { AvailabilityWindow, JointWindowFeasibility } from '../personal/recurringAvailability';
 import { jointWindowFeasibility, validExternalWindow } from '../personal/recurringAvailability';
 import { schoolCoverage } from '../personal/schoolCoverage';
+import { constraintsFromAvailability } from '../personal/dateConstraints';
 import { validCalendarDate } from '../personal/employerCalendar';
 
 /** A portfolio is a replacement scenario, not a collection of independently funded suggestions. */
@@ -148,11 +149,68 @@ export function selectJointFundedPortfolios(
   if (!mapped || adultA.availability.days.length !== adultB.availability.days.length
     || adultA.availability.days.some((day, index) => day.date !== adultB.availability.days[index].date))
     return null;
+  const partnerConstraints = constraintsFromAvailability(adultB.availability);
+  // Both partner evidence summaries must match the validated date-only facts.
+  // A stale or forged imported partial/constraints object must never silently
+  // override known completeness or omit advisory/hard dates.
+  if (!partnerConstraints || adultB.partial !== adultB.availability.partial
+    || JSON.stringify(partnerConstraints) !== JSON.stringify(adultB.constraints))
+    return null;
   const exclusions = new Set(mapped.blackouts ?? []);
   for (const day of adultB.availability.days) if (day.hardBlocked) exclusions.add(day.date);
+
+  // Objective ranking must see BOTH adults' soft calendar conflicts, not just
+  // partner B's conflicts during post-selection labeling. Recompute the B
+  // evidence from its validated date-only window, never trust caller metadata.
+  const advisoryDates = new Set(adultA.constraints.dates
+    .filter(entry => entry.severity === 'review-needed').map(entry => entry.date));
+  const addedPartnerAdvisories = partnerConstraints.dates.filter(entry => {
+    if (entry.severity !== 'review-needed' || advisoryDates.has(entry.date)) return false;
+    advisoryDates.add(entry.date);
+    return true;
+  });
+  const jointConstraints = {
+    dates: [...adultA.constraints.dates, ...addedPartnerAdvisories],
+    partial: adultA.constraints.partial || partnerConstraints.partial,
+    missingSources: [...new Set([
+      ...adultA.constraints.missingSources, ...partnerConstraints.missingSources,
+    ])],
+  };
+  // A solo-optimal portfolio may exhaust partner B's PTO even when a lower-ranked
+  // jointly affordable portfolio exists. Filter the WHOLE bounded candidate pool
+  // before objective winners are selected, not just the four displayed results.
+  const callerEligible = options.candidateEligible;
+  // A valid caller may supply up to three budget probes. We must reserve a slot
+  // for B's independent funding cap without creating four additional solves
+  // (which the bounded canonical selector deliberately rejects). Reject an
+  // untrusted non-array rather than throwing when spreading it.
+  if (options.additionalSearchBudgets !== undefined
+    && (!Array.isArray(options.additionalSearchBudgets)
+      || options.additionalSearchBudgets.length > 3
+      || !options.additionalSearchBudgets.every(n =>
+        Number.isInteger(n) && n >= 0 && n <= budgetA))) return null;
+  const callerProbes = options.additionalSearchBudgets ?? [];
+  const smallerFundedBudget = Math.min(budgetA, budgetB);
+  const searchBudgets = [...new Set([
+    smallerFundedBudget, ...callerProbes,
+  ])].filter(n => n !== budgetA).slice(0, 3);
   const portfolios = selectCanonicalPortfolios({
     ...mapped, blackouts: [...exclusions].sort(),
-  }, adultA.constraints, options);
+  }, jointConstraints, {
+    ...options, additionalSearchBudgets: searchBudgets,
+    candidateEligible: candidate => {
+      if (callerEligible && callerEligible(candidate) !== true) return false;
+      // A candidate is one REPLACEMENT SCENARIO. Validate aggregate A/B costs,
+      // hard blocks, provenance and dates before handing it a ranked objective.
+      const synthetic: CanonicalPortfolio = {
+        ...candidate, objective: 'balanced', explanation: '',
+      };
+      const assessed = filterJointPortfolios([synthetic], adultA.availability,
+        adultB.availability, budgetA, budgetB);
+      return Boolean(assessed && assessed.rejected === 0
+        && assessed.feasible.length + assessed.needsReview.length === 1);
+    },
+  });
   if (portfolios === null) return null;
   return filterJointPortfolios(portfolios, adultA.availability, adultB.availability, budgetA, budgetB);
 }
