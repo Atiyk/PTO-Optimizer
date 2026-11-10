@@ -28,7 +28,7 @@ describe('actual Copy link action protects private employer details', () => {
     const copiedURL = new URL(copied);
     expect(copiedURL.searchParams.get('b')).toBe('12');
     expect(copied).not.toMatch(/PRIVATE_|eh=|#/);
-    expect(screen.getByText(/company holidays omitted/i)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Copied \(company holidays omitted\)/i })).toBeTruthy();
     window.history.replaceState(null, '', '/');
   });
 });
