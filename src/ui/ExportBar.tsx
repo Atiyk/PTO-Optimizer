@@ -11,6 +11,7 @@ import { buttonClasses } from './Button';
 import { SubscribeFeed } from './SubscribeFeed';
 import { EmailReminders } from './EmailReminders';
 import { ordinal } from './scoreFormat';
+import { buildPublicPlanLink } from './publicSharePrivacy';
 
 interface ExportBarProps {
   breaks: Break[];
@@ -153,9 +154,15 @@ export function ExportBar(props: ExportBarProps) {
           label="Copy link"
           onClick={async () => {
             if (typeof window === 'undefined') return { ok: false, message: "Couldn't copy — try again" };
-            const ok = await copyText(window.location.href);
+            if (props.planSearch === undefined) return { ok: false, message: 'Plan link unavailable' };
+            // The live browser URL may contain private employer holiday names in eh.
+            // Only a deliberately constructed public link reaches the clipboard.
+            const share = buildPublicPlanLink(window.location.href, props.planSearch);
+            const ok = await copyText(share.url);
             if (ok) track('URL shared');
-            return ok ? { ok: true, message: 'Link copied' } : { ok: false, message: "Couldn't copy — try again" };
+            return ok
+              ? { ok: true, message: share.omittedPrivateCalendar ? 'Copied (calendar omitted)' : 'Link copied' }
+              : { ok: false, message: "Couldn't copy — try again" };
           }}
         />
         <button type="button" onClick={props.onPlanWithPartner} className={buttonClasses('secondary', 'md')}>
@@ -176,6 +183,9 @@ export function ExportBar(props: ExportBarProps) {
           </span>
         )}
       </label>
+      {props.planSearch !== undefined && (
+        <p className="text-xs text-muted">Copied public plan links leave out employer-calendar overrides and private names. Recipients may have different holiday assumptions.</p>
+      )}
       {props.planSearch !== undefined && <SubscribeFeed planSearch={props.planSearch} />}
       {props.planSearch !== undefined && <EmailReminders kind="plan" search={props.planSearch} />}
     </div>

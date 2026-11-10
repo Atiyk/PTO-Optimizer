@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { Button } from './Button';
+import { employerLabelsWouldBeShared } from './publicSharePrivacy';
 
 /**
  * Optional sign-in for reminder emails and "forward the approval". Renders nothing unless the
@@ -68,6 +69,10 @@ export function EmailReminders({ kind, search, initialStatus, enabled = BUILD_EN
   const linkField = kind === 'plan' ? 'planLink' : 'policyLink';
   const what = kind === 'plan' ? 'plan' : 'policy';
   const remindersText = kind === 'plan' ? 'the week before each “book by” date, and on the day' : '60, 30 and 7 days before PTO expires';
+  const privateCalendarInLink = kind === 'plan' && employerLabelsWouldBeShared(search);
+  const approvePrivateSave = () => !privateCalendarInLink || window.confirm(
+    'Your plan link contains custom employer calendar names. Signing in or saving this plan can store them in your private reminder link. Continue?',
+  );
 
   const act = async (body: Record<string, unknown>, done?: string) => {
     setBusy(true);
@@ -90,6 +95,7 @@ export function EmailReminders({ kind, search, initialStatus, enabled = BUILD_EN
   return (
     <section id="account" aria-labelledby={`${id}-heading`} className="flex min-w-0 flex-col gap-3 border-t border-line pt-5">
       <h3 id={`${id}-heading`} className="text-xl font-bold leading-6 text-ink type-condensed">Get reminders by email</h3>
+      {privateCalendarInLink && <p className="text-sm text-muted">Your private reminder link includes custom employer calendar names. You will be asked before saving or emailing that link.</p>}
       {!account ? (
         <>
           <p className="max-w-prose text-sm text-muted">
@@ -97,7 +103,7 @@ export function EmailReminders({ kind, search, initialStatus, enabled = BUILD_EN
           </p>
           <form
             className="flex min-w-0 flex-wrap gap-2 sm:flex-nowrap"
-            onSubmit={(event) => { event.preventDefault(); void act({ action: 'login', email, returnTo: `${window.location.pathname}${window.location.search}` }, `Check ${email.trim()} for a sign-in link. It works for 30 minutes.`); }}
+            onSubmit={(event) => { event.preventDefault(); if (!approvePrivateSave()) return; void act({ action: 'login', email, returnTo: `${window.location.pathname}${window.location.search}` }, `Check ${email.trim()} for a sign-in link. It works for 30 minutes.`); }}
           >
             <label htmlFor={`${id}-email`} className="sr-only">Email address</label>
             <input id={`${id}-email`} type="email" required autoComplete="email" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} className={INPUT} />
@@ -113,16 +119,19 @@ export function EmailReminders({ kind, search, initialStatus, enabled = BUILD_EN
               className="mt-0.5 h-4 w-4"
               checked={account.reminders && savedLink !== null}
               disabled={busy}
-              onChange={(event) => void act(event.target.checked
-                ? { action: 'save', [linkField]: currentLink, reminders: true }
-                : { action: 'save', reminders: false })}
+              onChange={(event) => {
+                if (event.target.checked && !approvePrivateSave()) return;
+                void act(event.target.checked
+                  ? { action: 'save', [linkField]: currentLink, reminders: true }
+                  : { action: 'save', reminders: false });
+              }}
             />
             <span>Email me {remindersText} for this {what}</span>
           </label>
           {account.reminders && savedLink !== null && savedLink !== currentLink && (
             <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
               <span>Emails follow the {what} you saved earlier, not this one.</span>
-              <Button variant="quiet" size="sm" disabled={busy} onClick={() => void act({ action: 'save', [linkField]: currentLink }, `Emails now follow this ${what}.`)}>Use this {what} instead</Button>
+              <Button variant="quiet" size="sm" disabled={busy} onClick={() => { if (approvePrivateSave()) void act({ action: 'save', [linkField]: currentLink }, `Emails now follow this ${what}.`); }}>Use this {what} instead</Button>
             </div>
           )}
           {status.features.inbound && status.inboundAddress && (
