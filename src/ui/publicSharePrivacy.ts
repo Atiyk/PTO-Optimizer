@@ -24,7 +24,9 @@ export function buildPublicPlanLink(currentHref: string, planSearch: string): {
   params.delete('eh');
   params.delete('ov');
   params.delete('signin');
-  const result = new URL(original.pathname, original.origin);
+  // Fix the origin first: a pathname beginning // must never replace the host.
+  const result = new URL(original.origin);
+  result.pathname = original.pathname;
   result.search = params.toString();
   return { url: result.toString(), omittedPrivateCalendar };
 }

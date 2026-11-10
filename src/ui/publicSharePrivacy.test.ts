@@ -30,6 +30,11 @@ describe('public plan link privacy', () => {
     expect(employerLabelsWouldBeShared('c=US&b=12')).toBe(false);
     expect(buildPublicPlanLink('https://gapless.example/pto?utm=x', 'c=US&b=12'))
       .toEqual({ url: 'https://gapless.example/pto?c=US&b=12', omittedPrivateCalendar: false });
+    const protocolRelative = buildPublicPlanLink(
+      'https://gapless.example//untrusted.example/path?private=1', 'c=US&b=12',
+    );
+    expect(new URL(protocolRelative.url).origin).toBe('https://gapless.example');
+    expect(new URL(protocolRelative.url).pathname).toBe('//untrusted.example/path');
     expect(employerLabelsWouldBeShared('eh=invalid-private-data')).toBe(true);
     const malformed = buildPublicPlanLink('https://gapless.example/pto', 'c=US&eh=invalid-private-data');
     expect(malformed.url).toBe('https://gapless.example/pto?c=US');
