@@ -3,7 +3,7 @@ import { COLORS, HOLIDAY_DOT } from './colorScheme';
 
 /** What a day is on /family's calendar. School closures are the subject; each is drawn by
  * who has the kids that day. Every state has its own shape, not only its own colour. */
-export type FamilyDayState = 'together' | 'pto' | 'other-adult' | 'uncovered' | 'free' | 'none';
+export type FamilyDayState = 'together' | 'pto' | 'other-adult' | 'other-adult-proposed' | 'uncovered' | 'free' | 'none';
 
 const HATCH_STYLE = {
   backgroundImage: 'repeating-linear-gradient(135deg, var(--text-primary) 0 1.5px, transparent 1.5px 6px)',
@@ -17,6 +17,7 @@ const STATE_WORDS: Record<FamilyDayState, string> = {
   together: 'school is off and you are off: a day with your kids',
   pto: 'school is off, your PTO: a day with your kids',
   'other-adult': 'school is off, covered by the other adult',
+  'other-adult-proposed': 'school is off, the other adult proposed cover and still needs to confirm',
   uncovered: 'school is off and you work: uncovered',
   free: 'your day off',
   none: '',
@@ -25,7 +26,7 @@ const STATE_WORDS: Record<FamilyDayState, string> = {
 const swatch = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px]';
 
 /** The legend draws exactly the marks the calendar draws. */
-export function FamilyLegend({ showOtherAdult }: { showOtherAdult: boolean }) {
+export function FamilyLegend({ otherAdultStatus }: { otherAdultStatus?: 'proposed' | 'confirmed' }) {
   return (
     <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink">
       <li className="flex min-h-7 items-center gap-2">
@@ -36,10 +37,10 @@ export function FamilyLegend({ showOtherAdult }: { showOtherAdult: boolean }) {
         <span aria-hidden="true" className={`${swatch} border ${COLORS.ptoBorder} ${COLORS.ptoBg}`} />
         Your PTO on a school day off
       </li>
-      {showOtherAdult && (
+      {otherAdultStatus && (
         <li className="flex min-h-7 items-center gap-2">
-          <span aria-hidden="true" className={`${swatch} relative border-2 border-ink bg-surface`}><OtherAdultNotch /></span>
-          Covered by the other adult
+          <span aria-hidden="true" className={`${swatch} relative border-2 border-ink bg-surface ${otherAdultStatus === 'proposed' ? 'border-dashed' : ''}`}><OtherAdultNotch /></span>
+          {otherAdultStatus === 'confirmed' ? 'Covered by the other adult' : 'Other adult proposed cover'}
         </li>
       )}
       <li className="flex min-h-7 items-center gap-2">
@@ -106,8 +107,9 @@ export function FamilyCalendar({
                   state === 'pto' ? `${COLORS.ptoBg} border ${COLORS.ptoBorder} text-white font-bold`
                     : state === 'together' ? 'bg-mark border-b-[3px] border-accent font-semibold text-ink'
                       : state === 'other-adult' ? 'border-2 border-ink bg-surface font-semibold text-ink'
-                        : state === 'uncovered' ? 'border border-dashed border-ink bg-surface font-bold text-ink'
-                          : state === 'free' ? 'bg-surface-alt text-muted' : 'text-ink';
+                        : state === 'other-adult-proposed' ? 'border-2 border-dashed border-ink bg-surface font-semibold text-ink'
+                          : state === 'uncovered' ? 'border border-dashed border-ink bg-surface font-bold text-ink'
+                            : state === 'free' ? 'bg-surface-alt text-muted' : 'text-ink';
                 const words = [`${MONTH_NAMES[mo - 1]} ${Number(iso.slice(8))}`, STATE_WORDS[state], label ?? '', holidayName ? `observed holiday: ${holidayName}` : '', iso === today ? 'today' : ''].filter(Boolean).join(', ');
                 return (
                   <span
@@ -120,7 +122,7 @@ export function FamilyCalendar({
                     {state === 'uncovered' && <span aria-hidden="true" className="absolute inset-0 rounded-[6px] opacity-25" style={HATCH_STYLE} />}
                     <span aria-hidden="true" className={state === 'uncovered' ? 'relative bg-surface px-0.5' : undefined}>{Number(iso.slice(8))}</span>
                     <span className="sr-only">{words}</span>
-                    {state === 'other-adult' && <OtherAdultNotch />}
+                    {(state === 'other-adult' || state === 'other-adult-proposed') && <OtherAdultNotch />}
                     {holidayName && state !== 'pto' && (
                       <span aria-hidden="true" className={`absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${HOLIDAY_DOT}`} />
                     )}

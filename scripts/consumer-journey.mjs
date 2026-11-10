@@ -305,8 +305,39 @@ try {
     ), 'Focus recovery after clearing forced dates');
     assert.equal(new URL(page.url()).searchParams.get('b'), '0', 'Reset must preserve the PTO budget.');
     assert.equal(new URL(page.url()).searchParams.get('s'), '2027-01-15', 'Reset must preserve the planning dates.');
+    await waitForPlanner(page);
+    assert.equal(await page.getByRole('button', { name: 'Save this plan', exact: true }).isEnabled(), true, 'A valid zero-budget plan can still be saved.');
+    assert.equal(await page.getByRole('button', { name: 'Copy link', exact: true }).isEnabled(), true, 'A valid zero-budget scenario remains shareable.');
     await noOverflow(page);
     await screenshot(page, '06-pinned-recovery-after-320.png');
+    await page.close();
+  });
+  await check('A saved break and a saved scenario both resume from local storage', async () => {
+    const context = await mobileContext();
+    const page = await open(context, ptoPath.replace('b=2', 'b=3'));
+    const card = page.locator('[data-break-start][data-break-end][data-break-pto]').first();
+    const start = await card.getAttribute('data-break-start');
+    assert.ok(start);
+    await card.getByRole('button', { name: 'Save break', exact: true }).click();
+    await card.getByText('Saved', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Save this plan', exact: true }).click();
+    const savedPlans = page.getByRole('list', { name: 'Saved plans', exact: true });
+    await savedPlans.getByRole('button', { name: 'Restore', exact: true }).waitFor();
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitForPlanner(page);
+    await card.getByText('Saved', { exact: true }).waitFor();
+    await page.getByLabel('PTO days available', { exact: true }).fill('2');
+    await eventually(() => assert.equal(new URL(page.url()).searchParams.get('b'), '2'), 'The active scenario should change');
+    await savedPlans.getByRole('button', { name: 'Restore', exact: true }).click();
+    await eventually(() => assert.equal(new URL(page.url()).searchParams.get('b'), '3'), 'Restore should reinstate the saved scenario');
+    const myPto = await open(context, '/policy/#requests');
+    const tracked = myPto.getByRole('region', { name: 'My PTO requests', exact: true });
+    const status = tracked.getByRole('combobox', { name: `Status for request ${start}`, exact: true });
+    assert.equal(await status.inputValue(), 'considering');
+    assert.equal(await tracked.getByRole('article').count(), 1);
+    await noOverflow(myPto);
+    await screenshot(myPto, '00-considering-saved-375.png');
+    await myPto.close();
     await page.close();
   });
   await check('Live plan → track → requested → approved → forecast → refresh, without duplicate deductions', async () => {
@@ -332,13 +363,14 @@ try {
     }).length;
     assert.ok(trackedCost > 0 && trackedCost <= 3);
     assert.match(await row.innerText(), new RegExp(`${trackedCost} PTO days?`));
-    // Tracking confirms in place: the button is replaced by "Tracked" on the card. Reload so
-    // the card offers it again, then track the same break a second time.
+    // The card recognizes the saved request on return and never offers a duplicate.
     assert.equal(await trackButton.count(), 0, 'A tracked break must confirm in place instead of offering Track again.');
     await main.reload({ waitUntil: 'domcontentloaded' });
     await waitForPlanner(main);
-    await trackButton.click();
-    await eventually(async () => assert.equal(await tracker.getByRole('article').count(), 1), 'Tracking the same break twice must not duplicate it.');
+    await eventually(async () => {
+      assert.equal(await tracker.getByRole('article').count(), 1);
+      assert.equal(await trackButton.count(), 0);
+    }, 'A reload should restore the same request and keep its card marked as tracked.');
     await row.getByRole('combobox', { name: `Status for request ${trackedStart}`, exact: true }).selectOption('requested');
     await row.locator('summary').filter({ hasText: 'Personal note' }).click();
     await row.getByLabel(`Personal note for request ${trackedStart}`, { exact: true }).fill(privateNote);
@@ -555,25 +587,23 @@ try {
     assert.ok(mainContext && main && trackedCost, 'Complete the tracking journey before checking its private-note privacy.');
     await main.goto(new URL(ptoPath.replace('b=2', 'b=3'), origin).href, { waitUntil: 'domcontentloaded' });
     await waitForPlanner(main);
+    const selectedCard = main.locator('[data-break-start][data-break-end][data-break-pto]').first();
+    const selectedStart = await selectedCard.getAttribute('data-break-start');
+    const selectedEnd = await selectedCard.getAttribute('data-break-end');
+    assert.ok(selectedStart && selectedEnd);
+    await selectedCard.getByRole('button', { name: 'Plan this break with a partner', exact: true }).click();
     const partner = main.getByRole('region', { name: 'Partner vacation planner', exact: true });
-    await partner.getByRole('button', { name: 'Plan with someone', exact: true }).click();
     assert.equal(await partner.getByRole('checkbox', { name: 'I have confirmed the availability I am sharing.', exact: true }).isChecked(), false);
-    const options = partner.locator('fieldset').getByRole('checkbox');
-    let chosen = false;
-    for (const option of await options.all()) {
-      const label = await option.evaluate((element) => element.closest('label')?.textContent.trim() ?? '');
-      if (label.startsWith('Also share') || label.startsWith('I have confirmed')) { await option.uncheck(); continue; }
-      await option.setChecked(!chosen); chosen = true;
-    }
-    assert.ok(chosen, 'At least one break must be available to share.');
+    assert.equal(await partner.getByRole('checkbox', { name: 'Show which of these dates I already have off.', exact: true }).isChecked(), false);
+    assert.equal(await partner.locator('fieldset input:checked').count(), 1, 'The selected card should be the only included break.');
     await partner.getByRole('button', { name: 'Copy partner link', exact: true }).click();
     const link = await clipboardText(main);
     assert.ok(!link.includes(privateNote));
     const shared = disclosedDays(link);
-    assert.ok(shared.every((date) => date >= '2027-01-15' && date <= '2027-01-24'));
+    assert.deepEqual(shared, datesBetween(selectedStart, selectedEnd));
     const recipient = await open(await mobileContext(), link);
     const joint = recipient.getByRole('region', { name: 'Partner vacation planner', exact: true });
-    await joint.getByRole('heading', { name: 'Here are the dates you can both take off.', exact: true }).waitFor();
+    await joint.getByRole('heading', { name: 'Possible dates together', exact: true }).waitFor();
     await recipient.getByLabel('PTO days available', { exact: true }).fill('1');
     await moreOptions(recipient);
     await recipient.getByLabel('Days to keep in reserve', { exact: true }).fill('0');
@@ -581,7 +611,8 @@ try {
     const card = joint.getByRole('article').first();
     const ownCost = numberIn(await card.getByText('You', { exact: true }).locator('..').innerText());
     assert.ok(ownCost <= 1, 'Joint opportunity must respect recipient PTO budget.');
-    await card.getByRole('button', { name: 'Share these dates', exact: true }).click();
+    await card.getByRole('button', { name: 'Review return proposal', exact: true }).click();
+    await joint.getByRole('button', { name: 'Copy return proposal', exact: true }).click();
     const jointDays = disclosedDays(await clipboardText(recipient));
     assert.ok(jointDays.every((date) => shared.includes(date)), 'A joint opportunity cannot invent undisclosed availability.');
     assert.equal(await recipient.getByText(privateNote, { exact: true }).count(), 0);

@@ -13,18 +13,22 @@ export function initialPolicyPreferences(search: string, country: string, draftS
   const restore = (savedSearch: string) => {
     const params = new URLSearchParams(savedSearch);
     for (const key of ['c', 'fd']) if (incoming.has(key)) params.set(key, incoming.get(key)!);
-    return readPolicyStateFromURL(params.toString(), country);
+    return readPolicyStateFromURL(params.toString(), country, true);
   };
   if (typeof draftSearch === 'string' && draftSearch.length <= 14000) return restore(draftSearch);
   try {
     const raw = localStorage.getItem(KEY);
     if (raw && raw.length <= 16000) {
       const saved = JSON.parse(raw);
-      if (saved.version === 1 && typeof saved.search === 'string') return restore(saved.search);
+      if (saved.version === 1 && typeof saved.search === 'string' && saved.search.length <= 14000) return restore(saved.search);
     }
   } catch { /* The quick forecast also works without browser storage. */ }
   const publicState = readPolicyStateFromURL(search, country);
-  return { ...defaultPolicyURLState(), country: publicState.country, currentBalance: 0, balanceEntered: false, carryoverMode: 'all', accrualCapEnabled: false, forecastDate: publicState.forecastDate };
+  return {
+    ...defaultPolicyURLState(), country: publicState.country, currentBalance: 0, balanceEntered: false,
+    amount: NaN, payDateAnchor: '', grantDate: '', hourlyRate: NaN, typicalWeeklyHours: NaN,
+    carryoverMode: 'all', accrualCapEnabled: false, forecastDate: publicState.forecastDate,
+  };
 }
 
 /** A history entry keeps the same-tab draft on reload without making it shareable

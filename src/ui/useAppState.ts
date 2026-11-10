@@ -1,4 +1,4 @@
-import { getConsumerHolidays as getHolidays, getConsumerHolidaysWithStatus as getHolidaysWithStatus, getConsumerSubdivisionCandidates as getSubdivisionCandidates } from '../personal/consumerHolidays';
+import { getConsumerHolidaysWithStatus as getHolidaysWithStatus, getConsumerSubdivisionCandidates as getSubdivisionCandidates, readPreloadedConsumerHolidays } from '../personal/consumerHolidays';
 import { SUBDIVISION_NAMES } from '@daysoff/engine/data/countries';
 import { planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
 import { previewPinnedDay, type PinPreview } from './pinPreview';
@@ -7,13 +7,13 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { computeMarginalValues } from '@daysoff/engine/solver/marginalValue';
 import type { Alternative, Break, SolveInput, WorkWeek } from '@daysoff/engine/solver/types';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
-import { getPreloadedHolidays, type Holiday } from '@daysoff/engine/data/holidays';
+import type { Holiday, HolidayFetchResult } from '@daysoff/engine/data/holidays';
 import { geolocateCountry } from './geo';
 import { activeCountryPreset } from '@daysoff/engine/data/countryPresets';
 import { computeQualifyingRuns, type WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import { weekStartForCountry } from './locale';
-import { mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
-import { readBrowserPlanSearch, readFullStateFromURL, writeBrowserPlanStateToURL, writeFullStateToURL, readOverlapPayloadFromURL, buildOverlapShareURL, type FullURLState, type WriteStateInput } from './urlState';
+import { isoToSerial, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
+import { readBrowserPlanSearch, readBrowserFullState, writeBrowserPlanStateToURL, writeFullStateToURL, readOverlapPayloadFromURL, buildOverlapShareURL, type FullURLState, type WriteStateInput } from './urlState';
 import type { DayCategory, ForcedState } from './types';
 import { classifyDay } from './dayCategory';
 import { alternativeForDate as alternativeForDateImpl } from './alternativeForDate';
@@ -23,6 +23,7 @@ import { defaultRangeEnd, defaultPlanRangeEnd, holidayEntriesFor, stateHolidayCa
 import { todayISO } from './today';
 import { plannerRequestCommitments, type PtoRequest } from '../personal/requestLedger';
 import { usePlannerComputation } from '../planning/usePlannerComputation';
+import { MAX_PINNED_PLANS, usePinnedPlans } from './pinnedPlanStore';
 
 export { defaultRangeEnd };
 export type { HolidayEntry };
@@ -85,6 +86,7 @@ export interface PlanSnapshot {
   applyTrackedRequests: boolean;
   reserveApprovedPto: boolean;
   unlimitedPto: boolean;
+  noticePeriodDays: number;
   peakCapEnabled: boolean;
   peakCapStart: string;
   peakCapEnd: string;
@@ -97,9 +99,12 @@ export interface PlanSnapshot {
   };
 }
 
-const MAX_PINNED_PLANS = 2;
-
 const NO_REQUESTS: readonly PtoRequest[] = [];
+const NO_HOLIDAYS: Holiday[] = [];
+
+interface LoadedHolidayScope extends HolidayFetchResult {
+  scope: string;
+}
 
 export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balanceAsOf = todayISO()) {
   const initial = useMemo<FullURLState>(() => {
@@ -151,7 +156,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
         peakCapMaxDays: 5,
       };
     }
-    return readFullStateFromURL(readBrowserPlanSearch(window.location.search, window.history.state), defaults);
+    return readBrowserFullState(window.location.search, window.history.state, defaults);
   }, []);
 
   // 'returned_with_saved_url' (Phase 3 item 9): fired once, only when the page was loaded
@@ -179,7 +184,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   const localApprovalOptions = typeof window === 'undefined' ? undefined : window.history.state?.plannerApprovalOptions;
   const [reserveApprovedPto, setReserveApprovedPto] = useState(localApprovalOptions?.reserve === true);
   const [applyTrackedRequests, setApplyTrackedRequests] = useState(
-    typeof localApprovalOptions?.apply === 'boolean' ? localApprovalOptions.apply : initial.publicShareVersion !== 1,
+    typeof localApprovalOptions?.apply === 'boolean' ? localApprovalOptions.apply : initial.publicShareVersion !== 1 && !initial.landingPreview,
   );
   const [useSharedHolidaySnapshot, setUseSharedHolidaySnapshot] = useState(initial.sharedObservedHolidays !== undefined);
   // Phase 3.1: "just in case" saving is the single largest reason PTO goes unused (44%).
@@ -291,14 +296,18 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   const [altFridayEnabled, setAltFridayEnabled] = useState(initial.altFridayEnabled ?? false);
   const [altFridayStart, setAltFridayStart] = useState(initial.altFridayStart ?? '');
 
-  // Phase 2: starts from whatever this route's own prerendered HTML already embedded for
-  // `country` (see holidays.ts's getPreloadedHolidays) instead of an empty list, so the
-  // very first paint already shows real holidays rather than a crawler/first-visitor
-  // seeing "no public holidays" before the fetch effect below has had a chance to run.
-  const [nationalHolidays, setNationalHolidays] = useState<Holiday[]>(() => getPreloadedHolidays(country));
-  const [stateHolidayCandidates, setStateHolidayCandidates] = useState<Holiday[]>([]);
-  const [nationalHolidayScope, setNationalHolidayScope] = useState('');
-  const [regionalHolidayScope, setRegionalHolidayScope] = useState('');
+  const nationalHolidayScope = `${country}|${rangeStart}|${rangeEnd}`;
+  const regionalHolidayScope = `${nationalHolidayScope}|${subdivision ?? ''}`;
+  const preloadedNational = useMemo(() => readPreloadedConsumerHolidays(country, rangeStart, rangeEnd), [country, rangeStart, rangeEnd]);
+  const preloadedRegional = useMemo(() => {
+    if (!subdivision) return;
+    const holidays = readPreloadedConsumerHolidays(country, rangeStart, rangeEnd, subdivision);
+    return holidays && stateHolidayCandidatesFor(holidays, country, subdivision, rangeStart, rangeEnd);
+  }, [country, subdivision, rangeStart, rangeEnd]);
+  const [nationalCalendar, setNationalCalendar] = useState<LoadedHolidayScope | null>(null);
+  const [regionalCalendar, setRegionalCalendar] = useState<LoadedHolidayScope | null>(null);
+  const holidayFocusDate = country === initial.country && subdivision === initial.subdivision && initial.holidayFocusDate
+    && initial.holidayFocusDate >= rangeStart && initial.holidayFocusDate <= rangeEnd ? initial.holidayFocusDate : undefined;
   const currentEmployerScope = employerScope(country, subdivision);
   const sharedObservedHolidays = useSharedHolidaySnapshot && country === initial.country && subdivision === initial.subdivision
     && rangeStart === initial.rangeStart && rangeEnd === initial.rangeEnd ? initial.sharedObservedHolidays : undefined;
@@ -362,6 +371,8 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       employerCalendar,
       publicShareVersion: initial.publicShareVersion,
       sharedObservedHolidays,
+      landingPreview: initial.landingPreview,
+      holidayFocusDate,
       planningVersion,
       planningStyle,
       minimumBreakDays,
@@ -395,6 +406,8 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     employerCalendar,
     initial.publicShareVersion,
     sharedObservedHolidays,
+    initial.landingPreview,
+    holidayFocusDate,
     planningVersion,
     planningStyle,
     minimumBreakDays,
@@ -445,19 +458,16 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   // whatever it has (weekends alone still solve a plan) rather than erroring out, but
   // `holidaysDegraded` lets the UI say so instead of silently presenting "no holidays" as
   // if that were a real fact about the calendar.
-  const [loadedHolidaysDegraded, setHolidaysDegraded] = useState(false);
   useEffect(() => {
+    if (preloadedNational !== undefined || !isSupportedPlanningRange(rangeStart, rangeEnd)) return;
     let cancelled = false;
-    getHolidaysWithStatus(country, rangeStart, rangeEnd).then(({ holidays, degraded }) => {
-      if (cancelled) return;
-      setNationalHolidays(holidays);
-      setHolidaysDegraded(degraded);
-      setNationalHolidayScope(`${country}|${rangeStart}|${rangeEnd}`);
+    getHolidaysWithStatus(country, rangeStart, rangeEnd).then(result => {
+      if (!cancelled) setNationalCalendar({ ...result, scope: nationalHolidayScope });
     });
     return () => {
       cancelled = true;
     };
-  }, [country, rangeStart, rangeEnd]);
+  }, [country, rangeStart, rangeEnd, nationalHolidayScope, preloadedNational]);
 
   /**
    * BUG FOUND (Phase 2): this effect used to gate on `country !== 'US'` - subdivision
@@ -471,54 +481,53 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
    * part alone stays gated to US; the live-fetch-and-filter part now works for any country.
    */
   useEffect(() => {
+    if (!subdivision || preloadedRegional !== undefined || !isSupportedPlanningRange(rangeStart, rangeEnd)) return;
     let cancelled = false;
-    if (!subdivision) {
-      setStateHolidayCandidates([]);
-      return;
-    }
-    (async () => {
-      const withSubdivision = await getHolidays(country, rangeStart, rangeEnd, subdivision);
-      const stateOnly = stateHolidayCandidatesFor(withSubdivision, country, subdivision, rangeStart, rangeEnd);
-
-      if (!cancelled) { setStateHolidayCandidates(stateOnly); setRegionalHolidayScope(`${country}|${subdivision}|${rangeStart}|${rangeEnd}`); }
-    })();
+    getHolidaysWithStatus(country, rangeStart, rangeEnd, subdivision).then(({ holidays, degraded }) => {
+      if (cancelled) return;
+      setRegionalCalendar({
+        holidays: stateHolidayCandidatesFor(holidays, country, subdivision, rangeStart, rangeEnd),
+        degraded,
+        scope: regionalHolidayScope,
+      });
+    });
     return () => {
       cancelled = true;
     };
-  }, [country, rangeStart, rangeEnd, subdivision]);
+  }, [country, rangeStart, rangeEnd, subdivision, regionalHolidayScope, preloadedRegional]);
 
   // BUG FOUND (Phase 2): nationalHolidays can't be used for this - getHolidaysWithStatus's
   // own subdivision filter strips every county-specific holiday out when no subdivision is
   // passed (see getSubdivisionCandidates's comment in holidays.ts for the empirical check
   // that found this). Fetched separately via the one function that bypasses that filter.
-  const [subdivisionCandidates, setSubdivisionCandidates] = useState<Holiday[]>([]);
+  const [subdivisionCalendar, setSubdivisionCalendar] = useState<{ scope: string; holidays: Holiday[] } | null>(null);
   useEffect(() => {
+    if (!isSupportedPlanningRange(rangeStart, rangeEnd)) return;
     let cancelled = false;
     getSubdivisionCandidates(country, rangeStart, rangeEnd).then((holidays) => {
-      if (!cancelled) setSubdivisionCandidates(holidays);
+      if (!cancelled) setSubdivisionCalendar({ scope: nationalHolidayScope, holidays });
     });
     return () => {
       cancelled = true;
     };
-  }, [country, rangeStart, rangeEnd]);
+  }, [country, rangeStart, rangeEnd, nationalHolidayScope]);
 
+  const national = nationalCalendar?.scope === nationalHolidayScope ? nationalCalendar : undefined;
+  const regional = subdivision && regionalCalendar?.scope === regionalHolidayScope ? regionalCalendar : undefined;
+  const subdivisionCandidates = subdivisionCalendar?.scope === nationalHolidayScope ? subdivisionCalendar.holidays : NO_HOLIDAYS;
   const discoveredSubdivisions = useMemo(() => [...new Set([...discoverSubdivisions(subdivisionCandidates), ...(country === 'US' ? Object.keys(SUBDIVISION_NAMES).filter(code => code.startsWith('US-')) : [])])].sort(), [subdivisionCandidates, country]);
-  const holidaysDegraded = sharedObservedHolidays === undefined && loadedHolidaysDegraded;
-  const holidaysReady = sharedObservedHolidays !== undefined || nationalHolidayScope === `${country}|${rangeStart}|${rangeEnd}` && (!subdivision || regionalHolidayScope === `${country}|${subdivision}|${rangeStart}|${rangeEnd}`);
+  const holidaysDegraded = sharedObservedHolidays === undefined && Boolean(national?.degraded || regional?.degraded);
+  const nationalHolidays = preloadedNational ?? national?.holidays;
+  const regionalHolidays = preloadedRegional ?? regional?.holidays;
+  const holidaysReady = sharedObservedHolidays !== undefined || Boolean(nationalHolidays && (!subdivision || regionalHolidays));
 
   const holidayEntries: HolidayEntry[] = useMemo(
-    () => holidayEntriesFor(nationalHolidays, stateHolidayCandidates, employerCalendar, rangeStart, rangeEnd, sharedObservedHolidays),
-    [nationalHolidays, stateHolidayCandidates, employerCalendar, rangeStart, rangeEnd, sharedObservedHolidays],
+    () => holidayEntriesFor(nationalHolidays ?? NO_HOLIDAYS, regionalHolidays ?? NO_HOLIDAYS, employerCalendar, rangeStart, rangeEnd, sharedObservedHolidays),
+    [nationalHolidays, regionalHolidays, employerCalendar, rangeStart, rangeEnd, sharedObservedHolidays],
   );
 
-  // A pinned (forced 'include') day is NOT free - it must cost a real PTO day, unlike a
-  // holiday. It used to be merged into offDays here, which made the solver treat it as
-  // already-off and never actually guaranteed it would appear in the plan at all (confirmed
-  // broken at breakCount=1 and breakCount=7 - see NOTES.md). It's passed separately as
-  // mustIncludeDays now; solve() itself reserves its cost and guarantees its presence.
-  // The 9/80 off-Fridays within the current range - computed and merged exactly like a
-  // holiday list (free, no PTO cost), not treated as a weekend via workWeek, since
-  // workWeek has no notion of week parity (see calendarMath.ts's own comment).
+  // Alternating Fridays are calendar days off. Pins pass separately so a pinned
+  // working day still costs PTO and a pinned holiday keeps its existing zero cost.
   const altFridayOffDates = useMemo(
     () => altFridayOffDatesFor(altFridayEnabled, altFridayStart, rangeStart, rangeEnd),
     [altFridayEnabled, altFridayStart, rangeStart, rangeEnd],
@@ -619,9 +628,12 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   );
   const isValidInput = validationIssues.length === 0;
 
-  const { solved, scores, pending: planningPending } = usePlannerComputation(
-    solveInput, isValidInput, planningVersion, minimumBreakDays, planningStyle,
+  // Wait for the current scope if the embedded calendar does not cover it.
+  const waitingForCalendar = isValidInput && !holidaysReady;
+  const { solved, scores, pending: computationPending } = usePlannerComputation(
+    solveInput, isValidInput && !waitingForCalendar, planningVersion, minimumBreakDays, planningStyle,
   );
+  const planningPending = waitingForCalendar || computationPending;
   const solveResult = solved.result;
 
   // The real outcome of pinning one more day, from the same planning call, cached per
@@ -728,18 +740,22 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     [blackoutSet, baseOffSet, isWeekendDay, chosenDaySet],
   );
 
-  // A day the plan actually converted from work to PTO, OR one the user explicitly
-  // pinned in - either is "a day you're taking," the thing that makes a run "qualify" for
-  // a band, as opposed to a weekend or holiday nobody spent PTO on.
   const isSuggestedPto = useCallback(
-    (iso: string) => isSuggestedPtoDay(iso, { blackoutSet, forced, baseOffSet, workWeek, chosenDaySet }),
-    [blackoutSet, forced, baseOffSet, workWeek, chosenDaySet],
+    (iso: string) => isSuggestedPtoDay(iso, { blackoutSet, baseOffSet, workWeek, chosenDaySet }),
+    [blackoutSet, baseOffSet, workWeek, chosenDaySet],
   );
 
   const offRuns = useMemo(
     () => isSupportedPlanningRange(rangeStart, rangeEnd) ? computeQualifyingRuns(rangeStart, rangeEnd, isOffForBand, isSuggestedPto) : [],
     [rangeStart, rangeEnd, isOffForBand, isSuggestedPto],
   );
+  const holidayOffRun = holidayFocusDate && isValidInput && !planningPending
+    ? offRuns.find(run => holidayFocusDate >= run.start && holidayFocusDate <= run.end)
+    : undefined;
+  const holidayFocusRun = holidayOffRun && {
+    ...holidayOffRun,
+    length: isoToSerial(holidayOffRun.end) - isoToSerial(holidayOffRun.start) + 1,
+  };
 
   // Chronological (start-date) order with a 1-based index - "break 1" is always the
   // earliest break in the plan, regardless of solve order. The SAME numbering both the
@@ -818,60 +834,57 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     [alternatives, hoveredAlternativeId, planningPending],
   );
 
-  const [pinnedPlans, setPinnedPlans] = useState<PlanSnapshot[]>([]);
-  const canPin = pinnedPlans.length < MAX_PINNED_PLANS && !planningPending && sharedObservedHolidays === undefined;
+  const { pinnedPlans, addPinnedPlan, removePinnedPlan, pinMessage } = usePinnedPlans();
+  const canPin = pinnedPlans.length < MAX_PINNED_PLANS && !planningPending && !holidaysDegraded && sharedObservedHolidays === undefined;
 
   const pinPlan = useCallback(() => {
     if (!canPin) return;
-    setPinnedPlans((prev) => {
-      if (prev.length >= MAX_PINNED_PLANS) return prev;
-      const snapshot: PlanSnapshot = {
-        country,
-        subdivision,
-        employerCalendar,
-        planningVersion,
-        planningStyle,
-        minimumBreakDays,
-        rangeStart,
-        rangeEnd,
-        budget,
-        w,
-        letSolverDecide,
-        manualBreakCount,
-        weekStartOverride,
-        accrualEnabled,
-        accrualPerMonth,
-        expiryEnabled,
-        expiryDate,
-        carryoverCap,
-        overlapDays,
-        blackouts,
-        workWeek,
-        forced,
-        altFridayEnabled,
-        altFridayStart,
-        reserveDays,
-        applyTrackedRequests,
-        reserveApprovedPto,
-        unlimitedPto,
-        peakCapEnabled,
-        peakCapStart,
-        peakCapEnd,
-        peakCapMaxDays,
-        summary: {
-          budgetSpent,
-          totalDaysOff,
-          breakCountActual,
-          travelPercentile: scores?.travel.percentile ?? null,
-        },
-      };
-      return [...prev, snapshot];
+    addPinnedPlan({
+      country,
+      subdivision,
+      employerCalendar,
+      planningVersion,
+      planningStyle,
+      minimumBreakDays,
+      rangeStart,
+      rangeEnd,
+      budget,
+      w,
+      letSolverDecide,
+      manualBreakCount,
+      weekStartOverride,
+      accrualEnabled,
+      accrualPerMonth,
+      expiryEnabled,
+      expiryDate,
+      carryoverCap,
+      overlapDays,
+      blackouts,
+      workWeek,
+      forced,
+      altFridayEnabled,
+      altFridayStart,
+      reserveDays,
+      applyTrackedRequests,
+      reserveApprovedPto,
+      unlimitedPto,
+      noticePeriodDays,
+      peakCapEnabled,
+      peakCapStart,
+      peakCapEnd,
+      peakCapMaxDays,
+      summary: {
+        budgetSpent,
+        totalDaysOff,
+        breakCountActual,
+        travelPercentile: scores?.travel.percentile ?? null,
+      },
     });
   }, [
     country, subdivision, employerCalendar, planningVersion, planningStyle, minimumBreakDays, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
     weekStartOverride, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap,
     overlapDays, blackouts, workWeek, forced, altFridayEnabled, altFridayStart,
-    canPin, reserveDays, applyTrackedRequests, reserveApprovedPto, unlimitedPto, peakCapEnabled, peakCapStart, peakCapEnd, peakCapMaxDays,
+    addPinnedPlan, canPin, reserveDays, applyTrackedRequests, reserveApprovedPto, unlimitedPto, noticePeriodDays, peakCapEnabled, peakCapStart, peakCapEnd, peakCapMaxDays,
     budgetSpent, totalDaysOff, breakCountActual, scores,
   ]);
 
@@ -910,6 +923,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       setApplyTrackedRequests(snap.applyTrackedRequests);
       setReserveApprovedPto(snap.reserveApprovedPto);
       setUnlimitedPtoRaw(snap.unlimitedPto);
+      setNoticePeriodDays(snap.noticePeriodDays);
       setPeakCapEnabled(snap.peakCapEnabled);
       setPeakCapStart(snap.peakCapStart);
       setPeakCapEnd(snap.peakCapEnd);
@@ -917,10 +931,6 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     },
     [pinnedPlans],
   );
-
-  const removePinnedPlan = useCallback((index: number) => {
-    setPinnedPlans((prev) => prev.filter((_, i) => i !== index));
-  }, []);
 
   const toggleDay = useCallback((date: string) => {
     setForced((prev) => {
@@ -968,6 +978,8 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     setMinimumBreakDays,
     holidaysDegraded,
     holidaysReady,
+    holidayFocusDate,
+    holidayFocusRun,
     country,
     setCountry: changeCountry,
     subdivision,
@@ -990,6 +1002,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     applyTrackedRequests,
     setApplyTrackedRequests,
     isSharedPlan: initial.publicShareVersion === 1,
+    isLandingPreview: initial.landingPreview === true,
     hasSharedHolidaySnapshot: sharedObservedHolidays !== undefined,
     restoreMyEmployerCalendar,
     reserveApprovedPto,
@@ -1083,6 +1096,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     clearForcedDays,
     forced,
     pinnedPlans,
+    pinMessage,
     canPin,
     pinPlan,
     restorePlan,

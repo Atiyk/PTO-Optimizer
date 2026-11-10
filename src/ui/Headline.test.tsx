@@ -41,7 +41,7 @@ describe('Headline render', () => {
   it('sets the result as one h1 with the marked figure first, inside a live status region', () => {
     const html = renderToStaticMarkup(<Headline {...props} />);
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    expect(html).toContain('role="status"');
+    expect(html).toContain('aria-live="polite"');
     expect(html).toContain('<span class="mark">26 days off</span>');
     expect(html).toMatch(/from 12 PTO days/);
     // The figure comes before what it costs.
@@ -62,7 +62,7 @@ describe('Headline render', () => {
     expect(html).not.toContain('Efficiency 100th');
   });
 
-  it('renders "Pin this plan" as a small control, disabled once two plans are already pinned', () => {
+  it('disables saving once two plans are saved', () => {
     const enabled = renderToStaticMarkup(
       <Headline
         budgetSpent={12}
@@ -76,7 +76,7 @@ describe('Headline render', () => {
         pinnedCount={0}
       />,
     );
-    expect(enabled).toContain('Pin this plan');
+    expect(enabled).toContain('Save this plan');
     expect(enabled).not.toContain('disabled=""');
 
     const disabled = renderToStaticMarkup(
@@ -93,7 +93,14 @@ describe('Headline render', () => {
       />,
     );
     expect(disabled).toContain('disabled=""');
-    expect(disabled).toContain('title="Two pinned');
+    expect(disabled).toContain('Remove a saved plan');
+  });
+
+  it('hides old numbers and save controls while the new plan is pending', () => {
+    const html = renderToStaticMarkup(<Headline {...props} pending />);
+    expect(html).toContain('Updating your plan');
+    expect(html).not.toContain('26 days off');
+    expect(html).not.toContain('Save this plan');
   });
 });
 

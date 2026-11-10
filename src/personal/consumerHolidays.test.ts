@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { rawHolidaysToHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import {
-  consumerHolidayLookupEnd, getConsumerHolidays, getConsumerHolidaysWithStatus, getConsumerSubdivisionCandidates,
+  consumerHolidayLookupEnd, getConsumerHolidays, getConsumerHolidaysWithStatus, getConsumerSubdivisionCandidates, readPreloadedConsumerHolidays,
 } from './consumerHolidays';
 
 const provider = vi.hoisted(() => ({ withStatus: vi.fn(), holidays: vi.fn(), subdivisions: vi.fn() }));
@@ -22,18 +22,35 @@ beforeEach(() => {
   provider.holidays.mockReset().mockResolvedValue([]);
   provider.subdivisions.mockReset().mockResolvedValue([]);
 });
+afterEach(() => {
+  delete window.__PTO_PRELOADED_HOLIDAY_YEARS__;
+  delete window.__PTO_PRELOADED_HOLIDAYS__;
+});
 
 describe('consumer nominal-year holiday lookup', () => {
-  it.each(['US', 'GB', 'CA', 'AU'])('looks up the nominal next year only for a Saturday New Year observed on December 31: %s', (country) => {
+  it.each(['US', 'GB', 'CA', 'AU', 'FM', 'MP', 'MX', 'PR', 'VI'])('looks up the nominal next year for a Saturday New Year observed on December 31: %s', (country) => {
     expect(consumerHolidayLookupEnd(country, '2027-12-01', '2027-12-31')).toBe('2028-01-01');
   });
 
   it('preserves all other lookup years, including ranges already crossing New Year', () => {
-    expect(consumerHolidayLookupEnd('DE', '2027-12-01', '2027-12-31')).toBe('2027-12-31');
+    expect(consumerHolidayLookupEnd('DE', '2027-12-01', '2027-12-30')).toBe('2027-12-30');
     expect(consumerHolidayLookupEnd('US', '2027-12-01', '2027-12-30')).toBe('2027-12-30');
     expect(consumerHolidayLookupEnd('US', '2026-12-01', '2026-12-31')).toBe('2026-12-31');
     expect(consumerHolidayLookupEnd('US', '2027-12-01', '2028-01-02')).toBe('2028-01-02');
     expect(consumerHolidayLookupEnd('US', '2026-01-01', '2026-01-31')).toBe('2026-01-31');
+  });
+
+  it('requires complete embedded nominal years and handles already-observed records outside the shift-normalized countries', async () => {
+    const observed = rawHolidaysToHolidays([{ ...rawNewYear('2027-12-31'), countryCode: 'MX' }]);
+    window.__PTO_PRELOADED_HOLIDAYS__ = { MX: observed };
+    window.__PTO_PRELOADED_HOLIDAY_YEARS__ = { MX: [2027] };
+    expect(readPreloadedConsumerHolidays('MX', '2027-12-27', '2027-12-31')).toBeUndefined();
+    window.__PTO_PRELOADED_HOLIDAY_YEARS__.MX.push(2028);
+    expect(readPreloadedConsumerHolidays('MX', '2027-12-27', '2027-12-31')).toEqual(observed);
+
+    provider.withStatus.mockResolvedValue({ holidays: observed, degraded: false });
+    await expect(getConsumerHolidaysWithStatus('MX', '2027-12-27', '2027-12-31')).resolves.toEqual({ holidays: observed, degraded: false });
+    expect(provider.withStatus).toHaveBeenCalledExactlyOnceWith('MX', '2027-12-27', '2028-01-01', undefined);
   });
 
   it('returns the real normalized Dec 31 holiday from the nominal 2028 data and removes repeated copies', async () => {

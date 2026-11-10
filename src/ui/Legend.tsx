@@ -9,7 +9,12 @@ import { PinIcon } from './DayCell';
  * ring for today. Every entry is a shape plus words, never colour alone. Employer and
  * blackout entries appear only when the plan has such days.
  */
-export function Legend({ showCompany = false, showBlackout = false }: { showCompany?: boolean; showBlackout?: boolean } = {}) {
+export function Legend({ showCompany, showBlackout, showPinned, showAlternatives }: {
+  showCompany?: boolean;
+  showBlackout?: boolean;
+  showPinned?: boolean;
+  showAlternatives?: boolean;
+} = {}) {
   return (
     <ul className="m-0 flex list-none flex-wrap items-center gap-x-5 gap-y-2 p-0 text-sm text-muted">
       <li className="flex items-center gap-2">
@@ -28,26 +33,26 @@ export function Legend({ showCompany = false, showBlackout = false }: { showComp
       )}
       <li className="flex items-center gap-2">
         <span aria-hidden className={`h-5 w-5 rounded-[6px] border ${COLORS.ptoBorder} ${COLORS.ptoBg}`} />
-        Suggested PTO
+        PTO to request
       </li>
-      <li className="flex items-center gap-2">
+      {showPinned && <li className="flex items-center gap-2">
         <span aria-hidden className={`flex h-5 w-5 items-center justify-center rounded-[6px] border ${COLORS.ptoBorder} ${COLORS.ptoBg} ${COLORS.ptoText}`}>
           <PinIcon className="h-3 w-3" />
         </span>
-        Pinned by you
-      </li>
-      <li className="flex items-center gap-2">
+        Pinned PTO
+      </li>}
+      {showAlternatives && <li className="flex items-center gap-2">
         <span aria-hidden className={`h-5 w-5 rounded-[6px] border border-dashed ${COLORS.altBorder}`} />
         Alternative
-      </li>
+      </li>}
       <li className="flex items-center gap-2">
         <span aria-hidden className={`h-5 w-9 rounded-[8px] border-b-[3px] border-[var(--accent)] ${COLORS.bandBg}`} />
-        Recommended break
+        Suggested break
       </li>
       {showBlackout && (
         <li className="flex items-center gap-2">
           <span aria-hidden className="h-5 w-5 rounded-[6px] border border-line bg-[repeating-linear-gradient(135deg,var(--border-default)_0_2px,transparent_2px_7px)]" />
-          Blackout, no PTO
+          Unavailable
         </li>
       )}
       <li className="flex items-center gap-2">

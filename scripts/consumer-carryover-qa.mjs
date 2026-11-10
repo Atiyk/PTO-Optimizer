@@ -30,6 +30,7 @@ try {
         r.status = 'captured';
         continue;
       }
+      await page.goto(new URL('/policy/?c=US&cb=12&bao=2027-01-01&ak=fl&am=0&gd=2027-01-01&cm=a&ace=0', base).href, { waitUntil: 'networkidle' });
       const openButton = page.getByRole('button', { name: 'Review next policy reset' });
       const target = await openButton.boundingBox();
       r.touchTargetHeight = target?.height ?? 0;

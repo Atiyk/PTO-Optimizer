@@ -142,4 +142,25 @@ describe('planner address privacy and shared calendars', () => {
       window.history.replaceState(null, '', '/');
     }
   });
+
+  it('keeps unsaved employer edits made after opening a public link in the same history entry', () => {
+    const incoming = { ...defaultEmployerCalendar('US'), custom: [{ date: '2027-01-08', name: 'Injected employer day' }] };
+    const search = new URLSearchParams({ c: 'US', s: '2027-01-04', e: '2027-01-17', b: '6', sv: '1', eh: encodeEmployerCalendar(incoming) });
+    window.history.replaceState(null, '', `/pto?${search}`);
+    const first = renderHook(() => useAppState());
+    try {
+      expect(first.result.current.holidayNameFor('2027-01-08')).toBeUndefined();
+      act(() => first.result.current.addCustomHoliday('2027-01-08', 'My same-tab edit'));
+      expect(first.result.current.holidayNameFor('2027-01-08')).toBe('My same-tab edit');
+      expect(window.location.search).not.toContain('eh=');
+      first.unmount();
+      const refreshed = renderHook(() => useAppState());
+      try {
+        expect(refreshed.result.current.holidayNameFor('2027-01-08')).toBe('My same-tab edit');
+      } finally { refreshed.unmount(); }
+    } finally {
+      first.unmount();
+      window.history.replaceState(null, '', '/');
+    }
+  });
 });

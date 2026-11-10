@@ -2,9 +2,12 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultEmployerCalendar, saveEmployerCalendar } from '../personal/employerCalendar';
 import { savePolicyPreferences } from '../personal/policyPreferences';
+import { decodePartnerAvailability } from '../planning/partner';
+import { track } from './analytics';
 import { decodeDateRanges, encodeDateRanges } from './familyUrlState';
 
 const copied: string[] = [];
+vi.mock('./analytics', () => ({ track: vi.fn() }));
 
 vi.mock('./requestText', () => ({
   copyText: vi.fn(async (text: string) => { copied.push(text); return true; }),
@@ -16,8 +19,10 @@ vi.mock('../personal/consumerHolidays', async (original) => ({
   getConsumerSubdivisionCandidates: vi.fn(async () => []),
 }));
 
-// A fixed, small preset so the plan is deterministic regardless of the shipped data.
-vi.mock('../content/schoolDistricts', () => {
+// Keep the small synthetic preset and also exercise a shipped district end to end.
+vi.mock('../content/schoolDistricts', async original => {
+  const real = await original<typeof import('../content/schoolDistricts')>();
+  const nyc = real.findDistrictPreset('nyc-doe-2026-27')!;
   const preset = {
     id: 'test-district-2026-27',
     district: 'Test City Public Schools',
@@ -43,9 +48,9 @@ vi.mock('../content/schoolDistricts', () => {
     return out;
   };
   return {
-    SCHOOL_DISTRICT_PRESETS: [preset],
+    SCHOOL_DISTRICT_PRESETS: [preset, nyc],
     SCHOOL_PRESETS_AS_OF: '2026-11-01',
-    findDistrictPreset: (id: string) => (id === preset.id ? preset : undefined),
+    findDistrictPreset: (id: string) => (id === preset.id ? preset : id === nyc.id ? nyc : undefined),
     presetOffDays: (p: typeof preset) => [...new Set(p.closures.flatMap((c) => weekdays(c.start, c.end)))].sort(),
     presetLabels: (p: typeof preset) => Object.fromEntries(p.closures.flatMap((c) => weekdays(c.start, c.end).map((d) => [d, c.label]))),
   };
@@ -56,7 +61,7 @@ const { FamilyConfirmList } = await import('./FamilyConfirmList');
 
 const go = (query: string) => window.history.replaceState(null, '', `/family?${query}`);
 
-beforeEach(() => { copied.length = 0; localStorage.clear(); });
+beforeEach(() => { copied.length = 0; localStorage.clear(); vi.mocked(track).mockClear(); });
 afterEach(() => { cleanup(); window.history.replaceState(null, '', '/'); });
 
 describe('Family planner', () => {
@@ -174,7 +179,7 @@ describe('Family planner', () => {
     const link = new URL(copied[0]);
     expect(decodeURIComponent(copied[0])).not.toMatch(/Emma|Maple|recess|picture|Winter/i);
     expect(link.searchParams.get('sd')).toBe(sd);
-    expect(link.searchParams.get('pp')).toBeTruthy();
+    expect(decodePartnerAvailability(link.searchParams.get('pp')!)?.freeDays).toBeNull();
     expect([...link.searchParams.keys()].sort()).toEqual(['pp', 'sd']);
   });
 
@@ -182,7 +187,7 @@ describe('Family planner', () => {
     go('c=US&s=2026-11-02&d=test-district-2026-27&pto=0&pp=1:p:20261228~20261231:-');
     render(<Family />);
     expect(screen.getByRole('heading', { name: 'Another adult shared their days' })).toBeTruthy();
-    expect(screen.getByText(/They cover 4 school days off/)).toBeTruthy();
+    expect(screen.getByText(/They could cover 4 school days off/)).toBeTruthy();
     expect(new URLSearchParams(window.location.search).has('pp')).toBe(false);
     expect(new URLSearchParams(window.history.state.familyDraft).get('pp')).toBe('1:p:20261228~20261231:-');
   });
@@ -191,6 +196,54 @@ describe('Family planner', () => {
     go('c=US&s=2026-11-02&d=test-district-2026-27&pto=60&pp=1:p:20261228~20261231:-');
     render(<Family />);
     expect(screen.getByText(/They don.t cover any of your remaining uncovered school days\. 4 of their days fall on school days off you already cover\./)).toBeTruthy();
+  });
+
+  it('separates actual district closures, added dates and proposed care in the uncovered list', async () => {
+    const extraDate = encodeDateRanges(['2026-12-18']);
+    go(`c=US&s=2026-11-02&d=nyc-doe-2026-27&pto=0&sd=${extraDate}&pp=1:p:20261228:-`);
+    render(<Family />);
+    const list = screen.getByRole('region', { name: 'Uncovered school days' });
+    expect(within(list).getByText(/Dec 28, 2026/).parentElement?.textContent).toMatch(/NYC Public Schools · Other adult proposed/);
+    expect(within(list).getByText(/Dec 18, 2026/).parentElement?.textContent).toMatch(/Added or shared dates/);
+    expect(within(list).queryByText(/Nov 3, 2026/)).toBeNull();
+    expect(screen.getByRole('link', { name: /NYC Public Schools.*School Year Calendar/ }).getAttribute('href')).toMatch(/^https:\/\/www\.schools\.nyc\.gov/);
+    await waitFor(() => expect(screen.queryByText(/Updating observed holidays/)).toBeNull());
+    expect(screen.queryByRole('button', { name: /confirmed care for these closures/ })).toBeNull();
+    expect(track).toHaveBeenCalledWith('family_share_opened');
+  });
+
+  it('recomputes coverage live and confirms only the listed closures after user review', async () => {
+    const school = encodeDateRanges(['2026-12-24', '2026-12-28', '2026-12-29']);
+    go(`c=US&s=2026-11-02&pto=2&sd=${school}&pp=1:c:20261224:-`);
+    const view = render(<Family />);
+    const priority = screen.getByRole<HTMLInputElement>('checkbox', { name: 'Cover school days first' });
+    expect(priority.checked).toBe(false);
+    fireEvent.click(priority);
+    expect(new URLSearchParams(window.location.search).get('cp')).toBe('1');
+    await waitFor(() => expect(screen.queryByText(/Updating observed holidays/)).toBeNull());
+    expect(track).toHaveBeenCalledWith('family_coverage_priority_changed');
+    expect(track).not.toHaveBeenCalledWith('family_listed_coverage_confirmed');
+    fireEvent.click(screen.getByRole('button', { name: /confirmed care for these closures/ }));
+    expect(screen.getByText('Coverage confirmed for these listed closures.')).toBeTruthy();
+    expect(track).toHaveBeenCalledWith('family_listed_coverage_confirmed');
+    view.unmount();
+    render(<Family />);
+    expect(screen.getByRole<HTMLInputElement>('checkbox', { name: 'Cover school days first' }).checked).toBe(true);
+  });
+
+  it('copies a comparable saved balance into the family budget only on request', () => {
+    savePolicyPreferences('c=US&u=1&cb=37&hpd=7.5&bao=2026-11-01');
+    go('c=US&s=2026-11-02&pto=2');
+    render(<Family />);
+    const input = screen.getByRole<HTMLInputElement>('spinbutton', { name: 'PTO for school breaks' });
+    expect(input.value).toBe('2');
+    expect(screen.getByText(/4 whole days from My PTO/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Use my saved balance' }));
+    expect(input.value).toBe('4');
+    expect(new URLSearchParams(window.location.search).get('pto')).toBe('4');
+    fireEvent.change(input, { target: { value: '3' } });
+    expect(input.value).toBe('3');
+    expect(screen.getByText(/4 whole days from My PTO/)).toBeTruthy();
   });
 
   it('flags unreadable school dates in a received link instead of dropping them silently', () => {

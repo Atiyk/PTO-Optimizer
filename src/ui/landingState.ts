@@ -1,5 +1,8 @@
 import { COUNTRIES } from '@daysoff/engine/data/countries';
-import { addDays, isoToSerial } from '@daysoff/engine/solver/dateUtils';
+import { isoToSerial } from '@daysoff/engine/solver/dateUtils';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import { defaultPlanRangeEnd, solvePlan } from '../autopilot/planFromSearch';
+import { planningStyleSettings } from '../planning/optimizer';
 import { isValidISODate } from './urlState';
 
 export interface LandingState {
@@ -10,6 +13,18 @@ export interface LandingState {
 }
 
 export const LANDING_MAX_RANGE_DAYS = 730;
+const PREVIEW_STYLE = 'balanced';
+const PREVIEW_VERSION = 2;
+const PREVIEW_MINIMUM = 3;
+
+export function computeLandingPlan(state: LandingState, holidays: readonly { date: string }[]) {
+  return solvePlan({
+    ...state,
+    ...planningStyleSettings(PREVIEW_STYLE),
+    offDays: [...new Set(holidays.map(({ date }) => date))],
+    workWeek: DEFAULT_WORK_WEEK,
+  }, PREVIEW_VERSION, PREVIEW_MINIMUM, PREVIEW_STYLE);
+}
 
 export function validLandingRange(start: string, end: string): boolean {
   return isValidISODate(start) && isValidISODate(end) && end >= start
@@ -18,7 +33,7 @@ export function validLandingRange(start: string, end: string): boolean {
 
 /** The explicit home marker separates new homepage links from historic optimizer links. */
 export function readLandingState(search: string, today: string, country: string): LandingState {
-  const defaults = { country, budget: 15, rangeStart: today, rangeEnd: addDays(today, 364) };
+  const defaults = { country, budget: 15, rangeStart: today, rangeEnd: defaultPlanRangeEnd(today) };
   const params = new URLSearchParams(search);
   if (params.get('home') !== '1') return defaults;
   const requestedCountry = params.get('c');
@@ -44,8 +59,23 @@ export function landingSearch(state: LandingState): string {
 export function landingPlanHref(state: LandingState, pinnedDate?: string): string {
   const params = new URLSearchParams({
     c: state.country, b: String(state.budget), s: state.rangeStart, e: state.rangeEnd,
-    rv: '0', pv: '2', ps: 'balanced', mb: '3', w: '30', count: '3',
+    rv: '0', pv: String(PREVIEW_VERSION), ps: PREVIEW_STYLE, mb: String(PREVIEW_MINIMUM), lp: '1',
   });
-  if (pinnedDate && isValidISODate(pinnedDate)) params.set('p', pinnedDate);
+  const preset = planningStyleSettings(PREVIEW_STYLE);
+  if (preset) {
+    params.set('w', String(preset.w));
+    params.set('count', String(preset.breakCount));
+  }
+  if (state.budget > 0 && pinnedDate && dateInLandingRange(state, pinnedDate)) params.set('p', pinnedDate);
   return `/pto?${params}`;
+}
+
+function dateInLandingRange(state: LandingState, date: string): boolean {
+  return isValidISODate(date) && date >= state.rangeStart && date <= state.rangeEnd;
+}
+
+/** Keep the observed date distinct from the working day that connects its off-runs. */
+export function landingHolidayHref(state: LandingState, date: string, bridgeDate?: string): string {
+  if (!dateInLandingRange(state, date)) return landingPlanHref(state);
+  return `${landingPlanHref(state, bridgeDate === date ? undefined : bridgeDate)}&hd=${date}#holiday-focus`;
 }

@@ -27,4 +27,14 @@ describe('homepage employer-observed holidays', () => {
   it('does not apply another country’s or a regional public holiday to a national preview', () => {
     expect(landingObservedHolidays(publicHolidays, defaultEmployerCalendar('GB'), '2027-01-01', '2027-01-31')).toEqual([]);
   });
+
+  it('uses the same exclusions as the planner for company holidays', () => {
+    const employer = {
+      ...defaultEmployerCalendar('US'),
+      excluded: ['2027-01-05|Company retreat'],
+      custom: [{ date: '2027-01-05', name: 'Company retreat' }],
+    };
+    expect(landingObservedHolidays(publicHolidays, employer, '2027-01-01', '2027-01-31').map(holiday => holiday.date))
+      .toEqual(['2027-01-01']);
+  });
 });

@@ -13,27 +13,16 @@ interface PinnedPlansStripProps {
 
 function summaryText(s: PinnedPlanSummary): string {
   const dayWord = s.budgetSpent === 1 ? 'day' : 'days';
+  const offWord = s.totalDaysOff === 1 ? 'day' : 'days';
   const breakWord = s.breakCountActual === 1 ? 'break' : 'breaks';
-  return `Pinned: ${s.budgetSpent} ${dayWord} → ${s.totalDaysOff} off · ${s.breakCountActual} ${breakWord}`;
+  return `${s.budgetSpent} PTO ${dayWord} → ${s.totalDaysOff} ${offWord} off · ${s.breakCountActual} ${breakWord}`;
 }
 
-/**
- * Phase 3 item 7: moving a slider used to permanently discard whatever plan was on screen
- * before it - the only way to compare two plans was to remember the numbers yourself. "Pin
- * this plan" (now a small control in the Headline itself - see UI density pass) snapshots
- * the full input state (everything that would be in the shareable URL) so sliders become
- * genuinely explorable: try something, pin it if it's interesting, keep exploring, restore
- * it later if the new direction doesn't pan out. Capped at two, since this is a quick
- * side-by-side comparison strip, not a saved-plans library.
- *
- * UI density pass: this component now renders ONLY the pinned-plan chips - the button and
- * its explanatory text moved into Headline.tsx ("a small control beside the result, not a
- * row"), so with nothing pinned yet there is nothing here to show at all.
- */
+/** Up to two saved scenarios, with their original settings available to restore. */
 export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlansStripProps) {
   if (summaries.length === 0) return null;
   return (
-    <ul aria-label="Pinned plans" className="m-0 flex list-none flex-wrap items-center gap-2 p-0">
+    <ul aria-label="Saved plans" className="m-0 flex list-none flex-wrap items-center gap-2 p-0">
       {summaries.map((s, i) => (
         <li
           key={i}
@@ -46,12 +35,12 @@ export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlans
             onClick={() => onRestore(i)}
             className="flex min-h-11 items-center px-2 font-semibold underline underline-offset-[0.22em] hover:bg-surface-alt"
           >
-            restore
+            Restore
           </button>
           <button
             type="button"
             onClick={() => onRemove(i)}
-            aria-label="Remove pinned plan"
+            aria-label={`Remove saved plan ${i + 1}`}
             className="flex h-11 w-11 items-center justify-center text-lg text-muted hover:bg-surface-alt hover:text-ink"
           >
             &times;

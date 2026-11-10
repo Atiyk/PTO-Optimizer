@@ -30,6 +30,9 @@ import { decodeParagraph, uniqueMatchedTerms } from '../policy/decode';
 import type { AccrualMethod, CarryoverRule, PlanYear, TimeOffPolicy } from '../policy/model';
 import { copyText } from './requestText';
 import { writePolicyStateToURL, type PolicyURLState } from './policyUrlState';
+import { isValidISODate } from './urlState';
+import { isSupportedPlanningRange } from './validation';
+import { usePinnedPlans } from './pinnedPlanStore';
 
 const HORIZON_MONTHS = 18;
 const WORKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
@@ -68,6 +71,23 @@ function Field({ label, termId, children }: { label: string; termId?: string; ch
 const inputClass = 'h-11 w-full min-w-0 rounded-[6px] border border-line-strong bg-surface px-3 text-base text-ink';
 const selectClass = 'select-ink h-11 w-full min-w-0 text-base';
 const checkRow = 'flex min-h-11 items-center gap-2 text-sm text-ink';
+const inputNumber = (value: string) => value === '' ? NaN : Number(value);
+const displayNumber = (value: number) => Number.isFinite(value) ? value : '';
+
+function missingForecastInput(policy: TimeOffPolicy, validWorkdayHours: boolean): string | undefined {
+  if (!isValidISODate(policy.balanceAsOf)) return 'Enter the date of your current PTO balance.';
+  const { accrual, carryover } = policy;
+  if ((accrual.kind === 'front-loaded' || accrual.kind === 'per-pay-period') && !Number.isFinite(accrual.amount)) {
+    return 'Enter how much PTO you earn. Enter 0 if you do not earn more PTO.';
+  }
+  if (accrual.kind === 'front-loaded' && !isValidISODate(accrual.grantDate)) return 'Enter the date your annual PTO is granted.';
+  if (accrual.kind === 'per-pay-period' && !isValidISODate(accrual.payDateAnchor)) return 'Enter a known pay date to forecast future accrual.';
+  if (accrual.kind === 'per-hour-worked' && (!Number.isFinite(accrual.rate) || !Number.isFinite(accrual.typicalWeeklyHours))) {
+    return 'Enter your PTO accrual rate and typical weekly hours.';
+  }
+  if (!validWorkdayHours) return 'Enter the hours in a normal workday, up to 24.';
+  if (carryover.useByDate !== undefined && !isValidISODate(carryover.useByDate)) return 'Enter the use-by date for carried PTO.';
+}
 
 /** A small SVG line+area chart of the projected balance - greyscale-legible, no colour-only
  * encoding (the cap line is dashed, not just a different hue). */
@@ -152,23 +172,31 @@ export function Policy() {
   const [balanceIncludesApprovedLeave, setBalanceIncludesApprovedLeave] = useState(d.balanceIncludesApprovedLeave ?? false);
   const [plannedDays, setPlannedDays] = useState<string[]>(d.plannedDays);
   const [currentCarriedBalance, setCurrentCarriedBalance] = useState(d.currentCarriedBalance ?? 0);
-  const [forecastDate, setForecastDate] = useState(d.forecastDate ?? addMonthsClamped(d.balanceAsOf, 3));
-  const [saveMessage, setSaveMessage] = useState('');
+  const useCarryoverDeadline = carryoverUseByEnabled && (carryoverMode !== 'none' || currentCarriedBalance > 0);
+  const [forecastDate, setForecastDate] = useState(d.forecastDate ?? (isValidISODate(d.balanceAsOf) ? addMonthsClamped(d.balanceAsOf, 3) : ''));
+  const [saveFeedback, setSaveFeedback] = useState<{ search: string; message: string }>();
   const ledger = useRequestLedger();
+  const { pinnedPlans } = usePinnedPlans();
 
   const [unit, setUnit] = useState<'days' | 'hours'>(d.unit);
   const [hoursPerDay, setHoursPerDay] = useState(d.hoursPerDay);
+  const needsWorkdayHours = unit === 'hours' || accrualKind === 'per-hour-worked';
+  const validWorkdayHours = Number.isFinite(hoursPerDay) && hoursPerDay > 0 && hoursPerDay <= 24;
+  const policyHoursPerDay = needsWorkdayHours || validWorkdayHours ? hoursPerDay : 8;
 
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pastedText, setPastedText] = useState('');
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
 
   const accrual: AccrualMethod = useMemo(() => {
-    if (accrualKind === 'front-loaded') return { kind: 'front-loaded', amount, grantDate };
-    if (accrualKind === 'per-pay-period') return { kind: 'per-pay-period', amount, frequency, payDateAnchor };
+    if (accrualKind === 'front-loaded') return { kind: 'front-loaded', amount, grantDate: amount === 0 && !grantDate ? balanceAsOf : grantDate };
+    if (accrualKind === 'per-pay-period') {
+      const anchor = !payDateAnchor && (amount === 0 || frequency === 'semi-monthly') ? balanceAsOf : payDateAnchor;
+      return { kind: 'per-pay-period', amount, frequency, payDateAnchor: anchor };
+    }
     if (accrualKind === 'per-hour-worked') return { kind: 'per-hour-worked', rate: hourlyRate, typicalWeeklyHours };
     return { kind: 'unlimited', expectedDaysPerYear };
-  }, [accrualKind, amount, grantDate, frequency, payDateAnchor, hourlyRate, typicalWeeklyHours, expectedDaysPerYear]);
+  }, [accrualKind, amount, grantDate, frequency, payDateAnchor, hourlyRate, typicalWeeklyHours, expectedDaysPerYear, balanceAsOf]);
 
   const planYear: PlanYear = useMemo(() => {
     if (planYearKind === 'anniversary') return { kind: 'anniversary', startDate: anniversaryStart };
@@ -180,15 +208,15 @@ export function Policy() {
     () => ({
       mode: carryoverMode,
       cap: carryoverMode === 'capped' ? carryoverCap : undefined,
-      useByDate: carryoverUseByEnabled ? carryoverUseBy : undefined,
+      useByDate: useCarryoverDeadline ? carryoverUseBy : undefined,
     }),
-    [carryoverMode, carryoverCap, carryoverUseByEnabled, carryoverUseBy],
+    [carryoverMode, carryoverCap, useCarryoverDeadline, carryoverUseBy],
   );
 
   const policy: TimeOffPolicy = useMemo(
     () => ({
       unit,
-      hoursPerDay,
+      hoursPerDay: policyHoursPerDay,
       accrual,
       planYear,
       accrualCap: accrualCapEnabled && accrualKind !== 'unlimited' ? accrualCap : undefined,
@@ -203,20 +231,20 @@ export function Policy() {
       plannedDays,
     }),
     [
-      unit, hoursPerDay, accrual, planYear, accrualCapEnabled, accrualKind, accrualCap, carryover,
+      unit, policyHoursPerDay, accrual, planYear, accrualCapEnabled, accrualKind, accrualCap, carryover,
       waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance, payoutOnLeaving, currentBalance, balanceIncludesApprovedLeave, currentCarriedBalance,
       balanceAsOf, plannedDays,
     ],
   );
 
   const currentPolicyURLState: PolicyURLState = useMemo(() => ({
-    unit, hoursPerDay, accrualKind, amount, frequency, payDateAnchor, grantDate, hourlyRate,
+    unit, hoursPerDay: policyHoursPerDay, accrualKind, amount, frequency, payDateAnchor, grantDate, hourlyRate,
     typicalWeeklyHours, expectedDaysPerYear, planYearKind, anniversaryStart, customResetDate,
     accrualCapEnabled, accrualCap, carryoverMode, carryoverCap, carryoverUseByEnabled,
     carryoverUseBy, waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance,
     payoutOnLeaving, currentBalance, balanceEntered: !needsBalance, balanceIncludesApprovedLeave, shiftMinutes, currentCarriedBalance, balanceAsOf, plannedDays, country, forecastDate,
     workWeek: trackerWorkWeek, subdivision: trackerSubdivision, altFridayStart: trackerAltFridayEnabled ? trackerAltFridayStart : undefined,
-  }), [unit, hoursPerDay, accrualKind, amount, frequency, payDateAnchor, grantDate, hourlyRate,
+  }), [unit, policyHoursPerDay, accrualKind, amount, frequency, payDateAnchor, grantDate, hourlyRate,
     typicalWeeklyHours, expectedDaysPerYear, planYearKind, anniversaryStart, customResetDate,
     accrualCapEnabled, accrualCap, carryoverMode, carryoverCap, carryoverUseByEnabled,
     carryoverUseBy, waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance,
@@ -230,11 +258,16 @@ export function Policy() {
   }, [currentPolicyURLState]);
   useEffect(() => keepPrivatePolicyDraft(privatePolicySearch, country), [privatePolicySearch, country]);
 
-  const horizonEnd = useMemo(() => addMonthsClamped(balanceAsOf, HORIZON_MONTHS), [balanceAsOf]);
-  const projection = useMemo(() => forecastWithRequests(policy, horizonEnd, ledger.requests), [policy, horizonEnd, ledger.requests]);
-  const selectedForecast = useMemo(() => forecastWithRequests(policy, forecastDate, ledger.requests), [policy, forecastDate, ledger.requests]);
+  const forecastInputIssue = missingForecastInput(policy, !needsWorkdayHours || validWorkdayHours);
+  const canProjectBalance = useMemo(() => !needsBalance && !forecastInputIssue && accrualKind !== 'unlimited'
+    && forecastWithRequests(policy, balanceAsOf) !== null, [needsBalance, forecastInputIssue, accrualKind, policy, balanceAsOf]);
+  const forecastFirst = canProjectBalance || accrualKind === 'unlimited';
+  const projection = useMemo(() => canProjectBalance
+    ? forecastWithRequests(policy, addMonthsClamped(balanceAsOf, HORIZON_MONTHS), ledger.requests)
+    : null, [canProjectBalance, policy, balanceAsOf, ledger.requests]);
+  const selectedForecast = useMemo(() => canProjectBalance ? forecastWithRequests(policy, forecastDate, ledger.requests) : null, [canProjectBalance, policy, forecastDate, ledger.requests]);
   const series = projection?.confirmed.series ?? [];
-  const summary = useMemo(() => generatePolicySummary(policy), [policy]);
+  const summary = useMemo(() => canProjectBalance || accrualKind === 'unlimited' ? generatePolicySummary(policy) : [], [canProjectBalance, accrualKind, policy]);
   const alerts = useMemo(() => generateAlerts(policy, projection?.confirmed.events ?? [], balanceAsOf, country), [policy, projection, balanceAsOf, country]);
   const hrQuestions = useMemo(() => generateHRQuestions(policy), [policy]);
 
@@ -243,12 +276,14 @@ export function Policy() {
   // a separate kind of loss). Shown beside the forecast figure itself, so a date picked just
   // before a reset can never read as "nothing expires" while the loss is a day away.
   const upcomingLoss = useMemo(() => {
+    if (!canProjectBalance) return undefined;
     const risks = expirationRisks(policy, country, ledger.requests, visitDate);
     return risks.filter((risk) => risk.kind !== 'cap').sort((a, b) => a.deadline.localeCompare(b.deadline))[0] ?? risks[0];
-  }, [policy, country, ledger.requests, visitDate]);
+  }, [canProjectBalance, policy, country, ledger.requests, visitDate]);
   const visitYear = Number(visitDate.slice(0, 4));
-  const calendarStart = Number(forecastDate.slice(0, 4)) - visitYear >= 10 ? visitDate : `${visitYear}-01-01`;
-  const calendarEnd = forecastDate > `${visitYear + 2}-12-31` ? forecastDate : `${visitYear + 2}-12-31`;
+  const calendarDate = isSupportedPlanningRange(visitDate, forecastDate) ? forecastDate : visitDate;
+  const calendarStart = Number(calendarDate.slice(0, 4)) - visitYear >= 10 ? visitDate : `${visitYear}-01-01`;
+  const calendarEnd = calendarDate > `${visitYear + 2}-12-31` ? calendarDate : `${visitYear + 2}-12-31`;
   const trackerCalendar = useRequestCalendar({ country, subdivision: trackerSubdivision, rangeStart: calendarStart, rangeEnd: calendarEnd, workWeek: trackerWorkWeek, altFridayStart: trackerAltFridayEnabled ? trackerAltFridayStart : undefined });
 
   const trackerShiftMinutes = unit === 'hours'
@@ -259,10 +294,11 @@ export function Policy() {
   const decoded = useMemo(() => decodeParagraph(pastedText), [pastedText]);
   const decodedTerms = useMemo(() => uniqueMatchedTerms(decoded), [decoded]);
 
+  const reportSave = (message: string) => setSaveFeedback({ search: privatePolicySearch, message });
   const saveButtons = (
     <div className="mt-5 flex flex-wrap gap-x-2 gap-y-1 border-t border-line pt-3 text-sm">
-      <button type="button" className="inline-flex min-h-11 items-center px-1 font-semibold text-ink underline decoration-1 underline-offset-[0.22em] transition-colors duration-150 hover:decoration-2" onClick={() => { setSaveMessage(savePolicyPreferences(privatePolicySearch) ? 'Policy saved in this browser.' : 'Browser storage is unavailable. You can still use the forecast on this page.'); }}>Save policy in this browser</button>
-      <button type="button" className="inline-flex min-h-11 items-center px-1 text-muted underline decoration-1 underline-offset-[0.22em] transition-colors duration-150 hover:decoration-2 hover:text-ink" onClick={() => setSaveMessage(deletePolicyPreferences() ? 'Saved policy deleted. Your current inputs stay on this page.' : 'Browser storage is unavailable.')}>Delete saved policy</button>
+      <button type="button" className="inline-flex min-h-11 items-center px-1 font-semibold text-ink underline decoration-1 underline-offset-[0.22em] transition-colors duration-150 hover:decoration-2" onClick={() => reportSave(savePolicyPreferences(privatePolicySearch) ? 'Policy saved in this browser.' : 'Browser storage is unavailable. You can still use the forecast on this page.')}>Save policy in this browser</button>
+      <button type="button" className="inline-flex min-h-11 items-center px-1 text-muted underline decoration-1 underline-offset-[0.22em] transition-colors duration-150 hover:decoration-2 hover:text-ink" onClick={() => reportSave(deletePolicyPreferences() ? 'Saved policy deleted. Your current inputs stay on this page.' : 'Browser storage is unavailable.')}>Delete saved policy</button>
     </div>
   );
 
@@ -275,37 +311,41 @@ export function Policy() {
           <p className="mt-3 max-w-2xl text-base text-muted">
             Enter your balance and how you earn PTO. The forecast and the expiry check update as you type; the rest of your policy lives in Advanced options.
           </p>
+          <aside aria-label="Saved plans" className="mt-2 flex flex-wrap items-baseline gap-x-3 text-sm text-muted">
+            <p>{pinnedPlans.length} saved {pinnedPlans.length === 1 ? 'plan' : 'plans'} in this browser.</p>
+            <a href="/pto#saved-plans" className="link-mark inline-flex min-h-11 items-center font-semibold">View saved plans</a>
+          </aside>
 
-          {/* Phones: until a balance is entered, the inputs come first (a forecast from a zero
-              balance answers nothing); after that the answer leads. */}
+          {/* On phones, incomplete policy inputs stay ahead of the forecast. */}
           {/* Inputs left, the answer right (sticky on desktop). Below lg the answer column
               dissolves (display: contents) so its two parts can be ordered answer, inputs,
               risk: the number first, then what drives it, then what could be lost. */}
           <div id="balance" className="mt-6 flex scroll-mt-24 flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,27rem)]">
-            <div className={`${needsBalance ? 'order-1' : 'order-2'} flex min-w-0 flex-col gap-6 lg:order-none lg:col-start-1 lg:row-start-1`}>
+            <div className={`${forecastFirst ? 'order-2' : 'order-1'} flex min-w-0 flex-col gap-6 lg:order-none lg:col-start-1 lg:row-start-1`}>
               <section aria-label="Quick balance forecast" className="min-w-0 rounded-[10px] border border-line bg-surface p-4 sm:p-6">
                 <h2 className="text-h2 font-bold type-condensed text-ink">Your balance and how you earn it</h2>
                 <p className="mt-1 text-sm text-muted">Use your real balance and employer rules. Full carryover at reset is assumed until you choose another rule.</p>
                 <div className="mt-5 grid gap-x-4 gap-y-4 sm:grid-cols-2">
                   <div className="flex min-w-0 flex-col gap-1">
                     <Field label={`Current PTO balance (${unit})`}><input type="number" step="any" value={enteredBalance ?? ''} aria-describedby="current-balance-hint" onChange={event => editBalance(event.target.value)} className={inputClass} /></Field>
-                    <p id="current-balance-hint" className="text-xs leading-5 text-muted">{needsBalance ? 'Starts at 0 until you enter yours: the number on your payslip or HR portal.' : 'From your payslip or HR portal, on the date beside it.'}</p>
+                    <p id="current-balance-hint" className="text-xs leading-5 text-muted">From your payslip or HR portal. Enter 0 if your balance is zero.</p>
                   </div>
                   <Field label="Balance as-of date"><input type="date" value={balanceAsOf} onChange={event => setBalanceAsOf(event.target.value)} className={inputClass} /></Field>
-                  <BalanceFromImage unit={unit} hoursPerDay={hoursPerDay} today={visitDate} onUse={(balance, asOf) => { setEnteredBalance(balance); if (asOf) setBalanceAsOf(asOf); }} />
+                  {(!needsWorkdayHours || validWorkdayHours) && <BalanceFromImage unit={unit} hoursPerDay={policyHoursPerDay} today={visitDate} onUse={(balance, asOf) => { setEnteredBalance(balance); if (asOf) setBalanceAsOf(asOf); }} />}
                   <Field label="How PTO accrues"><select value={accrualKind} onChange={event => setAccrualKind(event.target.value as AccrualMethod['kind'])} className={selectClass}><option value="front-loaded">Granted all at once</option><option value="per-pay-period">Each pay period</option><option value="per-hour-worked">For each hour worked</option><option value="unlimited">Unlimited PTO</option></select></Field>
                   <Field label="Balance unit"><select value={unit} onChange={event => setUnit(event.target.value as 'days' | 'hours')} className={selectClass}><option value="days">Days</option><option value="hours">Hours</option></select></Field>
-                  {(accrualKind === 'per-pay-period' || accrualKind === 'front-loaded') && <Field label={`${unit === 'hours' ? 'Hours' : 'Days'} earned each ${accrualKind === 'front-loaded' ? 'grant' : 'pay period'}`}><input type="number" min={0} step="any" value={amount} onChange={event => setAmount(Number(event.target.value))} className={inputClass} /></Field>}
+                  {(accrualKind === 'per-pay-period' || accrualKind === 'front-loaded') && <Field label={`${unit === 'hours' ? 'Hours' : 'Days'} earned each ${accrualKind === 'front-loaded' ? 'grant' : 'pay period'}`}><input type="number" min={0} step="any" value={displayNumber(amount)} onChange={event => setAmount(inputNumber(event.target.value))} className={inputClass} /></Field>}
                   {accrualKind === 'per-pay-period' && <><Field label="Pay frequency"><select value={frequency} onChange={event => setFrequency(event.target.value as typeof frequency)} className={selectClass}><option value="weekly">Weekly</option><option value="biweekly">Every two weeks</option><option value="semi-monthly">Twice a month</option><option value="monthly">Monthly</option></select></Field><Field label="Known pay date"><input type="date" value={payDateAnchor} onChange={event => setPayDateAnchor(event.target.value)} className={inputClass} /></Field></>}
                   {accrualKind === 'front-loaded' && <Field label="Annual grant date"><input type="date" value={grantDate} onChange={event => setGrantDate(event.target.value)} className={inputClass} /></Field>}
-                  {accrualKind === 'per-hour-worked' && <><Field label="Hours earned per hour worked"><input type="number" min={0} step="any" value={hourlyRate} onChange={event => setHourlyRate(Number(event.target.value))} className={inputClass} /></Field><Field label="Typical hours worked each week"><input type="number" min={0} step="any" value={typicalWeeklyHours} onChange={event => setTypicalWeeklyHours(Number(event.target.value))} className={inputClass} /></Field></>}
-                  {(unit === 'hours' || accrualKind === 'per-hour-worked') && <Field label="Hours per working day for conversion"><input type="number" min={0.25} step="any" value={hoursPerDay} onChange={event => setHoursPerDay(Number(event.target.value))} className={inputClass} /></Field>}
+                  {accrualKind === 'per-hour-worked' && <><Field label="Hours earned per hour worked"><input type="number" min={0} step="any" value={displayNumber(hourlyRate)} onChange={event => setHourlyRate(inputNumber(event.target.value))} className={inputClass} /></Field><Field label="Typical hours worked each week"><input type="number" min={0} step="any" value={displayNumber(typicalWeeklyHours)} onChange={event => setTypicalWeeklyHours(inputNumber(event.target.value))} className={inputClass} /></Field></>}
+                  {(unit === 'hours' || accrualKind === 'per-hour-worked') && <Field label="Hours per working day for conversion"><input type="number" min={0.25} step="any" value={displayNumber(hoursPerDay)} onChange={event => setHoursPerDay(inputNumber(event.target.value))} className={inputClass} /></Field>}
                   {accrualKind !== 'unlimited' && <Field label="Expiry and carryover"><select value={carryoverMode} onChange={event => setCarryoverMode(event.target.value as CarryoverRule['mode'])} className={selectClass}><option value="all">Full carryover at reset</option><option value="none">Use it or lose it at reset</option><option value="capped">Limited carryover at reset</option></select></Field>}
                   {accrualKind !== 'unlimited' && carryoverMode !== 'all' && <Field label="Reset date (new plan year begins)"><input type="date" value={planYearKind === 'calendar' ? `${Number(balanceAsOf.slice(0, 4)) + 1}-01-01` : planYearKind === 'anniversary' ? anniversaryStart : customResetDate} onChange={event => { setPlanYearKind('custom'); setCustomResetDate(event.target.value); }} className={inputClass} /></Field>}
-                  {accrualKind !== 'unlimited' && carryoverMode === 'capped' && <Field label={`Carryover limit (${unit})`}><input type="number" min={0} step="any" value={carryoverCap} onChange={event => setCarryoverCap(Number(event.target.value))} className={inputClass} /></Field>}
+                  {accrualKind !== 'unlimited' && carryoverMode === 'capped' && <Field label={`Carryover limit (${unit})`}><input type="number" min={0} step="any" value={displayNumber(carryoverCap)} onChange={event => setCarryoverCap(inputNumber(event.target.value))} className={inputClass} /></Field>}
                 </div>
                 {saveButtons}
-                {saveMessage && <p role="status" className="mt-1 text-sm text-muted">{saveMessage}</p>}
+                <p className="text-xs leading-5 text-muted">Save here to resume on another visit from this browser. Your balance and policy stay off the page URL.</p>
+                {saveFeedback?.search === privatePolicySearch && <p role="status" className="mt-1 text-sm text-muted">{saveFeedback.message}</p>}
               </section>
 
               <details className="group min-w-0 rounded-[10px] border border-line bg-surface">
@@ -364,7 +404,7 @@ export function Policy() {
                     {accrualKind === 'front-loaded' && (
                       <>
                         <Field label="Days granted" termId="front-loaded">
-                          <input type="number" min={0} step={0.5} value={amount} onChange={(e) => setAmount(Number(e.target.value))} className={inputClass} />
+                          <input type="number" min={0} step={0.5} value={displayNumber(amount)} onChange={(e) => setAmount(inputNumber(e.target.value))} className={inputClass} />
                         </Field>
                         <Field label="Grant date">
                           <input type="date" value={grantDate} onChange={(e) => setGrantDate(e.target.value)} className={inputClass} />
@@ -374,7 +414,7 @@ export function Policy() {
                     {accrualKind === 'per-pay-period' && (
                       <>
                         <Field label={`Amount per pay period (${unit})`} termId="accrual-rate">
-                          <input type="number" min={0} step={0.01} value={amount} onChange={(e) => setAmount(Number(e.target.value))} className={inputClass} />
+                          <input type="number" min={0} step={0.01} value={displayNumber(amount)} onChange={(e) => setAmount(inputNumber(e.target.value))} className={inputClass} />
                         </Field>
                         <Field label="Pay frequency" termId="pay-frequency">
                           <select value={frequency} onChange={(e) => setFrequency(e.target.value as typeof frequency)} className={selectClass}>
@@ -392,10 +432,10 @@ export function Policy() {
                     {accrualKind === 'per-hour-worked' && (
                       <>
                         <Field label="Rate per hour worked">
-                          <input type="number" min={0} step={0.001} value={hourlyRate} onChange={(e) => setHourlyRate(Number(e.target.value))} className={inputClass} />
+                          <input type="number" min={0} step={0.001} value={displayNumber(hourlyRate)} onChange={(e) => setHourlyRate(inputNumber(e.target.value))} className={inputClass} />
                         </Field>
                         <Field label="Typical hours worked per week">
-                          <input type="number" min={0} step={1} value={typicalWeeklyHours} onChange={(e) => setTypicalWeeklyHours(Number(e.target.value))} className={inputClass} />
+                          <input type="number" min={0} step={1} value={displayNumber(typicalWeeklyHours)} onChange={(e) => setTypicalWeeklyHours(inputNumber(e.target.value))} className={inputClass} />
                         </Field>
                       </>
                     )}
@@ -412,7 +452,7 @@ export function Policy() {
                     </Field>
                     {(unit === 'hours' || accrualKind === 'per-hour-worked') && (
                       <Field label="Hours in a full working day">
-                        <input type="number" min={1} step={0.5} value={hoursPerDay} onChange={(e) => setHoursPerDay(Number(e.target.value))} className={inputClass} />
+                        <input type="number" min={1} step={0.5} value={displayNumber(hoursPerDay)} onChange={(e) => setHoursPerDay(inputNumber(e.target.value))} className={inputClass} />
                       </Field>
                     )}
                   </div>
@@ -445,7 +485,7 @@ export function Policy() {
                     </Field>
                     {carryoverMode === 'capped' && (
                       <Field label={`Carryover limit (${unit})`}>
-                        <input type="number" min={0} step={0.5} value={carryoverCap} onChange={(e) => setCarryoverCap(Number(e.target.value))} className={inputClass} />
+                        <input type="number" min={0} step={0.5} value={displayNumber(carryoverCap)} onChange={(e) => setCarryoverCap(inputNumber(e.target.value))} className={inputClass} />
                       </Field>
                     )}
                   </div>
@@ -462,11 +502,11 @@ export function Policy() {
                     {accrualCapEnabled && accrualKind !== 'unlimited' && (
                       <div className="mb-2 max-w-xs">
                         <Field label={`Cap (${unit})`}>
-                          <input type="number" min={0} step={0.5} value={accrualCap} onChange={(e) => setAccrualCap(Number(e.target.value))} className={inputClass} />
+                          <input type="number" min={0} step={0.5} value={displayNumber(accrualCap)} onChange={(e) => setAccrualCap(inputNumber(e.target.value))} className={inputClass} />
                         </Field>
                       </div>
                     )}
-                    {carryoverMode !== 'none' && (
+                    {(carryoverMode !== 'none' || currentCarriedBalance > 0) && (
                       <>
                         <label className={checkRow}>
                           <input type="checkbox" className="h-4 w-4" checked={carryoverUseByEnabled} onChange={(e) => setCarryoverUseByEnabled(e.target.checked)} />
@@ -491,7 +531,7 @@ export function Policy() {
                     {waitingPeriodEnabled && (
                       <div className="mb-2 max-w-xs">
                         <Field label="Waiting period (days)">
-                          <input type="number" min={0} step={1} value={waitingPeriodDays} onChange={(e) => setWaitingPeriodDays(Number(e.target.value))} className={inputClass} />
+                          <input type="number" min={0} step={1} value={displayNumber(waitingPeriodDays)} onChange={(e) => setWaitingPeriodDays(inputNumber(e.target.value))} className={inputClass} />
                         </Field>
                       </div>
                     )}
@@ -500,7 +540,7 @@ export function Policy() {
                   <h3 className="mt-8 text-base font-bold text-ink">Balance, borrowing and payout</h3>
                   <div className="mt-3 grid gap-4 sm:grid-cols-2">
                     <Field label="Can your balance go negative?" termId="negative-balance">
-                      <input type="number" min={0} step={0.5} value={negativeBalanceAllowance} onChange={(e) => setNegativeBalanceAllowance(Number(e.target.value))} className={inputClass} />
+                      <input type="number" min={0} step={0.5} value={displayNumber(negativeBalanceAllowance)} onChange={(e) => setNegativeBalanceAllowance(inputNumber(e.target.value))} className={inputClass} />
                     </Field>
                     <Field label="If you leave, is unused PTO paid out?" termId="payout">
                       <select value={payoutOnLeaving} onChange={(e) => setPayoutOnLeaving(e.target.value as TimeOffPolicy['payoutOnLeaving'])} className={selectClass}>
@@ -510,7 +550,7 @@ export function Policy() {
                       </select>
                     </Field>
                     <Field label="Current balance">
-                      <input type="number" min={negativeBalanceAllowance * -1} step={0.5} value={enteredBalance ?? ''} onChange={(e) => editBalance(e.target.value)} className={inputClass} />
+                      <input type="number" min={Number.isFinite(negativeBalanceAllowance) ? -negativeBalanceAllowance : undefined} step={0.5} value={enteredBalance ?? ''} onChange={(e) => editBalance(e.target.value)} className={inputClass} />
                     </Field>
                     <Field label="As of">
                       <input type="date" value={balanceAsOf} onChange={(e) => setBalanceAsOf(e.target.value)} className={inputClass} />
@@ -539,9 +579,9 @@ export function Policy() {
                     <section>
                       <h3 className="mb-2 text-base font-bold text-ink">Your policy, in plain English</h3>
                       <div className="flex flex-col gap-1.5 text-base text-ink">
-                        {summary.map((s, i) => (
+                        {summary.length ? summary.map((s, i) => (
                           <p key={i}>{s}</p>
-                        ))}
+                        )) : <p className="text-sm text-muted">Complete your policy inputs to see a summary.</p>}
                       </div>
                     </section>
 
@@ -625,16 +665,23 @@ export function Policy() {
             </div>
 
             <div className="contents lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:flex lg:flex-col lg:gap-4">
-              <div className={`${needsBalance ? 'order-2' : 'order-1'} min-w-0 lg:order-none`}>
-                <QuickForecast policy={policy} balanceEntered={!needsBalance} requests={ledger.requests} upcomingLoss={upcomingLoss} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')} />
+              <div className={`${forecastFirst ? 'order-1' : 'order-2'} min-w-0 lg:order-none`}>
+                <QuickForecast policy={policy} balanceEntered={!needsBalance} inputIssue={forecastInputIssue} requests={ledger.requests} upcomingLoss={upcomingLoss} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')} />
               </div>
               <div id="expiration" className="order-3 min-w-0 scroll-mt-24 lg:order-none">
-                <ExpirationGuard policy={policy} country={country} requests={ledger.requests} today={visitDate} holidayCalendar={trackerCalendar} subdivision={trackerSubdivision} watchSearch={needsBalance ? undefined : privatePolicySearch} onAlertViewed={() => track('expiration_alert_viewed')} onAlertAction={() => track('expiration_alert_action_taken')} />
+                {canProjectBalance ? (
+                  <ExpirationGuard policy={policy} country={country} requests={ledger.requests} today={visitDate} holidayCalendar={trackerCalendar} subdivision={trackerSubdivision} watchSearch={privatePolicySearch} onAlertViewed={() => track('expiration_alert_viewed')} onAlertAction={() => track('expiration_alert_action_taken')} />
+                ) : (
+                  <section className="min-w-0 rounded-[10px] border border-line bg-surface p-4 sm:p-6">
+                    <h2 className="text-lg font-bold type-condensed text-ink">PTO expiration guard</h2>
+                    <p className="mt-2 text-sm text-muted">{accrualKind === 'unlimited' ? 'Unlimited PTO has no banked balance to expire.' : 'Enter your balance and policy above to check expiration risk.'}</p>
+                  </section>
+                )}
               </div>
             </div>
             <div id="requests" className="order-4 mt-6 min-w-0 scroll-mt-24 lg:order-none lg:col-start-1 lg:row-start-2 lg:mt-4">
-              <PtoTracker today={visitDate} ledger={ledger} calendar={pricedRequestCalendar} calendarReady={!trackerCalendar.loading && !trackerCalendar.degraded} calendarNotice={trackerCalendar.loading ? 'Loading your employer calendar…' : trackerCalendar.degraded ? 'Holiday data or a calendar input is unavailable. Check the calendar settings before adding or changing request dates.' : selectedForecast?.confirmed.balance === null || selectedForecast?.confirmed.balance === undefined ? undefined : `Projected balance on ${compactDate(forecastDate)}: ${new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(selectedForecast.confirmed.balance)} ${unit}. ${balanceIncludesApprovedLeave ? 'Approved leave already included in your balance is not deducted again.' : 'Approved requests you track here reduce it.'}`} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
-              <WalletTransfer policy={needsBalance ? undefined : policy} requests={ledger.requests} forecastDate={forecastDate} />
+              <PtoTracker today={visitDate} ledger={ledger} calendar={pricedRequestCalendar} calendarReady={!trackerCalendar.loading && !trackerCalendar.degraded} calendarNotice={trackerCalendar.loading ? 'Loading your employer calendar…' : trackerCalendar.degraded ? 'Holiday data or a calendar input is unavailable. Check the calendar settings before adding or changing request dates.' : undefined} forecastSummary={selectedForecast?.confirmed.balance === null || selectedForecast?.confirmed.balance === undefined ? undefined : `Projected balance on ${compactDate(forecastDate)} is ${new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(selectedForecast.confirmed.balance)} ${unit}.`} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
+              <WalletTransfer policy={canProjectBalance ? policy : undefined} requests={ledger.requests} forecastDate={forecastDate} />
               <details className="group mt-3 rounded-[10px] border border-line bg-surface">
                 <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 font-semibold text-ink sm:px-6 [&::-webkit-details-marker]:hidden">
                   My request calendar and workweek
@@ -683,7 +730,7 @@ export function Policy() {
           </div>
 
           <div className="mt-12 border-t border-line pt-8 lg:mt-16 lg:pt-10">
-            <DeparturePayoutEstimator policy={policy} requests={ledger.requests} />
+            <DeparturePayoutEstimator policy={policy} policyReady={canProjectBalance} requests={ledger.requests} />
           </div>
         </Container>
       </main>

@@ -46,6 +46,9 @@ export function PrimaryControls({
 }: PrimaryControlsProps) {
   const locale = localeForCountry(country);
   const budgetId = useId();
+  const sliderId = useId();
+  const sliderBudget = Number.isFinite(budget) ? Math.max(0, budget) : 0;
+  const maxSliderBudget = Math.max(60, sliderBudget);
 
   return (
     <>
@@ -54,12 +57,11 @@ export function PrimaryControls({
       <div className="@container min-w-0">
         <div className="grid min-w-0 grid-cols-1 gap-3.5 @min-[19rem]:grid-cols-[6.5rem_minmax(0,1fr)] @min-[19rem]:items-end">
           <div className="flex min-w-0 flex-col gap-1.5">
-            <label htmlFor={budgetId} className={LABEL_CLASS}>PTO days<span className="sr-only"> available</span></label>
+            <label htmlFor={budgetId} className={LABEL_CLASS}>PTO days available</label>
             <input id={budgetId}
               type="number"
               inputMode="numeric"
               min={0}
-              max={60}
               step={1}
               value={budget}
               onChange={(e) => onChangeBudget(Number(e.target.value))}
@@ -68,6 +70,21 @@ export function PrimaryControls({
           </div>
           <CountrySelect country={country} onChangeCountry={onChangeCountry} widthClass="w-full" />
         </div>
+      </div>
+
+      <div className="min-w-0">
+        <label htmlFor={sliderId} className={LABEL_CLASS}>Adjust PTO days</label>
+        <input
+          id={sliderId}
+          type="range"
+          min={0}
+          max={maxSliderBudget}
+          step={1}
+          value={sliderBudget}
+          aria-valuetext={`${sliderBudget} PTO ${sliderBudget === 1 ? 'day' : 'days'} available`}
+          onChange={(e) => onChangeBudget(Number(e.target.value))}
+          className="block h-11 w-full cursor-pointer"
+        />
       </div>
 
       <fieldset className="@container m-0 flex min-w-0 flex-col gap-1.5 border-0 p-0">

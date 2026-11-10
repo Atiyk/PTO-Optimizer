@@ -218,6 +218,18 @@ try {
           result.weightingKeyboardResponsive = nextWeight !== previousWeight;
           result.plannerResponsiveHeadings = await page.getByRole('heading', { name: 'Your time off' }).isVisible()
             && await page.getByRole('heading', { name: 'Shape your plan' }).isVisible();
+          if (label === 'after' && width <= 375) {
+            result.mobileRequestCardsBeforeCalendar = await page.evaluate(() => {
+              const summary = document.querySelector('main h1');
+              const request = document.querySelector('#breaks-heading');
+              const controls = document.querySelector('#plan-controls');
+              const calendar = document.querySelector('#complete-plan-heading');
+              const order = [summary, request, controls, calendar];
+              return order.every((element, index) => element && (!index
+                || order[index - 1].getBoundingClientRect().top < element.getBoundingClientRect().top
+                && (order[index - 1].compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING)));
+            });
+          }
           // Check that the local-only explanation uses actual recommended dates,
           // opens with keyboard-compatible native details, and stays readable at 320px.
           const explanation = page.locator('[data-testid="plan-explanation"]');
@@ -272,7 +284,7 @@ try {
           || !result.correctRoute || result.guideContentVisible === false || result.guideExampleVisible === false || result.guideQuestionsVisible === false
           || result.destinationsReachable === false || result.menuOpenedWithKeyboard === false || result.menuClosedWithEscape === false
           || result.menuFocusReturned === false || result.slidersVisible === false || result.slidersOutsideAdvanced === false
-          || result.weightingKeyboardResponsive === false || result.plannerResponsiveHeadings === false
+          || result.weightingKeyboardResponsive === false || result.plannerResponsiveHeadings === false || result.mobileRequestCardsBeforeCalendar === false
           || result.searchEmptyState === false || result.searchHidesUnrelatedPaths === false
           || result.searchFindsTerm === false || result.searchClearRestoresPaths === false
           || result.searchFocusReturned === false || result.searchHorizontalOverflow === true

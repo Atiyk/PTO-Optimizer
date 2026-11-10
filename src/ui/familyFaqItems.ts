@@ -16,7 +16,7 @@ export const FAMILY_FAQ_ITEMS: FAQItem[] = [
   {
     question: 'What does a “Share with family” link contain?',
     answer:
-      'Only dates. You choose whether to include the school closure dates, your available days, or both. The link never contains your PTO balance, your employer, names, notes, or the text of anything you imported. Anyone who has the link can see those dates.',
+      'You choose whether to include school closure dates, your available days, or both. For availability, you choose whether to confirm it and show which dates you already have off. The link never contains your PTO balance, your employer, names, notes, or the text of anything you imported. Anyone who has the link can see those dates.',
   },
   {
     question: 'Why does it say coverage is partial?',
@@ -26,6 +26,6 @@ export const FAMILY_FAQ_ITEMS: FAQItem[] = [
   {
     question: 'How does it choose which breaks to take off?',
     answer:
-      'It spends your PTO where it buys the most days with your kids: for each school break it finds the best run of consecutive working days to take off, then picks the combination across breaks that adds up to the most days together without going over the PTO you set. Switch a break off and the days move to the others straight away.',
+      'It spends your PTO where it buys the most days with your kids: for each school break it finds the best run of consecutive working days to take off, then picks the combination across breaks that adds up to the most days together without going over the PTO you set. Choose Cover school days first to use PTO on the earliest listed closures that still need care. Switch a break off to make its PTO available for other breaks.',
   },
 ];

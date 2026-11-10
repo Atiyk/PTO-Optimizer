@@ -127,6 +127,8 @@ export interface FullURLState {
   publicShareVersion?: 1;
   /** Observed dates intentionally shared by the sender, without employer labels. */
   sharedObservedHolidays?: string[];
+  landingPreview?: true;
+  holidayFocusDate?: string;
   country?: string;
   subdivision?: string;
   rangeStart: string;
@@ -200,6 +202,10 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
   const employerCalendar = publicShareVersion === undefined && sharedCalendar
     && employerScope(sharedCalendar.country, sharedCalendar.subdivision) === employerScope(country, subdivision)
     ? sharedCalendar : undefined;
+  const landingPreview = params.get('lp') === '1';
+  const holidayFocus = landingPreview ? params.get('hd') : null;
+  const holidayFocusDate = holidayFocus && isValidISODate(holidayFocus)
+    && holidayFocus >= rangeStart && holidayFocus <= rangeEnd ? holidayFocus : undefined;
 
   const wsRaw = params.get('ws');
   const weekStartOverride: WeekStart | 'auto' = wsRaw === '0' ? 0 : wsRaw === '1' ? 1 : 'auto';
@@ -250,6 +256,8 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
     ...(employerCalendar ? { employerCalendar } : {}),
     ...(publicShareVersion ? { publicShareVersion } : {}),
     ...(sharedObservedHolidays !== undefined ? { sharedObservedHolidays } : {}),
+    ...(landingPreview ? { landingPreview: true as const } : {}),
+    ...(holidayFocusDate ? { holidayFocusDate } : {}),
     rangeStart,
     rangeEnd,
     budget,
@@ -286,6 +294,8 @@ export interface WriteStateInput {
   employerCalendar?: EmployerCalendar;
   publicShareVersion?: 1;
   sharedObservedHolidays?: readonly string[];
+  landingPreview?: true;
+  holidayFocusDate?: string;
   country: string;
   subdivision: string | undefined;
   rangeStart: string;
@@ -336,6 +346,10 @@ export function writeFullStateToURL(params: URLSearchParams, state: WriteStateIn
   } else {
     params.delete('ho');
   }
+  if (state.landingPreview) params.set('lp', '1');
+  else params.delete('lp');
+  if (state.landingPreview && state.holidayFocusDate) params.set('hd', state.holidayFocusDate);
+  else params.delete('hd');
 
   params.set('c', state.country);
   params.set('s', state.rangeStart);
@@ -426,7 +440,7 @@ export function writeFullStateToURL(params: URLSearchParams, state: WriteStateIn
 }
 
 const PRIVATE_PLAN_KEYS = new Set([
-  'eh', 'sv', 'ho', 'pp', 'ov', 'od', 'bo', 'r',
+  'eh', 'sv', 'ho', 'hd', 'pp', 'ov', 'od', 'bo', 'r',
   'ac', 'am', 'ex', 'xd', 'cc', 'np', 'pc', 'pcs', 'pce', 'pcm', 'up',
 ]);
 const PRIVATE_PLAN_HISTORY_KEY = 'gaplessPrivatePlanV1';
@@ -455,6 +469,17 @@ export function readBrowserPlanSearch(search: string, historyState: unknown): st
     if (PRIVATE_PLAN_KEYS.has(key) && !params.has(key)) params.set(key, value);
   }
   return params.toString();
+}
+
+/** A public link cannot carry employer settings. The current tab can still
+ * restore the employer edits it stored privately after opening that link. */
+export function readBrowserFullState(search: string, historyState: unknown, defaults: FullURLDefaults): FullURLState {
+  const merged = readBrowserPlanSearch(search, historyState);
+  const plan = readFullStateFromURL(merged, defaults);
+  if (plan.publicShareVersion !== 1 || plan.sharedObservedHolidays !== undefined || new URLSearchParams(search).has('eh')) return plan;
+  const employerCalendar = decodeEmployerCalendar(new URLSearchParams(merged).get('eh'));
+  if (!employerCalendar || employerScope(employerCalendar.country, employerCalendar.subdivision) !== employerScope(plan.country ?? defaults.country, plan.subdivision)) return plan;
+  return { ...plan, employerCalendar };
 }
 
 /** Write public controls into the address bar and private draft state into the

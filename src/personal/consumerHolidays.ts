@@ -1,14 +1,19 @@
 import { COUNTRIES } from '@daysoff/engine/data/countries';
 import {
-  getHolidays, getHolidaysWithStatus, getSubdivisionCandidates,
+  getHolidays, getHolidaysWithStatus, getPreloadedHolidays, getSubdivisionCandidates,
   type Holiday, type HolidayFetchResult,
 } from '@daysoff/engine/data/holidays';
 import { mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { isValidISODate } from '../ui/urlState';
 
 const COUNTRY_CODES = new Set(COUNTRIES.map(({ code }) => code));
-// Match the existing engine's observed-date correction, without changing shared logic.
-const OBSERVED_FIX_COUNTRIES = new Set(['US', 'GB', 'CA', 'AU']);
+
+declare global {
+  interface Window {
+    /** Nominal source years included in each prerendered calendar. */
+    __PTO_PRELOADED_HOLIDAY_YEARS__?: Record<string, number[]>;
+  }
+}
 
 function validRange(start: string, end: string): boolean {
   if (!isValidISODate(start) || !isValidISODate(end) || end < start) return false;
@@ -16,12 +21,12 @@ function validRange(start: string, end: string): boolean {
   return years < 10 || (years === 10 && end.slice(5) <= start.slice(5));
 }
 
-/** A Saturday January 1 is normalized by the existing loader to the preceding
- * Friday. Fetch its nominal year when that observed Friday is the requested end date.
+/** A Saturday January 1 can be observed on the preceding Friday. Both loader
+ * normalization and already-observed source records can put it in the prior year.
  * Other ranges keep their original lookup years, avoiding unrelated data failures. */
 export function consumerHolidayLookupEnd(country: string, rangeStart: string, rangeEnd: string): string {
   if (!COUNTRY_CODES.has(country) || !validRange(rangeStart, rangeEnd)
-    || !OBSERVED_FIX_COUNTRIES.has(country) || !rangeEnd.endsWith('-12-31')) return rangeEnd;
+    || !rangeEnd.endsWith('-12-31')) return rangeEnd;
   const nextNewYear = `${Number(rangeEnd.slice(0, 4)) + 1}-01-01`;
   return isValidISODate(nextNewYear) && mondayIndexedDow(nextNewYear) === 5 ? nextNewYear : rangeEnd;
 }
@@ -54,6 +59,22 @@ export function validScope(country: string, start: string, end: string, subdivis
   return COUNTRY_CODES.has(country) && validRange(start, end)
     && (!subdivision || (/^[A-Z0-9-]{1,16}$/.test(subdivision)
       && subdivision.startsWith(`${country}-`) && subdivision.length > country.length + 1));
+}
+
+/** An empty array can be complete. Undefined means the requested source years
+ * are missing and the live lookup is needed, including any observed spillover. */
+export function readPreloadedConsumerHolidays(country: string, start: string, end: string, subdivision?: string): Holiday[] | undefined {
+  if (typeof window === 'undefined' || !validScope(country, start, end, subdivision)) return;
+  const years = window.__PTO_PRELOADED_HOLIDAY_YEARS__?.[country];
+  if (!years) return;
+  const lookupEnd = consumerHolidayLookupEnd(country, start, end);
+  for (let year = Number(start.slice(0, 4)); year <= Number(lookupEnd.slice(0, 4)); year++) {
+    if (!years.includes(year)) return;
+  }
+  try {
+    const preloaded = getPreloadedHolidays(country).filter(holiday => !holiday.counties || (subdivision && holiday.counties.includes(subdivision)));
+    return observedEntries(preloaded, country, start, end);
+  } catch { return undefined; }
 }
 
 export async function getConsumerHolidaysWithStatus(

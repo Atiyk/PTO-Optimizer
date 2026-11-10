@@ -145,6 +145,7 @@ jobs:
           NODE
           qa_status=0
           set -o pipefail
+          node current/scripts/consumer-plan-parity-qa.mjs http://127.0.0.1:4177 "$GITHUB_WORKSPACE/qa-evidence/plan-parity" || qa_status=1
           node current/scripts/consumer-journey.mjs http://127.0.0.1:4177 "$GITHUB_WORKSPACE/qa-evidence/journey" || qa_status=1
           node current/scripts/consumer-date-editor-qa.mjs http://127.0.0.1:4177 "$GITHUB_WORKSPACE/qa-evidence/date-editor" || qa_status=1
           node current/scripts/consumer-touch-calendar-qa.mjs http://127.0.0.1:4177 "$GITHUB_WORKSPACE/qa-evidence/touch-calendar" || qa_status=1

@@ -228,3 +228,27 @@ describe('planFamilyTime validation and performance', () => {
     expect(huge.ptoUsed).toBe(60);
   });
 });
+
+describe('coverage priority', () => {
+  const schoolOffDays = ['2026-11-16', '2026-11-17', '2026-11-18', '2026-12-24'];
+  const otherAdultDays = ['2026-11-17', '2026-12-24'];
+  const base = { schoolOffDays, otherAdultDays, prioritizeCoverage: true, ptoBudget: 2 };
+
+  it('uses PTO on the earliest listed closures that need coverage and skips confirmed care', () => {
+    const result = plan({ ...base, otherAdultConfirmed: true })!;
+    expect(result.plans.flatMap(item => item.ptoDays)).toEqual(['2026-11-16', '2026-11-18']);
+    expect(result.gaps.map(gap => gap.cover)).toEqual(['pto', 'other-adult', 'pto', 'other-adult']);
+    expect(result.uncoveredDays).toEqual([]);
+    expect(result.coverage).toBe('partial');
+  });
+
+  it('treats proposed availability as tentative and keeps exclusions and budgets', () => {
+    const result = plan({ ...base, otherAdultConfirmed: false })!;
+    expect(result.plans.flatMap(item => item.ptoDays)).toEqual(['2026-11-16', '2026-11-17']);
+    expect(result.uncoveredDays).toEqual(['2026-11-18', '2026-12-24']);
+    expect(result.gaps.at(-1)?.cover).toBe('other-adult-proposed');
+    const excluded = plan({ ...base, otherAdultConfirmed: false, excludedBreaks: [result.breaks[0].id] })!;
+    expect(excluded.plans.flatMap(item => item.ptoDays)).toEqual(['2026-12-24']);
+    expect(excluded.ptoLeft).toBe(1);
+  });
+});

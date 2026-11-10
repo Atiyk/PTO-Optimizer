@@ -7,12 +7,13 @@ export const REQUEST_CHANGE_EVENT = 'gapless:requests-changed';
 export const MAX_REQUESTS = 300;
 const MAX_REQUEST_DAYS = 1096;
 
-export const REQUEST_STATUSES = ['planned', 'requested', 'approved', 'rejected', 'canceled', 'completed'] as const;
+export const REQUEST_STATUSES = ['considering', 'planned', 'requested', 'approved', 'completed', 'canceled', 'rejected'] as const;
 export type RequestStatus = typeof REQUEST_STATUSES[number];
 
 /** All states can be corrected manually. No transition represents an employer action. */
 const correctionsFrom = (status: RequestStatus) => REQUEST_STATUSES.filter((next) => next !== status);
 export const REQUEST_TRANSITIONS: Record<RequestStatus, readonly RequestStatus[]> = {
+  considering: correctionsFrom('considering'),
   planned: correctionsFrom('planned'), requested: correctionsFrom('requested'), approved: correctionsFrom('approved'),
   rejected: correctionsFrom('rejected'), canceled: correctionsFrom('canceled'), completed: correctionsFrom('completed'),
 };
@@ -50,6 +51,12 @@ export interface RequestInput {
   /** A single-day request can take less than the scheduled shift. */
   partialMinutes?: number;
   note?: string;
+}
+
+export interface SavedBreakInput {
+  start: ISODate;
+  end: ISODate;
+  ptoDates: readonly ISODate[];
 }
 
 export interface RequestStorage {
@@ -128,6 +135,24 @@ export function createPtoRequest(input: RequestInput, calendar: RequestCalendar,
   };
 }
 
+/** A recommendation already has a day cost. Keep those exact charged dates. */
+export function createSavedBreakRequest(input: SavedBreakInput, calendar: RequestCalendar, id: string, now = new Date().toISOString()): PtoRequest | null {
+  if (!calendarCoversRequest(calendar, input.start, input.end) || !/^[A-Za-z0-9_-]{1,100}$/.test(id)) return null;
+  const ptoDates = [...new Set(input.ptoDates)].sort();
+  const workDates = new Set(requestPtoDates(input.start, input.end, calendar));
+  if (ptoDates.length !== input.ptoDates.length || !ptoDates.every(date => workDates.has(date))) return null;
+  return {
+    id, start: input.start, end: input.end, ptoDates, ptoDays: ptoDates.length,
+    status: 'considering', note: '', createdAt: now, updatedAt: now,
+  };
+}
+
+/** Date edits use the saved request's unit even if the tracker now uses another one. */
+export function calendarForSavedRequest(request: PtoRequest, calendar: RequestCalendar): RequestCalendar | null {
+  if (request.ptoMinutes === undefined) return { ...calendar, shiftMinutes: undefined };
+  return calendar.shiftMinutes === undefined ? null : calendar;
+}
+
 export function parseRequestLedger(raw: string | null): PtoRequest[] {
   if (!raw || raw.length > 1_000_000) return [];
   try {
@@ -188,7 +213,7 @@ export function writeRequestLedger(requests: readonly PtoRequest[], storage: Req
 }
 
 export function isActiveRequest(request: PtoRequest): boolean {
-  return request.status !== 'canceled' && request.status !== 'rejected';
+  return isScheduledRequest(request, true);
 }
 
 export function isScheduledRequest(request: PtoRequest, includeTentative: boolean): boolean {

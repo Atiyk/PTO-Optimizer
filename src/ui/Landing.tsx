@@ -1,9 +1,7 @@
-import { getConsumerHolidaysWithStatus as getHolidaysWithStatus } from '../personal/consumerHolidays';
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { COUNTRIES } from '@daysoff/engine/data/countries';
-import { getPreloadedHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { addDays, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
-import { DEFAULT_WORK_WEEK, type Break } from '@daysoff/engine/solver/types';
+import type { Break } from '@daysoff/engine/solver/types';
 import { formatCardDateRange, formatLong, formatShort, monthShortName } from '@daysoff/engine/calendar/dateFormat';
 import { SiteHeader } from './SiteHeader';
 import { Footer } from './Footer';
@@ -18,10 +16,9 @@ import { downloadHolidaysICS } from './icsExport';
 import { copyText } from './requestText';
 import { buildPublicPlanLink } from './publicSharePrivacy';
 import { track } from './analytics';
-import { landingPlanHref, landingSearch, readLandingState, validLandingRange } from './landingState';
-import { solveConsumer } from '../planning/optimizer';
+import { computeLandingPlan, landingHolidayHref, landingPlanHref, landingSearch, readLandingState, validLandingRange } from './landingState';
 import { readEmployerCalendar } from '../personal/employerCalendar';
-import { landingObservedHolidays } from './landingCalendar';
+import { landingObservedHolidays, useLandingHolidays } from './landingCalendar';
 import { weekStartForCountry } from './locale';
 import { HOLIDAY_DOT } from './colorScheme';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
@@ -62,7 +59,7 @@ function monthsBetween(start: string, end: string): string[] {
  * The whole plan as a printed year schedule: one row per month, days aligned under the same
  * weekday columns (week start as on /pto: Sunday for US/CA/JP, Monday elsewhere), every
  * break of the plan drawn as a soft blue run with a Signal Blue rule and each PTO day a solid blue block; holidays sit on soft teal. The holiday dot is
- * the planner's own. The grid is a picture (aria-hidden); the visible list beneath it names
+ * the planner's own. The grid is a picture (aria-hidden); the visible list names
  * every break in words, so nothing depends on colour or on seeing the grid.
  */
 function PlanYear({ breaks, best, rangeStart, rangeEnd, holidayName, weekStart }: {
@@ -117,12 +114,12 @@ function PlanYear({ breaks, best, rangeStart, rangeEnd, holidayName, weekStart }
         <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="relative size-3.5 bg-holiday-soft"><span className={`absolute bottom-0.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${HOLIDAY_DOT}`} /></span>Public holiday</span>
       </span>
     </figcaption>
-    <div className="grid gap-x-12 gap-y-4 lg:grid-cols-2">{columns.map(block)}</div>
-    <ol aria-label="Breaks in this plan" className="mt-5 grid list-none gap-x-8 gap-y-1 p-0 text-base text-ink sm:grid-cols-2 lg:grid-cols-3">
-      {chronological.map((brk) => <li key={brk.id}>
+    <ol aria-label="Breaks in this plan" className="mb-5 grid list-none gap-x-8 gap-y-1 p-0 text-base text-ink sm:grid-cols-2 lg:grid-cols-3">
+      {chronological.map((brk) => <li key={brk.id} data-break-start={brk.start} data-break-end={brk.end} data-break-pto={brk.ptoCost}>
         <span className="font-semibold">{breakDates(brk)}</span>: {brk.totalDaysOff} days off for {plural(brk.ptoCost, 'PTO day')}{brk.id === best.id ? ' (longest)' : ''}
       </li>)}
     </ol>
+    <div className="grid gap-x-12 gap-y-4 lg:grid-cols-2">{columns.map(block)}</div>
   </figure>;
 }
 
@@ -151,11 +148,7 @@ export function Landing() {
   const employer = useMemo(() => readEmployerCalendar(country), [country]);
   const customizedHolidays = employer.excluded.length > 0 || employer.custom.length > 0;
   const validRange = validLandingRange(rangeStart, rangeEnd);
-  const calendarKey = `${country}:${rangeStart}:${rangeEnd}`;
-  const [calendar, setCalendar] = useState<{ key: string; holidays: Holiday[]; loading: boolean; degraded: boolean }>(() => ({
-    key: calendarKey, holidays: getPreloadedHolidays(country).filter((holiday) => !holiday.counties),
-    loading: getPreloadedHolidays(country).length === 0, degraded: false,
-  }));
+  const calendar = useLandingHolidays(country, rangeStart, rangeEnd, validRange);
   const engaged = useRef(false);
   const [copyMessage, setCopyMessage] = useState('');
   const update = (next: Partial<typeof state>) => {
@@ -169,26 +162,16 @@ export function Landing() {
     if (window.location.search !== query) window.history.replaceState(null, '', `/${query}${window.location.hash}`);
   }, [state, validRange]);
   useEffect(() => {
-    if (!validRange) return;
-    let cancelled = false;
-    getHolidaysWithStatus(country, rangeStart, rangeEnd).then((result) => {
-      if (!cancelled) setCalendar({ key: calendarKey, ...result, loading: false });
-    }).catch(() => {
-      if (!cancelled) setCalendar({ key: calendarKey, holidays: [], degraded: true, loading: false });
-    });
-    return () => { cancelled = true; };
-  }, [country, rangeStart, rangeEnd, calendarKey, validRange]);
-  useEffect(() => {
     const onPopState = () => setState(readLandingState(window.location.search, today, geolocateCountry()));
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, [today]);
 
-  const loading = calendar.key !== calendarKey || calendar.loading;
-  const holidays = useMemo(() => landingObservedHolidays(calendar.key === calendarKey ? calendar.holidays : [], employer, rangeStart, rangeEnd), [calendar, calendarKey, employer, rangeStart, rangeEnd]);
+  const { loading } = calendar;
+  const holidays = useMemo(() => landingObservedHolidays(calendar.holidays, employer, rangeStart, rangeEnd), [calendar.holidays, employer, rangeStart, rangeEnd]);
   const holidaySet = useMemo(() => new Set(holidays.map((holiday) => holiday.date)), [holidays]);
   const holidayName = useMemo(() => new Map(holidays.map((holiday) => [holiday.date, holiday.name])), [holidays]);
-  const plan = useMemo(() => validRange && !loading ? solveConsumer({ offDays: [...holidaySet], rangeStart, rangeEnd, budget, country, workWeek: DEFAULT_WORK_WEEK }, { minimumBreakDays: 3, style: 'balanced' }) : null, [validRange, loading, holidaySet, rangeStart, rangeEnd, budget, country]);
+  const plan = useMemo(() => validRange && !loading ? computeLandingPlan(state, holidays) : null, [state, validRange, loading, holidays]);
   const bestBreak = useMemo(() => plan?.result.primary.slice().sort((a, b) => b.totalDaysOff - a.totalDaysOff || b.multiplier - a.multiplier || a.start.localeCompare(b.start))[0], [plan]);
   const used = plan?.result.primary.reduce((total, brk) => total + brk.ptoCost, 0) ?? 0;
   const breakCount = plan?.result.primary.length ?? 0;
@@ -225,7 +208,7 @@ export function Landing() {
               </select>.
             </p>
 
-            <section aria-labelledby="landing-result" className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-1">
+            <section aria-labelledby="landing-result" data-plan-result={!validRange ? 'unavailable' : loading ? 'pending' : 'ready'} className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-1">
               {bestBreak ? <>
                 <h2 id="landing-result" className="text-[clamp(2.75rem,1.75rem+3vw,4.5rem)] leading-none tabular-nums type-display text-ink">
                   <span className="sr-only">Your plan: </span><span className="mark">{planDaysOff} days off</span>
@@ -270,7 +253,7 @@ export function Landing() {
             {bestBreak && plan && <PlanYear breaks={plan.result.primary} best={bestBreak} rangeStart={rangeStart} rangeEnd={rangeEnd} holidayName={holidayName} weekStart={weekStartForCountry(country)} />}
             <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-8 gap-y-1">
               <p className="max-w-3xl text-sm text-muted">Preview assumes a Monday–Friday workweek. {customizedHolidays ? 'Your saved employer holiday calendar is applied' : 'National public holidays are assumed to be observed by your employer'}{employer.custom.length > 0 ? ', including additional company days off' : ''}. Calendar days off include weekends, observed holidays, and PTO days.</p>
-              <a href={href} className={`${LINK} text-sm`}>Customize workweek and employer holidays →</a>
+              <a href={`${href}#planning-assumptions`} className={`${LINK} text-sm`}>Customize workweek and employer holidays →</a>
             </div>
             {calendar.degraded && <p className="mt-2 text-sm font-semibold text-ink" role="status">Some holiday data is unavailable. This preview may miss public holidays.</p>}
           </div>
@@ -318,14 +301,14 @@ export function Landing() {
 
           {upcoming.length > 0 ? <ol aria-label={`All ${upcoming.length} upcoming holidays`} className="mt-6 list-none p-0">
             {upcoming.map((entry) => {
-              const bridge = bridges.find((candidate) => candidate.combined.start === entry.run.start || candidate.combined.end === entry.run.end);
+              const bridge = budget > 0 ? bridges.find((candidate) => candidate.combined.start === entry.run.start || candidate.combined.end === entry.run.end) : undefined;
               return <li key={entry.holiday.date} className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-baseline gap-x-4 rounded-[6px] px-3 py-3 odd:bg-surface sm:px-5 sm:grid-cols-[7rem_minmax(0,1fr)_auto] sm:gap-x-8">
                 <p className="text-h2 font-bold type-condensed text-ink tabular-nums">{formatShort(entry.holiday.date)}</p>
                 <div className="min-w-0">
                   <p className="text-lg font-semibold text-ink">{entry.holiday.name}</p>
                   <p className="text-sm text-muted">{entry.weekday}, {formatLong(entry.holiday.date)}{entry.isObserved ? ' · observed' : ''} · {entry.runLength >= 3 ? <span className="mark text-ink">{entry.runLength} calendar days off</span> : `${plural(entry.runLength, 'calendar day')} off`} before PTO</p>
                 </div>
-                <a href={landingPlanHref(state, bridge?.bridgeDate)} className={`${LINK} col-start-2 text-sm sm:col-start-3 sm:justify-self-end`}>{bridge ? `Connect a ${runLength(bridge.combined)}-day break` : 'Plan around this holiday'} →</a>
+                <a href={landingHolidayHref(state, entry.holiday.date, bridge?.bridgeDate)} className={`${LINK} col-start-2 text-sm sm:col-start-3 sm:justify-self-end`}>{bridge ? `Connect a ${runLength(bridge.combined)}-day break` : 'View this holiday in the planner'} →</a>
               </li>;
             })}
           </ol> : <p className="mt-8 rounded-[10px] bg-surface p-5 text-base text-muted">{loading ? 'Updating public holidays…' : calendar.degraded ? 'Holiday data could not be loaded. You can still use the planner with your own holiday dates.' : 'No upcoming observed holidays in this range. The planner can still help you make more of your weekends.'}</p>}

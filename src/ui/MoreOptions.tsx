@@ -257,7 +257,7 @@ export function MoreOptions(props: MoreOptionsProps) {
       </section>
 
       <section>
-        <h3 className={H4_CLASS}>Work week</h3>
+        <h3 id="planning-assumptions" tabIndex={-1} className={`${H4_CLASS} scroll-mt-16`}>Work week</h3>
         <div className="flex flex-wrap gap-1.5">
           {WEEKDAY_LABELS.map((label, i) => (
             <label key={label} className="flex min-h-11 min-w-9 cursor-pointer flex-col items-center gap-1 text-xs font-medium text-ink">
@@ -349,7 +349,7 @@ export function MoreOptions(props: MoreOptionsProps) {
       <ImportCalendar onImportBusyDays={props.onAddBlackouts} />
 
       <section className="@min-[36rem]:col-span-2">
-        <h3 className={H4_CLASS}>My employer&apos;s holidays</h3>
+        <h3 id="employer-holidays" className={`${H4_CLASS} scroll-mt-16`}>My employer&apos;s holidays</h3>
         <p className="mb-3 max-w-prose text-sm text-muted">{props.sharedHolidaySnapshot
           ? 'These dates came from the shared plan. Switch to your saved calendar to edit employer holidays.'
           : 'Adjust these dates if your company follows a different calendar. Changes update your plan immediately.'}</p>

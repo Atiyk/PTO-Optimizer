@@ -26,6 +26,7 @@ export interface FamilyURLState {
   country?: string;
   start?: string;
   ptoBudget: number;
+  prioritizeCoverage?: boolean;
   districtId?: string;
   customOffDays: string[];
   excludedBreaks: string[];
@@ -42,6 +43,7 @@ export interface FamilyURLWriteState {
   /** The start a fresh visit would compute (today); `s` is omitted when equal. */
   defaultStart?: string;
   ptoBudget: number;
+  prioritizeCoverage?: boolean;
   districtId?: string;
   customOffDays: readonly string[];
   excludedBreaks: readonly string[];
@@ -132,6 +134,8 @@ export function readFamilyStateFromURL(search: string): FamilyURLState {
   if (start !== null) { if (isValidISODate(start)) state.start = start; else bad('s'); }
   const pto = clampedPto(params.get('pto'));
   if (pto === null) bad('pto'); else state.ptoBudget = pto;
+  const priority = params.get('cp');
+  if (priority !== null) { if (priority === '1') state.prioritizeCoverage = true; else bad('cp'); }
   const district = params.get('d');
   if (district !== null) { if (DISTRICT_ID.test(district)) state.districtId = district; else bad('d'); }
   for (const [name, key] of [['sd', 'customOffDays'], ['x', 'excludedBreaks']] as const) {
@@ -176,6 +180,7 @@ export function writeFamilyStateToURL(params: URLSearchParams, state: FamilyURLW
   setOrDelete(params, 's', state.start && state.start !== state.defaultStart ? state.start : undefined);
   const pto = Math.max(0, Math.min(MAX_FAMILY_PTO, Math.round(state.ptoBudget)));
   setOrDelete(params, 'pto', Number.isFinite(pto) && pto !== DEFAULT_FAMILY_PTO ? String(pto) : undefined);
+  setOrDelete(params, 'cp', state.prioritizeCoverage ? '1' : undefined);
   setOrDelete(params, 'd', state.districtId);
   for (const [name, dates] of [['sd', state.customOffDays], ['x', state.excludedBreaks]] as const) {
     const encoded = encodeDateRanges(dates);

@@ -5,18 +5,18 @@ import { readPartnerAvailability } from '../planning/partner';
 import { PtoTracker } from './PtoTracker';
 import { useRequestLedger } from './useRequestLedger';
 import { settleLedgerAction } from '../integration/browserWalletStore';
-import { track } from './analytics';
-import { useMemo, useRef, useState } from 'react';
+import { track, trackBreakAction } from './analytics';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { SiteHeader } from './SiteHeader';
 import { CompactResultBar, Headline } from './Headline';
 import { buttonClasses } from './Button';
 import { SummaryMetrics } from './SummaryMetrics';
 import { PlanExplanation } from './PlanExplanation';
 import { PrimaryControls, ReserveControls } from './PrimaryControls';
-import { Chevron, PlusMinus } from './Chevron';
+import { PlusMinus } from './Chevron';
 import { pinPreviewText } from './pinPreview';
 import { planningStyleSettings } from '../planning/optimizer';
-import { formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
+import { formatCardDateRange, formatLong } from '@daysoff/engine/calendar/dateFormat';
 import { RelaxedMinimumNotice } from './PlanRecoveryNotice';
 import { PlanSliders } from './PlanSliders';
 import { SubdivisionSelect } from './CountrySelect';
@@ -36,7 +36,7 @@ import { PeakCapBanner } from './PeakCapBanner';
 import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { Container } from './Container';
-import { isContested, mostContestedBreakId } from '@daysoff/engine/calendar/requestDeadline';
+import { mostContestedBreakId } from '@daysoff/engine/calendar/requestDeadline';
 import { breakReason } from './breakReason';
 import { useAppState } from './useAppState';
 import { useTodayISO } from './useTodayISO';
@@ -45,15 +45,15 @@ import { PortfolioComparison } from '../planning/PortfolioComparison';
 import { useHasHover } from './useHasHover';
 
 export function App() {
-  // UI density pass: the old two-level "Adjust" (-> nested "More options") disclosure
-  // collapsed into one - a single toggle, clearly named for what it contains, instead of a
-  // vague "Adjust" that opened a small panel which then had its OWN "More options" button
-  // inside it. See the button's own label below for the stated contents.
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [comparisonOpen, setComparisonOpen] = useState(false);
   const resultRef = useRef<HTMLElement>(null);
   const ledger = useRequestLedger();
   const today = useTodayISO();
   const state = useAppState(ledger.requests, today);
+  const plannable = !state.validationIssues.length && !state.solverIssue && !state.planningPending;
+  const requestToolsReady = plannable && state.holidaysReady && !state.holidaysDegraded;
+  const requestsByDates = useMemo(() => new Map(ledger.requests.map(request => [`${request.start}|${request.end}`, request])), [ledger.requests]);
   const partnerReceived = useMemo(() => readPartnerAvailability(typeof window === 'undefined' ? '' : readBrowserPlanSearch(window.location.search, window.history.state)), []);
   const freeDays = useMemo(() => {
     if (state.validationIssues.length) return [];
@@ -62,12 +62,20 @@ export function App() {
     return rangeISO(state.rangeStart, state.rangeEnd).filter(date => !unavailable.has(date) && (off.has(date) || !state.workWeek[mondayIndexedDow(date)]));
   }, [state.validationIssues, state.effectiveOffDays, state.solveInput.blackouts, state.rangeStart, state.rangeEnd, state.workWeek]);
   const requestCalendar = { workWeek: state.workWeek, offDays: state.effectiveOffDays, rangeStart: state.rangeStart, rangeEnd: state.rangeEnd };
-  // Tracking confirms on the break itself ("Tracked"), without jumping down the page.
-  const trackBreak = (brk: typeof state.breaks[number]) => {
-    if (state.planningPending || !state.holidaysReady || state.holidaysDegraded) return false;
-    return settleLedgerAction(ledger.addRequest({ start: brk.start, end: brk.end }, requestCalendar), (action) => {
-      if (action.ok) track('request_tracking_started');
-      return action.ok;
+  const recordBreak = (brk: typeof state.breaks[number], ptoDates: string[], action: 'saved' | 'tracked') => {
+    if (!requestToolsReady || ptoDates.length !== brk.ptoCost) {
+      return { ok: false, message: 'Wait for your calendar to update, then try again.' };
+    }
+    const range = { start: brk.start, end: brk.end };
+    const recorded = action === 'saved'
+      ? ledger.saveBreak({ ...range, ptoDates }, requestCalendar)
+      : ledger.addRequest(range, requestCalendar);
+    return settleLedgerAction(recorded, result => {
+      if (result.ok && !result.existing) {
+        if (action === 'tracked') track('request_tracking_started');
+        trackBreakAction(action);
+      }
+      return result;
     });
   };
   // The touch day sheet sets a day's state directly (take / never / let the planner
@@ -84,39 +92,52 @@ export function App() {
   // Opening More options from the rail scrolls the panel into view (it can open below the
   // fold inside the sticky rail).
   const optionsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const openAssumptions = () => {
+      if (window.location.hash !== '#planning-assumptions') return;
+      setOptionsOpen(true);
+    };
+    openAssumptions();
+    window.addEventListener('hashchange', openAssumptions);
+    return () => window.removeEventListener('hashchange', openAssumptions);
+  }, []);
+  useEffect(() => {
+    if (!optionsOpen || window.location.hash !== '#planning-assumptions') return;
+    const heading = document.getElementById('planning-assumptions');
+    heading?.scrollIntoView?.({ block: 'start' });
+    heading?.focus({ preventScroll: true });
+  }, [optionsOpen]);
   const toggleOptions = () => {
     const next = !optionsOpen;
     setOptionsOpen(next);
-    if (next) requestAnimationFrame(() => optionsRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }));
+    if (next && window.location.hash !== '#planning-assumptions') requestAnimationFrame(() => optionsRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }));
   };
-  const [partnerOpenKey, setPartnerOpenKey] = useState(0);
-  const openPartnerPlanner = () => {
-    setPartnerOpenKey((k) => k + 1);
+  const [partnerOpen, setPartnerOpen] = useState<{ key: number; breakId?: string }>({ key: 0 });
+  const openPartnerPlanner = (breakId?: string) => {
+    setPartnerOpen((previous) => ({ key: previous.key + 1, breakId }));
     requestAnimationFrame(() => document.getElementById('partner-planner')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }));
   };
   const hasHover = useHasHover();
+  const holidayFocusDate = state.holidayFocusDate;
+  const holidayFocusRun = state.holidayFocusRun;
+  useEffect(() => {
+    if (!holidayFocusDate || window.location.hash !== '#holiday-focus') return;
+    const heading = document.getElementById('holiday-focus');
+    heading?.scrollIntoView?.({ block: 'start' });
+    heading?.focus({ preventScroll: true });
+  }, [holidayFocusDate]);
 
   const previewRun = state.hoveredAlternative
     ? { start: state.hoveredAlternative.start, end: state.hoveredAlternative.end }
     : null;
 
-  // Layout fix: cards render in DATE order again - badge #1 is the earliest break in the
-  // year. The contested flag stays ON the card it belongs to (BreakCard's own
-  // isMostContested prop, styled as a neutral inline note, not reordering/red chrome); this
-  // line just tells a visitor which card number to look for first, so the information the
-  // old reordering carried survives without disturbing the scannable chronological list.
   const mostContestedId = mostContestedBreakId(state.breaks);
-  const mostContested = state.orderedBreaks.find(({ brk }) => brk.id === mostContestedId);
-  // Only say a break is in a busy period when it actually passes the busy-dates threshold;
-  // "the busiest of three quiet breaks" is not a busy period.
-  const mostContestedIndex = mostContested && isContested(mostContested.brk) ? mostContested.index : undefined;
 
   const { showHelp, setShowHelp } = useKeyboardShortcuts({
     onCopyLink: () => document.getElementById('shortcut-copy-link')?.click(),
     onDownloadIcs: () => document.getElementById('shortcut-download-ics')?.click(),
   });
 
-  const plannable = !state.validationIssues.length && !state.solverIssue && !state.planningPending;
   const fieldLabel = 'text-sm font-semibold text-ink';
   const selectClass = 'select-ink w-full min-w-0 text-[15px] font-normal';
   const stylePreset = planningStyleSettings(state.planningStyle);
@@ -125,19 +146,13 @@ export function App() {
   return (
     <div className="min-h-screen bg-page">
       <SiteHeader active="pto" />
-      <CompactResultBar watch={resultRef} totalDaysOff={state.totalDaysOff} budgetSpent={state.budgetSpent} breakCountActual={state.breakCountActual} />
+      {plannable && <CompactResultBar watch={resultRef} totalDaysOff={state.totalDaysOff} budgetSpent={state.budgetSpent} breakCountActual={state.breakCountActual} />}
 
-      {/* Operate layout. Desktop (lg+): a sticky control rail on the left (inputs, the two
-          always-visible sliders, planning style, More options) and a results column that
-          leads with the result line, then the calendar, the breaks, the actions, the
-          tracker and the questions. Phones: one column - result, controls (inputs and both
-          sliders), the compact break list, the calendar, actions, then the rest. Results
-          update live; there is no submit step anywhere. */}
       <main id="main-content" tabIndex={-1} className="focus:outline-none" data-plan-ready={state.holidaysReady && !state.planningPending}>
         <Container className="px-4 pb-16 pt-6 sm:px-6 lg:pb-24 lg:pt-10">
           <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)] xl:gap-x-14">
 
-            <section ref={resultRef} aria-label="Your plan" className="flex min-w-0 flex-col gap-5 lg:col-span-2 lg:col-start-1 lg:row-start-1">
+            <section id="saved-plans" ref={resultRef} tabIndex={-1} aria-label="Your plan" data-plan-result={state.planningPending ? 'pending' : plannable ? 'ready' : 'unavailable'} className="flex min-w-0 scroll-mt-16 flex-col gap-4 sm:gap-5 lg:col-span-2 lg:col-start-1 lg:row-start-1">
               <Headline
                 budgetSpent={state.budgetSpent}
                 totalDaysOff={state.totalDaysOff}
@@ -145,7 +160,9 @@ export function App() {
                 scores={state.scores}
                 budget={state.budget}
                 reserveDays={state.reserveDays}
-                canPin={state.canPin && plannable}
+                canPin={state.canPin && requestToolsReady}
+                pending={state.planningPending}
+                unavailable={!plannable && !state.planningPending}
                 onPin={state.pinPlan}
                 pinnedCount={state.pinnedPlans.length}
                 unlimitedPto={state.unlimitedPto}
@@ -155,15 +172,130 @@ export function App() {
                 onRestore={state.restorePlan}
                 onRemove={state.removePinnedPlan}
               />
-              <SummaryMetrics
-                budgetSpent={state.budgetSpent}
-                totalDaysOff={state.totalDaysOff}
-                breakCountActual={state.breakCountActual}
-                scores={state.scores}
-                travelBasis={state.country === 'US' ? 'us' : 'estimate'}
-              />
-              {state.planningPending && <p role="status" className="text-sm text-muted">Updating your plan. The previous result is shown while it calculates.</p>}
+              {state.pinMessage && <p role="status" className="text-sm text-muted">{state.pinMessage}</p>}
               {plannable && (
+                <SummaryMetrics
+                  budgetSpent={state.budgetSpent}
+                  totalDaysOff={state.totalDaysOff}
+                  breakCountActual={state.breakCountActual}
+                  scores={state.scores}
+                  travelBasis={state.country === 'US' ? 'us' : 'estimate'}
+                />
+              )}
+              <nav aria-label="On this page" className="flex flex-wrap gap-2">
+                {[
+                  ['#plan-controls', 'Adjust plan'],
+                  ['#complete-plan-heading', 'Calendar'],
+                  ['#take-it-heading', 'Export and share'],
+                ].map(([href, label]) => (
+                  <a key={href} href={href} className={buttonClasses('secondary', 'md', 'px-3! text-sm!')}>{label}</a>
+                ))}
+                <a href="#compare-plans" onClick={() => setComparisonOpen(true)} className={buttonClasses('secondary', 'md', 'hidden! px-3! text-sm! lg:inline-flex!')}>Compare options</a>
+              </nav>
+            </section>
+
+            <div className="flex min-w-0 flex-col gap-5 lg:col-start-2 lg:row-start-2">
+              {holidayFocusDate && (
+                <div id="holiday-focus" tabIndex={-1} className="scroll-mt-16 rounded-[10px] border border-line bg-surface p-4 text-sm text-ink">
+                  <p className="font-semibold">Planning around {state.holidayNameFor(holidayFocusDate) ?? 'this holiday'}</p>
+                  <p>{formatLong(holidayFocusDate)}</p>
+                  {holidayFocusRun && holidayFocusRun.length > 1 && (
+                    <p className="mt-1">{holidayFocusRun.length} calendar days off · {formatCardDateRange(holidayFocusRun.start, holidayFocusRun.end)}</p>
+                  )}
+                  {!state.planningPending && !state.validationIssues.length && <a className="link-mark inline-flex min-h-11 items-center" href={`#day-${holidayFocusDate}`}>Find this date on the calendar</a>}
+                </div>
+              )}
+              {(state.partnerOverlapReceived || partnerReceived.invalid || partnerReceived.availability || state.validationIssues.length > 0 || state.solverIssue || state.relaxedMinimum !== undefined || state.peakCapApplied || state.holidaysDegraded) && (
+                <div className="flex flex-col gap-3">
+                  {state.partnerOverlapReceived && (
+                    <PartnerOverlapBanner overlapDayCount={state.overlapDays.length} onDismiss={state.dismissPartnerOverlapBanner} />
+                  )}
+                  {partnerReceived.invalid && <p role="alert" className="rounded-[10px] border border-error bg-error-soft p-4 text-sm text-ink">This partner availability link is invalid or too large. Ask for a new link with fewer dates.</p>}
+                  {partnerReceived.availability && <p role="status" className="rounded-[10px] bg-surface-alt p-4 text-sm text-ink">Someone shared {partnerReceived.availability.days.length} {partnerReceived.availability.status} available dates. Your own PTO budget and calendar apply. <a className="link-mark font-semibold" href="#partner-planner">See dates you can both take off</a></p>}
+                  <ValidationBanner issues={state.validationIssues} />
+                  {state.relaxedMinimum !== undefined && (
+                    <RelaxedMinimumNotice
+                      minimum={state.relaxedMinimum}
+                      onClearPins={() => {
+                        state.clearForcedDays();
+                        requestAnimationFrame(() => document.getElementById('complete-plan-heading')?.focus());
+                      }}
+                      onNoMinimum={() => {
+                        state.setMinimumBreakDays(0);
+                        requestAnimationFrame(() => document.getElementById('complete-plan-heading')?.focus());
+                      }}
+                    />
+                  )}
+                  {state.solverIssue && (
+                    <PlanRecoveryNotice
+                      issue={state.solverIssue}
+                      hasForcedDays={Object.keys(state.forced).length > 0}
+                      onClearForcedDays={() => {
+                        state.clearForcedDays();
+                        requestAnimationFrame(() => document.getElementById('complete-plan-heading')?.focus());
+                      }}
+                      onReviewSettings={() => {
+                        setOptionsOpen(true);
+                        requestAnimationFrame(() => document.getElementById('planning-options')?.scrollIntoView({ block: 'start' }));
+                      }}
+                    />
+                  )}
+                  <PeakCapBanner
+                    applied={state.peakCapApplied}
+                    maxDays={state.peakCapMaxDays}
+                    startDate={state.peakCapStart}
+                    endDate={state.peakCapEnd}
+                  />
+                  {state.holidaysDegraded && (
+                    <p role="status" className="rounded-[10px] bg-surface-alt p-4 text-sm text-ink">
+                      Some public holidays could not load. Check your employer calendar before requesting these dates.
+                    </p>
+                  )}
+                </div>
+              )}
+              <section aria-labelledby="breaks-heading" id="summary-heading" className="min-w-0 scroll-mt-16">
+                <h2 id="breaks-heading" tabIndex={-1} className="scroll-mt-16 text-h2 font-bold text-ink type-condensed">Requesting each break</h2>
+                {plannable && state.breaks.length > 0 ? (
+                  <ul className="m-0 mt-3 flex list-none flex-col gap-3 p-0">
+                    {state.orderedBreaks.map(({ index, brk }) => {
+                      const ptoDates = brk.days.filter(state.isSuggestedPto);
+                      const breakReady = requestToolsReady && ptoDates.length === brk.ptoCost;
+                      const request = requestsByDates.get(`${brk.start}|${brk.end}`);
+                      const requestState = request ? request.status === 'considering' ? 'saved' : 'tracked' : undefined;
+                      const requestDatesChanged = request && (request.ptoDates.length !== ptoDates.length
+                        || request.ptoDates.some(date => !ptoDates.includes(date)));
+                      return (
+                        <li key={brk.id} data-break-start={brk.start} data-break-end={brk.end} data-break-pto={brk.ptoCost} className="rounded-[10px] border border-line bg-surface">
+                          <BreakCard
+                            onSave={breakReady ? () => recordBreak(brk, ptoDates, 'saved') : undefined}
+                            onTrack={breakReady ? () => recordBreak(brk, ptoDates, 'tracked') : undefined}
+                            requestState={requestState}
+                            requestDatesChanged={requestDatesChanged}
+                            requestToolsReady={breakReady}
+                            onPlanWithPartner={breakReady ? () => openPartnerPlanner(brk.id) : undefined}
+                            brk={brk}
+                            index={index}
+                            highlighted={state.highlightedBreakIds.has(brk.id) || state.hoveredBreakId === brk.id}
+                            isPtoDay={state.isSuggestedPto}
+                            onHover={state.setHoveredBreakId}
+                            isMostContested={brk.id === mostContestedId}
+                            reason={breakReason(brk, state.holidayNameFor)}
+                            today={today}
+                            noticePeriodDays={state.noticePeriodDays}
+                            workWeek={state.workWeek}
+                            offDays={state.effectiveOffDays}
+                            defaultExpanded={index === 1}
+                            anchorId={`break-${index}`}
+                          />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : plannable && <p className="mt-2 text-sm text-muted">No breaks fit these settings. Try a wider date range or more available PTO.</p>}
+              </section>
+              {plannable && <a href="#planning-assumptions" className="link-mark inline-flex min-h-11 w-fit items-center text-sm">Edit workweek and employer holidays</a>}
+
+              {plannable && state.breaks.length > 0 && (
                 <PlanExplanation
                   breaks={state.breaks}
                   workWeek={state.workWeek}
@@ -172,16 +304,9 @@ export function App() {
                   totalDaysOff={state.totalDaysOff}
                 />
               )}
-              {/* Phones: the calendar sits two screens down, below the settings, so the result
-                  carries direct links to each part of the page. */}
-              <nav aria-label="On this page" className="-mt-1 flex gap-2 overflow-x-auto md:hidden">
-                {[['#complete-plan-heading', 'Calendar'], ['#breaks-heading', 'Request each break'], ['#take-it-heading', 'Export and share']].map(([href, label]) => (
-                  <a key={href} href={href} className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-line bg-surface px-4 text-sm font-semibold text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]">{label}</a>
-                ))}
-              </nav>
-            </section>
+            </div>
 
-            <aside id="plan-controls" aria-label="Plan settings" className="min-w-0 scroll-mt-16 lg:sticky lg:top-4 lg:col-start-1 lg:row-start-2 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto lg:overscroll-auto">
+            <aside id="plan-controls" aria-label="Plan settings" tabIndex={-1} className="min-w-0 scroll-mt-16 lg:sticky lg:top-4 lg:col-start-1 lg:row-span-2 lg:row-start-2 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto lg:overscroll-auto">
               <div className="rounded-[10px] border border-line bg-surface p-4 sm:p-5 md:grid md:grid-cols-2 md:gap-x-10 lg:block">
                 <section aria-labelledby="plan-inputs-heading" className="flex min-w-0 flex-col gap-3.5">
                   <h2 id="plan-inputs-heading" className="text-xl font-bold leading-6 text-ink type-condensed">Your time off</h2>
@@ -205,16 +330,16 @@ export function App() {
                   <p className="text-sm text-muted">This planner budgets full days. <a href="/policy" className="link-mark">Track and forecast hourly leave in My PTO</a>.</p>
                   {state.hasSharedHolidaySnapshot && (
                     <p className="text-sm text-muted">
-                      This plan uses the observed holiday dates its sender selected. Switch to your saved calendar to edit or pin the plan.{' '}
+                      This plan uses the observed holiday dates its sender selected. Switch to your calendar to edit or save the plan.{' '}
                       <button type="button" className="link-mark min-h-11" onClick={state.restoreMyEmployerCalendar}>Use my saved calendar</button>
                     </p>
                   )}
                   {state.hasTrackedRequests && (
                     <div className="space-y-1 text-sm text-muted">
-                      {state.isSharedPlan && (
+                      {(state.isSharedPlan || state.isLandingPreview) && (
                         <label className="flex min-h-11 items-center gap-2">
                           <input type="checkbox" checked={state.applyTrackedRequests} onChange={event => state.setApplyTrackedRequests(event.target.checked)} />
-                          Apply my tracked requests to this shared plan
+                          Apply my tracked requests
                         </label>
                       )}
                       {state.applyTrackedRequests && <p>Tracked approved time off is excluded from new breaks on this device.</p>}
@@ -233,7 +358,7 @@ export function App() {
                 <section aria-labelledby="plan-shape-heading" className="mt-5 flex min-w-0 flex-col gap-3 border-t border-line pt-4 md:mt-0 md:border-t-0 md:pt-0 lg:mt-5 lg:border-t lg:pt-4">
                   <div>
                     <h2 id="plan-shape-heading" className="text-xl font-bold leading-6 text-ink type-condensed">Shape your plan</h2>
-                    <p className="mt-1 text-sm text-muted">Move either slider; the plan updates as you go.</p>
+                    <p className="mt-1 text-sm text-muted">The plan updates as you move the sliders.</p>
                   </div>
                   <PlanSliders
                     w={state.w}
@@ -312,9 +437,6 @@ export function App() {
                         />
                         Show alternatives on the calendar
                       </label>
-                      {state.showAlternatives && plannable && state.holidaysReady && (
-                        <PortfolioComparison input={state.solveInput} minimumBreakDays={state.minimumBreakDays} calendarIncomplete={state.holidaysDegraded} />
-                      )}
 
                       <MoreOptions
                         weekStartOverride={state.weekStartOverride}
@@ -368,118 +490,25 @@ export function App() {
               </div>
             </aside>
 
-            {/* The results body. DOM order follows the phone reading order (breaks before the
-                calendar, so a screen reader hears the three breaks before ~60 day cells); on
-                desktop the calendar is lifted above the breaks with `order` as the dominant
-                visual. The two are independent regions, so focus order stays meaningful. */}
-            <div className="flex min-w-0 flex-col gap-12 lg:col-start-2 lg:row-start-2 lg:gap-16">
-              {(state.partnerOverlapReceived || partnerReceived.invalid || partnerReceived.availability || state.validationIssues.length > 0 || state.solverIssue || state.relaxedMinimum !== undefined || state.peakCapApplied || state.holidaysDegraded) && (
-                <div className="flex flex-col gap-3">
-                  {state.partnerOverlapReceived && (
-                    <PartnerOverlapBanner overlapDayCount={state.overlapDays.length} onDismiss={state.dismissPartnerOverlapBanner} />
-                  )}
-                  {partnerReceived.invalid && <p role="alert" className="rounded-[10px] border border-error bg-error-soft p-4 text-sm text-ink">This partner availability link is invalid or too large. Ask for a new link with fewer dates.</p>}
-                  {partnerReceived.availability && <p role="status" className="rounded-[10px] bg-surface-alt p-4 text-sm text-ink">Someone shared {partnerReceived.availability.days.length} {partnerReceived.availability.status} available dates. Your own PTO budget and calendar apply. <a className="link-mark font-semibold" href="#partner-planner">See dates you can both take off</a></p>}
-                  <ValidationBanner issues={state.validationIssues} />
-                  {state.relaxedMinimum !== undefined && (
-                    <RelaxedMinimumNotice
-                      minimum={state.relaxedMinimum}
-                      onClearPins={() => {
-                        state.clearForcedDays();
-                        requestAnimationFrame(() => document.getElementById('complete-plan-heading')?.focus());
-                      }}
-                      onNoMinimum={() => {
-                        state.setMinimumBreakDays(0);
-                        requestAnimationFrame(() => document.getElementById('complete-plan-heading')?.focus());
-                      }}
-                    />
-                  )}
-                  {state.solverIssue && (
-                    <PlanRecoveryNotice
-                      issue={state.solverIssue}
-                      hasForcedDays={Object.keys(state.forced).length > 0}
-                      onClearForcedDays={() => {
-                        state.clearForcedDays();
-                        requestAnimationFrame(() => document.getElementById('complete-plan-heading')?.focus());
-                      }}
-                      onReviewSettings={() => {
-                        setOptionsOpen(true);
-                        requestAnimationFrame(() => document.getElementById('planning-options')?.scrollIntoView({ block: 'start' }));
-                      }}
-                    />
-                  )}
-                  <PeakCapBanner
-                    applied={state.peakCapApplied}
-                    maxDays={state.peakCapMaxDays}
-                    startDate={state.peakCapStart}
-                    endDate={state.peakCapEnd}
-                  />
-                  {state.holidaysDegraded && (
-                    <p role="status" className="rounded-[10px] bg-surface-alt p-4 text-sm text-ink">
-                      Couldn&apos;t reach public holiday data for this country &mdash; showing weekends and any holidays
-                      already cached. You can add known holidays manually in More options, or try again later.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* The plan at a glance, above the calendar at every width: one line per break,
-                  each linked to its full card below. DOM order is the visual order. */}
-              <section aria-labelledby="summary-heading" className="min-w-0">
-                <h2 id="summary-heading" className="text-h2 font-bold text-ink type-condensed">
-                  {state.breaks.length === 1 ? 'Your break' : 'Your breaks'}
-                </h2>
-                {state.breaks.length === 0 ? (
-                  <p className="mt-1 max-w-prose text-sm text-muted">
-                    {state.solverIssue
-                      ? 'Your current constraints prevent a valid plan. Adjust your selected dates or review the settings.'
-                      : 'No PTO-worthy breaks fit this range and budget yet — try widening the date range or increasing PTO days.'}
-                  </p>
-                ) : (
-                  <>
-                    <ol className="m-0 mt-3 list-none divide-y divide-line border-y border-line p-0">
-                      {state.orderedBreaks.map(({ index, brk }) => (
-                        <li key={brk.id}>
-                          <a
-                            href={`#break-${index}`}
-                            onMouseEnter={() => state.setHoveredBreakId(brk.id)}
-                            onMouseLeave={() => state.setHoveredBreakId(null)}
-                            onFocus={() => state.setHoveredBreakId(brk.id)}
-                            onBlur={() => state.setHoveredBreakId(null)}
-                            className="group grid min-h-11 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 py-2 text-ink hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
-                          >
-                            <span aria-hidden="true" className="flex h-6 min-w-6 items-center justify-center rounded-[6px] bg-accent px-1 text-xs font-bold tabular-nums text-white">{index}</span>
-                            <span className="min-w-0 tabular-nums">
-                              <span className="sr-only">Break {index}: </span>
-                              <span className="font-bold type-condensed text-lg leading-6">{formatCardDateRange(brk.start, brk.end)}</span>
-                              <span className="ml-3 text-sm"><span className="mark font-semibold">{brk.totalDaysOff} {brk.totalDaysOff === 1 ? 'day' : 'days'} off</span> for {brk.ptoCost} PTO {brk.ptoCost === 1 ? 'day' : 'days'}</span>
-                            </span>
-                            <span className="flex items-center gap-1 text-sm text-muted group-hover:text-ink">
-                              <span className="hidden sm:inline">Details</span>
-                              <Chevron direction="right" />
-                            </span>
-                          </a>
-                        </li>
-                      ))}
-                    </ol>
-                    {state.breaks.length > 1 && mostContestedIndex !== undefined && (
-                      <p className="mt-2 max-w-prose text-sm text-muted">
-                        Break {mostContestedIndex} has the highest relative demand estimate among the breaks shown. The model uses {state.country === 'US' ? 'historical 2025 US airport checkpoint counts' : 'generic seasonality'}. It is a planning estimate.
-                      </p>
-                    )}
-                  </>
-                )}
-              </section>
+            <div className="flex min-w-0 flex-col gap-12 lg:col-start-2 lg:row-start-3 lg:gap-16">
+              <details id="compare-plans" open={comparisonOpen} className="scroll-mt-16 rounded-[10px] border border-line bg-surface px-4 py-2" onToggle={event => setComparisonOpen(event.currentTarget.open)}>
+                <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-2 font-semibold text-ink [&::-webkit-details-marker]:hidden">
+                  Compare plans <PlusMinus open={comparisonOpen} />
+                </summary>
+                {comparisonOpen && (plannable && state.holidaysReady ? (
+                  <PortfolioComparison input={state.solveInput} minimumBreakDays={state.minimumBreakDays} calendarIncomplete={state.holidaysDegraded} />
+                ) : <p className="mb-2 text-sm text-muted">Comparison is available when your plan is ready.</p>)}
+              </details>
 
               <section aria-labelledby="complete-plan-heading" className="min-w-0">
-                <h2 id="complete-plan-heading" tabIndex={-1} className="text-h2 font-bold text-ink type-condensed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Your complete plan</h2>
+                <h2 id="complete-plan-heading" tabIndex={-1} className="scroll-mt-16 text-h2 font-bold text-ink type-condensed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Your complete plan</h2>
                 <p className="mt-1 max-w-prose text-sm text-muted">
                   {/* Chosen by CSS, not JS, so the prerendered page is right on touch from the first paint. */}
-                  <span className="hidden [@media(hover:hover)]:inline">Click a day to take it, click again to rule it out, a third time to let the planner decide. Hover or focus a day to see what pinning it would do. Arrow keys move between days.</span>
-                  <span className="[@media(hover:hover)]:hidden">Tap a day to take it, rule it out, or let the planner decide.</span>
+                  <span className="hidden [@media(hover:hover)]:inline">Click a day to cycle through take off, rule out, and let the planner decide. Arrow keys move between days.</span>
+                  <span className="[@media(hover:hover)]:hidden">Tap a day to change its setting.</span>
                 </p>
                 <div className="mt-4 rounded-[10px] border border-line bg-surface p-3 sm:p-5">
-                  {!state.validationIssues.length ? <CalendarErrorBoundary>
+                  {!state.validationIssues.length && !state.planningPending ? <CalendarErrorBoundary>
                     <Calendar
                       rangeStart={state.rangeStart}
                       rangeEnd={state.rangeEnd}
@@ -505,52 +534,21 @@ export function App() {
                       onSetDayState={setDayState}
                       pinPreview={pinPreview}
                     />
-                  </CalendarErrorBoundary> : <p role="status" className="text-sm text-muted">Choose valid dates and a PTO balance to display the calendar.</p>}
-                  <div className="mt-5 border-t border-line pt-4">
-                    <Legend showCompany={state.holidayEntries.some((h) => h.checked && h.source === 'custom')} showBlackout={state.hasBlackouts} />
-                  </div>
+                  </CalendarErrorBoundary> : <p className="text-sm text-muted">{state.planningPending ? 'Updating the calendar…' : 'Check your dates and PTO balance to see the calendar.'}</p>}
+                  {!state.validationIssues.length && !state.planningPending && (
+                    <div className="mt-5 border-t border-line pt-4">
+                      <Legend showCompany={state.holidayEntries.some((h) => h.checked && h.source === 'custom')} showBlackout={state.hasBlackouts} showPinned={Object.values(state.forced).includes('include')} showAlternatives={state.showAlternatives} />
+                    </div>
+                  )}
                 </div>
-              </section>
-
-              <section aria-labelledby="breaks-heading" className="min-w-0">
-                <h2 id="breaks-heading" className="text-h2 font-bold text-ink type-condensed">Requesting each break</h2>
-                <p className="mt-1 max-w-prose text-sm text-muted">
-                  Why each break was chosen, when to ask for it, and a ready-made request. Public holidays are assumed observed; customize your employer calendar in More options.
-                </p>
-                {state.planningPending ? (
-                  <p className="mt-4 text-sm text-muted">Request tools will return when the updated plan is ready.</p>
-                ) : state.breaks.length > 0 ? (
-                  <ul className="m-0 mt-4 flex list-none flex-col divide-y divide-line border-y border-line p-0">
-                    {state.orderedBreaks.map(({ index, brk }) => (
-                      <li key={brk.id} className="py-1">
-                        <BreakCard
-                          onTrack={plannable && state.holidaysReady && !state.holidaysDegraded ? trackBreak : undefined}
-                          brk={brk}
-                          index={index}
-                          highlighted={state.highlightedBreakIds.has(brk.id) || state.hoveredBreakId === brk.id}
-                          isPtoDay={state.isSuggestedPto}
-                          onHover={state.setHoveredBreakId}
-                          isMostContested={brk.id === mostContestedId}
-                          reason={breakReason(brk, state.holidayNameFor)}
-                          today={today}
-                          noticePeriodDays={state.noticePeriodDays}
-                          workWeek={state.workWeek}
-                          offDays={state.effectiveOffDays}
-                          defaultExpanded={index === 1}
-                          anchorId={`break-${index}`}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                ) : <p className="mt-4 text-sm text-muted">Breaks appear here once the plan has some.</p>}
               </section>
 
               <section aria-labelledby="take-it-heading" className="flex min-w-0 flex-col gap-5">
                 <div>
-                  <h2 id="take-it-heading" className="text-h2 font-bold text-ink type-condensed">Take it with you</h2>
-                  <p className="mt-1 text-sm text-muted">Free, and no account needed. Your plan stays in this browser unless you share its link, subscribe to its calendar feed, or turn on email reminders.</p>
+                  <h2 id="take-it-heading" tabIndex={-1} className="scroll-mt-16 text-h2 font-bold text-ink type-condensed">Take it with you</h2>
+                  <p className="mt-1 text-sm text-muted">Download your calendar, copy a shareable plan link, or plan with a partner.</p>
                 </div>
-                {plannable ? <ExportBar
+                {requestToolsReady ? <ExportBar
                   breaks={state.breaks}
                   isSuggestedPto={state.isSuggestedPto}
                   categoryOf={state.categoryOf}
@@ -565,15 +563,18 @@ export function App() {
                   workWeek={state.workWeek}
                   offDays={state.effectiveOffDays}
                   observedHolidayDates={state.holidaysReady && !state.holidaysDegraded ? state.holidayEntries.filter(holiday => holiday.checked).map(holiday => holiday.date) : undefined}
-                  onPlanWithPartner={openPartnerPlanner}
+                  onPlanWithPartner={() => openPartnerPlanner()}
                   planSearch={state.planSearch}
-                /> : <p role="status" className="text-sm text-muted">{state.planningPending ? 'Updating your plan…' : 'Check your planning inputs before exporting.'}</p>}
+                /> : <p className="text-sm text-muted">{
+                  !plannable && !state.planningPending ? 'Check your planning inputs before exporting.'
+                    : 'Calendar and sharing tools appear when a plan and its holidays are ready.'
+                }</p>}
 
                 {plannable && state.holidaysReady && !state.holidaysDegraded && (
                   <PortraitShare breaks={state.breaks} rangeStart={state.rangeStart} rangeEnd={state.rangeEnd} holidayAssumption={state.employerCalendar.custom.length ? 'company' : state.employerCalendar.excluded.length ? 'customized' : 'public'} remainingBalance={state.unlimitedPto ? undefined : Math.max(0, state.budget - state.budgetSpent)} holidayNamesOf={brk => [...new Set(state.holidayEntries.filter(holiday => holiday.checked && holiday.date >= brk.start && holiday.date <= brk.end).map(holiday => holiday.source === 'custom' ? 'Company holiday' : holiday.name))]} />
                 )}
                 <div id="partner-planner" className="scroll-mt-16">
-                  {state.holidaysReady && !state.holidaysDegraded && plannable ? <PartnerPlanner openKey={partnerOpenKey} breaks={state.breaks} freeDays={freeDays} input={state.solveInput} minimumBreakLength={state.minimumBreakDays} /> : <p role="status" className="text-sm text-muted">Partner planning will be available after your calendar loads with valid dates and holiday data.</p>}
+                  {requestToolsReady && <PartnerPlanner openKey={partnerOpen.key} selectedBreakId={partnerOpen.breakId} breaks={state.breaks} freeDays={freeDays} input={state.solveInput} minimumBreakLength={state.minimumBreakDays} />}
                 </div>
               </section>
 

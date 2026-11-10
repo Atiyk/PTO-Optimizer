@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
-import { track } from './analytics';
+import { track, trackBreakAction, trackOnceInDocument } from './analytics';
 
 beforeEach(() => {
   window.history.replaceState(null, '', '/pto?b=17&s=2027-06-01&e=2027-12-31&eh=private-calendar#private-plan');
@@ -8,8 +8,44 @@ beforeEach(() => {
 
 afterEach(() => {
   delete window.plausible;
+  window.localStorage.removeItem('timebower.analytics.breakActions.v1');
   window.history.replaceState(null, '', '/');
   vi.restoreAllMocks();
+});
+
+describe('break action milestones', () => {
+  it('counts a received partner proposal once across planner remounts in a document', () => {
+    const spy = vi.fn();
+    window.plausible = spy;
+    trackOnceInDocument('partner_share_opened');
+    trackOnceInDocument('partner_share_opened');
+    expect(spy).toHaveBeenCalledExactlyOnceWith('partner_share_opened', { url: window.location.origin + '/pto' });
+  });
+
+  it('reports the first success of each type and one second distinct action without plan data', () => {
+    const spy = vi.fn();
+    window.plausible = spy;
+    trackBreakAction('saved');
+    trackBreakAction('saved');
+    trackBreakAction('exported');
+    trackBreakAction('tracked');
+    trackBreakAction('shared');
+    const path = { url: window.location.origin + '/pto' };
+    expect(spy.mock.calls).toEqual([
+      ['first_break_saved', path],
+      ['first_break_exported', path],
+      ['second_meaningful_break_action', path],
+      ['first_break_tracked', path],
+      ['first_break_shared', path],
+    ]);
+  });
+
+  it('does not consume a browser-local milestone when the referrer is private', () => {
+    vi.mocked(Object.getOwnPropertyDescriptor(document, 'referrer')!.get!).mockReturnValue('https://example.test/?private=1');
+    trackBreakAction('saved');
+    expect(window.plausible).toBeUndefined();
+    expect(window.localStorage.getItem('timebower.analytics.breakActions.v1')).toBeNull();
+  });
 });
 
 describe('track', () => {
