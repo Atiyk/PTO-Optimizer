@@ -133,7 +133,7 @@ export function App() {
           tracker and the questions. Phones: one column - result, controls (inputs and both
           sliders), the compact break list, the calendar, actions, then the rest. Results
           update live; there is no submit step anywhere. */}
-      <main id="main-content" tabIndex={-1} className="focus:outline-none">
+      <main id="main-content" tabIndex={-1} className="focus:outline-none" data-plan-ready={state.holidaysReady && !state.planningPending}>
         <Container className="px-4 pb-16 pt-6 sm:px-6 lg:pb-24 lg:pt-10">
           <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)] xl:gap-x-14">
 

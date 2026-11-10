@@ -68,7 +68,8 @@ for (const [name, engine] of Object.entries({ firefox, webkit })) {
 
     // The static fixture serves the real planner at the directory index.
     link.pathname = '/pto/';
-    await page.goto(link);
+    await page.goto(link, { waitUntil: 'domcontentloaded' });
+    await page.locator('main[data-plan-ready="true"]').waitFor({ state: 'visible' });
     await page.getByRole('heading', { name: 'Your time off' }).waitFor();
     await page.getByRole('heading', { name: 'Your complete plan' }).waitFor();
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));

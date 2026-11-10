@@ -337,7 +337,7 @@ export function Landing() {
         <Container className="grid gap-x-16 gap-y-10 px-4 py-14 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:py-20">
           <div className="min-w-0">
             <h2 id="landing-how" className="max-w-[12ch] text-display-sm type-display text-ink">Same inputs, same plan.</h2>
-            <p className="mt-4 max-w-sm text-lg text-ink">Every setting lives in the link, so a plan reproduces exactly when you open it again or send it on.</p>
+            <p className="mt-4 max-w-sm text-lg text-ink">A shared link carries the scenario you choose to share. Private employer settings and tracked requests stay in your browser.</p>
           </div>
           <div className="grid min-w-0 gap-x-10 gap-y-8 sm:grid-cols-2">
             <div className="sm:col-span-2">

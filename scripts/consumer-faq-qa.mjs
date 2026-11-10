@@ -36,12 +36,13 @@ try {
       page.on('pageerror', e => errors.push(e.message));
       const result = { width, route: route.name, errors };
       try {
-        const response = await page.goto(new URL(route.path, base).href, { waitUntil: 'networkidle' });
+        const response = await page.goto(new URL(route.path, base).href, { waitUntil: route.name === 'pto-inline-faq' ? 'domcontentloaded' : 'networkidle' });
         if (!response?.ok()) throw new Error(`Route returned ${response?.status()}`);
         const serverHtml = await response.text();
         if (!serverHtml.includes('How does it choose which days to take?')) {
           throw new Error('FAQ question missing from prerendered HTML');
         }
+        if (route.name === 'pto-inline-faq') await page.locator('main[data-plan-ready="true"]').waitFor({ state: 'visible' });
         const summary = route.name === 'faq'
           ? page.locator('main details > summary').first()
           : page.locator('#questions details > summary').first();

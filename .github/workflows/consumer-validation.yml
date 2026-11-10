@@ -121,10 +121,12 @@ jobs:
             node current/scripts/consumer-qa.mjs http://127.0.0.1:4174 "$GITHUB_WORKSPACE/qa-evidence/before" before || baseline_exit=$?
             printf 'Baseline browser evidence exit status: %s\n' "$baseline_exit"
           fi
-          node current/scripts/consumer-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/after" after
-          node current/scripts/consumer-header-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/header"
-          node current/scripts/consumer-privacy-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/privacy"
-          node current/scripts/consumer-cross-browser-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/cross-browser"
+          qa_status=0
+          node current/scripts/consumer-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/after" after || qa_status=1
+          node current/scripts/consumer-header-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/header" || qa_status=1
+          node current/scripts/consumer-privacy-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/privacy" || qa_status=1
+          node current/scripts/consumer-cross-browser-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/cross-browser" || qa_status=1
+          exit "$qa_status"
       - name: Verify the complete consumer journey at 375 pixels
         if: ${{ !cancelled() }}
         run: |
@@ -141,11 +143,13 @@ jobs:
           }
           if (!ready) throw new Error('Consumer journey preview did not start.');
           NODE
-          node current/scripts/consumer-journey.mjs http://127.0.0.1:4177 "$GITHUB_WORKSPACE/qa-evidence/journey"
-          node current/scripts/consumer-date-editor-qa.mjs http://127.0.0.1:4177 "$GITHUB_WORKSPACE/qa-evidence/date-editor"
-          node current/scripts/consumer-touch-calendar-qa.mjs http://127.0.0.1:4177 "$GITHUB_WORKSPACE/qa-evidence/touch-calendar"
+          qa_status=0
           set -o pipefail
-          node current/scripts/consumer-wallet-storage-qa.mjs http://127.0.0.1:4177 | tee "$GITHUB_WORKSPACE/qa-evidence/wallet-storage.txt"
+          node current/scripts/consumer-journey.mjs http://127.0.0.1:4177 "$GITHUB_WORKSPACE/qa-evidence/journey" || qa_status=1
+          node current/scripts/consumer-date-editor-qa.mjs http://127.0.0.1:4177 "$GITHUB_WORKSPACE/qa-evidence/date-editor" || qa_status=1
+          node current/scripts/consumer-touch-calendar-qa.mjs http://127.0.0.1:4177 "$GITHUB_WORKSPACE/qa-evidence/touch-calendar" || qa_status=1
+          node current/scripts/consumer-wallet-storage-qa.mjs http://127.0.0.1:4177 | tee "$GITHUB_WORKSPACE/qa-evidence/wallet-storage.txt" || qa_status=1
+          exit "$qa_status"
       - name: Install pinned metrics tools outside the checkout
         if: ${{ !cancelled() }}
         # Versions and Node engine requirements verified against npm on 2026-11-02.

@@ -34,7 +34,8 @@ try {
     const entry = { width, checks: [] };
     results.push(entry);
     try {
-      await page.goto(new URL('/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15', origin).href, { waitUntil: 'networkidle' });
+      await page.goto(new URL('/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15', origin).href, { waitUntil: 'domcontentloaded' });
+      await page.locator('main[data-plan-ready="true"]').waitFor({ state: 'visible' });
       await page.evaluate(() => document.fonts.ready);
       const logo = page.getByRole('link', { name: /home/i }).first();
       if (!(await logo.isVisible())) throw new Error('Logo/home link not visible');

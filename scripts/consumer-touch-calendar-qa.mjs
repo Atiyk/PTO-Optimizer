@@ -32,7 +32,8 @@ try {
         return route.continue();
       });
       await page.clock.setFixedTime(new Date('2027-01-01T17:00:00Z'));
-      await page.goto(new URL('/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15&rv=0&pv=2', origin).href, { waitUntil: 'networkidle' });
+      await page.goto(new URL('/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15&rv=0&pv=2', origin).href, { waitUntil: 'domcontentloaded' });
+      await page.locator('main[data-plan-ready="true"]').waitFor({ state: 'visible' });
       assert.equal(await page.evaluate(() => matchMedia('(hover: hover)').matches), false, 'Browser must simulate a touch-only device');
       const day = page.locator('#day-2027-01-20');
       await day.waitFor({ state: 'visible' });

@@ -126,7 +126,8 @@ try {
         return ['http:', 'https:'].includes(url.protocol) && url.origin !== variant.origin ? requestRoute.abort() : requestRoute.continue();
       });
       try {
-        await page.goto(new URL(route.path, variant.origin).href, { waitUntil: 'networkidle', timeout: 30000 });
+        await page.goto(new URL(route.path, variant.origin).href, { waitUntil: variant.name === 'before' ? 'networkidle' : 'domcontentloaded', timeout: 30000 });
+        if (route.name === 'pto' && variant.name === 'after') await page.locator('main[data-plan-ready="true"]').waitFor({ state: 'visible' });
         await page.locator('#root').waitFor({ state: 'visible' });
         await page.evaluate(() => document.fonts.ready);
         const title = await page.title();

@@ -60,7 +60,7 @@ try {
   for (const width of [1440, 768, 375, 320]) {
     for (const route of routes) {
       // At 320 px cover each route affected by this batch and the learning routes.
-      if (width === 320 && !['home', 'pto', 'policy', 'family', 'understand', 'guide-accrual', 'guide-carryover', 'guide-holidays', 'guide-payout'].includes(route.name)) continue;
+      if (width === 320 && !['home', 'pto', 'policy', 'family', 'sabbatical', 'understand', 'guide-accrual', 'guide-carryover', 'guide-holidays', 'guide-payout'].includes(route.name)) continue;
       const context = await browser.newContext({
         viewport: { width, height: 1000 },
         timezoneId: 'America/New_York',
@@ -96,7 +96,8 @@ try {
 
       const result = { route: route.name, width, runtimeErrors, failedSameOriginResponses };
       try {
-        await page.goto(new URL(route.path, baseUrl).href, { waitUntil: 'networkidle', timeout: 30000 });
+        await page.goto(new URL(route.path, baseUrl).href, { waitUntil: label === 'before' ? 'networkidle' : 'domcontentloaded', timeout: 30000 });
+        if (route.name === 'pto' && label !== 'before') await page.locator('main[data-plan-ready="true"]').waitFor({ state: 'visible' });
         await page.locator('#root').waitFor({ state: 'visible', timeout: 15000 });
         await page.evaluate(() => document.fonts.ready);
         // Allow asynchronous same-origin holiday loading and React effects to settle.
@@ -220,6 +221,7 @@ try {
           // Check that the local-only explanation uses actual recommended dates,
           // opens with keyboard-compatible native details, and stays readable at 320px.
           const explanation = page.locator('[data-testid="plan-explanation"]');
+          await explanation.waitFor({ state: 'visible', timeout: 15000 });
           result.planExplanationVisible = await explanation.isVisible();
           if (result.planExplanationVisible) {
             await explanation.locator('summary').click();
