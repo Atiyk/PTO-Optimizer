@@ -73,7 +73,7 @@ describe('private employer calendar subscriptions', () => {
     expect(screen.queryByRole('link', { name: /Outlook/ })).toBeNull();
     expect(screen.queryByLabelText(/paste this link/i)).toBeNull();
     expect(document.body.textContent).not.toContain('PRIVATE_EMPLOYER_POLICY_TITLE');
-    fireEvent.click(screen.getByRole('button', { name: /Include employer calendar details/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Share calendar details/i }));
     const google = screen.getByRole('link', { name: /Google Calendar/ });
     const outlook = screen.getByRole('link', { name: /Outlook/ });
     const external = new URL(outlook.getAttribute('href')!);

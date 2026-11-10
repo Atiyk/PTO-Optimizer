@@ -439,7 +439,7 @@ try {
     await moreOptions(recipient);
     assert.equal(await holidaySection(recipient).getByRole('checkbox', { name: /PRIVATE_EMPLOYER_POLICY_TITLE/ }).count(), 0,
       'Shared public URL must not restore the sender private title on the recipient.');
-    await subscriptions.getByRole('button', { name: /Include employer calendar details in subscription links/ }).click();
+    await subscriptions.getByRole('button', { name: /Share calendar details/ }).click();
     const google = new URL(await subscriptions.getByRole('link', { name: /Google Calendar/ }).getAttribute('href'));
     const cid = google.searchParams.get('cid');
     assert.ok(cid && new URL(cid.replace(/^webcal:/, 'https:')).searchParams.get('eh')?.includes(secret),

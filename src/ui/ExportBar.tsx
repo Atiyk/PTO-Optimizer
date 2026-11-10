@@ -161,7 +161,7 @@ export function ExportBar(props: ExportBarProps) {
             const ok = await copyText(share.url);
             if (ok) track('URL shared');
             return ok
-              ? { ok: true, message: share.omittedPrivateCalendar ? 'Copied (company holidays omitted)' : 'Link copied' }
+              ? { ok: true, message: share.omittedPrivateCalendar ? 'Copied (calendar omitted)' : 'Link copied' }
               : { ok: false, message: "Couldn't copy — try again" };
           }}
         />

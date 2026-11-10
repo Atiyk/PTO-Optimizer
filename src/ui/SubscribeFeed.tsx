@@ -85,7 +85,7 @@ export function SubscribeFeed({ planSearch, origin, path = '/api/feed', calendar
         <>
           <p className="max-w-prose text-sm text-muted">Calendar subscription links include your custom employer holiday names and exclusions so the dates remain accurate. Apple, Google, Outlook, or anyone with the link may see them. Nothing is shared unless you choose to include them.</p>
           <Button variant="secondary" onClick={() => setConsentedQuery(planSearch)}>
-            Include employer calendar details in subscription links
+            Share calendar details
           </Button>
         </>
       ) : !links ? null : (
