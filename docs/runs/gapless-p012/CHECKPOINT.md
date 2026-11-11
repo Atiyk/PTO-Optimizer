@@ -30,7 +30,7 @@ source of truth between scheduled executions. No sensitive user data belongs her
 |---|---|---|---|
 | P0 | 1, 2, 10, 11 | `gapless/p0-release` → PR #145, merged as `3bae6ed` (critic GO on 494d135) | DONE: merged, Vercel prod success, prod smoke passed (run 43017235618 attempt 2) |
 | P1 | 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17 | `gapless/p1-release` @ 0d9384a (pushed): C 16/17, B 13/14, W2 3/4 (2878ab3), QA account-form scoping. S 5/6 → `gapless/p1-s-solver-travel` (/home/user/p1s); T 7 → `gapless/p1-t-performance` (/home/user/p1t) | DONE: PR #146 merged as 40b6766 (critic GO on b59abcb), Vercel prod success, prod smoke run 43070390357 passed |
-| P2 | 8, 15, 18, 19 | from main 40b6766 | In progress |
+| P2 | 8, 15, 18, 19 | `gapless/p2-release` → PR #147 draft @ 945ce9a | Critic reviewing |
 
 ## Issue traceability
 
@@ -85,6 +85,8 @@ Residual risks noted by P (not fixed): `/api/watch` and reminder-email links car
 - ~18:20Z–21:20Z — Usage limit hit a third time (2 P2 agents). Work preserved: p2a 6df98f1 (issue 8), 662e036 (issue 15); p2b a2273c4 (issue 19) + uncommitted cross-browser QA edits. Hourly wakes 18:19–20:19 had nothing runnable.
 - 2026-11-11T21:20Z — Execution 4 (21:17 slot). D and T resumed.
 
+- ~21:50Z — T done (18/19: f19d450, a2273c4), D done (8/15: 9287fe3). Merged into `gapless/p2-release` → e74869d: vitest 195/2084, tsc, lint, build OK. Draft PR #147 opened early for Firefox/WebKit CI: chromium + firefox passed every new check; webkit failed native date typing (GTK keeps digits in month segment). 945ce9a: non-Chromium branch now asserts a valid date and that the plan link follows it; Chromium strict. Critic Q reviewing 945ce9a. Q2 for Atiyk (live subscriptions for signed-in users) in PR body.
+
 ## Next action
 
-P2 from main 40b6766: agent D/S on 8 (explain missing alternatives) + 15 (zero vs unknown balance); agent T/C on 18 (Firefox/WebKit tests) + 19 (subscriptions after edits). Max 2 agents. Then P2 release PR, critic, CI, merge, prod smoke, final report, disable trigger.
+Critic verdict on 945ce9a; CI green on that SHA; ready; merge; Vercel; prod smoke (add P2 marker); then final report, disable trigger trig_012aCT8YKo4cP88QEzmsx7Cf, remove agent worktrees.
