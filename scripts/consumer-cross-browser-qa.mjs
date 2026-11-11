@@ -34,16 +34,23 @@ for (const name of selected) assert.ok(Object.hasOwn(engines, name), `Unknown en
 // axe-core is installed with the workspace (via @axe-core/playwright); fail loudly if missing.
 const axeSource = await readFile(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
 
-/** Same-origin only; the analytics script is stubbed so no request leaves the fixture. */
+/** Same-origin only; the analytics script is stubbed so no request leaves the fixture.
+ * Other origins answer 503 with a CORS header: the app sees an unavailable service (which it
+ * handles), and WebKit does not report the test's own abort as a page error. */
 async function isolate(context) {
   await context.route('**/*', (route) => {
     const url = new URL(route.request().url());
     if (url.origin === base.origin && url.pathname === '/_vercel/insights/script.js') {
       return route.fulfill({ contentType: 'application/javascript', body: '' });
     }
-    return url.origin === base.origin ? route.continue() : route.abort();
+    if (url.origin === base.origin) return route.continue();
+    return route.fulfill({ status: 503, headers: { 'access-control-allow-origin': '*' }, body: '' });
   });
 }
+
+/** The prerendered snapshot (scripts/prerenderShell.ts) holds disabled copies of the controls
+ * until React mounts. Reading a value before then reads the snapshot, not the app. */
+const mounted = (page) => page.locator('[data-prerendered-controls]').waitFor({ state: 'detached' });
 
 const noOverflow = (page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1);
 
@@ -229,6 +236,7 @@ for (const name of selected) {
     assert.equal(await currentBalance.inputValue(), '0');
     assert.equal(new URL(page.url()).searchParams.has('cb'), false);
     await page.reload();
+    await mounted(page);
     assert.equal(await currentBalance.inputValue(), '0');
     result.checks.push('explicit zero survives reload without a private balance in the address');
 
@@ -275,6 +283,7 @@ async function checkPolicyStorage(browser, result) {
     assert.equal(new URL(page.url()).searchParams.has('cb'), false);
     // A fresh page restores the saved policy, with no unreadable notice.
     await page.goto(new URL('/policy/', base).href);
+    await mounted(page);
     assert.equal(await balance.inputValue(), '7');
     assert.equal(await page.getByText(/could not be read/).count(), 0);
 
