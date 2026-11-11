@@ -23,6 +23,7 @@ import { QuickForecast } from './QuickForecast';
 import { BalanceFromImage } from './BalanceFromImage';
 import { useRequestLedger } from './useRequestLedger';
 import { WalletTransfer } from './WalletTransfer';
+import { publishBalanceBasis } from './usePersonalWorkspace';
 import { generateAlerts } from '../policy/alerts';
 import { generatePolicySummary } from '../policy/summary';
 import { generateHRQuestions, hrQuestionsMessage } from '../policy/hrQuestions';
@@ -260,6 +261,8 @@ export function Policy() {
     return params.toString();
   }, [currentPolicyURLState]);
   useEffect(() => keepPrivatePolicyDraft(privatePolicySearch, country), [privatePolicySearch, country]);
+  // One balance basis for every personal view: the planner reads this setting.
+  useEffect(() => publishBalanceBasis(balanceIncludesApprovedLeave), [balanceIncludesApprovedLeave]);
 
   const forecastInputIssue = missingForecastInput(policy, !needsWorkdayHours || validWorkdayHours);
   const canProjectBalance = useMemo(() => !needsBalance && !forecastInputIssue && accrualKind !== 'unlimited'

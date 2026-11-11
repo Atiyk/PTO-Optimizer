@@ -24,6 +24,8 @@ import { DistrictPicker, ImportSources } from './FamilySources';
 import { FamilyShare } from './FamilyShare';
 import { FAMILY_FAQ_ITEMS } from './familyFaqItems';
 import { useRequestCalendar } from './useRequestCalendar';
+import { usePersonalWorkspace } from './usePersonalWorkspace';
+import { committedRequestDays } from '../personal/workspace';
 import { ShareDatePreview } from './ShareDatePreview';
 import { track } from './analytics';
 
@@ -78,7 +80,14 @@ export function Family() {
   const savedBalance = savedSchedule?.balanceEntered && savedSchedule.accrualKind !== 'unlimited' &&
     (savedSchedule.unit === 'days' || (!savedSchedule.shiftMinutes && Number.isFinite(savedSchedule.hoursPerDay) && savedSchedule.hoursPerDay > 0))
     ? savedSchedule : undefined;
-  const balanceInDays = savedBalance ? savedBalance.currentBalance / (savedBalance.unit === 'hours' ? savedBalance.hoursPerDay : 1) : null;
+  const workspace = usePersonalWorkspace();
+  // Tracked requests after the saved balance date are deducted once (workspace rule),
+  // using the basis the balance was saved with.
+  const committed = useMemo(() => savedBalance
+    ? committedRequestDays(workspace.requests, { asOf: savedBalance.balanceAsOf, includesApprovedLeave: savedBalance.balanceIncludesApprovedLeave === true })
+    : { approvedDays: 0, tentativeDays: 0 }, [savedBalance, workspace.requests]);
+  const balanceInDays = savedBalance
+    ? savedBalance.currentBalance / (savedBalance.unit === 'hours' ? savedBalance.hoursPerDay : 1) - committed.approvedDays - committed.tentativeDays : null;
   const savedBudget = balanceInDays !== null && Number.isFinite(balanceInDays)
     ? Math.max(0, Math.min(MAX_FAMILY_PTO, Math.floor(balanceInDays))) : null;
   const { calendar, holidayNames, loading: workCalendarLoading, degraded: workCalendarDegraded } = useRequestCalendar({
@@ -290,7 +299,8 @@ export function Family() {
                         {savedBalance.unit === 'hours' ? ` At ${savedBalance.hoursPerDay} hours per workday.` : ''}
                         {balanceInDays !== null && balanceInDays > MAX_FAMILY_PTO ? ` This planner uses up to ${MAX_FAMILY_PTO} days.` : ''}
                         {balanceInDays !== null && balanceInDays < 0 ? ' The saved balance is negative.' : ''}
-                        {' '}Check what you can spend after pending requests or balance changes.
+                        {committed.approvedDays || committed.tentativeDays ? ` That is after ${committed.approvedDays} approved and ${committed.tentativeDays} tentative tracked ${committed.approvedDays + committed.tentativeDays === 1 ? 'day' : 'days'}.` : ''}
+                        {' '}Check what you can spend after balance changes.
                       </p>
                     </div>
                   )}

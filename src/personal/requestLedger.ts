@@ -228,34 +228,6 @@ export function requestDatesForScenario(requests: readonly PtoRequest[], asOf: I
     .filter((date) => date > asOf && date <= through).sort();
 }
 
-/** Tracked approvals constrain new recommendations locally. The days reserved from
- * a gross planning budget use the PTO cost saved with the request, never its full span. */
-export function plannerRequestCommitments(requests: readonly PtoRequest[], start: ISODate, end: ISODate, balanceAsOf: ISODate): {
-  unavailableDates: ISODate[];
-  approvedPtoDays: number;
-  hasHourlyBookings: boolean;
-} {
-  if (!isValidISODate(start) || !isValidISODate(end) || start > end) return { unavailableDates: [], approvedPtoDays: 0, hasHourlyBookings: false };
-  const unavailable = new Set<ISODate>();
-  const approved = new Set<ISODate>();
-  let hasHourlyBookings = false;
-  for (const request of requests) {
-    if (request.status !== 'approved' && request.status !== 'completed') continue;
-    if (!validRequestRange(request.start, request.end)) continue;
-    const first = request.start > start ? request.start : start;
-    const last = request.end < end ? request.end : end;
-    if (first > last) continue;
-    for (const date of rangeISO(first, last)) unavailable.add(date);
-    if (request.ptoMinutes !== undefined) hasHourlyBookings = true;
-    if (request.status === 'approved' && request.ptoMinutes === undefined) {
-      for (const date of request.ptoDates) {
-        if (date > balanceAsOf && date >= first && date <= last) approved.add(date);
-      }
-    }
-  }
-  return { unavailableDates: [...unavailable].sort(), approvedPtoDays: approved.size, hasHourlyBookings };
-}
-
 export function requestConflicts(requests: readonly PtoRequest[]): { firstId: string; secondId: string; start: ISODate; end: ISODate }[] {
   const active = requests.filter(isActiveRequest);
   const conflicts: { firstId: string; secondId: string; start: ISODate; end: ISODate }[] = [];

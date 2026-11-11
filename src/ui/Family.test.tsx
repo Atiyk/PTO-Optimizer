@@ -2,6 +2,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultEmployerCalendar, saveEmployerCalendar } from '../personal/employerCalendar';
 import { savePolicyPreferences } from '../personal/policyPreferences';
+import { createPtoRequest, writeRequestLedger } from '../personal/requestLedger';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { decodePartnerAvailability } from '../planning/partner';
 import { track } from './analytics';
 import { decodeDateRanges, encodeDateRanges } from './familyUrlState';
@@ -244,6 +246,21 @@ describe('Family planner', () => {
     fireEvent.change(input, { target: { value: '3' } });
     expect(input.value).toBe('3');
     expect(screen.getByText(/4 whole days from My PTO/)).toBeTruthy();
+  });
+
+  it('subtracts tracked approved and tentative days from the saved balance once', () => {
+    savePolicyPreferences('c=US&u=1&cb=37&hpd=7.5&bao=2026-11-01');
+    const cal = { workWeek: DEFAULT_WORK_WEEK, offDays: [] };
+    writeRequestLedger([
+      createPtoRequest({ start: '2026-11-16', end: '2026-11-17', status: 'approved' }, cal, 'approved')!,
+      createPtoRequest({ start: '2026-11-17', end: '2026-11-18', status: 'requested' }, cal, 'tentative')!,
+      createPtoRequest({ start: '2026-10-20', end: '2026-10-20', status: 'completed' }, cal, 'past')!,
+    ]);
+    go('c=US&s=2026-11-02&pto=0');
+    render(<Family />);
+    expect(screen.getByText(/1 whole day from My PTO/).textContent).toMatch(/after 2 approved and 1 tentative/);
+    fireEvent.click(screen.getByRole('button', { name: 'Use my saved balance' }));
+    expect(screen.getByRole<HTMLInputElement>('spinbutton', { name: 'PTO for school breaks' }).value).toBe('1');
   });
 
   it('flags unreadable school dates in a received link instead of dropping them silently', () => {

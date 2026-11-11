@@ -65,7 +65,7 @@ describe('discoverSubdivisions (Phase 2: subdivisions via the counties field, an
 });
 
 describe('private approved requests in the consumer planner', () => {
-  it('updates recommendations on approval and deducts bookings only from a gross budget', () => {
+  it('updates recommendations on approval and deducts bookings once unless the balance includes them', () => {
     window.history.replaceState(null, '', '/pto?c=US&s=2027-01-04&e=2027-01-17&b=6&rv=0');
     const approved = createPtoRequest({
       start: '2027-01-07', end: '2027-01-08', status: 'approved', note: 'private request note',
@@ -76,13 +76,16 @@ describe('private approved requests in the consumer planner', () => {
       { initialProps: { requests: [planned] } },
     );
     try {
-      expect(view.result.current.solveInput.blackouts).toEqual([]);
+      // Workspace rule: planned leave is tentative, already off and reserved once.
+      expect(view.result.current.solveInput.blackouts).toEqual(['2027-01-07', '2027-01-08']);
+      expect(view.result.current).toMatchObject({ effectiveBudget: 4, tentativePtoDays: 2, approvedPtoDays: 0 });
       view.rerender({ requests: [approved] });
       expect(view.result.current.solveInput.blackouts).toEqual(['2027-01-07', '2027-01-08']);
-      expect(view.result.current.effectiveBudget).toBe(6);
+      expect(view.result.current).toMatchObject({ effectiveBudget: 4, tentativePtoDays: 0, approvedPtoDays: 2 });
       expect(view.result.current.breaks.flatMap(brk => brk.days)).not.toContain('2027-01-07');
-      act(() => view.result.current.setReserveApprovedPto(true));
-      expect(view.result.current.effectiveBudget).toBe(4);
+      // "My balance already includes approved leave": nothing is subtracted again.
+      act(() => view.result.current.setReserveApprovedPto(false));
+      expect(view.result.current.effectiveBudget).toBe(6);
       expect(view.result.current.planSearch).not.toContain('2027-01-07');
       expect(window.location.search).not.toContain('2027-01-07');
       expect(view.result.current.planSearch).not.toContain('private');
