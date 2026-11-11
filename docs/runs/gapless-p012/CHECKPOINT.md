@@ -29,7 +29,7 @@ source of truth between scheduled executions. No sensitive user data belongs her
 | Batch | Issues | Branch / PR | State |
 |---|---|---|---|
 | P0 | 1, 2, 10, 11 | `gapless/p0-release` → PR #145, merged as `3bae6ed` (critic GO on 494d135) | DONE: merged, Vercel prod success, prod smoke passed (run 43017235618 attempt 2) |
-| P1 | 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17 | `gapless/p1-release` @ 0d9384a (pushed): C 16/17, B 13/14, W2 3/4 (2878ab3), QA account-form scoping. S 5/6 → `gapless/p1-s-solver-travel` (/home/user/p1s); T 7 → `gapless/p1-t-performance` (/home/user/p1t) | Integrating |
+| P1 | 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17 | `gapless/p1-release` @ 0d9384a (pushed): C 16/17, B 13/14, W2 3/4 (2878ab3), QA account-form scoping. S 5/6 → `gapless/p1-s-solver-travel` (/home/user/p1s); T 7 → `gapless/p1-t-performance` (/home/user/p1t) | PR #146 draft @ 1b315a9; critic Q reviewing |
 | P2 | 8, 15, 18, 19 | — | Not started |
 
 ## Issue traceability
@@ -74,6 +74,8 @@ Residual risks noted by P (not fixed): `/api/watch` and reminder-email links car
 
 - ~16:50Z — S done (5/6, 40d41b7): breaks include adjacent free days and never touch; US travel demand = centred 7-day seasonal mean shared by solver and evidence panel; copy says estimate, not forecast/fare. Merged → 89ace0b. O follow-up: calendar-day notice counted from first working day of the break (requestByDate; was counting from the free Saturday). C done (12, 10ef0fa): partial-day leave no longer counts as a parent's day off in Family; per-parent workweek tests. Merged → 7432f38 (pushed): vitest 190/2033 pass, tsc, lint 0 err, build OK. apps/teams 289/290 with coverageEvents hook flake (passes alone). Solve perf test exceeded 1000 ms once at load 7, passes alone. Agent P on issue 9 in /home/user/p1p (base 89ace0b).
 
+- ~17:15Z — P done (9, a6cad76): recipient saved calendar opt-in on sv=1 links; share-only `er` (PLANNER_REVISION=2) and `hf` (public holiday hash); recipient notice. Q1 for Atiyk logged in PR #146 (kept). Merged → 1b315a9: vitest 192/2043, tsc, lint 0 err, build OK. PR #146 opened (draft), subscribed. Critic Q started on exact SHA 1b315a9.
+
 ## Next action
 
-When P (issue 9) reports: merge into `gapless/p1-release`, full checks, open P1 release PR (draft→ready), run critic Q on exact SHA, fix, CI, merge, Vercel, prod smoke. Follow-ups noted: school week Mon–Fri assumption (Sun–Thu countries); partial-day booking overcount in Family; verify:dist hash.
+Critic Q verdict on 1b315a9 → route blockers, recheck on the new SHA, then CI green → mark #146 ready → merge (merge commit) → Vercel → push gapless/prod-smoke (update marker step for P1) → mark P1 complete. Then P2 (8, 15, 18, 19).
