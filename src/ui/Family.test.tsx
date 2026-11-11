@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultEmployerCalendar, saveEmployerCalendar } from '../personal/employerCalendar';
 import { savePolicyPreferences } from '../personal/policyPreferences';
 import { createPtoRequest, writeRequestLedger } from '../personal/requestLedger';
+import { committedRequestDays } from '../personal/workspace';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { decodePartnerAvailability } from '../planning/partner';
 import { track } from './analytics';
@@ -303,6 +304,21 @@ describe('Family planner', () => {
     const words = (day: number) => screen.getByText(new RegExp(`^November ${day}(,|$)`), { selector: '.sr-only' }).textContent;
     expect(words(27)).toMatch(/school is off and you are off/);
     expect(words(30)).toMatch(/you work: uncovered/);
+  });
+
+  it('treats two 4h partials on one 8h day as off all day, the same total the planner charges', async () => {
+    savePolicyPreferences('c=US');
+    const cal = { workWeek: DEFAULT_WORK_WEEK, offDays: [], shiftMinutes: [480, 480, 480, 480, 480, 0, 0] };
+    const requests = [
+      createPtoRequest({ start: '2026-11-30', end: '2026-11-30', status: 'approved', partialMinutes: 240 }, cal, 'am')!,
+      createPtoRequest({ start: '2026-11-30', end: '2026-11-30', status: 'approved', partialMinutes: 240 }, cal, 'pm')!,
+    ];
+    writeRequestLedger(requests);
+    expect(committedRequestDays(requests, { asOf: '2026-11-01', includesApprovedLeave: false }, { hoursPerDay: 8 }).approvedDays).toBe(1);
+    go(`c=US&s=2026-11-02&pto=0&sd=${encodeDateRanges(['2026-11-30'])}`);
+    render(<Family />);
+    const words = () => screen.getByText(/^November 30(,|$)/, { selector: '.sr-only' }).textContent;
+    await waitFor(() => expect(words()).toMatch(/school is off and you are off/));
   });
 
   it('flags unreadable school dates in a received link instead of dropping them silently', () => {

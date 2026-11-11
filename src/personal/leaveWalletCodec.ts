@@ -82,7 +82,7 @@ function requestLedgerSnapshot(requests: readonly PtoRequest[]): string | null {
     const parsed = parseRequestLedger(JSON.stringify({ version: 1, requests }));
     if (parsed.length !== requests.length || parsed.some((r) => !validWalletRequestId(r.id))) return null;
     return JSON.stringify(parsed.sort((a, b) => a.id.localeCompare(b.id)).map((r) => ({
-      id: r.id, start: r.start, end: r.end, ptoDates: r.ptoDates, ptoMinutes: r.ptoMinutes, partialMinutes: r.partialMinutes,
+      id: r.id, start: r.start, end: r.end, ptoDates: r.ptoDates, ptoMinutes: r.ptoMinutes, partialMinutes: r.partialMinutes, partialShiftMinutes: r.partialShiftMinutes,
       status: r.status, createdAt: r.createdAt, updatedAt: r.updatedAt,
     })));
   } catch { return null; }

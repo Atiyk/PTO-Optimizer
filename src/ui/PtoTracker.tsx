@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { REQUEST_STATUSES, calendarCoversRequest, calendarForSavedRequest, createPtoRequest, initialRequestDate, requestCalendarCoverageHint, requestConflicts, requestPtoDates, requestPtoMinutes, validRequestRange, type PtoRequest, type RequestCalendar, type RequestStatus } from '../personal/requestLedger';
 import type { RequestLedgerState } from './useRequestLedger';
-import { requestDayEquivalent, scheduledMinutesOn, type WorkdaySchedule } from '../personal/workspace';
+import { partialShiftMinutes, requestDayEquivalent, type WorkdaySchedule } from '../personal/workspace';
 import { Button } from './Button';
 import { compactDate, compactDatesIn } from './compactDate';
 import { formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
@@ -31,7 +31,7 @@ function requestCostLabel(days: number, minutes?: Readonly<Record<string, number
   const hours = Object.values(minutes).reduce((sum, duration) => sum + duration, 0) / 60;
   const label = `${durationFormat.format(hours)} PTO ${hours === 1 ? 'hour' : 'hours'}`;
   const date = partialDay?.request.partialMinutes !== undefined ? partialDay.request.start : undefined;
-  if (!partialDay || !date || scheduledMinutesOn(date, partialDay.schedule) === undefined) return label;
+  if (!partialDay || !date || partialShiftMinutes(partialDay.request, date, partialDay.schedule) === undefined) return label;
   return `${label} · ${durationFormat.format(requestDayEquivalent(partialDay.request, date, partialDay.schedule))} day`;
 }
 

@@ -3,8 +3,8 @@ import { isoToSerial } from '@daysoff/engine/solver/dateUtils';
 import { validateCurrentCarriedBalance, type TimeOffPolicy } from '../policy/model';
 import { projectBalance, type BalancePoint, type PolicyEvent } from '../policy/projection';
 import { isValidISODate } from '../ui/urlState';
-import { isScheduledRequest, requestConflicts, validShiftMinutes, type PtoRequest } from './requestLedger';
-import { chargeableRequestDates, requestDateCharge, requestDayEquivalent, scheduledMinutesOn, type BalanceBasis, type WorkdaySchedule } from './workspace';
+import { requestConflicts, validShiftMinutes, type PtoRequest } from './requestLedger';
+import { chargeSplitByDate, combinedDateCost, requestDateCharge, scheduledMinutesOn, type BalanceBasis, type WorkdaySchedule } from './workspace';
 
 export interface ForecastScenario {
   balance: number | null;
@@ -49,7 +49,6 @@ function validPolicy(policy: TimeOffPolicy): boolean {
 function scenario(policy: TimeOffPolicy, through: ISODate, requests: readonly PtoRequest[], tentative: boolean): ForecastScenario {
   // The shared workspace rule decides which request days this balance still owes.
   const basis: BalanceBasis = { asOf: policy.balanceAsOf, includesApprovedLeave: policy.balanceIncludesApprovedLeave === true };
-  const charged = new Set(chargeableRequestDates(requests, basis, through, tentative));
   const alreadyInBalance = new Set(requests.flatMap(request => request.ptoDates
     .filter(date => date > policy.balanceAsOf && requestDateCharge(request, date, basis) === 'in-balance')));
   const inForecast = (date: ISODate) => isValidISODate(date) && date > policy.balanceAsOf
@@ -60,18 +59,19 @@ function scenario(policy: TimeOffPolicy, through: ISODate, requests: readonly Pt
     ? (schedule.shiftMinutes ? (scheduledMinutesOn(date, schedule) ?? policy.hoursPerDay * 60) / 60 : policy.hoursPerDay) : 1;
   const bookedHours = new Map<ISODate, number>();
   for (const date of policy.plannedDays.filter(inForecast)) bookedHours.set(date, wholeDay(date));
-  for (const request of requests) {
-    if (!isScheduledRequest(request, tentative)) continue;
-    for (const date of request.ptoDates.filter(date => charged.has(date))) {
-      const minutes = request.ptoMinutes?.[date];
-      const recorded = minutes !== undefined && Number.isInteger(minutes) && minutes > 0 && minutes <= 1440;
-      const amount = policy.unit === 'hours'
-        ? (recorded ? minutes / 60 : wholeDay(date))
-        : requestDayEquivalent(request, date, schedule);
-      // No time-of-day overlap is stored. Treat overlapping records as one booking
-      // at the larger recorded amount rather than consuming both in full.
-      bookedHours.set(date, Math.max(bookedHours.get(date) ?? 0, amount));
-    }
+  // The shared per-date rule (workspace.combinedDateCost), in this balance's native unit,
+  // so the forecast and the planner charge every date the same amount.
+  const measure = (onDate: readonly PtoRequest[], date: ISODate) => {
+    const cost = combinedDateCost(onDate, date, schedule);
+    if (policy.unit !== 'hours') return cost.days;
+    const recorded = (cost.minutes ?? 0) / 60;
+    return cost.legacyWholeDay ? Math.max(wholeDay(date), recorded) : recorded;
+  };
+  for (const [date, split] of chargeSplitByDate(requests, basis, (_request, day) => day <= through, measure)) {
+    const booked = split.booked ?? 0;
+    const amount = (split.bookedCharged ? booked : 0) + (tentative ? Math.max(0, split.total - booked) : 0);
+    if (amount <= 0) continue;
+    bookedHours.set(date, Math.max(bookedHours.get(date) ?? 0, amount));
   }
   const scenarioPolicy = { ...policy, plannedDays: [...bookedHours.keys()].sort() };
   const { series, events } = projectBalance(scenarioPolicy, through, bookedHours);

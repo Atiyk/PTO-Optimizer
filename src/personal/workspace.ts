@@ -71,62 +71,119 @@ export function scheduledMinutesOn(date: ISODate, schedule: WorkdaySchedule | un
 export const roundDayEquivalent = (days: number) => Math.round(days * 1000) / 1000;
 
 /**
- * Hours → day-equivalents, the one conversion every planner uses.
- *   - A whole-day request (no recorded minutes) costs 1 day per PTO date: legacy data is unchanged.
- *   - An hourly request priced at the full shift costs 1 day: it takes that whole workday,
- *     whatever the shift length (a 10h day on a 4x10 schedule is one planner day).
- *   - A partial day costs its recorded minutes ÷ that weekday's scheduled minutes, at most 1.
- *     When the shift is unknown it costs a whole day, so a planner never under-reserves.
+ * The shift a partial day is measured against: the shift saved with the request when it was
+ * priced, else that weekday's shift in `schedule`, else `schedule.hoursPerDay`.
  */
-export function requestDayEquivalent(request: PtoRequest, date: ISODate, schedule?: WorkdaySchedule): number {
-  return roundDayEquivalent(exactDayEquivalent(request, date, schedule));
+export function partialShiftMinutes(request: PtoRequest, date: ISODate, schedule?: WorkdaySchedule): number | undefined {
+  return request.partialShiftMinutes ?? scheduledMinutesOn(date, schedule);
 }
-
-/** Unrounded, so sums are rounded once rather than accumulating per-date rounding. */
-function exactDayEquivalent(request: PtoRequest, date: ISODate, schedule?: WorkdaySchedule): number {
-  const minutes = request.ptoMinutes?.[date];
-  if (minutes === undefined || request.partialMinutes === undefined) return 1;
-  const scheduled = scheduledMinutesOn(date, schedule);
-  return scheduled === undefined ? 1 : Math.min(1, minutes / scheduled);
-}
-
-type DatedCharge = { charge: 'charge' | 'tentative'; days: number };
 
 /**
- * Per-date charge across the whole ledger; a booked charge wins over a tentative one.
- * Overlapping requests on one date charge that date once, at the larger day-equivalent.
+ * THE per-date charge rule. Every planner, the forecast and the family planner use it.
+ *
+ * For the requests that cover one date:
+ *   - A whole-day request takes the whole day. That covers a legacy request with no
+ *     recorded minutes, and an hourly request priced at the full shift (a 10h day on a
+ *     4x10 schedule is one day). Any number of whole-day requests on a date still cost
+ *     one day (P0: never charge a day twice).
+ *   - Otherwise the partial days' minutes are SUMMED and capped at the shift. Requests
+ *     record minutes, not times of day, so distinct requests on one date are assumed not
+ *     to overlap: 4h + 4h on an 8h day is the whole day.
+ *   - With no known shift, a partial day costs a whole day (never under-reserves).
+ * `days` is the day-equivalent; `minutes` is the native-hours amount (undefined when only
+ * a legacy whole-day request covers the date, whose hours are that day's scheduled hours).
  */
-function chargesByDate(requests: readonly PtoRequest[], basis: BalanceBasis, keep: (request: PtoRequest, date: ISODate) => boolean, schedule?: WorkdaySchedule) {
-  const charged = new Map<ISODate, DatedCharge>();
+export function combinedDateCost(requests: readonly PtoRequest[], date: ISODate, schedule?: WorkdaySchedule): { days: number; minutes?: number; legacyWholeDay: boolean; shiftUnknown?: boolean } {
+  let legacyWholeDay = false;
+  let wholeMinutes: number | undefined;
+  let partialSum = 0;
+  let shift: number | undefined;
+  let partials = 0;
   for (const request of requests) {
-    for (const date of request.ptoDates) {
-      if (!keep(request, date)) continue;
-      const charge = requestDateCharge(request, date, basis);
-      if (charge !== 'charge' && charge !== 'tentative') continue;
-      const days = exactDayEquivalent(request, date, schedule);
-      const current = charged.get(date);
-      if (!current || (charge === 'charge' && current.charge === 'tentative')) charged.set(date, { charge, days });
-      else if (current.charge === charge) current.days = Math.max(current.days, days);
+    const minutes = request.ptoMinutes?.[date];
+    if (minutes === undefined) legacyWholeDay = true;
+    else if (request.partialMinutes === undefined) wholeMinutes = Math.max(wholeMinutes ?? 0, minutes);
+    else {
+      partials++;
+      partialSum += minutes;
+      const own = partialShiftMinutes(request, date, schedule);
+      if (own !== undefined) shift = Math.max(shift ?? 0, own);
     }
   }
-  // A date booked by one request and already in the balance via another is not re-charged.
+  if (legacyWholeDay || wholeMinutes !== undefined) return { days: 1, minutes: wholeMinutes, legacyWholeDay };
+  if (partials === 0) return { days: 0, minutes: 0, legacyWholeDay };
+  if (shift === undefined) return { days: 1, minutes: partialSum, legacyWholeDay, shiftUnknown: true };
+  return { days: Math.min(1, partialSum / shift), minutes: Math.min(partialSum, shift), legacyWholeDay };
+}
+
+/** One request's day-equivalent on `date` under the shared rule. */
+export function requestDayEquivalent(request: PtoRequest, date: ISODate, schedule?: WorkdaySchedule): number {
+  return roundDayEquivalent(combinedDateCost([request], date, schedule).days);
+}
+
+/**
+ * What a date costs under a basis, split by role. `booked` is the booked requests' combined
+ * cost (`bookedCharged` false when the balance already holds it); `tentative` is only what
+ * tentative requests add on top, so a booked partial inside a tentative full day leaves the
+ * day costing one in total (the booked part + the tentative rest), never less.
+ */
+export interface DateChargeSplit<T> {
+  booked: T | undefined;
+  bookedCharged: boolean;
+  /** Booked and tentative requests together. */
+  total: T;
+}
+
+export function chargeSplitByDate<T>(
+  requests: readonly PtoRequest[], basis: BalanceBasis, keep: (request: PtoRequest, date: ISODate) => boolean,
+  measure: (onDate: readonly PtoRequest[], date: ISODate) => T,
+): Map<ISODate, DateChargeSplit<T>> {
+  const groups = new Map<ISODate, { booked: PtoRequest[]; tentative: PtoRequest[]; charged: boolean }>();
   for (const request of requests) {
-    if (planningRole(request.status) !== 'booked') continue;
-    for (const date of request.ptoDates) if (charged.get(date)?.charge === 'tentative' && requestDateCharge(request, date, basis) === 'in-balance') charged.delete(date);
+    for (const date of new Set(request.ptoDates)) {
+      if (!keep(request, date)) continue;
+      const charge = requestDateCharge(request, date, basis);
+      if (charge === 'none') continue;
+      const group = groups.get(date) ?? { booked: [], tentative: [], charged: false };
+      if (charge === 'tentative') group.tentative.push(request);
+      else { group.booked.push(request); if (charge === 'charge') group.charged = true; }
+      groups.set(date, group);
+    }
+  }
+  const result = new Map<ISODate, DateChargeSplit<T>>();
+  for (const [date, group] of groups) {
+    result.set(date, {
+      booked: group.booked.length ? measure(group.booked, date) : undefined,
+      bookedCharged: group.charged,
+      total: measure([...group.booked, ...group.tentative], date),
+    });
+  }
+  return result;
+}
+
+type DatedCharge = { charge: number; tentative: number };
+
+/** Day-equivalents each date still owes: the booked charge, and what tentative requests add. */
+function chargesByDate(requests: readonly PtoRequest[], basis: BalanceBasis, keep: (request: PtoRequest, date: ISODate) => boolean, schedule?: WorkdaySchedule) {
+  const charged = new Map<ISODate, DatedCharge>();
+  for (const [date, split] of chargeSplitByDate(requests, basis, keep, (onDate, day) => combinedDateCost(onDate, day, schedule).days)) {
+    const booked = split.booked ?? 0;
+    const entry = { charge: split.bookedCharged ? booked : 0, tentative: Math.max(0, split.total - booked) };
+    if (entry.charge > 0 || entry.tentative > 0) charged.set(date, entry);
   }
   return charged;
 }
 
 const sumDays = (charges: Iterable<DatedCharge>, kind: 'charge' | 'tentative' | 'any') => {
   let total = 0;
-  for (const entry of charges) if (kind === 'any' || entry.charge === kind) total += entry.days;
+  for (const entry of charges) total += kind === 'charge' ? entry.charge : kind === 'tentative' ? entry.tentative : entry.charge + entry.tentative;
   return roundDayEquivalent(total);
 };
 
 /** Dates a forecast must still subtract through `through`, unioned and sorted. */
 export function chargeableRequestDates(requests: readonly PtoRequest[], basis: BalanceBasis, through: ISODate, includeTentative: boolean): ISODate[] {
   const charged = chargesByDate(requests, basis, (_request, date) => date <= through);
-  return [...charged].filter(([, entry]) => includeTentative || entry.charge === 'charge').map(([date]) => date).sort();
+  return [...charged].filter(([, entry]) => entry.charge > 0 || includeTentative).map(([date]) => date).sort();
 }
 
 export interface PlanningCommitments {
@@ -198,7 +255,7 @@ export function fullDayLeaveDates(
   const { start, end } = range;
   if (!isValidISODate(start) || !isValidISODate(end) || start > end) return [];
   const whole = new Set<ISODate>();
-  const minutes = new Map<ISODate, number>();
+  const hourly = new Map<ISODate, PtoRequest[]>();
   for (const request of requests) {
     const role = planningRole(request.status);
     if ((role !== 'booked' && role !== 'tentative') || !validRequestRange(request.start, request.end)) continue;
@@ -206,15 +263,16 @@ export function fullDayLeaveDates(
     const last = request.end < end ? request.end : end;
     if (first > last) continue;
     for (const date of rangeISO(first, last)) {
-      const booked = request.ptoMinutes?.[date];
       // A date in the span with no hours recorded is not a workday of the request: off anyway.
-      if (booked === undefined || (request.partialMinutes === undefined && scheduledMinutesOn(date, schedule) === undefined)) whole.add(date);
-      else minutes.set(date, (minutes.get(date) ?? 0) + booked);
+      if (request.ptoMinutes?.[date] === undefined) whole.add(date);
+      else hourly.set(date, [...(hourly.get(date) ?? []), request]);
     }
   }
-  for (const [date, booked] of minutes) {
-    const scheduled = scheduledMinutesOn(date, schedule);
-    if (scheduled !== undefined && booked >= scheduled) whole.add(date);
+  // Same rule as the cost (combinedDateCost): whole-shift requests fill the day, partial
+  // minutes are summed against the shift; a partial day with no known shift stays partial.
+  for (const [date, onDate] of hourly) {
+    const cost = combinedDateCost(onDate, date, schedule);
+    if (cost.days >= 1 && !cost.shiftUnknown) whole.add(date);
   }
   return [...whole].sort();
 }

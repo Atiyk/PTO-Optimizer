@@ -39,6 +39,9 @@ export interface PtoRequest {
   /** When present, actual native hours priced with the request calendar. */
   ptoMinutes?: Readonly<Record<ISODate, number>>;
   partialMinutes?: number;
+  /** For a partial day: the scheduled shift it was priced against, so its day share never
+   * depends on a schedule saved later. Absent on requests saved before P1 fixes. */
+  partialShiftMinutes?: number;
   status: RequestStatus;
   note: string;
   createdAt: string;
@@ -132,6 +135,8 @@ export function createPtoRequest(input: RequestInput, calendar: RequestCalendar,
     id, start: input.start, end: input.end, ptoDates, ptoDays: ptoDates.length,
     ...(ptoMinutes ? { ptoMinutes } : {}),
     ...(input.partialMinutes !== undefined ? { partialMinutes: input.partialMinutes } : {}),
+    ...(input.partialMinutes !== undefined && validMinutes(calendar.shiftMinutes?.[mondayIndexedDow(input.start)])
+      ? { partialShiftMinutes: calendar.shiftMinutes![mondayIndexedDow(input.start)] } : {}),
     status, note: (input.note ?? '').slice(0, 1000), createdAt: now, updatedAt: now,
   };
 }
@@ -189,11 +194,14 @@ export function parseLedgerRecord(raw: string | null): { requests: PtoRequest[];
         || !ptoDates.every(date => Object.hasOwn(minutes, date) && validMinutes(minutes[date])))) continue;
       if (item.partialMinutes !== undefined && (!validMinutes(item.partialMinutes) || item.start !== item.end
         || ptoDates.length !== 1 || minutes?.[item.start] !== item.partialMinutes)) continue;
+      if (item.partialShiftMinutes !== undefined && (item.partialMinutes === undefined || !validMinutes(item.partialShiftMinutes)
+        || item.partialShiftMinutes < item.partialMinutes)) continue;
       result.push({
         id: item.id, start: item.start, end: item.end, status: item.status,
         ptoDates, ptoDays: ptoDates.length, note: item.note.slice(0, 1000),
         ...(minutes === undefined ? {} : { ptoMinutes: Object.fromEntries(ptoDates.map(date => [date, minutes[date]])) }),
         ...(item.partialMinutes === undefined ? {} : { partialMinutes: item.partialMinutes }),
+        ...(item.partialShiftMinutes === undefined ? {} : { partialShiftMinutes: item.partialShiftMinutes }),
         createdAt: item.createdAt, updatedAt: item.updatedAt,
       });
       seen.add(item.id);

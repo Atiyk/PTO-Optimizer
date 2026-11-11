@@ -91,8 +91,11 @@ describe('planner commitments from the shared rule', () => {
   it('uses hours per day when there is no per-weekday schedule, and a whole day when the shift is unknown', () => {
     const partial = hourly('p', '2027-01-11', '2027-01-11', 'approved', shifts8, 120);
     expect(planningCommitments([partial], range, owes, { hoursPerDay: 8 })).toMatchObject({ reservedPtoDayEquivalent: 0.25, reservedPtoDays: 1 });
-    // Without any schedule the planner never guesses a smaller cost.
-    expect(planningCommitments([partial], range, owes)).toMatchObject({ reservedPtoDayEquivalent: 1, reservedPtoDays: 1, hasHourlyBookings: true });
+    // A new request keeps the shift it was priced against, so it needs no saved schedule.
+    expect(planningCommitments([partial], range, owes)).toMatchObject({ reservedPtoDayEquivalent: 0.25 });
+    // A partial day saved before shifts were recorded, with no schedule: never a smaller guess.
+    const legacy = { ...partial, partialShiftMinutes: undefined };
+    expect(planningCommitments([legacy], range, owes)).toMatchObject({ reservedPtoDayEquivalent: 1, reservedPtoDays: 1, hasHourlyBookings: true });
   });
 
   it('charges a date booked both whole-day and hourly once, and skips hourly days already in the balance', () => {
@@ -213,5 +216,45 @@ describe('fullDayLeaveDates: only whole days of leave mean the person is off', (
     const whole = request('w', '2027-01-12', '2027-01-12', 'approved');
     const partial = hourly('p', '2027-01-12', '2027-01-12', shifts8, 60);
     expect(fullDayLeaveDates([partial, whole], range, { shiftMinutes: shifts8.shiftMinutes })).toEqual(['2027-01-12']);
+  });
+});
+
+describe('one per-date charge rule shared by the planner, the forecast and Family', () => {
+  const shifts8 = { ...calendar, offDays: [], shiftMinutes: [480, 480, 480, 480, 480, 0, 0] };
+  const fourTens = { workWeek: [true, true, true, true, false, false, false] as RequestCalendar['workWeek'], offDays: [], shiftMinutes: [600, 600, 600, 600, 0, 0, 0] };
+  const make = (id: string, start: string, end: string, status: RequestStatus, cal: RequestCalendar, partialMinutes?: number) =>
+    createPtoRequest({ start, end, status, partialMinutes }, cal, id, '2027-01-01T00:00:00.000Z')!;
+  const basis = { asOf: '2027-02-01', includesApprovedLeave: false };
+  const march = { start: '2027-03-01', end: '2027-03-31' };
+
+  it('Q1-2: a booked 2h partial inside a tentative full week never lowers that day below one', () => {
+    const requests = [
+      make('week', '2027-03-01', '2027-03-05', 'requested', { ...calendar, offDays: [] }),
+      make('appt', '2027-03-02', '2027-03-02', 'approved', shifts8, 120),
+    ];
+    // Booked part 0.25; the tentative week adds the rest of Tuesday (0.75) plus four days.
+    expect(planningCommitments(requests, march, basis, { shiftMinutes: shifts8.shiftMinutes })).toMatchObject({
+      approvedPtoDays: 0.25, tentativePtoDays: 4.75, reservedPtoDayEquivalent: 5, reservedPtoDays: 5,
+    });
+    expect(committedRequestDays(requests, basis, { shiftMinutes: shifts8.shiftMinutes })).toEqual({ approvedDays: 0.25, tentativeDays: 4.75 });
+  });
+
+  it('Q1-3: two 4h partials on one 8h day sum to a full day for cost and for Family', () => {
+    const requests = [make('am', '2027-03-02', '2027-03-02', 'approved', shifts8, 240), make('pm', '2027-03-02', '2027-03-02', 'approved', shifts8, 240)];
+    const schedule = { shiftMinutes: shifts8.shiftMinutes };
+    expect(planningCommitments(requests, march, basis, schedule)).toMatchObject({ approvedPtoDays: 1, reservedPtoDays: 1 });
+    expect(committedRequestDays(requests, basis, schedule).approvedDays).toBe(1);
+    expect(fullDayLeaveDates(requests, march, schedule)).toEqual(['2027-03-02']);
+    // Hours beyond the shift are capped: three 4h partials still cost one day.
+    expect(planningCommitments([...requests, make('x', '2027-03-02', '2027-03-02', 'approved', shifts8, 240)], march, basis, schedule).approvedPtoDays).toBe(1);
+    // P0 guarantee: two whole-day requests on the same date still cost one day.
+    const whole = [make('w1', '2027-03-03', '2027-03-03', 'approved', shifts8), make('w2', '2027-03-03', '2027-03-03', 'approved', { ...calendar, offDays: [] })];
+    expect(planningCommitments(whole, march, basis, schedule).approvedPtoDays).toBe(1);
+  });
+
+  it('Q1-4: a partial day keeps the shift it was priced against, even when only hours per day is known', () => {
+    const fiveOfTen = make('five', '2027-03-01', '2027-03-01', 'approved', fourTens, 300);
+    expect(requestDayEquivalent(fiveOfTen, '2027-03-01', { hoursPerDay: 8 })).toBe(0.5);
+    expect(planningCommitments([fiveOfTen], march, basis, { hoursPerDay: 8 })).toMatchObject({ approvedPtoDays: 0.5 });
   });
 });
