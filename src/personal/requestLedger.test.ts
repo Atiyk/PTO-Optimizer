@@ -89,6 +89,7 @@ describe('personal PTO requests', () => {
       // Completed counts as booked, as in the forecast: 01-05..01-08 once each.
       approvedPtoDays: 4,
       tentativePtoDays: 2,
+      reservedPtoDayEquivalent: 6,
       reservedPtoDays: 6,
       hasHourlyBookings: false,
     });

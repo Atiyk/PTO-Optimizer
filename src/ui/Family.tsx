@@ -84,8 +84,8 @@ export function Family() {
   // Tracked requests after the saved balance date are deducted once (workspace rule),
   // using the basis the balance was saved with.
   const committed = useMemo(() => savedBalance
-    ? committedRequestDays(workspace.requests, { asOf: savedBalance.balanceAsOf, includesApprovedLeave: savedBalance.balanceIncludesApprovedLeave === true })
-    : { approvedDays: 0, tentativeDays: 0 }, [savedBalance, workspace.requests]);
+    ? committedRequestDays(workspace.requests, { asOf: savedBalance.balanceAsOf, includesApprovedLeave: savedBalance.balanceIncludesApprovedLeave === true }, workspace.schedule)
+    : { approvedDays: 0, tentativeDays: 0 }, [savedBalance, workspace.requests, workspace.schedule]);
   const balanceInDays = savedBalance
     ? savedBalance.currentBalance / (savedBalance.unit === 'hours' ? savedBalance.hoursPerDay : 1) - committed.approvedDays - committed.tentativeDays : null;
   const savedBudget = balanceInDays !== null && Number.isFinite(balanceInDays)

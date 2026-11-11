@@ -6,7 +6,7 @@ import { createPtoRequest, type PtoRequest, type RequestStatus } from '../person
 import { expirationRisks } from '../personal/expiration';
 import { forecastWithRequests } from '../personal/forecast';
 import { useAppState } from '../ui/useAppState';
-import { publishBalanceBasis, readBrowserBalanceBasis } from '../ui/usePersonalWorkspace';
+import { publishBalanceBasis, publishWorkdaySchedule, readBrowserBalanceBasis, readBrowserWorkdaySchedule } from '../ui/usePersonalWorkspace';
 import { savePolicyPreferences } from '../personal/policyPreferences';
 
 /**
@@ -79,6 +79,35 @@ describe('expiry hand-off never deducts a request twice', () => {
       expect(result.current.effectiveBudget).toBe(risk.planningBudget);
       unmount();
     }
+  });
+});
+
+describe('hourly requests reserve planner budget once', () => {
+  it('reserves a 4h request on an 8h day as one rounded-up planner day, and two half days as one', () => {
+    const hourly = (id: string, date: string) => createPtoRequest(
+      { start: date, end: date, status: 'approved', partialMinutes: 240 },
+      { ...calendar, shiftMinutes: [480, 480, 480, 480, 480, 0, 0] }, id, '2027-10-01T00:00:00.000Z',
+    )!;
+    const schedule = { shiftMinutes: [480, 480, 480, 480, 480, 0, 0] };
+    const one = renderHook(() => useAppState([hourly('h1', '2027-11-15')], today, { includesApprovedLeave: false, schedule }));
+    expect(one.result.current.effectiveBudget).toBe(9);
+    expect(one.result.current.reservedPtoDayEquivalent).toBe(0.5);
+    one.unmount();
+    const two = renderHook(() => useAppState([hourly('h1', '2027-11-15'), hourly('h2', '2027-11-16')], today, { includesApprovedLeave: false, schedule }));
+    expect(two.result.current.effectiveBudget).toBe(9);
+    two.unmount();
+    // A balance that already includes approved leave is not reduced again.
+    window.history.replaceState(null, '', window.location.href);
+    const included = renderHook(() => useAppState([hourly('h1', '2027-11-15')], today, { includesApprovedLeave: true, schedule }));
+    expect(included.result.current.effectiveBudget).toBe(10);
+    included.unmount();
+  });
+
+  it('My PTO publishes the hourly schedule the planner reads', () => {
+    expect(readBrowserWorkdaySchedule()).toBeUndefined();
+    publishWorkdaySchedule({ shiftMinutes: [600, 600, 600, 600, 0, 0, 0], hoursPerDay: 10 });
+    expect(readBrowserWorkdaySchedule()).toEqual({ shiftMinutes: [600, 600, 600, 600, 0, 0, 0], hoursPerDay: 10 });
+    expect(window.location.search).not.toContain('shm');
   });
 });
 

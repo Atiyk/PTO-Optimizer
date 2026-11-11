@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { REQUEST_STATUSES, calendarCoversRequest, calendarForSavedRequest, createPtoRequest, initialRequestDate, requestCalendarCoverageHint, requestConflicts, requestPtoDates, requestPtoMinutes, validRequestRange, type PtoRequest, type RequestCalendar, type RequestStatus } from '../personal/requestLedger';
 import type { RequestLedgerState } from './useRequestLedger';
+import { requestDayEquivalent, scheduledMinutesOn, type WorkdaySchedule } from '../personal/workspace';
 import { Button } from './Button';
 import { compactDate, compactDatesIn } from './compactDate';
 import { formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
@@ -22,10 +23,14 @@ const STATUS_COPY: Record<RequestStatus, { label: string; description: string }>
 
 const durationFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
 
-function requestCostLabel(days: number, minutes?: Readonly<Record<string, number>>) {
+/** Hours are the recorded unit; a partial day also shows its share of that day's shift. */
+function requestCostLabel(days: number, minutes?: Readonly<Record<string, number>>, partialDay?: { request: PtoRequest; schedule: WorkdaySchedule }) {
   if (minutes === undefined) return `${days} PTO ${days === 1 ? 'day' : 'days'}`;
   const hours = Object.values(minutes).reduce((sum, duration) => sum + duration, 0) / 60;
-  return `${durationFormat.format(hours)} PTO ${hours === 1 ? 'hour' : 'hours'}`;
+  const label = `${durationFormat.format(hours)} PTO ${hours === 1 ? 'hour' : 'hours'}`;
+  const date = partialDay?.request.partialMinutes !== undefined ? partialDay.request.start : undefined;
+  if (!partialDay || !date || scheduledMinutesOn(date, partialDay.schedule) === undefined) return label;
+  return `${label} · ${durationFormat.format(requestDayEquivalent(partialDay.request, date, partialDay.schedule))} day`;
 }
 
 function SubmitBy({ start, noticePeriodDays, calendar, today }: { start: string; noticePeriodDays: number; calendar: RequestCalendar; today: string }) {
@@ -50,7 +55,7 @@ function RequestRow({ request, ledger, calendar, calendarReady, onStatusChanged,
   const preview = changedDates && calendarReady && pricedCalendar && !invalid && !outsideCoverage
     ? createPtoRequest({ ...request, start, end }, pricedCalendar, request.id, request.updatedAt)
     : null;
-  const savedCost = requestCostLabel(request.ptoDays, request.ptoMinutes);
+  const savedCost = requestCostLabel(request.ptoDays, request.ptoMinutes, { request, schedule: { shiftMinutes: calendar.shiftMinutes } });
   return (
     <article className="min-w-0 border-t border-line pt-4">
       <div className="flex flex-wrap items-center justify-between gap-3">

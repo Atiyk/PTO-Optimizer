@@ -23,7 +23,7 @@ import { QuickForecast } from './QuickForecast';
 import { BalanceFromImage } from './BalanceFromImage';
 import { useRequestLedger } from './useRequestLedger';
 import { WalletTransfer } from './WalletTransfer';
-import { publishBalanceBasis } from './usePersonalWorkspace';
+import { publishBalanceBasis, publishWorkdaySchedule } from './usePersonalWorkspace';
 import { generateAlerts } from '../policy/alerts';
 import { generatePolicySummary } from '../policy/summary';
 import { generateHRQuestions, hrQuestionsMessage } from '../policy/hrQuestions';
@@ -221,6 +221,7 @@ export function Policy() {
     () => ({
       unit,
       hoursPerDay: policyHoursPerDay,
+      ...(shiftMinutes ? { shiftMinutes } : {}),
       accrual,
       planYear,
       accrualCap: accrualCapEnabled && accrualKind !== 'unlimited' ? accrualCap : undefined,
@@ -235,7 +236,7 @@ export function Policy() {
       plannedDays,
     }),
     [
-      unit, policyHoursPerDay, accrual, planYear, accrualCapEnabled, accrualKind, accrualCap, carryover,
+      unit, policyHoursPerDay, shiftMinutes, accrual, planYear, accrualCapEnabled, accrualKind, accrualCap, carryover,
       waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance, payoutOnLeaving, currentBalance, balanceIncludesApprovedLeave, currentCarriedBalance,
       balanceAsOf, plannedDays,
     ],
@@ -296,6 +297,11 @@ export function Policy() {
     ? shiftMinutes ?? trackerWorkWeek.map(working => working ? Math.round(hoursPerDay * 60) : 0)
     : undefined;
   const pricedRequestCalendar = { ...trackerCalendar.calendar, shiftMinutes: trackerShiftMinutes };
+  // Planners convert this tracker's hourly requests to days with the same shifts.
+  const publishedShiftKey = trackerShiftMinutes?.join(',');
+  useEffect(() => {
+    if (unit === 'hours' && publishedShiftKey) publishWorkdaySchedule({ shiftMinutes: publishedShiftKey.split(',').map(Number), hoursPerDay: policyHoursPerDay });
+  }, [unit, publishedShiftKey, policyHoursPerDay]);
 
   const decoded = useMemo(() => decodeParagraph(pastedText), [pastedText]);
   const decodedTerms = useMemo(() => uniqueMatchedTerms(decoded), [decoded]);

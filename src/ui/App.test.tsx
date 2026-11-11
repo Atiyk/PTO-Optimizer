@@ -81,6 +81,19 @@ describe('planner result actions', () => {
     expect(screen.getByTestId('tracked-requests-summary').textContent).toBe('Includes 1 approved day off · 0 tentative, 1 reserved from the budget.');
   });
 
+  it('reserves an hourly half day from the budget once and labels it in hours and days', async () => {
+    window.history.replaceState(null, '', '/pto?c=US&s=2027-01-01&e=2027-02-28&b=6&rv=0&w=0&count=2');
+    localStorage.setItem('gapless.personal.workspace.v1', JSON.stringify({ version: 1, balanceIncludesApprovedLeave: false, workdaySchedule: { shiftMinutes: [480, 480, 480, 480, 480, 0, 0] } }));
+    localStorage.setItem('gapless.personal.requests.v1', JSON.stringify({ version: 1, requests: [{
+      id: 'half', start: '2027-01-12', end: '2027-01-12', ptoDates: ['2027-01-12'], ptoDays: 1, ptoMinutes: { '2027-01-12': 240 }, partialMinutes: 240,
+      status: 'approved', note: '', createdAt: '2026-11-01T00:00:00.000Z', updatedAt: '2026-11-01T00:00:00.000Z',
+    }] }));
+    render(<App />);
+    const summary = await screen.findByTestId('tracked-requests-summary');
+    expect(summary.textContent).toBe('Includes 0.5 approved day off · 0 tentative, 1 reserved from the budget.');
+    expect(screen.getByTestId('tracked-hourly-note').textContent).toBe('Hourly requests count as a share of that day\'s shift: 0.5 day owed. The planner budgets whole days, so it reserves 1.');
+  });
+
   it('keeps new recommendations clear of a tracked break shown beside them', async () => {
     window.history.replaceState(null, '', '/pto?c=US&s=2027-01-01&e=2027-02-28&b=6&rv=0&w=0&count=2');
     localStorage.setItem('gapless.personal.requests.v1', JSON.stringify({ version: 1, requests: [{

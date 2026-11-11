@@ -1,5 +1,5 @@
 import type { ISODate } from '@daysoff/engine/solver/types';
-import { rangeISO } from '@daysoff/engine/solver/dateUtils';
+import { mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { isValidISODate } from '../ui/urlState';
 import { validRequestRange, type PtoRequest, type RequestStatus, type RequestStorage } from './requestLedger';
 
@@ -49,52 +49,115 @@ export function requestDateCharge(request: PtoRequest, date: ISODate, basis: Bal
   return basis.includesApprovedLeave ? 'in-balance' : 'charge';
 }
 
-/** Per-date charge across the whole ledger; a booked charge wins over a tentative one. */
-function chargesByDate(requests: readonly PtoRequest[], basis: BalanceBasis, keep: (request: PtoRequest, date: ISODate) => boolean) {
-  const charged = new Map<ISODate, 'charge' | 'tentative'>();
+/**
+ * The user's working schedule, used only to express an hourly booking as a share of
+ * that weekday's shift. `shiftMinutes` is Monday–Sunday; `hoursPerDay` is the fallback.
+ */
+export interface WorkdaySchedule {
+  shiftMinutes?: readonly number[];
+  hoursPerDay?: number;
+}
+
+/** Scheduled minutes on `date`, or undefined when the schedule does not say. */
+export function scheduledMinutesOn(date: ISODate, schedule: WorkdaySchedule | undefined): number | undefined {
+  const shift = schedule?.shiftMinutes?.length === 7 ? schedule.shiftMinutes[mondayIndexedDow(date)] : undefined;
+  if (typeof shift === 'number' && Number.isFinite(shift) && shift > 0) return shift;
+  const hours = schedule?.hoursPerDay;
+  return typeof hours === 'number' && Number.isFinite(hours) && hours > 0 ? Math.round(hours * 60) : undefined;
+}
+
+/** Day-equivalent totals are rounded once, to the thousandth: 3 × (3h of a 9h shift) is exactly one day. */
+export const roundDayEquivalent = (days: number) => Math.round(days * 1000) / 1000;
+
+/**
+ * Hours → day-equivalents, the one conversion every planner uses.
+ *   - A whole-day request (no recorded minutes) costs 1 day per PTO date: legacy data is unchanged.
+ *   - An hourly request priced at the full shift costs 1 day: it takes that whole workday,
+ *     whatever the shift length (a 10h day on a 4x10 schedule is one planner day).
+ *   - A partial day costs its recorded minutes ÷ that weekday's scheduled minutes, at most 1.
+ *     When the shift is unknown it costs a whole day, so a planner never under-reserves.
+ */
+export function requestDayEquivalent(request: PtoRequest, date: ISODate, schedule?: WorkdaySchedule): number {
+  return roundDayEquivalent(exactDayEquivalent(request, date, schedule));
+}
+
+/** Unrounded, so sums are rounded once rather than accumulating per-date rounding. */
+function exactDayEquivalent(request: PtoRequest, date: ISODate, schedule?: WorkdaySchedule): number {
+  const minutes = request.ptoMinutes?.[date];
+  if (minutes === undefined || request.partialMinutes === undefined) return 1;
+  const scheduled = scheduledMinutesOn(date, schedule);
+  return scheduled === undefined ? 1 : Math.min(1, minutes / scheduled);
+}
+
+type DatedCharge = { charge: 'charge' | 'tentative'; days: number };
+
+/**
+ * Per-date charge across the whole ledger; a booked charge wins over a tentative one.
+ * Overlapping requests on one date charge that date once, at the larger day-equivalent.
+ */
+function chargesByDate(requests: readonly PtoRequest[], basis: BalanceBasis, keep: (request: PtoRequest, date: ISODate) => boolean, schedule?: WorkdaySchedule) {
+  const charged = new Map<ISODate, DatedCharge>();
   for (const request of requests) {
     for (const date of request.ptoDates) {
       if (!keep(request, date)) continue;
       const charge = requestDateCharge(request, date, basis);
-      if (charge === 'charge') charged.set(date, 'charge');
-      else if (charge === 'tentative' && !charged.has(date)) charged.set(date, 'tentative');
+      if (charge !== 'charge' && charge !== 'tentative') continue;
+      const days = exactDayEquivalent(request, date, schedule);
+      const current = charged.get(date);
+      if (!current || (charge === 'charge' && current.charge === 'tentative')) charged.set(date, { charge, days });
+      else if (current.charge === charge) current.days = Math.max(current.days, days);
     }
   }
   // A date booked by one request and already in the balance via another is not re-charged.
   for (const request of requests) {
     if (planningRole(request.status) !== 'booked') continue;
-    for (const date of request.ptoDates) if (charged.get(date) === 'tentative' && requestDateCharge(request, date, basis) === 'in-balance') charged.delete(date);
+    for (const date of request.ptoDates) if (charged.get(date)?.charge === 'tentative' && requestDateCharge(request, date, basis) === 'in-balance') charged.delete(date);
   }
   return charged;
 }
 
+const sumDays = (charges: Iterable<DatedCharge>, kind: 'charge' | 'tentative' | 'any') => {
+  let total = 0;
+  for (const entry of charges) if (kind === 'any' || entry.charge === kind) total += entry.days;
+  return roundDayEquivalent(total);
+};
+
 /** Dates a forecast must still subtract through `through`, unioned and sorted. */
 export function chargeableRequestDates(requests: readonly PtoRequest[], basis: BalanceBasis, through: ISODate, includeTentative: boolean): ISODate[] {
   const charged = chargesByDate(requests, basis, (_request, date) => date <= through);
-  return [...charged].filter(([, charge]) => includeTentative || charge === 'charge').map(([date]) => date).sort();
+  return [...charged].filter(([, entry]) => includeTentative || entry.charge === 'charge').map(([date]) => date).sort();
 }
 
 export interface PlanningCommitments {
   /** Every calendar day of booked and tentative requests in range: already off, never recommended again. */
   unavailableDates: ISODate[];
-  /** Whole-day booked PTO dates after the as-of date in range (shown even if already in the balance). */
+  /** Booked PTO day-equivalents after the as-of date in range (shown even if already in the balance). */
   approvedPtoDays: number;
-  /** Whole-day tentative PTO dates after the as-of date in range, excluding days already booked. */
+  /** Tentative PTO day-equivalents after the as-of date in range, excluding days already booked. */
   tentativePtoDays: number;
-  /** What the planning budget must subtract under the basis: each day once. */
+  /** Exact day-equivalents the budget owes under the basis (hourly partial days are fractions). */
+  reservedPtoDayEquivalent: number;
+  /** Whole days the planning budget subtracts: the exact owed amount rounded UP, each day once. */
   reservedPtoDays: number;
-  /** The planner budgets whole days; hourly bookings stay unavailable without a guessed cost. */
+  /** At least one booked or tentative request in range was recorded in hours. */
   hasHourlyBookings: boolean;
 }
 
-const NO_COMMITMENTS: PlanningCommitments = { unavailableDates: [], approvedPtoDays: 0, tentativePtoDays: 0, reservedPtoDays: 0, hasHourlyBookings: false };
+const NO_COMMITMENTS: PlanningCommitments = { unavailableDates: [], approvedPtoDays: 0, tentativePtoDays: 0, reservedPtoDayEquivalent: 0, reservedPtoDays: 0, hasHourlyBookings: false };
 
-export function planningCommitments(requests: readonly PtoRequest[], range: { start: ISODate; end: ISODate }, basis: BalanceBasis): PlanningCommitments {
+/**
+ * Rounding: day-equivalents are summed exactly (to the thousandth), then the budget
+ * reservation is rounded up to a whole day because the planner recommends whole days.
+ * Rounding up is deliberate: a half day booked never lets the planner spend that half twice.
+ */
+export function planningCommitments(
+  requests: readonly PtoRequest[], range: { start: ISODate; end: ISODate }, basis: BalanceBasis, schedule?: WorkdaySchedule,
+): PlanningCommitments {
   const { start, end } = range;
   if (!isValidISODate(start) || !isValidISODate(end) || start > end) return NO_COMMITMENTS;
   const unavailable = new Set<ISODate>();
   let hasHourlyBookings = false;
-  const wholeDay: PtoRequest[] = [];
+  const committed: PtoRequest[] = [];
   for (const request of requests) {
     const role = planningRole(request.status);
     if ((role !== 'booked' && role !== 'tentative') || !validRequestRange(request.start, request.end)) continue;
@@ -103,19 +166,19 @@ export function planningCommitments(requests: readonly PtoRequest[], range: { st
     if (first > last) continue;
     for (const date of rangeISO(first, last)) unavailable.add(date);
     if (request.ptoMinutes !== undefined) hasHourlyBookings = true;
-    else wholeDay.push(request);
+    committed.push(request);
   }
   const inRange = (_request: PtoRequest, date: ISODate) => date >= start && date <= end;
-  const owed = chargesByDate(wholeDay, basis, inRange);
+  const owed = chargesByDate(committed, basis, inRange, schedule);
   // Approved days are counted for display whether or not the balance already holds them.
-  const shown = chargesByDate(wholeDay, { ...basis, includesApprovedLeave: false }, inRange);
-  const approvedPtoDays = [...shown.values()].filter(charge => charge === 'charge').length;
-  const tentativePtoDays = [...shown.values()].filter(charge => charge === 'tentative').length;
+  const shown = chargesByDate(committed, { ...basis, includesApprovedLeave: false }, inRange, schedule);
+  const reservedPtoDayEquivalent = sumDays(owed.values(), 'any');
   return {
     unavailableDates: [...unavailable].sort(),
-    approvedPtoDays,
-    tentativePtoDays,
-    reservedPtoDays: owed.size,
+    approvedPtoDays: sumDays(shown.values(), 'charge'),
+    tentativePtoDays: sumDays(shown.values(), 'tentative'),
+    reservedPtoDayEquivalent,
+    reservedPtoDays: Math.ceil(reservedPtoDayEquivalent),
     hasHourlyBookings,
   };
 }
@@ -154,10 +217,10 @@ export function committedPlanEntries(requests: readonly PtoRequest[], range: { s
   return entries.sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end) || a.id.localeCompare(b.id));
 }
 
-/** Whole committed days after a saved balance, for planners that start from that balance. */
-export function committedRequestDays(requests: readonly PtoRequest[], basis: BalanceBasis): { approvedDays: number; tentativeDays: number } {
-  const charged = [...chargesByDate(requests, basis, () => true).values()];
-  return { approvedDays: charged.filter(c => c === 'charge').length, tentativeDays: charged.filter(c => c === 'tentative').length };
+/** Committed day-equivalents after a saved balance, for planners that start from that balance. */
+export function committedRequestDays(requests: readonly PtoRequest[], basis: BalanceBasis, schedule?: WorkdaySchedule): { approvedDays: number; tentativeDays: number } {
+  const charged = [...chargesByDate(requests, basis, () => true, schedule).values()];
+  return { approvedDays: sumDays(charged, 'charge'), tentativeDays: sumDays(charged, 'tentative') };
 }
 
 /**
@@ -167,26 +230,66 @@ export function committedRequestDays(requests: readonly PtoRequest[], basis: Bal
 export const BALANCE_BASIS_STORAGE_KEY = 'gapless.personal.workspace.v1';
 export const BALANCE_BASIS_CHANGED = 'gapless:workspace-basis-changed';
 
-export function readBalanceBasisPreference(storage: RequestStorage | null): boolean | undefined {
+interface WorkspaceRecord {
+  version: 1;
+  balanceIncludesApprovedLeave?: boolean;
+  workdaySchedule?: WorkdaySchedule;
+}
+
+function validSchedule(value: unknown): WorkdaySchedule | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const { shiftMinutes, hoursPerDay } = value as Record<string, unknown>;
+  const shiftsOk = shiftMinutes === undefined || (Array.isArray(shiftMinutes) && shiftMinutes.length === 7
+    && shiftMinutes.every(m => typeof m === 'number' && Number.isInteger(m) && m >= 0 && m <= 1440) && shiftMinutes.some(m => m > 0));
+  const hoursOk = hoursPerDay === undefined || (typeof hoursPerDay === 'number' && Number.isFinite(hoursPerDay) && hoursPerDay > 0 && hoursPerDay <= 24);
+  if (!shiftsOk || !hoursOk || (shiftMinutes === undefined && hoursPerDay === undefined)) return undefined;
+  return { ...(shiftMinutes ? { shiftMinutes: [...shiftMinutes as number[]] } : {}), ...(hoursPerDay !== undefined ? { hoursPerDay } : {}) };
+}
+
+function readWorkspaceRecord(storage: RequestStorage | null): WorkspaceRecord | undefined {
   if (!storage) return undefined;
   try {
     const raw = storage.getItem(BALANCE_BASIS_STORAGE_KEY);
     if (!raw || raw.length > 1000) return undefined;
     const value: unknown = JSON.parse(raw);
-    if (!value || typeof value !== 'object' || !('version' in value) || value.version !== 1
-      || !('balanceIncludesApprovedLeave' in value) || typeof value.balanceIncludesApprovedLeave !== 'boolean') return undefined;
-    return value.balanceIncludesApprovedLeave;
+    if (!value || typeof value !== 'object' || !('version' in value) || value.version !== 1) return undefined;
+    const record = value as Record<string, unknown>;
+    return {
+      version: 1,
+      ...(typeof record.balanceIncludesApprovedLeave === 'boolean' ? { balanceIncludesApprovedLeave: record.balanceIncludesApprovedLeave } : {}),
+      ...(validSchedule(record.workdaySchedule) ? { workdaySchedule: validSchedule(record.workdaySchedule) } : {}),
+    };
   } catch {
     return undefined;
   }
 }
 
-export function writeBalanceBasisPreference(includesApprovedLeave: boolean, storage: RequestStorage | null): boolean {
+/** Read-modify-write so the basis and the schedule never overwrite each other. */
+function updateWorkspaceRecord(patch: Partial<WorkspaceRecord>, storage: RequestStorage | null): boolean {
   if (!storage) return false;
   try {
-    storage.setItem(BALANCE_BASIS_STORAGE_KEY, JSON.stringify({ version: 1, balanceIncludesApprovedLeave: includesApprovedLeave }));
+    const next = { ...(readWorkspaceRecord(storage) ?? {}), ...patch, version: 1 as const };
+    storage.setItem(BALANCE_BASIS_STORAGE_KEY, JSON.stringify(next));
     return true;
   } catch {
     return false;
   }
+}
+
+export function readBalanceBasisPreference(storage: RequestStorage | null): boolean | undefined {
+  return readWorkspaceRecord(storage)?.balanceIncludesApprovedLeave;
+}
+
+export function writeBalanceBasisPreference(includesApprovedLeave: boolean, storage: RequestStorage | null): boolean {
+  return updateWorkspaceRecord({ balanceIncludesApprovedLeave: includesApprovedLeave }, storage);
+}
+
+/** The hourly schedule My PTO priced requests with; device-local, never placed in a URL. */
+export function readWorkdaySchedulePreference(storage: RequestStorage | null): WorkdaySchedule | undefined {
+  return readWorkspaceRecord(storage)?.workdaySchedule;
+}
+
+export function writeWorkdaySchedulePreference(schedule: WorkdaySchedule, storage: RequestStorage | null): boolean {
+  const valid = validSchedule(schedule);
+  return valid ? updateWorkspaceRecord({ workdaySchedule: valid }, storage) : false;
 }

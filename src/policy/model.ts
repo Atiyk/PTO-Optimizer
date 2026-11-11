@@ -34,6 +34,9 @@ export interface TimeOffPolicy {
   unit: PolicyUnit;
   /** Only meaningful when unit === 'hours'; used to translate to/from whole days for display. */
   hoursPerDay: number;
+  /** Optional Monday–Sunday scheduled minutes (e.g. 4x10 or 9/80). Converts hours to
+   * day-equivalents per weekday; absent means every workday is `hoursPerDay` long. */
+  shiftMinutes?: readonly number[];
   accrual: AccrualMethod;
   planYear: PlanYear;
   /** Max balance; accrual that would exceed it is lost until the balance drops again. */

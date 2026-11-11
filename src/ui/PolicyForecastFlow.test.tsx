@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { Policy } from './Policy';
+import { readBrowserWorkdaySchedule } from './usePersonalWorkspace';
 import { initialPolicyPreferences, readBrowserPolicyDraft, savePolicyPreferences } from '../personal/policyPreferences';
 
 const INITIAL_SEARCH = '?c=US&cb=10&bao=2027-01-01&ak=pp&am=1&fq=m&pda=2027-01-15&cm=a&ace=0&fd=2027-03-15';
@@ -14,6 +15,15 @@ beforeEach(() => {
   window.history.replaceState(null, '', `/policy${INITIAL_SEARCH}`);
 });
 afterEach(() => { cleanup(); window.localStorage.clear(); window.history.replaceState(null, '', '/policy'); });
+
+describe('hourly schedule shared with the planner', () => {
+  it('publishes an hours policy\'s per-weekday shifts for planners, never in the URL', () => {
+    window.history.replaceState(null, '', '/policy?c=US&u=1&hpd=10&shm=600,600,600,600,0,0,0&cb=80&bao=2027-01-01&ak=pp&am=8&fq=m&pda=2027-01-15&cm=a&ace=0&fd=2027-03-15');
+    render(<Policy />);
+    expect(readBrowserWorkdaySchedule()).toEqual({ shiftMinutes: [600, 600, 600, 600, 0, 0, 0], hoursPerDay: 10 });
+    expect(window.location.search).not.toContain('shm');
+  });
+});
 
 describe('quick policy forecast in the real consumer page', () => {
   it('updates from only the current balance, as-of date and accrual inputs without a submission', () => {
