@@ -1,14 +1,15 @@
-import { US_DEMAND_INDEX, demandFor } from '@daysoff/engine/data/demandIndex';
+import { US_DEMAND_SOURCE_YEAR, demandFor, usSeasonalDemand } from '@daysoff/engine/data/demandIndex';
 import { validCalendarDate } from '../personal/employerCalendar';
 
 /**
- * Consumer-only evidence adapter; does not alter the shared solver's legacy scoring.
+ * Consumer evidence adapter: provenance and caveats for the travel figure.
  * The raw US index is 2025 TSA throughput by month/day. Using a given 2025 Friday
  * value to score the corresponding date in 2027 can invert weekday preferences.
  *
- * A centred seven-day *seasonal* mean deliberately removes much of that single-
- * year weekday signal. It is still a rough historical proxy, not a forecast or
- * a price. Full objective integration requires separate benchmarks and critic QA.
+ * A centred seven-day *seasonal* mean deliberately removes that single-year weekday
+ * signal. The solver uses the same figure (engine `usSeasonalDemand`), so what this
+ * reports is what the planner weighed. It is still a rough historical proxy, not a
+ * forecast or a price.
  */
 export type TravelEvidenceKind =
   | 'historical-seasonal-estimate'
@@ -31,28 +32,12 @@ export interface TravelEvidence {
   caveat: string;
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const TSA_SOURCE_YEAR = 2025;
-const SEASONAL_HALF_WINDOW = 3;
+const TSA_SOURCE_YEAR = US_DEMAND_SOURCE_YEAR;
 
+/** The SAME seasonal figure the planner's solver uses (one source of truth, issue 6). */
 function seasonalUS(day: string): number | null {
-  const md = day.slice(5);
-  // The source year is non-leap. Feb 29 uses the adjacent Feb 28 signal.
-  const sourceMD = md === '02-29' ? '02-28' : md;
-  const mm = Number(sourceMD.slice(0, 2));
-  const dd = Number(sourceMD.slice(3, 5));
-  const center = Date.UTC(TSA_SOURCE_YEAR, mm - 1, dd);
-  let sum = 0;
-  let n = 0;
-  for (let offset = -SEASONAL_HALF_WINDOW; offset <= SEASONAL_HALF_WINDOW; offset++) {
-    const key = new Date(center + offset * DAY_MS).toISOString().slice(5, 10);
-    const observed = US_DEMAND_INDEX[key];
-    if (Number.isFinite(observed) && observed > 0) {
-      sum += observed;
-      n++;
-    }
-  }
-  return n > 0 ? sum / n : null;
+  const value = usSeasonalDemand(day);
+  return Number.isFinite(value) && value > 0 ? value : null;
 }
 
 /**

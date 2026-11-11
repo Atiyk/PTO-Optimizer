@@ -63,7 +63,7 @@ constructor — all date arithmetic happens in UTC on `YYYY-MM-DD` strings via
 | `blackouts?` | `string[]` | Dates that can never be PTO, even if they'd otherwise be off |
 | `overlapDays?` | `string[]` | Someone else's days off; breaks touching these get a small value bonus and an `Overlaps` tag |
 | `workWeek?` | `[boolean×7]` | Monday→Sunday, `true` = normally a working day. Defaults to Mon–Fri |
-| `country?` | `string` | ISO country code — selects the travel-demand index (US has real TSA data; everything else gets a generic "Estimated" fallback) |
+| `country?` | `string` | ISO country code — selects the travel-demand index (US uses a 7-day seasonal average of 2025 TSA checkpoint counts; everything else gets a generic "Estimated" seasonal rule). Neither is a forecast or a price |
 | `w?` | `number` | 0–100 (step 10). 0 = maximise days off, ignore travel demand. 100 = minimise travel demand, accept fewer days off. Default 30 |
 | `breakCount?` | `number` | 0–7. 0 = unconstrained. 1–6 = target exactly that many breaks (falls back to the nearest achievable count). 7 = maximise break count. Default 0 |
 
