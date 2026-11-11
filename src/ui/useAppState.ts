@@ -22,7 +22,7 @@ import { validateInputs, isSupportedPlanningRange } from './validation';
 import { defaultRangeEnd, defaultPlanRangeEnd, holidayEntriesFor, stateHolidayCandidatesFor, altFridayOffDatesFor, effectiveOffDaysFor, mustIncludeDaysFor, effectiveBlackoutsFor, effectiveBudgetFor, policyAccrualFieldsFor, buildSolveInput, isSuggestedPtoDay, type HolidayEntry } from '../autopilot/planFromSearch';
 import { todayISO } from './today';
 import type { PtoRequest } from '../personal/requestLedger';
-import { planningCommitments } from '../personal/workspace';
+import { committedPlanEntries, planningCommitments } from '../personal/workspace';
 import { usePlannerComputation } from '../planning/usePlannerComputation';
 import { MAX_PINNED_PLANS, usePinnedPlans } from './pinnedPlanStore';
 
@@ -552,6 +552,11 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     [requests, rangeStart, rangeEnd, balanceAsOf, reserveApprovedPto],
   );
   const bookedDates = useMemo(() => new Set(applyTrackedRequests ? commitments.unavailableDates : []), [applyTrackedRequests, commitments]);
+  // Tracked and approved requests stay visible in the results beside new breaks.
+  const committedEntries = useMemo(
+    () => applyTrackedRequests ? committedPlanEntries(requests, { start: rangeStart, end: rangeEnd }) : [],
+    [applyTrackedRequests, requests, rangeStart, rangeEnd],
+  );
   const mustIncludeDays = useMemo(
     () => mustIncludeDaysFor(forced).filter(date => !bookedDates.has(date)),
     [forced, bookedDates],
@@ -1013,6 +1018,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     reservedPtoDays: applyTrackedRequests && !unlimitedPto ? commitments.reservedPtoDays : 0,
     hasHourlyBookings: commitments.hasHourlyBookings,
     hasTrackedRequests: commitments.unavailableDates.length > 0,
+    committedEntries,
     applyTrackedRequests,
     setApplyTrackedRequests,
     isSharedPlan: initial.publicShareVersion === 1,

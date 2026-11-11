@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { createPtoRequest, type PtoRequest, type RequestCalendar, type RequestStatus } from './requestLedger';
 import {
-  BALANCE_BASIS_STORAGE_KEY, chargeableRequestDates, committedRequestDays, planningCommitments, planningRole,
+  BALANCE_BASIS_STORAGE_KEY, chargeableRequestDates, committedPlanEntries, committedRequestDays, planningCommitments, planningRole,
   readBalanceBasisPreference, requestDateCharge, writeBalanceBasisPreference,
 } from './workspace';
 
@@ -91,5 +91,23 @@ describe('shared balance basis preference', () => {
     expect(readBalanceBasisPreference(storage)).toBeUndefined();
     expect(readBalanceBasisPreference({ getItem() { throw new Error('denied'); }, setItem() {} })).toBeUndefined();
     expect(BALANCE_BASIS_STORAGE_KEY).toBe('gapless.personal.workspace.v1');
+  });
+});
+
+describe('committed entries the planner keeps visible', () => {
+  it('lists booked and tentative requests overlapping the window in date order with their saved cost', () => {
+    const entries = [
+      request('later', '2027-01-18', '2027-01-19', 'approved'),
+      request('tracked', '2027-01-11', '2027-01-12', 'planned'),
+      request('idea', '2027-01-13', '2027-01-13', 'considering'),
+      request('gone', '2027-01-14', '2027-01-14', 'canceled'),
+      request('outside', '2027-03-01', '2027-03-02', 'approved'),
+      request('edge', '2027-01-01', '2027-01-04', 'requested'),
+    ];
+    expect(committedPlanEntries(entries, range).map(e => [e.id, e.role, e.status, e.start, e.end, e.ptoDays])).toEqual([
+      ['edge', 'tentative', 'requested', '2027-01-01', '2027-01-04', 1],
+      ['tracked', 'tentative', 'planned', '2027-01-11', '2027-01-12', 2],
+      ['later', 'booked', 'approved', '2027-01-18', '2027-01-19', 2],
+    ]);
   });
 });

@@ -120,6 +120,40 @@ export function planningCommitments(requests: readonly PtoRequest[], range: { st
   };
 }
 
+export interface CommittedPlanEntry {
+  id: string;
+  role: 'booked' | 'tentative';
+  status: RequestStatus;
+  start: ISODate;
+  end: ISODate;
+  ptoDates: readonly ISODate[];
+  /** The cost saved with the request, never recomputed from the span. */
+  ptoDays: number;
+  /** Native recorded minutes when the request was priced hourly. */
+  ptoMinutes?: number;
+}
+
+/**
+ * Booked and tentative requests overlapping a planning window, in date order, so the
+ * planner can keep them visible beside new recommendations. Display only: their
+ * days and costs are already excluded/reserved by planningCommitments.
+ */
+export function committedPlanEntries(requests: readonly PtoRequest[], range: { start: ISODate; end: ISODate }): CommittedPlanEntry[] {
+  if (!isValidISODate(range.start) || !isValidISODate(range.end) || range.start > range.end) return [];
+  const entries: CommittedPlanEntry[] = [];
+  for (const request of requests) {
+    const role = planningRole(request.status);
+    if ((role !== 'booked' && role !== 'tentative') || !validRequestRange(request.start, request.end)) continue;
+    if (request.end < range.start || request.start > range.end) continue;
+    entries.push({
+      id: request.id, role, status: request.status, start: request.start, end: request.end,
+      ptoDates: request.ptoDates, ptoDays: request.ptoDays,
+      ...(request.ptoMinutes ? { ptoMinutes: Object.values(request.ptoMinutes).reduce((sum, minutes) => sum + minutes, 0) } : {}),
+    });
+  }
+  return entries.sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end) || a.id.localeCompare(b.id));
+}
+
 /** Whole committed days after a saved balance, for planners that start from that balance. */
 export function committedRequestDays(requests: readonly PtoRequest[], basis: BalanceBasis): { approvedDays: number; tentativeDays: number } {
   const charged = [...chargesByDate(requests, basis, () => true).values()];

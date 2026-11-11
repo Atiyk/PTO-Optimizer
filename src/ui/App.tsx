@@ -24,6 +24,7 @@ import { MoreOptions } from './MoreOptions';
 import { Calendar } from './Calendar';
 import { Legend } from './Legend';
 import { BreakCard } from './BreakCard';
+import { CommittedBreakCard } from './CommittedBreakCard';
 import { PinnedPlansStrip } from './PinnedPlansStrip';
 import { ExportBar } from './ExportBar';
 import { PartnerOverlapBanner } from './PartnerOverlapBanner';
@@ -71,6 +72,7 @@ export function App() {
     return rangeISO(state.rangeStart, state.rangeEnd).filter(date => !unavailable.has(date) && (off.has(date) || !state.workWeek[mondayIndexedDow(date)]));
   }, [state.validationIssues, state.effectiveOffDays, state.solveInput.blackouts, state.rangeStart, state.rangeEnd, state.workWeek]);
   const requestCalendar = { workWeek: state.workWeek, offDays: state.effectiveOffDays, rangeStart: state.rangeStart, rangeEnd: state.rangeEnd };
+  const [justTracked, setJustTracked] = useState<{ id: string; message: string } | null>(null);
   const recordBreak = (brk: typeof state.breaks[number], ptoDates: string[], action: 'saved' | 'tracked') => {
     if (!requestToolsReady || ptoDates.length !== brk.ptoCost) {
       return { ok: false, message: 'Wait for your calendar to update, then try again.' };
@@ -84,6 +86,8 @@ export function App() {
         if (action === 'tracked') track('request_tracking_started');
         trackBreakAction(action);
       }
+      // The tracked break moves into the committed entries; keep its confirmation there.
+      if (action === 'tracked' && result.ok && result.id) setJustTracked({ id: result.id, message: result.message });
       return result;
     });
   };
@@ -265,8 +269,13 @@ export function App() {
               )}
               <section aria-labelledby="breaks-heading" id="summary-heading" className="min-w-0 scroll-mt-16">
                 <h2 id="breaks-heading" tabIndex={-1} className="scroll-mt-16 text-h2 font-bold text-ink type-condensed">Requesting each break</h2>
-                {plannable && state.breaks.length > 0 ? (
+                {plannable && (state.breaks.length > 0 || state.committedEntries.length > 0) ? (
                   <ul className="m-0 mt-3 flex list-none flex-col gap-3 p-0">
+                    {state.committedEntries.map(entry => (
+                      <li key={`committed-${entry.id}`} data-testid="committed-entry" data-committed-start={entry.start} data-committed-end={entry.end} data-committed-status={entry.status} className="rounded-[10px] border border-line bg-surface-alt">
+                        <CommittedBreakCard entry={entry} message={justTracked?.id === entry.id ? justTracked.message : undefined} focusLink={justTracked?.id === entry.id} />
+                      </li>
+                    ))}
                     {state.orderedBreaks.map(({ index, brk }) => {
                       const ptoDates = brk.days.filter(state.isSuggestedPto);
                       const breakReady = requestToolsReady && ptoDates.length === brk.ptoCost;
