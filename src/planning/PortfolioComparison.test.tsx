@@ -88,6 +88,26 @@ it('offers verified changes that update the inputs live, and moves focus to the 
   expect(screen.queryByRole('button', { name: /generate|submit|calculate/i })).toBeNull();
 });
 
+it('returns focus to the heading when the panel is replaced while the new plan is prepared', () => {
+  const zero: SolveInput = { rangeStart: '2027-03-02', rangeEnd: '2027-03-02', budget: 0, offDays: [], w: 0, breakCount: 3 };
+  const props = { input: zero, minimumBreakDays: 0, calendarIncomplete: false, budget: 0, reservedDays: 0, onSetBudget: vi.fn(), onExtendEnd: vi.fn() };
+  const { rerender } = render(<PortfolioComparison {...props} />);
+  act(() => vi.runOnlyPendingTimers());
+  act(() => ComparisonWorker.current.publish());
+  fireEvent.click(screen.getByRole('button', { name: 'Add 1 PTO day' }));
+  // A heavier plan re-solves: the app shows a placeholder, then mounts the panel again.
+  rerender(<p>Comparison is available when your plan is ready.</p>);
+  expect(document.activeElement).toBe(document.body);
+  rerender(<PortfolioComparison {...props} input={{ ...zero, budget: 1 }} budget={1} />);
+  expect(document.activeElement?.textContent).toBe('Compare recommendation goals');
+});
+
+it('does not take focus when the panel mounts without a suggestion having been applied', () => {
+  const zero: SolveInput = { rangeStart: '2027-03-02', rangeEnd: '2027-03-02', budget: 0, offDays: [], w: 0, breakCount: 3 };
+  render(<PortfolioComparison input={zero} minimumBreakDays={0} calendarIncomplete={false} />);
+  expect(document.activeElement).toBe(document.body);
+});
+
 it('shows an end-date suggestion only when it was verified, and none while suggestions are pending', () => {
   const onExtendEnd = vi.fn();
   const tiny: SolveInput = { rangeStart: '2027-03-02', rangeEnd: '2027-03-02', budget: 3, offDays: [], w: 0, breakCount: 3 };

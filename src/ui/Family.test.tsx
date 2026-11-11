@@ -234,6 +234,21 @@ describe('Family planner', () => {
     expect(screen.getByRole<HTMLInputElement>('checkbox', { name: 'Cover school days first' }).checked).toBe(true);
   });
 
+  it('keeps an emptied PTO field unknown instead of planning with 0 days', () => {
+    go('c=US&s=2026-11-02&pto=6');
+    render(<Family />);
+    const input = screen.getByRole<HTMLInputElement>('spinbutton', { name: 'PTO for school breaks' });
+    fireEvent.change(input, { target: { value: '' } });
+    expect(input.value).toBe('');
+    expect(new URLSearchParams(window.location.search).get('pto')).toBe('6');
+    expect(screen.getByText('Enter your PTO days. Enter 0 if you have none.')).toBeTruthy();
+    fireEvent.change(input, { target: { value: '0' } });
+    expect(new URLSearchParams(window.location.search).get('pto')).toBe('0');
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.blur(input);
+    expect(input.value).toBe('0');
+  });
+
   it('copies a comparable saved balance into the family budget only on request', () => {
     savePolicyPreferences('c=US&u=1&cb=37&hpd=7.5&bao=2026-11-01');
     go('c=US&s=2026-11-02&pto=2');

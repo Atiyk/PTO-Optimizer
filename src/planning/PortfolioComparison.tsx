@@ -47,12 +47,23 @@ function suggestionResult(suggestion: PortfolioSuggestion, budget: number, reser
     ? `${plans} · ${reservedDays} kept in reserve` : plans;
 }
 
+/** When a suggestion was applied. A heavier plan re-solves with this panel replaced by a
+ * placeholder, which drops keyboard focus; the panel takes it back when it mounts again,
+ * but only shortly after the click and only if focus has not gone anywhere else. */
+let suggestionAppliedAt = 0;
+const FOCUS_RETURN_MS = 15000;
+
 export function PortfolioComparison({ input, minimumBreakDays, calendarIncomplete, allowBudgetChange = true, onSetBudget, onExtendEnd, budget = input.budget, reservedDays = 0 }: PortfolioComparisonProps) {
   const job = useMemo<PortfolioComparisonJob>(
     () => ({ input: { ...input, minimumBreakDays }, calendarIncomplete, allowBudgetChange }),
     [input, minimumBreakDays, calendarIncomplete, allowBudgetChange],
   );
   const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    const lost = !document.activeElement || document.activeElement === document.body;
+    if (lost && Date.now() - suggestionAppliedAt < FOCUS_RETURN_MS) headingRef.current?.focus();
+    suggestionAppliedAt = 0;
+  }, []);
   const [completed, setCompleted] = useState<{ job: PortfolioComparisonJob; report: CanonicalPortfolioReport | null; suggestions?: PortfolioSuggestion[] }>();
   useEffect(() => {
     let cancelled = false;
@@ -96,6 +107,7 @@ export function PortfolioComparison({ input, minimumBreakDays, calendarIncomplet
     else onExtendEnd?.(suggestion.rangeEnd);
     // The clicked button is replaced by the new result; keep keyboard focus in this panel.
     headingRef.current?.focus();
+    suggestionAppliedAt = Date.now();
   };
   return (
     <section aria-label="Compare recommendation goals" className="min-w-0 rounded-lg border border-line bg-surface-alt p-3 text-sm text-ink">
