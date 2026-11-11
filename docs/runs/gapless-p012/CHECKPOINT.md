@@ -28,8 +28,8 @@ source of truth between scheduled executions. No sensitive user data belongs her
 
 | Batch | Issues | Branch / PR | State |
 |---|---|---|---|
-| P0 | 1, 2, 10, 11 | `gapless/p0-release` (base #144 head) | Audit |
-| P1 | 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17 | — | Not started |
+| P0 | 1, 2, 10, 11 | `gapless/p0-release` → PR #145, merged as `3bae6ed` (critic GO on 494d135) | Merged; Vercel prod success; prod smoke in progress |
+| P1 | 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17 | C 16/17 @ b42baa7; B 13/14 @ dea2dcf; W2 3/4 in progress | In progress |
 | P2 | 8, 15, 18, 19 | — | Not started |
 
 ## Issue traceability
@@ -61,6 +61,8 @@ Residual risks noted by P (not fixed): `/api/watch` and reminder-email links car
 
 - ~11:50Z — Fixes f1bdf68 (W) + 27e67c6 (P) integrated → P0 candidate 5d4d36e (local 1862/1862, tsc, lint, build). Critic round 2: GO on 5d4d36e. P3 follow-ups H-1/H-2/P-3 deferred. Waiting on required CI for 5d4d36e.
 
+- ~12:00Z — #145 merged (merge commit 3bae6ed) after both required checks green on 494d135 (320px privacy overflow fixed). Vercel status success. Prod smoke via GitHub Actions workflow on `gapless/prod-smoke` (container cannot reach vercel.app): routes 200, P0 privacy copy live, feed with private key → `private, no-store`. consumer-qa flagged formSubmitControls=1 on /pto: the opt-in email sign-in form, which renders only where accounts are enabled (prod, not CI) and is unchanged since #142. Not a P0 regression; QA now counts it separately (7777e23), carried into P1.
+
 ## Next action
 
-When both required checks green on 5d4d36e: mark #145 ready, merge (merge commit), verify Vercel production READY on merged SHA, smoke-test prod. Then P1: integrate C (16/17, b42baa7) and start remaining P1 issues max 2 agents at a time.
+Confirm prod smoke run on 7777e23 (routes + journey). Then build `gapless/p1-release` from 3bae6ed: integrate C (b42baa7), B (dea2dcf), W2 (3/4) when done, plus the consumer-qa account-form scoping. Remaining P1 (5, 6, 7, 9, 12) at most 2 agents at a time.
