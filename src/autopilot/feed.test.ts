@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addDays } from '@daysoff/engine/solver/dateUtils';
 import { requestByDate } from '@daysoff/engine/calendar/requestDeadline';
-import { buildPlanFeedICS, holidayEventLines, MAX_FEED_QUERY_LENGTH } from './feed';
+import { buildPlanFeedICS, feedSnapshotNote, holidayEventLines, MAX_FEED_QUERY_LENGTH } from './feed';
 import type { HolidaySource } from './planFromSearch';
 import { diskHolidays } from './feedTestHolidays';
 import { generateICS } from '../ui/icsExport';
@@ -69,7 +69,7 @@ describe('buildPlanFeedICS: same events as the downloaded .ics', () => {
     const [y, m, d] = TODAY.split('-').map(Number);
     const download = generateICS(result.plan.breaks, result.plan.isPtoDay, new Date(y, m - 1, d, 12), {
       enabled: true, leadDays: 14, workWeek: result.plan.state.workWeek, offDays: result.plan.solveInput.offDays,
-    });
+    }, feedSnapshotNote(undefined));
     const body = (ics: string) => ics.slice(ics.indexOf('BEGIN:VEVENT'), ics.lastIndexOf('END:VEVENT')).replace(/^DTSTAMP:.*$/gm, 'DTSTAMP');
     expect(body(result.ics)).toContain(body(download));
     expect(events(result.ics).filter((e) => prop(e, 'UID')!.startsWith('UID:pto-')).length).toBe(events(download).length);
@@ -214,5 +214,50 @@ describe('input bounds', () => {
     const result = buildPlanFeedICS('?c=../../etc&s=2027-01-01&e=2027-12-31&b=10', TODAY, (c, y) => { seen.push(`${c}-${y}`); return null; });
     expect(seen).toEqual([]);
     expect(result.ok).toBe(true);
+  });
+});
+
+describe('issue 19: a subscription is a fixed snapshot, and says so', () => {
+  const descriptions = (ics: string) => events(ics)
+    .filter((e) => prop(e, 'UID')!.startsWith('UID:pto-'))
+    .map((e) => prop(e, 'DESCRIPTION')?.replace(/\\([,;\\])/g, '$1'));
+
+  it('every PTO-day and book-by event names the day the subscription was created', () => {
+    const { ics } = feed(`${SEARCH}&fc=2026-11-01`);
+    const notes = descriptions(ics);
+    expect(notes.length).toBeGreaterThan(10);
+    for (const note of notes) {
+      expect(note).toContain('Created from your plan on November 1, 2026.');
+      expect(note).toContain('Later edits are not included');
+    }
+    expect(ics.replace(/\r\n /g, '')).toContain('X-WR-CALDESC:Created from your plan on November 1\\, 2026.');
+  });
+
+  it('a link without a creation date still says it is a fixed snapshot, without inventing a date', () => {
+    const notes = descriptions(feed().ics);
+    for (const note of notes) {
+      expect(note).toContain('Created from a saved plan link.');
+      expect(note).not.toMatch(/on \w+ \d+, \d{4}/);
+    }
+  });
+
+  it('ignores an invalid or future creation date', () => {
+    for (const fc of ['2026-13-01', 'yesterday', '2026-11-06']) {
+      expect(feed(`${SEARCH}&fc=${fc}`).ics).toBe(feed().ics);
+    }
+    // One day ahead of the UTC date is allowed: the subscriber's local date can lead UTC.
+    expect(feed(`${SEARCH}&fc=2026-11-05`).ics.replace(/\r\n /g, '')).toContain('November 5\\, 2026');
+  });
+
+  it('keeps the same event UIDs whatever the creation date, so a refresh updates events in place', () => {
+    const uids = (ics: string) => events(ics).map((e) => prop(e, 'UID'));
+    expect(uids(feed(`${SEARCH}&fc=2026-11-01`).ics)).toEqual(uids(feed().ics));
+    expect(uids(feed(`${SEARCH}&fc=2026-11-03`).ics)).toEqual(uids(feed().ics));
+  });
+
+  it('keeps every line within 75 octets with the note', () => {
+    for (const line of feed(`${SEARCH}&fc=2026-11-01`).ics.split('\r\n')) {
+      expect(new TextEncoder().encode(line).length).toBeLessThanOrEqual(75);
+    }
   });
 });

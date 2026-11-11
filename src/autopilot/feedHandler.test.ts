@@ -98,6 +98,13 @@ describe('handleFeedRequest', () => {
     },
   );
 
+  it('keeps the CDN cache when the link carries its subscription date (fc)', async () => {
+    const res = await handleFeedRequest(new Request(`${URL_OK}&sv=1&fc=2026-11-04`), reader, NOW);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe(FEED_CACHE_CONTROL);
+    expect((await res.text()).replace(/\r\n /g, '')).toContain('Created from your plan on November 4\\, 2026.');
+  });
+
   it('keeps the CDN cache for a current public share-format feed', async () => {
     const res = await handleFeedRequest(new Request(`${URL_OK}&sv=1&w=30&count=0`), reader, NOW);
     expect(res.headers.get('cache-control')).toBe(FEED_CACHE_CONTROL);

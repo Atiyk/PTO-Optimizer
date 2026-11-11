@@ -27,6 +27,27 @@ export const MAX_FEED_QUERY_LENGTH = 4096;
 
 export const FEED_CALENDAR_NAME = `${PRODUCT_NAME} - PTO plan`;
 
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/**
+ * Issue 19: a subscription is a fixed snapshot of the plan link's inputs. Later edits in
+ * the planner never reach it (nothing is stored server-side), so every event says so and
+ * names the day the link was made (`fc`, written by SubscribeFeed), when it is known.
+ */
+export function feedSnapshotNote(createdOn: string | undefined): string {
+  const [year, month, day] = (createdOn ?? '').split('-').map(Number);
+  const origin = createdOn ? `Created from your plan on ${MONTHS[month - 1]} ${day}, ${year}.` : 'Created from a saved plan link.';
+  return `${origin} Later edits are not included; subscribe again to update.`;
+}
+
+/** The link's creation date, if valid and not after tomorrow (UTC): the subscriber's local
+ * date may lead the server's UTC day by one. Anything else is ignored, never an error. */
+export function feedCreatedOn(value: string | null, today: string): string | undefined {
+  if (value === null || !isValidISODate(value)) return undefined;
+  const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+  return value <= tomorrow ? value : undefined;
+}
+
 export type FeedResult = { ok: true; ics: string; plan: SolvedPlan } | { ok: false; status: number; message: string };
 
 function stripQuestionMark(search: string): string {
@@ -80,6 +101,7 @@ export function buildPlanFeedICS(search: string, today: string, holidays: Holida
   if (!plan.ok) return { ok: false, status: 400, message: plan.issues.join(' ') };
 
   const dtstamp = feedDtstamp(today);
+  const note = feedSnapshotNote(feedCreatedOn(params.get('fc'), today));
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -87,10 +109,11 @@ export function buildPlanFeedICS(search: string, today: string, holidays: Holida
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     foldLine(`X-WR-CALNAME:${escapeText(FEED_CALENDAR_NAME)}`),
+    foldLine(`X-WR-CALDESC:${escapeText(note)}`),
     'REFRESH-INTERVAL;VALUE=DURATION:PT12H',
     'X-PUBLISHED-TTL:PT12H',
-    ...ptoDayEventLines(plan.breaks, plan.isPtoDay, dtstamp),
-    ...bookByEventLines(plan.breaks, today, plan.state.noticePeriodDays, dtstamp, plan.state.workWeek, plan.solveInput.offDays, plan.state.noticeUnit),
+    ...ptoDayEventLines(plan.breaks, plan.isPtoDay, dtstamp, note),
+    ...bookByEventLines(plan.breaks, today, plan.state.noticePeriodDays, dtstamp, plan.state.workWeek, plan.solveInput.offDays, plan.state.noticeUnit, note),
     ...holidayEventLines(plan.holidayEntries.map((entry) => entry.source === 'custom'
       ? { ...entry, name: 'Employer-observed day off' }
       : entry), plan.state.country, dtstamp),

@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import { localeForCountry } from './locale';
 import { CountrySelect } from './CountrySelect';
+import { useWholeDayDraft } from './useWholeDayDraft';
 
 interface PrimaryControlsProps {
   advanced?: boolean;
@@ -47,6 +48,8 @@ export function PrimaryControls({
   const locale = localeForCountry(country);
   const budgetId = useId();
   const sliderId = useId();
+  const budgetHintId = useId();
+  const budgetDraft = useWholeDayDraft(budget, onChangeBudget);
   const sliderBudget = Number.isFinite(budget) ? Math.max(0, budget) : 0;
   const maxSliderBudget = Math.max(60, sliderBudget);
 
@@ -63,13 +66,18 @@ export function PrimaryControls({
               inputMode="numeric"
               min={0}
               step={1}
-              value={budget}
-              onChange={(e) => onChangeBudget(Number(e.target.value))}
+              value={budgetDraft.text}
+              aria-describedby={budgetDraft.empty ? budgetHintId : undefined}
+              onChange={(e) => budgetDraft.onChange(e.target.value)}
+              onBlur={budgetDraft.onBlur}
               className={`${DATE_FIELD_CLASS} w-24 @min-[19rem]:w-full`}
             />
           </div>
           <CountrySelect country={country} onChangeCountry={onChangeCountry} widthClass="w-full" />
         </div>
+        <p id={budgetHintId} role="status" className={budgetDraft.empty ? 'mt-1.5 text-sm text-muted' : 'sr-only'}>
+          {budgetDraft.empty ? 'Enter your PTO days. Enter 0 if you have none.' : ''}
+        </p>
       </div>
 
       <div className="min-w-0">

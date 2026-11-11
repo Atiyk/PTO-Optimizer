@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useWholeDayDraft } from './useWholeDayDraft';
 import { initialPolicyPreferences } from '../personal/policyPreferences';
 import { buildSchoolCalendar } from '../personal/schoolCalendar';
 import { familyParentFreeDays, MAX_FAMILY_PTO, planFamilyTime, type FamilyPlanResult, type SchoolBreak, type FamilyBreakPlan } from '../personal/familyPlan';
@@ -185,6 +186,7 @@ export function Family() {
     setPtoBudget(Math.max(0, Math.min(MAX_FAMILY_PTO, Math.round(n))));
     setBudgetMessage('');
   };
+  const budgetDraft = useWholeDayDraft(ptoBudget, setBudget);
 
   return (
     <div className="min-h-screen bg-page">
@@ -288,11 +290,14 @@ export function Family() {
                       <div className="mt-1.5 flex items-center gap-2">
                         <div className="inline-flex items-stretch overflow-hidden rounded-[6px] border border-line-strong bg-surface">
                           <button type="button" aria-label="One fewer PTO day" disabled={ptoBudget <= 0} onClick={() => setBudget(ptoBudget - 1)} className={stepBtn}>&minus;</button>
-                          <input id="family-pto" type="number" min={0} max={MAX_FAMILY_PTO} step={1} value={ptoBudget} onChange={(e) => { const n = Number(e.target.value); if (Number.isFinite(n)) setBudget(n); }} className={numberInput} />
+                          <input id="family-pto" type="number" min={0} max={MAX_FAMILY_PTO} step={1} value={budgetDraft.text} aria-describedby={budgetDraft.empty ? 'family-pto-hint' : undefined} onChange={(e) => budgetDraft.onChange(e.target.value)} onBlur={budgetDraft.onBlur} className={numberInput} />
                           <button type="button" aria-label="One more PTO day" disabled={ptoBudget >= MAX_FAMILY_PTO} onClick={() => setBudget(ptoBudget + 1)} className={stepBtn}>+</button>
                         </div>
                         <span className="text-sm text-muted">days</span>
                       </div>
+                      <p id="family-pto-hint" role="status" className={budgetDraft.empty ? 'mt-1.5 text-sm text-muted' : 'sr-only'}>
+                        {budgetDraft.empty ? 'Enter your PTO days. Enter 0 if you have none.' : ''}
+                      </p>
                     </div>
                   </div>
                   <p className="mt-3 text-xs leading-5 text-muted">Choose how many PTO days to use for school closures. Changes here apply to this plan.</p>
