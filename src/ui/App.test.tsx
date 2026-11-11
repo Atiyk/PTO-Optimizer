@@ -94,7 +94,7 @@ describe('planner result actions', () => {
     const committed = within(cards).getByTestId('committed-entry');
     expect(within(committed).getByText('Tracked · requested')).toBeTruthy();
     expect(within(committed).getByText('5 PTO days')).toBeTruthy();
-    const recommended = cards.querySelectorAll('li[data-break-start]');
+    const recommended = cards.querySelectorAll('li[data-break-start]:not([data-testid="committed-entry"])');
     expect(recommended.length).toBeGreaterThan(0);
     let spent = 0;
     for (const card of recommended) {
@@ -105,6 +105,27 @@ describe('planner result actions', () => {
     }
     // 6 entered - 5 reserved once for the tentative request.
     expect(spent).toBeLessThanOrEqual(1);
+  });
+
+  it('shares a committed break with a partner as the one included break, without private notes', async () => {
+    window.history.replaceState(null, '', '/pto?c=US&s=2027-01-01&e=2027-02-28&b=6&rv=0&w=0&count=2');
+    localStorage.setItem('gapless.personal.requests.v1', JSON.stringify({ version: 1, requests: [{
+      id: 'trip', start: '2027-01-02', end: '2027-01-10', ptoDates: ['2027-01-04', '2027-01-05', '2027-01-06', '2027-01-07', '2027-01-08'], ptoDays: 5,
+      status: 'approved', note: 'qa-private-note', createdAt: '2026-11-01T00:00:00.000Z', updatedAt: '2026-11-01T00:00:00.000Z',
+    }] }));
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Your plan' }).getAttribute('data-plan-result')).toBe('ready'));
+    const cards = screen.getByRole('region', { name: 'Requesting each break' });
+    // The committed entry carries the same break attributes as a recommendation and comes first.
+    const first = cards.querySelector('li[data-break-start][data-break-end][data-break-pto]')!;
+    expect(first.getAttribute('data-testid')).toBe('committed-entry');
+    expect([first.getAttribute('data-break-start'), first.getAttribute('data-break-end'), first.getAttribute('data-break-pto')]).toEqual(['2027-01-02', '2027-01-10', '5']);
+    fireEvent.click(within(first as HTMLElement).getByRole('button', { name: 'Plan this break with a partner' }));
+    const partner = await screen.findByRole('region', { name: 'Partner vacation planner' });
+    const checked = [...partner.querySelectorAll<HTMLInputElement>('fieldset input:checked')];
+    expect(checked).toHaveLength(1);
+    expect(checked[0].closest('label')?.textContent).toMatch(/Jan 2/);
+    expect(partner.textContent).not.toContain('qa-private-note');
   });
 
   it('saves a break as Considering and restores its saved state on a new visit', async () => {

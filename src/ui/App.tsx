@@ -73,6 +73,12 @@ export function App() {
   }, [state.validationIssues, state.effectiveOffDays, state.solveInput.blackouts, state.rangeStart, state.rangeEnd, state.workWeek]);
   const requestCalendar = { workWeek: state.workWeek, offDays: state.effectiveOffDays, rangeStart: state.rangeStart, rangeEnd: state.rangeEnd };
   const [justTracked, setJustTracked] = useState<{ id: string; message: string } | null>(null);
+  // Committed requests as shareable breaks: dates and saved cost only, never notes.
+  const committedBreaks = useMemo(() => state.committedEntries.map(entry => {
+    const days = rangeISO(entry.start, entry.end);
+    return { id: `committed:${entry.id}`, start: entry.start, end: entry.end, days, totalDaysOff: days.length, ptoCost: entry.ptoDays, multiplier: entry.ptoDays ? days.length / entry.ptoDays : days.length, tags: [], meanDemand: 1 };
+  }), [state.committedEntries]);
+  const partnerBreaks = useMemo(() => [...committedBreaks, ...state.breaks], [committedBreaks, state.breaks]);
   const recordBreak = (brk: typeof state.breaks[number], ptoDates: string[], action: 'saved' | 'tracked') => {
     if (!requestToolsReady || ptoDates.length !== brk.ptoCost) {
       return { ok: false, message: 'Wait for your calendar to update, then try again.' };
@@ -272,8 +278,13 @@ export function App() {
                 {plannable && (state.breaks.length > 0 || state.committedEntries.length > 0) ? (
                   <ul className="m-0 mt-3 flex list-none flex-col gap-3 p-0">
                     {state.committedEntries.map(entry => (
-                      <li key={`committed-${entry.id}`} data-testid="committed-entry" data-committed-start={entry.start} data-committed-end={entry.end} data-committed-status={entry.status} className="rounded-[10px] border border-line bg-surface-alt">
-                        <CommittedBreakCard entry={entry} message={justTracked?.id === entry.id ? justTracked.message : undefined} focusLink={justTracked?.id === entry.id} />
+                      <li key={`committed-${entry.id}`} data-testid="committed-entry" data-committed-start={entry.start} data-committed-end={entry.end} data-committed-status={entry.status} data-break-start={entry.start} data-break-end={entry.end} data-break-pto={entry.ptoDays} className="rounded-[10px] border border-line bg-surface-alt">
+                        <CommittedBreakCard
+                          entry={entry}
+                          message={justTracked?.id === entry.id ? justTracked.message : undefined}
+                          focusLink={justTracked?.id === entry.id}
+                          onPlanWithPartner={requestToolsReady ? () => openPartnerPlanner(`committed:${entry.id}`) : undefined}
+                        />
                       </li>
                     ))}
                     {state.orderedBreaks.map(({ index, brk }) => {
@@ -599,7 +610,7 @@ export function App() {
                   <PortraitShare breaks={state.breaks} rangeStart={state.rangeStart} rangeEnd={state.rangeEnd} holidayAssumption={state.employerCalendar.custom.length ? 'company' : state.employerCalendar.excluded.length ? 'customized' : 'public'} remainingBalance={state.unlimitedPto ? undefined : Math.max(0, state.budget - state.budgetSpent)} holidayNamesOf={brk => [...new Set(state.holidayEntries.filter(holiday => holiday.checked && holiday.date >= brk.start && holiday.date <= brk.end).map(holiday => holiday.source === 'custom' ? 'Company holiday' : holiday.name))]} />
                 )}
                 <div id="partner-planner" className="scroll-mt-16">
-                  {requestToolsReady && <PartnerPlanner openKey={partnerOpen.key} selectedBreakId={partnerOpen.breakId} breaks={state.breaks} freeDays={freeDays} input={state.solveInput} minimumBreakLength={state.minimumBreakDays} />}
+                  {requestToolsReady && <PartnerPlanner openKey={partnerOpen.key} selectedBreakId={partnerOpen.breakId} breaks={partnerBreaks} freeDays={freeDays} input={state.solveInput} minimumBreakLength={state.minimumBreakDays} />}
                 </div>
               </section>
 
