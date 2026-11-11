@@ -1,0 +1,47 @@
+# Post-release production smoke test. Runs only when the gapless/prod-smoke branch is
+# pushed (by the release orchestrator after each batch merge), against the live site.
+# Uses the repository's own consumer browser suites; no deploys, secrets or paid services.
+name: Production smoke
+
+on:
+  push:
+    branches: [gapless/prod-smoke]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PROD: https://pto-optimizer-seven.vercel.app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Release markers served by production
+        run: |
+          set -e
+          curl -fsS "$PROD/privacy.html" | grep -q "saved plans you pin" && echo "privacy.html: P0 copy present"
+          for p in / /pto/ /policy/ /family/ /sabbatical/ /faq/ /privacy.html; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$PROD$p"); echo "$p $code"; [ "$code" = 200 ]
+          done
+          curl -fsS -D - -o /dev/null "$PROD/api/feed?c=US&s=2027-01-01&e=2027-12-31&b=15&bo=2027-03-01" | grep -i '^cache-control' 
+      - name: Consumer routes at 1440/768/375/320 against production
+        run: node scripts/consumer-qa.mjs "$PROD" qa-prod after
+      - name: Consumer journey against production
+        run: node scripts/consumer-journey.mjs "$PROD" qa-prod-journey
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: production-smoke
+          path: |
+            qa-prod
+            qa-prod-journey
