@@ -40,7 +40,8 @@ source of truth between scheduled executions. No sensitive user data belongs her
 | 2 | P0 | P | p0-p-share-privacy @ 60c76b9 | Much fixed by #131/#134/#137/#140. Remaining: address bar blocklist (not allowlist); feed CDN-cached legacy private params; Vercel beforeSend spread extra fields; 3 drifting private-key lists | `shareFormat.ts` v1 allowlist, partitions, feed private no-store, analytics {type,url} | 23 added | pending | P0 |
 | 1 | P0 | W | p0-w-workspace-ledger @ 76274c2 | Forecast, expiry guard, planner, family each had own request-charge rules | `src/personal/workspace.ts` single deduction rule + `usePersonalWorkspace` | 15 added | pending | P0 |
 | 11 | P0 | W | same | Planner ignored planned/requested; approved reserve default off (disagreed with My PTO); expiry guard double-counted; family ignored ledger | same | same | pending | P0 |
-| 16, 17 | P1 | C | p1-c-ics-holidays (in progress) | — | — | — | — | P1 |
+| 16 | P1 | C | p1-c-ics-holidays @ b42baa7 (local, base 6009e25) | icsImport.ts:228 dropped every recurring VEVENT; Family rejected whole file | `icsRecurrence.ts` bounded RRULE/EXDATE/RDATE/RECURRENCE-ID expansion; unsupported reported by name | 46+ | pending | P1 |
+| 17 | P1 | C | same | Bundled data 2026–2028 only; empty Nager answer cached as 'no holidays', degraded=false | `uncoveredYears` + HolidayCoverageNotice; no empty caching. Follow-up: extend bundled range at build (Nager is free) / move notice into useAppState | 18 | pending | P1 |
 
 Residual risks noted by P (not fixed): `/api/watch` and reminder-email links carry balance by design after opt-in; `/api/inbound` secret in query string; browser history keeps originally-opened URLs.
 
@@ -49,6 +50,8 @@ Residual risks noted by P (not fixed): `/api/watch` and reminder-email links car
 - 2026-11-11T06:17Z — Execution 1 started. Repo inspected, scheduler created, checkpoint created.
 
 - 2026-11-11 ~06:50Z — B, P, W reports in; merged locally into gapless/p0-release. W asked to keep tracked breaks visible (override of 'disappear on track').
+
+- ~07:15Z — PR #145 opened (head 6b188a8). Required check 'Consumer browser and visual evidence' failed: journey 'Partner sharing…' finds no break card after tracking because committed cards lack data-break-* + partner action. W fixing in product. Critic Q reviewing 6b188a8. C finished 16/17 locally.
 
 ## Next action
 
