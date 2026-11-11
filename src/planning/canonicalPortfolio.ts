@@ -31,6 +31,8 @@ export interface CanonicalPortfolio {
 }
 export type PortfolioShortfallKind =
   | 'no-feasible-plan'
+  | 'no-pto-days'
+  | 'unavailable-dates'
   | 'one-plan-found'
   | 'shared-objective-winners'
   | 'incomplete-calendar'
@@ -39,6 +41,8 @@ export type PortfolioShortfallKind =
 export interface CanonicalPortfolioReport {
   portfolios: CanonicalPortfolio[];
   feasiblePlanCount: number;
+  /** True when the bounded search skipped engine alternatives it found. */
+  searchLimited?: boolean;
   shortfalls: Array<{ kind: PortfolioShortfallKind; message: string }>;
 }
 
@@ -167,7 +171,7 @@ export function analyzeCanonicalPortfolios(input: SolveInput, constraints: Const
   const canonicalInput: SolveInput = { ...input, blackouts: hard, w: 0 };
   const partialCalendarEvidence = Boolean(constraints.partial || constraints.missingSources.length);
   const shortfalls: CanonicalPortfolioReport['shortfalls'] = partialCalendarEvidence
-    ? [{ kind: 'incomplete-calendar', message: 'Some calendar sources are missing or incomplete. Check the dates before booking.' }]
+    ? [{ kind: 'incomplete-calendar', message: 'Holiday data for these dates is missing or incomplete, so these plans may change. Check the dates before booking.' }]
     : [];
   if (!validatePtoDates(canonicalInput, input.mustIncludeDays ?? []).valid) {
     return { portfolios: [], feasiblePlanCount: 0, shortfalls: [
@@ -219,12 +223,14 @@ export function analyzeCanonicalPortfolios(input: SolveInput, constraints: Const
 
   // Include bounded, lower-budget search passes for partner funding without
   // modifying the legacy default call's solver work or altering its objective labels.
+  let searchLimited = false;
   const searchBudgets = [...new Set([input.budget, ...(options.additionalSearchBudgets ?? [])])];
   function search(searchBudget: number, count: number, excluded = hard): void {
     const { result } = solveConsumer({
       ...canonicalInput, budget: searchBudget, breakCount: count, blackouts: excluded,
     });
     addPlan(result.primary);
+    if (result.alternatives.length > MAX_PLAN_REPLACEMENTS) searchLimited = true;
     // Each engine alternative replaces a break inside its original funded plan.
     for (const replacement of result.alternatives.slice(0, MAX_PLAN_REPLACEMENTS)) {
       const remaining = result.primary.filter(brk =>
@@ -310,14 +316,25 @@ export function analyzeCanonicalPortfolios(input: SolveInput, constraints: Const
   }
   if (output.length < 3) {
     if (feasible.length === 0) {
-      shortfalls.push({ kind: 'no-feasible-plan', message: 'The search found no plan that fits the budget and dates. Review your constraints or widen the date range.' });
+      // Separate a zero balance and blocked dates from other infeasibility. The unblocked
+      // probe is one bounded solve and only answers "would any break fit without them?".
+      const blockedOnly = input.budget > 0 && hard.length > 0
+        && solveConsumer({ ...canonicalInput, blackouts: [], breakCount: 1 }).result.primary.length > 0;
+      if (input.budget === 0) {
+        shortfalls.push({ kind: 'no-pto-days', message: 'You have 0 PTO days to plan with, so there are no plans to compare.' });
+      } else if (blockedOnly) {
+        shortfalls.push({ kind: 'unavailable-dates', message: 'Your ruled-out dates leave no room for a break in this date range.' });
+      } else {
+        shortfalls.push({ kind: 'no-feasible-plan', message: 'No plan fits your PTO days and dates.' });
+      }
     } else if (feasible.length === 1) {
-      shortfalls.push({ kind: 'one-plan-found', message: 'The search found one unique feasible plan for these settings.' });
+      shortfalls.push({ kind: 'one-plan-found', message: 'Only one plan fits these settings, so there is nothing to compare it with.' });
     } else if (sharedWinner) {
-      shortfalls.push({ kind: 'shared-objective-winners', message: 'Several objectives favor the same plan. Each distinct winner is shown once.' });
-    } else {
-      shortfalls.push({ kind: 'bounded-search', message: 'The search found fewer than three distinct objective winners.' });
+      shortfalls.push({ kind: 'shared-objective-winners', message: 'Some goals lead to the same plan, so it appears only once.' });
+    }
+    if (searchLimited && feasible.length > 0) {
+      shortfalls.push({ kind: 'bounded-search', message: 'The planner checks a limited set of plan shapes, so other plans may exist.' });
     }
   }
-  return { portfolios: output, feasiblePlanCount: feasible.length, shortfalls };
+  return { portfolios: output, feasiblePlanCount: feasible.length, searchLimited, shortfalls };
 }

@@ -1,4 +1,5 @@
 import { HolidayCoverageNotice } from './HolidayCoverageNotice';
+import { useUncoveredHolidayYears } from './holidayCoverage';
 import { PortraitShare } from './PortraitShare';
 import { rangeISO, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { PartnerPlanner } from './PartnerPlanner';
@@ -62,6 +63,8 @@ export function App() {
   const today = useTodayISO();
   const state = useAppState(workspace.requests, today, { includesApprovedLeave: workspace.includesApprovedLeave, schedule: workspace.schedule });
   const plannable = !state.validationIssues.length && !state.solverIssue && !state.planningPending;
+  // Issue 8/17: plan years without holiday data are limited source data for the comparison.
+  const uncoveredHolidayYears = useUncoveredHolidayYears(state.country, state.rangeStart, state.rangeEnd);
   const requestToolsReady = plannable && state.holidaysReady && !state.holidaysDegraded;
   const requestsByDates = useMemo(() => new Map(ledger.requests.map(request => [`${request.start}|${request.end}`, request])), [ledger.requests]);
   const partnerReceived = useMemo(() => readPartnerAvailability(typeof window === 'undefined' ? '' : readBrowserPlanSearch(window.location.search, window.history.state)), []);
@@ -564,7 +567,16 @@ export function App() {
                   Compare plans <PlusMinus open={comparisonOpen} />
                 </summary>
                 {comparisonOpen && (plannable && state.holidaysReady ? (
-                  <PortfolioComparison input={state.solveInput} minimumBreakDays={state.minimumBreakDays} calendarIncomplete={state.holidaysDegraded} />
+                  <PortfolioComparison
+                    input={state.solveInput}
+                    minimumBreakDays={state.minimumBreakDays}
+                    calendarIncomplete={state.holidaysDegraded || uncoveredHolidayYears.length > 0}
+                    allowBudgetChange={!state.unlimitedPto}
+                    // effectiveBudget = max(0, budget - reserved); start from the reserved
+                    // floor so the planner gains exactly the verified number of days.
+                    onAddPto={extraDays => state.setBudget(Math.max(state.budget, state.reserveDays + state.reservedPtoDays) + extraDays)}
+                    onExtendEnd={state.setRangeEnd}
+                  />
                 ) : <p className="mb-2 text-sm text-muted">Comparison is available when your plan is ready.</p>)}
               </details>
 
