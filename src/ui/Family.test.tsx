@@ -278,6 +278,33 @@ describe('Family planner', () => {
     await waitFor(() => expect(screen.getByText(/PTO days? used, \d+ left of 13/).textContent).toMatch(/^0 PTO days used, 13 left of 13/));
   });
 
+  it('plans around a Sunday to Thursday workweek: Friday is free, Sunday is a workday', async () => {
+    savePolicyPreferences('c=US&ww=1111001');
+    go(`c=US&s=2026-11-02&pto=0&sd=${encodeDateRanges(['2026-11-26', '2026-11-27', '2026-11-30'])}`);
+    render(<Family />);
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('2 days with your kids without using PTO.'));
+    const words = (day: number) => screen.getByText(new RegExp(`^November ${day}(,|$)`), { selector: '.sr-only' }).textContent;
+    expect(words(27)).toMatch(/school is off and you are off/);
+    expect(words(26)).toMatch(/you work: uncovered/);
+    expect(words(29)).toBe('November 29');
+    expect(screen.getByText(/school days off, you work 3/)).toBeTruthy();
+  });
+
+  it('keeps a partial-day appointment on a school closure as a coverage gap', async () => {
+    savePolicyPreferences('c=US');
+    const cal = { workWeek: DEFAULT_WORK_WEEK, offDays: [], shiftMinutes: [480, 480, 480, 480, 480, 0, 0] };
+    writeRequestLedger([
+      createPtoRequest({ start: '2026-11-30', end: '2026-11-30', status: 'approved', partialMinutes: 120 }, cal, 'dentist')!,
+      createPtoRequest({ start: '2026-11-27', end: '2026-11-27', status: 'approved' }, { workWeek: DEFAULT_WORK_WEEK, offDays: [] }, 'whole')!,
+    ]);
+    go(`c=US&s=2026-11-02&pto=0&sd=${encodeDateRanges(['2026-11-26', '2026-11-27', '2026-11-30'])}`);
+    render(<Family />);
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('3 days with your kids without using PTO.'));
+    const words = (day: number) => screen.getByText(new RegExp(`^November ${day}(,|$)`), { selector: '.sr-only' }).textContent;
+    expect(words(27)).toMatch(/school is off and you are off/);
+    expect(words(30)).toMatch(/you work: uncovered/);
+  });
+
   it('flags unreadable school dates in a received link instead of dropping them silently', () => {
     go('s=2026-11-02&sd=garbage');
     render(<Family />);

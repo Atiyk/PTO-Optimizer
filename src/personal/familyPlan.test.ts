@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addDays, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { MAX_SCHOOL_CALENDAR_DAYS } from './schoolCalendar';
-import { MAX_FAMILY_PTO, planFamilyTime, type FamilyPlanInput } from './familyPlan';
+import { familyParentFreeDays, MAX_FAMILY_PTO, planFamilyTime, type FamilyPlanInput } from './familyPlan';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { createPtoRequest } from './requestLedger';
 import { planningCommitments } from './workspace';
@@ -267,5 +267,48 @@ describe('coverage priority', () => {
     const excluded = plan({ ...base, otherAdultConfirmed: false, excludedBreaks: [result.breaks[0].id] })!;
     expect(excluded.plans.flatMap(item => item.ptoDays)).toEqual(['2026-12-24']);
     expect(excluded.ptoLeft).toBe(1);
+  });
+});
+
+describe("familyParentFreeDays: each parent's own workweek, not Monday to Friday", () => {
+  // Mon-indexed masks, as the saved `ww` workweek stores them.
+  const week = (mask: string) => [...mask].map(day => day === '1');
+  const thanksgiving = { start: '2026-11-21', end: '2026-11-30' }; // Sat .. Mon
+  // School closes Thu 26, Fri 27 and Mon 30.
+  const schoolOffDays = ['2026-11-26', '2026-11-27', '2026-11-30'];
+  const plan = (mask: string, offDays: string[] = []) => planFamilyTime({
+    ...thanksgiving, schoolOffDays, ptoBudget: 0,
+    parentFreeDays: familyParentFreeDays({ ...thanksgiving, workWeek: week(mask), offDays }),
+  })!;
+  const cover = (result: ReturnType<typeof plan>) => Object.fromEntries(result.gaps.map(gap => [gap.date, gap.cover]));
+
+  it('frees Friday and Saturday but not Sunday for a Sunday to Thursday parent', () => {
+    expect(familyParentFreeDays({ ...thanksgiving, workWeek: week('1111001'), offDays: [] }))
+      .toEqual(['2026-11-21', '2026-11-27', '2026-11-28']);
+    const result = plan('1111001');
+    expect(cover(result)).toEqual({ '2026-11-26': 'uncovered', '2026-11-27': 'you-off', '2026-11-30': 'uncovered' });
+    expect(result.breaks[0].parentWorkdays).toEqual(['2026-11-26', '2026-11-29', '2026-11-30']);
+    expect(result.plans[0]).toMatchObject({ togetherStart: '2026-11-27', togetherEnd: '2026-11-28', togetherDays: 2 });
+  });
+
+  it('frees the fourth weekday for a Monday to Thursday 4x10 parent', () => {
+    expect(cover(plan('1111000'))).toEqual({ '2026-11-26': 'uncovered', '2026-11-27': 'you-off', '2026-11-30': 'uncovered' });
+  });
+
+  it('counts weekend shifts as workdays and midweek rest days as free for a weekend worker', () => {
+    // Works Fri, Sat, Sun, Mon; off Tue to Thu.
+    const result = plan('1000111');
+    expect(cover(result)).toEqual({ '2026-11-26': 'you-off', '2026-11-27': 'uncovered', '2026-11-30': 'uncovered' });
+    expect(result.breaks[0].parentWorkdays).toEqual(['2026-11-27', '2026-11-28', '2026-11-29', '2026-11-30']);
+  });
+
+  it('adds employer holidays and full days of leave on top of the workweek', () => {
+    expect(cover(plan('1111100', ['2026-11-26', '2026-11-30']))).toEqual({ '2026-11-26': 'you-off', '2026-11-27': 'uncovered', '2026-11-30': 'you-off' });
+  });
+
+  it('falls back to Monday to Friday for an invalid or all-zero workweek, never to no workdays', () => {
+    const fallback = familyParentFreeDays({ ...thanksgiving, workWeek: week('1111100'), offDays: [] });
+    expect(familyParentFreeDays({ ...thanksgiving, workWeek: week('0000000'), offDays: [] })).toEqual(fallback);
+    expect(familyParentFreeDays({ ...thanksgiving, workWeek: [true, true], offDays: [] })).toEqual(fallback);
   });
 });
