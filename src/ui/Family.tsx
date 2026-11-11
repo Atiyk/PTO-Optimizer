@@ -25,7 +25,7 @@ import { FamilyShare } from './FamilyShare';
 import { FAMILY_FAQ_ITEMS } from './familyFaqItems';
 import { useRequestCalendar } from './useRequestCalendar';
 import { usePersonalWorkspace } from './usePersonalWorkspace';
-import { committedRequestDays } from '../personal/workspace';
+import { committedRequestDays, planningCommitments } from '../personal/workspace';
 import { ShareDatePreview } from './ShareDatePreview';
 import { track } from './analytics';
 
@@ -133,10 +133,17 @@ export function Family() {
   }, [preset, presetDates, customOffDays, schoolOffDays]);
   const schoolLabels = useMemo(() => (preset ? presetLabels(preset) : {}), [preset]);
 
+  // Tracked approved and tentative requests are already off (workspace rule), so the
+  // family plan never spends PTO on them again; their cost is deducted from the saved
+  // balance above, once.
+  const committedOffDays = useMemo(
+    () => planningCommitments(workspace.requests, { start, end }, { asOf: savedBalance?.balanceAsOf ?? today, includesApprovedLeave: savedBalance?.balanceIncludesApprovedLeave === true }).unavailableDates,
+    [workspace.requests, start, end, savedBalance, today],
+  );
   const parentFreeDays = useMemo(() => {
-    const offDays = new Set(calendar.offDays);
+    const offDays = new Set([...calendar.offDays, ...committedOffDays]);
     return rangeISO(start, end).filter((date) => !calendar.workWeek[mondayIndexedDow(date)] || offDays.has(date));
-  }, [start, end, calendar.offDays, calendar.workWeek]);
+  }, [start, end, calendar.offDays, calendar.workWeek, committedOffDays]);
   const parentFreeSet = useMemo(() => new Set(parentFreeDays), [parentFreeDays]);
   const otherAdultDays = received.availability?.days;
   const otherAdultConfirmed = received.availability?.status === 'confirmed';

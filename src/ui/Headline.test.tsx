@@ -110,4 +110,11 @@ describe('balanceLine', () => {
     expect(balanceLine(10, 15, 3, 1)).toBe('1 break · 10 of 15 PTO days planned · 3 kept in reserve · 2 not placed');
     expect(balanceLine(15, 15, 0, 4, true)).toBe('4 breaks · 15 of 15 target days planned');
   });
+  it('labels days reserved for tracked requests instead of calling them not placed', () => {
+    expect(balanceLine(2, 12, 3, 1, false, 7)).toBe('1 break · 2 of 12 PTO days planned · 3 kept in reserve · 7 reserved for tracked requests');
+    expect(balanceLine(0, 1, 0, 0, false, 1)).toBe('0 breaks · 0 of 1 PTO day planned · 1 reserved for tracked requests');
+    const html = renderToStaticMarkup(<Headline budgetSpent={2} totalDaysOff={4} breakCountActual={1} scores={null} budget={12} reserveDays={3} trackedReservedDays={7} canPin={false} onPin={() => {}} pinnedCount={0} />);
+    expect(html).toContain('7 reserved for tracked requests');
+    expect(html).not.toContain('not placed');
+  });
 });

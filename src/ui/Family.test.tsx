@@ -263,6 +263,21 @@ describe('Family planner', () => {
     expect(screen.getByRole<HTMLInputElement>('spinbutton', { name: 'PTO for school breaks' }).value).toBe('1');
   });
 
+  it('treats tracked approved and tentative days as already off, so they cost no family PTO', async () => {
+    savePolicyPreferences('c=US&cb=20&bao=2026-11-01');
+    const cal = { workWeek: DEFAULT_WORK_WEEK, offDays: [] };
+    writeRequestLedger([
+      createPtoRequest({ start: '2027-03-01', end: '2027-03-05', status: 'approved' }, cal, 'approved')!,
+      createPtoRequest({ start: '2027-04-05', end: '2027-04-06', status: 'requested' }, cal, 'tentative')!,
+    ]);
+    go('c=US&s=2027-01-04&pto=10&sd=20270301.5,v.2');
+    render(<Family />);
+    fireEvent.click(screen.getByRole('button', { name: 'Use my saved balance' }));
+    const budget = screen.getByRole<HTMLInputElement>('spinbutton', { name: 'PTO for school breaks' });
+    expect(budget.value).toBe('13');
+    await waitFor(() => expect(screen.getByText(/PTO days? used, \d+ left of 13/).textContent).toMatch(/^0 PTO days used, 13 left of 13/));
+  });
+
   it('flags unreadable school dates in a received link instead of dropping them silently', () => {
     go('s=2026-11-02&sd=garbage');
     render(<Family />);

@@ -179,6 +179,7 @@ export function App() {
                 scores={state.scores}
                 budget={state.budget}
                 reserveDays={state.reserveDays}
+                trackedReservedDays={state.reservedPtoDays}
                 canPin={state.canPin && requestToolsReady}
                 pending={state.planningPending}
                 unavailable={!plannable && !state.planningPending}
@@ -384,6 +385,7 @@ export function App() {
                         <label className="flex min-h-11 items-center gap-2">
                           <input type="checkbox" checked={state.reserveApprovedPto} onChange={event => state.setReserveApprovedPto(event.target.checked)} />
                           Reserve {state.approvedPtoDays} approved PTO {state.approvedPtoDays === 1 ? 'day' : 'days'} from the entered budget
+                          <span className="text-muted">(for this plan only; My PTO keeps its own setting)</span>
                         </label>
                       )}
                     </div>

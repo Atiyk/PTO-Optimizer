@@ -126,6 +126,10 @@ describe('planner result actions', () => {
     expect(checked).toHaveLength(1);
     expect(checked[0].closest('label')?.textContent).toMatch(/Jan 2/);
     expect(partner.textContent).not.toContain('qa-private-note');
+    // The tab-local reserve toggle says it applies to this plan only, not to My PTO.
+    const toggle = screen.getByRole<HTMLInputElement>('checkbox', { name: /Reserve 5 approved PTO days from the entered budget/ });
+    expect(toggle.closest('label')?.textContent).toMatch(/for this plan only/i);
+    expect(toggle.checked).toBe(true);
   });
 
   it('saves a break as Considering and restores its saved state on a new visit', async () => {

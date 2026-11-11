@@ -18,6 +18,8 @@ interface HeadlineProps {
   unavailable?: boolean;
   /** "target days" instead of "PTO days" in the balance line for unlimited-PTO plans. */
   unlimitedPto?: boolean;
+  /** PTO the planner reserves once for approved and tentative tracked requests. */
+  trackedReservedDays?: number;
 }
 
 /**
@@ -38,13 +40,17 @@ export function headlineText(budgetSpent: number, budget: number, reserveDays: n
 }
 
 /** The supporting line under the figure: break count, then how the balance was used. */
-export function balanceLine(budgetSpent: number, budget: number, reserveDays: number, breakCountActual: number, unlimitedPto = false): string {
+export function balanceLine(budgetSpent: number, budget: number, reserveDays: number, breakCountActual: number, unlimitedPto = false, trackedReservedDays = 0): string {
   const breaks = `${breakCountActual} ${breakCountActual === 1 ? 'break' : 'breaks'}`;
   const unit = unlimitedPto ? 'target' : 'PTO';
   const dayWord = budget === 1 ? 'day' : 'days';
   const parts = [breaks, `${budgetSpent} of ${budget} ${unit} ${dayWord} planned`];
-  if (reserveDays > 0) parts.push(`${Math.min(budget, reserveDays)} kept in reserve`);
-  const unplanned = Math.max(0, budget - budgetSpent - Math.min(budget, reserveDays));
+  const reserve = Math.min(budget, reserveDays);
+  // PTO already promised to tracked requests (workspace rule) is not "not placed".
+  const tracked = Math.min(Math.max(0, budget - reserve), trackedReservedDays);
+  if (reserveDays > 0) parts.push(`${reserve} kept in reserve`);
+  if (tracked > 0) parts.push(`${tracked} reserved for tracked requests`);
+  const unplanned = Math.max(0, budget - budgetSpent - reserve - tracked);
   if (unplanned > 0) parts.push(`${unplanned} not placed`);
   return parts.join(' · ');
 }
@@ -54,7 +60,7 @@ export function balanceLine(budgetSpent: number, budget: number, reserveDays: nu
  * costs beside it ("from 12 PTO days"). This is the page's single h1 and sits inside a polite
  * live region, so a screen reader hears the new result as the sliders move.
  */
-export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, reserveDays, canPin, onPin, pinnedCount, pending, unavailable, unlimitedPto = false }: HeadlineProps) {
+export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, reserveDays, canPin, onPin, pinnedCount, pending, unavailable, unlimitedPto = false, trackedReservedDays = 0 }: HeadlineProps) {
   if (pending || unavailable) {
     return <div className="min-w-0">
       <h1 className="text-h2 font-bold text-ink type-condensed">Your PTO plan</h1>
@@ -79,7 +85,7 @@ export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, 
           Save this plan
         </Button>
       </div>
-      <p className="mt-3 text-sm tabular-nums text-muted">{balanceLine(budgetSpent, budget, reserveDays, breakCountActual, unlimitedPto)}</p>
+      <p className="mt-3 text-sm tabular-nums text-muted">{balanceLine(budgetSpent, budget, reserveDays, breakCountActual, unlimitedPto, trackedReservedDays)}</p>
     </div>
   );
 }
