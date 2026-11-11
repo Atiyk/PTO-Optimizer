@@ -4,7 +4,7 @@ import type { WorkWeek } from '@daysoff/engine/solver/types';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import type { ForcedState } from './types';
-import { isPlanAddressKey, partitionPlanParams } from './shareFormat';
+import { isPlanAddressKey, partitionPlanParams, PLAN_URL_KEYS } from './shareFormat';
 
 // Maps the old, now-removed named objectives and shape presets to a sensible (w, breakCount)
 // pair, so a previously-shared link still opens to something reasonable instead of erroring
@@ -453,6 +453,20 @@ function publicPlanFingerprint(params: URLSearchParams): string {
 function browserHistoryRecord(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown> : {};
+}
+
+/** History state that carries `privateSearch` as this entry's private draft for the
+ * public `search`, so readBrowserPlanSearch restores it. Only private (non-address) keys
+ * are kept: a hand-off can add private inputs but never override public ones. */
+export function historyWithPrivatePlanDraft(search: string, historyState: unknown, privateSearch: string): Record<string, unknown> {
+  const draft = new URLSearchParams();
+  for (const [key, value] of new URLSearchParams(privateSearch)) {
+    if (!isPlanAddressKey(key) && PLAN_URL_KEYS[key] === 'private') draft.set(key, value);
+  }
+  return {
+    ...browserHistoryRecord(historyState),
+    [PRIVATE_PLAN_HISTORY_KEY]: { publicSearch: publicPlanFingerprint(new URLSearchParams(search)), privateSearch: draft.toString() },
+  };
 }
 
 /** Restore a draft from the current history entry after refresh. An incoming link

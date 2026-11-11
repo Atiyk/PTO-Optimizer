@@ -51,6 +51,7 @@ export const PLAN_URL_KEYS: Readonly<Record<string, UrlKeyClass>> = Object.freez
   ho: 'share-only', // observed holiday dates the sender opted to share, without labels
   // Address bar only.
   lp: 'address-only', // arrived from the landing preview
+  hx: 'address-only', // one-shot nonce for an on-device hand-off (src/ui/planHandoff.ts); stripped on load
   // Private, on-device only.
   eh: 'private', // employer holiday calendar, custom names, exclusions
   hd: 'private', // landing holiday focus date

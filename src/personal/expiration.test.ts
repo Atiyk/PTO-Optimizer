@@ -1,3 +1,4 @@
+import { isPlanAddressKey } from '../ui/shareFormat';
 import { describe, expect, it } from 'vitest';
 import type { TimeOffPolicy } from '../policy/model';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
@@ -28,7 +29,12 @@ describe('expiration guard and calendar reminders', () => {
     // them back once: 7 entered - 3 reserved = the 4-day plan.
     expect(params.get('b')).toBe('7');
     expect(params.get('rv')).toBe('0');
-    expect(params.get('bo')).toBe('2026-12-14,2026-12-15,2026-12-16');
+    // Privacy (Issue 2): booked dates are not put in the navigable link. The planner
+    // derives them from the same on-device ledger; the risk keeps them as data.
+    expect(params.has('bo')).toBe(false);
+    for (const key of params.keys()) expect(isPlanAddressKey(key), key).toBe(true);
+    expect(risk.unavailableDates).toEqual(['2026-12-14', '2026-12-15', '2026-12-16']);
+    expect(risk.privatePlan).toBeUndefined();
     expect(expirationRisks(policy, 'US', [{ ...entry, status: 'requested' }], '2026-11-02')[0].daysAtStake).toBe(7);
   });
   it('uses the entered carried-day deadline inclusively, matching the policy projection', () => {
