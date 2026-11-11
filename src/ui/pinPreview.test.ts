@@ -16,11 +16,13 @@ describe('pin fallback', () => {
   });
 
   it('never collapses a pinned plan to nothing when a plan without the minimum exists', () => {
-    const pinned = { ...input, mustIncludeDays: ['2026-12-07'] };
+    // A lone Wednesday. (A lone Monday pin now includes its free weekend - Sat-Mon is
+    // 3 days and meets the minimum - so it no longer reproduces this case.)
+    const pinned = { ...input, mustIncludeDays: ['2026-12-09'] };
     const strict = solveConsumer(pinned, options);
     const outcome = solveWithPinFallback(pinned, options);
     expect(outcome.result.primary.length).toBeGreaterThan(0);
-    // The bug this guards: the strict solve fails for a lone Monday pin (Dec 7)...
+    // The bug this guards: the strict solve fails for a lone midweek pin (Dec 9)...
     expect(strict.issue).toContain('3-day minimum');
     // ...and the relaxation is never silent: the UI is told which minimum was set aside.
     expect(outcome.relaxedMinimum).toBe(3);

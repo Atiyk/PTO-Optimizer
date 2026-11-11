@@ -21,7 +21,7 @@ const DEFAULT_W = 30;
  * restriction (see buildCandidates' own comment on the bridge-finding bug it fixes) made
  * every one of a year's ~260 workdays its own candidate start reaching up to the full
  * budget forward, instead of just the ~104 off-days - a ~3.5x blowup that pushed full-year
- * solves from ~500ms to ~1.6-1.9s. 21 (three weeks) comfortably spans even an unusually
+ * solves from ~500ms to ~1.6-1.9s. 14 (about three working weeks) spans even an unusually
  * long holiday-free gap between off periods while keeping the search bounded - see
  * solve.test.ts's performance block, re-measured after this constant was introduced.
  */
@@ -90,6 +90,37 @@ function isWorkingDow(iso: ISODate, workWeek: WorkWeek): boolean {
   return workWeek[mondayIndexedDow(iso)];
 }
 
+/** Candidate for the exact span [startIdx, endIdx], computed from scratch. */
+function spanCandidate(
+  days: ISODate[],
+  isOff: boolean[],
+  overlapSet: Set<string>,
+  expiryDate: ISODate | undefined,
+  country: string | undefined,
+  startIdx: number,
+  endIdx: number,
+): Candidate {
+  let cost1 = 0;
+  let cost2 = 0;
+  let overlapDayCount = 0;
+  let demandSum = 0;
+  for (let j = startIdx; j <= endIdx; j++) {
+    const dISO = days[j];
+    if (!isOff[j]) {
+      if (!expiryDate || dISO <= expiryDate) cost1++;
+      else cost2++;
+    }
+    if (overlapSet.has(dISO)) overlapDayCount++;
+    demandSum += demandFor(dISO, country).value;
+  }
+  const length = endIdx - startIdx + 1;
+  return {
+    startIdx, endIdx, start: days[startIdx], end: days[endIdx], length,
+    cost: cost1 + cost2, cost1, cost2, overlapDayCount, demandSum,
+    demandDeviationScaled: Math.round((demandSum / length - 1) * DEMAND_DEVIATION_SCALE),
+  };
+}
+
 function buildCandidates(
   days: ISODate[],
   isOff: boolean[],
@@ -126,8 +157,18 @@ function buildCandidates(
    * just more of the search space actually gets explored. A blackout day still can't start
    * a span (you can't spend PTO on a day you're barred from taking off).
    */
+  // Issue 5: a recommended break is a whole ABSENCE - from the day after you were last at
+  // work to the day before you are next at work. A span that starts or ends partway into a
+  // free run (a weekend, a holiday) under-reports the days off you get anyway, and lets the
+  // travel term "not count" a free weekend it doesn't like. So a span may only START where
+  // the previous day is a work day (or the range starts), and only END where the next day
+  // is a work day, a ruled-out day, or past the range end. The last two were previously
+  // unreachable: a break could only end on a free day, so "Mon-Thu before a required
+  // Friday" or "the final Mon-Thu of the range" could never be recommended at all.
+  const canEnd = (j: number) => j === n - 1 || !isOff[j + 1];
   for (let i = 0; i < n; i++) {
     if (isBlackout[i]) continue;
+    if (i > 0 && isOff[i - 1]) continue;
     // Only a workday start gets the tighter WORKDAY_START_REACH_CAP - an off-day anchor
     // (the original, already-correct long-bridge behavior) keeps its full real-budget reach.
     const startCap = isOff[i] ? maxCandidateCost : Math.min(maxCandidateCost, WORKDAY_START_REACH_CAP);
@@ -155,7 +196,7 @@ function buildCandidates(
       if (overlapSet.has(dISO)) overlapDayCount++;
       demandSum += demandFor(dISO, country).value;
       const length = j - i + 1;
-      if (isOff[j] && cost >= 1) {
+      if (cost >= 1 && canEnd(j)) {
         candidates.push({
           startIdx: i,
           endIdx: j,
@@ -173,27 +214,9 @@ function buildCandidates(
     }
   }
 
-  // Standalone single-day PTO: a day off on its own, not anchored to an existing off day.
-  // Always a legitimate (if usually suboptimal) option now that shape is a count, not a length.
-  for (let i = 0; i < n; i++) {
-    if (isOff[i] || isBlackout[i]) continue;
-    const dISO = days[i];
-    const demand = demandFor(dISO, country).value;
-    candidates.push({
-      startIdx: i,
-      endIdx: i,
-      start: dISO,
-      end: dISO,
-      length: 1,
-      cost: 1,
-      cost1: !expiryDate || dISO <= expiryDate ? 1 : 0,
-      cost2: expiryDate && dISO > expiryDate ? 1 : 0,
-      overlapDayCount: overlapSet.has(dISO) ? 1 : 0,
-      demandSum: demand,
-      demandDeviationScaled: Math.round((demand - 1) * DEMAND_DEVIATION_SCALE),
-    });
-  }
-
+  // No separate single-day loop any more: a lone workday between two work days is already
+  // a valid start AND end above, and a lone workday next to a free day is extended to
+  // include it (a PTO Friday is reported as Fri-Sun, which is what the person gets).
   return candidates;
 }
 
@@ -219,13 +242,17 @@ function candidateValue(w: number, c: Candidate): number {
 
 /** Index of the first candidate (1-based dp row) that is compatible (ends before this candidate starts). */
 function findCompatiblePrefix(candidates: Candidate[], idx: number): number {
-  const startIdx = candidates[idx].startIdx;
-  // candidates sorted by endIdx ascending; find count of candidates with endIdx < startIdx
+  // Two breaks must be separated by at least one day at work: candidates always end
+  // right before a work day, so a predecessor must end at least two days before this
+  // start. Ending the day before would make the two one continuous absence counted as
+  // two breaks (issue 5).
+  const lastCompatibleEnd = candidates[idx].startIdx - 2;
+  // candidates sorted by endIdx ascending; find count of candidates with endIdx <= lastCompatibleEnd
   let lo = 0;
   let hi = candidates.length;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
-    if (candidates[mid].endIdx < startIdx) lo = mid + 1;
+    if (candidates[mid].endIdx <= lastCompatibleEnd) lo = mid + 1;
     else hi = mid;
   }
   return lo;
@@ -547,10 +574,10 @@ function solveMaxCount(
     // The ordinary value DP below still selects the final plan and tie-breaks; it
     // may use more expensive spans when fewer than budgetMax breaks are feasible.
     let count = 0;
-    let lastEnd = -1;
+    let lastEnd = -2;
     for (const candidate of candidates) {
       if (count >= budgetMax) break;
-      if (candidate.cost !== 1 || candidate.startIdx <= lastEnd) continue;
+      if (candidate.cost !== 1 || candidate.startIdx <= lastEnd + 1) continue;
       if (input.accrualPerMonth && count + 1 > accruedBy(candidate.end, input.rangeStart, input.budget, input.accrualPerMonth)) continue;
       count++;
       lastEnd = candidate.endIdx;
@@ -727,6 +754,10 @@ function roundMultiplier(n: number): number {
  * equivalent) now only appears when demand could plausibly have been a real factor in the
  * choice, not just a true-but-irrelevant fact about the date.
  */
+// Issue 6: US demand is now the seasonal 7-day mean (demandIndex.ts usSeasonalDemand),
+// which ranges about 0.82-1.13, so 'Peak travel' (>= 1.25) cannot occur for US plans and
+// 'Low travel demand' marks only the genuinely quiet mid-January to early-February season.
+// That is deliberate: the data does not support a day-level busy/quiet claim.
 function demandTag(c: Candidate, estimated: boolean, w: number): BreakTag | null {
   if (w === 0) return null;
   const mean = c.demandSum / c.length;
@@ -756,8 +787,9 @@ function toBreak(c: Candidate, overlapSet: Set<string>, estimated: boolean, w: n
   };
 }
 
+/** Overlapping OR touching: a touching pair is one continuous absence, not two breaks. */
 function candidatesOverlap(a: Candidate, b: Candidate): boolean {
-  return a.startIdx <= b.endIdx && b.startIdx <= a.endIdx;
+  return a.startIdx <= b.endIdx + 1 && b.startIdx <= a.endIdx + 1;
 }
 
 /**
@@ -859,13 +891,18 @@ function solveCore(input: SolveInput): SolveResult {
     ? builtCandidates.filter((candidate) => candidate.length >= minimumBreakDays)
     : builtCandidates;
   candidates.sort((a, b) => a.endIdx - b.endIdx || a.startIdx - b.startIdx);
-  if (candidates.length === 0)
+  // Pinned workdays are still added below when the whole budget is reserved for them
+  // (no affordable candidate at all), so only return early when there are none.
+  if (candidates.length === 0 && mustIncludeForcedCost.size === 0)
     return { primary: [], alternatives: [], breakCountRequested, breakCountActual: 0, budgetSpent: 0, peakCapApplied: false };
 
   let chosen: Candidate[];
   let breakCountActual: number;
 
-  if (input.expiryDate) {
+  if (candidates.length === 0) {
+    chosen = [];
+    breakCountActual = 0;
+  } else if (input.expiryDate) {
     const cap = breakCountRequested === 0 || breakCountRequested === 7 ? null : breakCountRequested;
     chosen = solveDualWindow(candidates, effectiveInput, w, cap);
     breakCountActual = chosen.length;
@@ -891,23 +928,24 @@ function solveCore(input: SolveInput): SolveResult {
   // in this file, applied to a harder constraint (the day MUST be in the plan) than a soft
   // target (a break count).
   if (mustIncludeForcedCost.size > 0) {
-    for (const d of mustIncludeForcedCost) {
+    const indexOf = new Map(days.map((d, i) => [d, i]));
+    for (const d of [...mustIncludeForcedCost].sort()) {
       const alreadyCovered = chosen.some((c) => d >= c.start && d <= c.end);
       if (alreadyCovered) continue;
-      const demand = demandFor(d, input.country).value;
-      chosen.push({
-        startIdx: -1, // synthetic: not a real index into `days`/`candidates`, never looked up by index
-        endIdx: -1,
-        start: d,
-        end: d,
-        length: 1,
-        cost: 1,
-        cost1: !input.expiryDate || d <= (input.expiryDate as ISODate) ? 1 : 0,
-        cost2: input.expiryDate && d > (input.expiryDate as ISODate) ? 1 : 0,
-        overlapDayCount: overlapSet.has(d) ? 1 : 0,
-        demandSum: demand,
-        demandDeviationScaled: Math.round((demand - 1) * DEMAND_DEVIATION_SCALE),
-      });
+      // Issue 5: the pinned day is a whole absence too - it includes the free days next
+      // to it, and joins a chosen break it touches instead of sitting beside it as a
+      // second "break".
+      let startIdx = indexOf.get(d)!;
+      let endIdx = startIdx;
+      while (startIdx > 0 && isOff[startIdx - 1]) startIdx--;
+      while (endIdx < n - 1 && isOff[endIdx + 1]) endIdx++;
+      const touching = chosen.filter((c) => c.startIdx <= endIdx + 1 && startIdx <= c.endIdx + 1);
+      for (const c of touching) {
+        startIdx = Math.min(startIdx, c.startIdx);
+        endIdx = Math.max(endIdx, c.endIdx);
+      }
+      chosen = chosen.filter((c) => !touching.includes(c));
+      chosen.push(spanCandidate(days, isOff, overlapSet, input.expiryDate, input.country, startIdx, endIdx));
     }
     chosen.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
     breakCountActual = chosen.length;
