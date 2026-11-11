@@ -3,8 +3,8 @@ import { isoToSerial } from '@daysoff/engine/solver/dateUtils';
 import { validateCurrentCarriedBalance, type TimeOffPolicy } from '../policy/model';
 import { projectBalance, type BalancePoint, type PolicyEvent } from '../policy/projection';
 import { isValidISODate } from '../ui/urlState';
-import { isScheduledRequest, requestConflicts, type PtoRequest } from './requestLedger';
-import { chargeableRequestDates, requestDateCharge, type BalanceBasis } from './workspace';
+import { isScheduledRequest, requestConflicts, validShiftMinutes, type PtoRequest } from './requestLedger';
+import { chargeableRequestDates, requestDateCharge, requestDayEquivalent, scheduledMinutesOn, type BalanceBasis, type WorkdaySchedule } from './workspace';
 
 export interface ForecastScenario {
   balance: number | null;
@@ -54,14 +54,20 @@ function scenario(policy: TimeOffPolicy, through: ISODate, requests: readonly Pt
     .filter(date => date > policy.balanceAsOf && requestDateCharge(request, date, basis) === 'in-balance')));
   const inForecast = (date: ISODate) => isValidISODate(date) && date > policy.balanceAsOf
     && date <= through && !alreadyInBalance.has(date);
+  // Native-unit spend per date: hours for an hours balance, day-equivalents for a day balance.
+  const schedule: WorkdaySchedule = { shiftMinutes: validShiftMinutes(policy.shiftMinutes) ? policy.shiftMinutes : undefined, hoursPerDay: policy.hoursPerDay };
+  const wholeDay = (date: ISODate) => policy.unit === 'hours'
+    ? (schedule.shiftMinutes ? (scheduledMinutesOn(date, schedule) ?? policy.hoursPerDay * 60) / 60 : policy.hoursPerDay) : 1;
   const bookedHours = new Map<ISODate, number>();
-  for (const date of policy.plannedDays.filter(inForecast)) bookedHours.set(date, policy.hoursPerDay);
+  for (const date of policy.plannedDays.filter(inForecast)) bookedHours.set(date, wholeDay(date));
   for (const request of requests) {
     if (!isScheduledRequest(request, tentative)) continue;
     for (const date of request.ptoDates.filter(date => charged.has(date))) {
       const minutes = request.ptoMinutes?.[date];
-      const amount = minutes !== undefined && Number.isInteger(minutes) && minutes > 0 && minutes <= 1440
-        ? minutes / 60 : policy.hoursPerDay;
+      const recorded = minutes !== undefined && Number.isInteger(minutes) && minutes > 0 && minutes <= 1440;
+      const amount = policy.unit === 'hours'
+        ? (recorded ? minutes / 60 : wholeDay(date))
+        : requestDayEquivalent(request, date, schedule);
       // No time-of-day overlap is stored. Treat overlapping records as one booking
       // at the larger recorded amount rather than consuming both in full.
       bookedHours.set(date, Math.max(bookedHours.get(date) ?? 0, amount));

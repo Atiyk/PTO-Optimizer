@@ -82,7 +82,7 @@ export function projectBalance(policy: TimeOffPolicy, horizonEnd: ISODate, hourl
     }
 
     if (plannedSet.has(d)) {
-      const spend = policy.unit === 'hours' ? (hourlySpend?.get(d) ?? policy.hoursPerDay) : 1;
+      const spend = hourlySpend?.get(d) ?? (policy.unit === 'hours' ? policy.hoursPerDay : 1);
       carriedAmount = Math.max(0, carriedAmount - spend);
       balance = Math.max(balance - spend, -policy.negativeBalanceAllowance);
       events.push({ kind: 'planned-day-taken', date: d, amount: spend });

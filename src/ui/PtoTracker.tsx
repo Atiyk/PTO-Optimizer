@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { REQUEST_STATUSES, calendarCoversRequest, calendarForSavedRequest, createPtoRequest, initialRequestDate, requestCalendarCoverageHint, requestConflicts, requestPtoDates, requestPtoMinutes, validRequestRange, type PtoRequest, type RequestCalendar, type RequestStatus } from '../personal/requestLedger';
 import type { RequestLedgerState } from './useRequestLedger';
+import { requestDayEquivalent, scheduledMinutesOn, type WorkdaySchedule } from '../personal/workspace';
 import { Button } from './Button';
 import { compactDate, compactDatesIn } from './compactDate';
 import { formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
@@ -24,10 +25,14 @@ const STATUS_COPY: Record<RequestStatus, { label: string; description: string }>
 
 const durationFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
 
-function requestCostLabel(days: number, minutes?: Readonly<Record<string, number>>) {
+/** Hours are the recorded unit; a partial day also shows its share of that day's shift. */
+function requestCostLabel(days: number, minutes?: Readonly<Record<string, number>>, partialDay?: { request: PtoRequest; schedule: WorkdaySchedule }) {
   if (minutes === undefined) return `${days} PTO ${days === 1 ? 'day' : 'days'}`;
   const hours = Object.values(minutes).reduce((sum, duration) => sum + duration, 0) / 60;
-  return `${durationFormat.format(hours)} PTO ${hours === 1 ? 'hour' : 'hours'}`;
+  const label = `${durationFormat.format(hours)} PTO ${hours === 1 ? 'hour' : 'hours'}`;
+  const date = partialDay?.request.partialMinutes !== undefined ? partialDay.request.start : undefined;
+  if (!partialDay || !date || scheduledMinutesOn(date, partialDay.schedule) === undefined) return label;
+  return `${label} · ${durationFormat.format(requestDayEquivalent(partialDay.request, date, partialDay.schedule))} day`;
 }
 
 /** A stored ISO timestamp as the viewer's local calendar date (not its UTC date). */
@@ -58,7 +63,7 @@ function RequestRow({ request, ledger, calendar, calendarReady, onStatusChanged,
   const preview = changedDates && calendarReady && pricedCalendar && !invalid && !outsideCoverage
     ? createPtoRequest({ ...request, start, end }, pricedCalendar, request.id, request.updatedAt)
     : null;
-  const savedCost = requestCostLabel(request.ptoDays, request.ptoMinutes);
+  const savedCost = requestCostLabel(request.ptoDays, request.ptoMinutes, { request, schedule: { shiftMinutes: calendar.shiftMinutes } });
   return (
     <article className="min-w-0 border-t border-line pt-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -202,7 +207,8 @@ export function PtoTracker({ ledger, calendar, calendarReady = true, calendarNot
         }}>Track these dates</Button>
       </details>
       {ledger.message && <p role="status" className="mt-4 text-sm text-muted">{compactDatesIn(ledger.message)}</p>}
-      {!ledger.storageAvailable && <p role="status" className="mt-4 border-l-2 border-ink pl-3 text-sm text-ink">Browser storage is unavailable. Your tracker works for this visit, but changes may disappear when you leave.</p>}
+      {ledger.storageNotice && <p role="status" data-testid="ledger-storage-notice" className="mt-4 border-l-2 border-ink pl-3 text-sm text-ink">{ledger.storageNotice}</p>}
+      {!ledger.storageAvailable && !ledger.storageNotice && <p role="status" className="mt-4 border-l-2 border-ink pl-3 text-sm text-ink">Browser storage is unavailable. Your tracker works for this visit, but changes may disappear when you leave.</p>}
       {conflicts.length > 0 && <p className="mt-4 flex gap-2 border-l-2 border-ink pl-3 text-sm text-ink">Some request dates overlap. They are flagged here and deducted only once in the balance forecast. Review the dates before requesting leave.</p>}
       <div className="mt-5 flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-ink">{showPast ? 'All tracked requests' : 'Upcoming requests'}</p>

@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { browserRequestStorage } from '../personal/requestLedger';
-import { BALANCE_BASIS_CHANGED, BALANCE_BASIS_STORAGE_KEY, readBalanceBasisPreference, writeBalanceBasisPreference } from '../personal/workspace';
+import {
+  BALANCE_BASIS_CHANGED, BALANCE_BASIS_STORAGE_KEY, readBalanceBasisPreference, readWorkdaySchedulePreference,
+  writeBalanceBasisPreference, writeWorkdaySchedulePreference, type WorkdaySchedule,
+} from '../personal/workspace';
 import { initialPolicyPreferences } from '../personal/policyPreferences';
 import { useRequestLedger } from './useRequestLedger';
 
@@ -20,6 +23,18 @@ export function publishBalanceBasis(includesApprovedLeave: boolean): void {
   }
 }
 
+export function readBrowserWorkdaySchedule(): WorkdaySchedule | undefined {
+  return readWorkdaySchedulePreference(browserRequestStorage());
+}
+
+/** My PTO publishes the hourly schedule it prices requests with, so planners convert hours the same way. */
+export function publishWorkdaySchedule(schedule: WorkdaySchedule): void {
+  if (JSON.stringify(readBrowserWorkdaySchedule()) === JSON.stringify(schedule)) return;
+  if (writeWorkdaySchedulePreference(schedule, browserRequestStorage()) && typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(BALANCE_BASIS_CHANGED));
+  }
+}
+
 /**
  * The personal workspace for a view: the live request ledger plus the balance basis
  * every derivation in src/personal/workspace.ts needs. Local to this browser.
@@ -27,8 +42,13 @@ export function publishBalanceBasis(includesApprovedLeave: boolean): void {
 export function usePersonalWorkspace() {
   const ledger = useRequestLedger();
   const [includesApprovedLeave, setIncludesApprovedLeave] = useState(readBrowserBalanceBasis);
+  const [schedule, setSchedule] = useState(readBrowserWorkdaySchedule);
   useEffect(() => {
-    const refresh = () => setIncludesApprovedLeave(readBrowserBalanceBasis());
+    const refresh = () => {
+      setIncludesApprovedLeave(readBrowserBalanceBasis());
+      const next = readBrowserWorkdaySchedule();
+      setSchedule(current => JSON.stringify(current) === JSON.stringify(next) ? current : next);
+    };
     const onStorage = (event: StorageEvent) => { if (event.key === BALANCE_BASIS_STORAGE_KEY || event.key === null) refresh(); };
     window.addEventListener(BALANCE_BASIS_CHANGED, refresh);
     window.addEventListener('storage', onStorage);
@@ -37,5 +57,5 @@ export function usePersonalWorkspace() {
       window.removeEventListener('storage', onStorage);
     };
   }, []);
-  return { ledger, requests: ledger.requests, includesApprovedLeave };
+  return { ledger, requests: ledger.requests, includesApprovedLeave, schedule };
 }

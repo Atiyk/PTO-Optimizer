@@ -47,6 +47,11 @@ import { readBrowserPlanSearch } from './urlState';
 import { PortfolioComparison } from '../planning/PortfolioComparison';
 import { useHasHover } from './useHasHover';
 
+const dayNumber = new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format;
+/** Day-equivalents keep a singular unit up to one: "0.5 day", "1 day", "1.5 days". */
+const dayWord = (days: number) => days > 0 && days <= 1 ? 'day' : 'days';
+const dayAmount = (days: number) => `${dayNumber(days)} ${dayWord(days)}`;
+
 export function App() {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [comparisonOpen, setComparisonOpen] = useState(false);
@@ -54,7 +59,7 @@ export function App() {
   const workspace = usePersonalWorkspace();
   const ledger = workspace.ledger;
   const today = useTodayISO();
-  const state = useAppState(workspace.requests, today, { includesApprovedLeave: workspace.includesApprovedLeave });
+  const state = useAppState(workspace.requests, today, { includesApprovedLeave: workspace.includesApprovedLeave, schedule: workspace.schedule });
   const plannable = !state.validationIssues.length && !state.solverIssue && !state.planningPending;
   const requestToolsReady = plannable && state.holidaysReady && !state.holidaysDegraded;
   const requestsByDates = useMemo(() => new Map(ledger.requests.map(request => [`${request.start}|${request.end}`, request])), [ledger.requests]);
@@ -381,16 +386,23 @@ export function App() {
                       )}
                       {state.applyTrackedRequests && (state.approvedPtoDays > 0 || state.tentativePtoDays > 0) && (
                         <p data-testid="tracked-requests-summary">
-                          Includes {state.approvedPtoDays} approved {state.approvedPtoDays === 1 ? 'day' : 'days'} off · {state.tentativePtoDays} tentative
+                          Includes {dayNumber(state.approvedPtoDays)} approved {dayWord(state.approvedPtoDays)} off · {dayNumber(state.tentativePtoDays)} tentative
                           {state.reservedPtoDays > 0 && !state.unlimitedPto ? `, ${state.reservedPtoDays} reserved from the budget` : ''}.
                         </p>
                       )}
                       {state.applyTrackedRequests && <p>Tracked approved, planned and requested time off is excluded from new breaks on this device.</p>}
-                      {state.applyTrackedRequests && state.hasHourlyBookings && <p>This planner uses whole days. <a className="link-mark" href="/policy">My PTO</a> forecasts recorded hourly costs.</p>}
+                      {state.applyTrackedRequests && state.hasHourlyBookings && (
+                        <p data-testid="tracked-hourly-note">
+                          {workspace.schedule
+                            ? <>Hourly requests count as a share of that day's shift: {dayAmount(state.reservedPtoDayEquivalent)} owed.</>
+                            : <>Hourly requests count as whole days here until <a className="link-mark" href="/policy">My PTO</a> has your work hours.</>}
+                          {!state.unlimitedPto && state.reservedPtoDayEquivalent !== state.reservedPtoDays ? ` The planner budgets whole days, so it reserves ${state.reservedPtoDays}.` : ''}
+                        </p>
+                      )}
                       {state.applyTrackedRequests && !state.unlimitedPto && state.approvedPtoDays > 0 && (
                         <label className="flex min-h-11 items-center gap-2">
                           <input type="checkbox" checked={state.reserveApprovedPto} onChange={event => state.setReserveApprovedPto(event.target.checked)} />
-                          Reserve {state.approvedPtoDays} approved PTO {state.approvedPtoDays === 1 ? 'day' : 'days'} from the entered budget
+                          Reserve {dayNumber(state.approvedPtoDays)} approved PTO {dayWord(state.approvedPtoDays)} from the entered budget
                           <span className="text-muted">(for this plan only; My PTO keeps its own setting)</span>
                         </label>
                       )}

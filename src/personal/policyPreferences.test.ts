@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { deletePolicyPreferences, initialPolicyPreferences, keepPrivatePolicyDraft, savePolicyPreferences } from './policyPreferences';
+import { deletePolicyPreferences, initialPolicyPreferences, keepPrivatePolicyDraft, policyStorageNotice, rememberLoadedPolicy, savePolicyPreferences, writePolicyPreferences } from './policyPreferences';
 import { readPolicyStateFromURL, writePolicyStateToURL } from '../ui/policyUrlState';
 
 const KEY = 'gapless.personal.policy.v1';
@@ -68,5 +68,45 @@ describe('optional local policy preferences', () => {
     const invalid = readPolicyStateFromURL('?cb=80&car=Infinity&fd=2027-02-30', 'US');
     expect(invalid.currentCarriedBalance).toBe(0);
     expect(invalid.forecastDate).toBeUndefined();
+  });
+});
+
+describe('policy saves never overwrite newer data from another tab', () => {
+  it('refuses a save when another tab saved a policy after this page loaded it, then lets the user replace it deliberately', () => {
+    initialPolicyPreferences('', 'US');
+    rememberLoadedPolicy();
+    // Another tab saves a different policy.
+    window.localStorage.setItem(KEY, JSON.stringify({ version: 1, search: 'c=US&cb=30', revision: 'other-tab-1', updatedAt: '2027-01-01T00:00:00.000Z' }));
+    expect(writePolicyPreferences(saved)).toBe('stale');
+    expect(JSON.parse(window.localStorage.getItem(KEY)!).search).toBe('c=US&cb=30');
+    // The notice was shown; saving again is an explicit choice to replace it.
+    expect(writePolicyPreferences(saved)).toBe('saved');
+    expect(initialPolicyPreferences('', 'US').currentBalance).toBe(18);
+  });
+
+  it('migrates a legacy saved policy with a backup, and quarantines unreadable JSON with a notice', () => {
+    const legacy = JSON.stringify({ version: 1, search: 'c=US&cb=12' });
+    window.localStorage.setItem(KEY, legacy);
+    expect(initialPolicyPreferences('', 'US').currentBalance).toBe(12);
+    rememberLoadedPolicy();
+    expect(writePolicyPreferences(saved)).toBe('saved');
+    expect(JSON.parse(window.localStorage.getItem(`${KEY}.backup`)!).raw).toBe(legacy);
+    expect(JSON.parse(window.localStorage.getItem(KEY)!)).toMatchObject({ version: 1, revision: expect.any(String), updatedAt: expect.any(String) });
+
+    window.localStorage.setItem(KEY, '{"version":1,"search":');
+    initialPolicyPreferences('', 'US');
+    rememberLoadedPolicy();
+    expect(policyStorageNotice()).toMatch(/could not be read/);
+    expect(writePolicyPreferences(saved)).toBe('saved');
+    expect(JSON.parse(window.localStorage.getItem(`${KEY}.quarantine`)!)[0].raw).toBe('{"version":1,"search":');
+  });
+
+  it('never replaces a policy saved by a newer version', () => {
+    const newer = JSON.stringify({ version: 2, policy: {} });
+    window.localStorage.setItem(KEY, newer);
+    initialPolicyPreferences('', 'US');
+    rememberLoadedPolicy();
+    expect(writePolicyPreferences(saved)).toBe('newer-version');
+    expect(window.localStorage.getItem(KEY)).toBe(newer);
   });
 });

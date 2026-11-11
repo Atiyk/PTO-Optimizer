@@ -2,7 +2,7 @@ import { getConsumerHolidaysWithStatus as getHolidaysWithStatus, getConsumerSubd
 import { SUBDIVISION_NAMES } from '@daysoff/engine/data/countries';
 import { planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
 import { previewPinnedDay, type PinPreview } from './pinPreview';
-import { defaultEmployerCalendar, readEmployerCalendar, saveEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
+import { defaultEmployerCalendar, readEmployerCalendar, writeEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { computeMarginalValues } from '@daysoff/engine/solver/marginalValue';
 import type { Alternative, Break, SolveInput, WorkWeek } from '@daysoff/engine/solver/types';
@@ -23,7 +23,7 @@ import { validateInputs, isSupportedPlanningRange } from './validation';
 import { defaultRangeEnd, defaultPlanRangeEnd, holidayEntriesFor, stateHolidayCandidatesFor, altFridayOffDatesFor, effectiveOffDaysFor, mustIncludeDaysFor, effectiveBlackoutsFor, effectiveBudgetFor, policyAccrualFieldsFor, buildSolveInput, isSuggestedPtoDay, type HolidayEntry } from '../autopilot/planFromSearch';
 import { todayISO } from './today';
 import type { PtoRequest } from '../personal/requestLedger';
-import { committedPlanEntries, planningCommitments } from '../personal/workspace';
+import { committedPlanEntries, planningCommitments, type WorkdaySchedule } from '../personal/workspace';
 import { usePlannerComputation } from '../planning/usePlannerComputation';
 import { MAX_PINNED_PLANS, usePinnedPlans } from './pinnedPlanStore';
 
@@ -114,6 +114,8 @@ interface LoadedHolidayScope extends HolidayFetchResult {
 export interface PlannerWorkspaceBasis {
   /** My PTO's "balance already includes approved leave" setting. */
   includesApprovedLeave?: boolean;
+  /** The hourly schedule My PTO priced requests with; converts hours to planner days. */
+  schedule?: WorkdaySchedule;
 }
 
 export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balanceAsOf = todayISO(), workspaceBasis: PlannerWorkspaceBasis = {}) {
@@ -358,7 +360,10 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   }, [updateEmployerCalendar]);
   const saveEmployerHolidays = useCallback(() => {
     if (sharedObservedHolidays !== undefined) return;
-    setEmployerCalendarMessage(saveEmployerCalendar(employerCalendar) ? 'Employer calendar saved in this browser.' : 'Browser storage is unavailable. Your changes still apply to this tab.');
+    const saved = writeEmployerCalendar(employerCalendar);
+    setEmployerCalendarMessage(saved === 'saved' ? 'Employer calendar saved in this browser.'
+      : saved === 'stale' ? 'Another tab saved a different employer calendar after this page loaded it. Nothing was overwritten. Save again to replace it with this plan\'s calendar.'
+        : 'Browser storage is unavailable. Your changes still apply to this tab.');
   }, [employerCalendar, sharedObservedHolidays]);
   const resetEmployerHolidays = useCallback(() => {
     if (sharedObservedHolidays !== undefined) return;
@@ -555,8 +560,8 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   const effectiveOffDays = useMemo(() => effectiveOffDaysFor(holidayEntries, altFridayOffDates), [holidayEntries, altFridayOffDates]);
 
   const commitments = useMemo(
-    () => planningCommitments(requests, { start: rangeStart, end: rangeEnd }, { asOf: balanceAsOf, includesApprovedLeave: !reserveApprovedPto }),
-    [requests, rangeStart, rangeEnd, balanceAsOf, reserveApprovedPto],
+    () => planningCommitments(requests, { start: rangeStart, end: rangeEnd }, { asOf: balanceAsOf, includesApprovedLeave: !reserveApprovedPto }, workspaceBasis.schedule),
+    [requests, rangeStart, rangeEnd, balanceAsOf, reserveApprovedPto, workspaceBasis.schedule],
   );
   const bookedDates = useMemo(() => new Set(applyTrackedRequests ? commitments.unavailableDates : []), [applyTrackedRequests, commitments]);
   // Tracked and approved requests stay visible in the results beside new breaks.
@@ -1025,6 +1030,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     approvedPtoDays: commitments.approvedPtoDays,
     tentativePtoDays: commitments.tentativePtoDays,
     reservedPtoDays: applyTrackedRequests && !unlimitedPto ? commitments.reservedPtoDays : 0,
+    reservedPtoDayEquivalent: applyTrackedRequests && !unlimitedPto ? commitments.reservedPtoDayEquivalent : 0,
     hasHourlyBookings: commitments.hasHourlyBookings,
     hasTrackedRequests: commitments.unavailableDates.length > 0,
     committedEntries,

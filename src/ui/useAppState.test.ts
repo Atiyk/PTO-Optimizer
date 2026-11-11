@@ -167,3 +167,20 @@ describe('planner address privacy and shared calendars', () => {
     }
   });
 });
+
+describe('employer calendar save with another tab open', () => {
+  it('does not overwrite a calendar another tab saved after this plan loaded it', () => {
+    localStorage.clear();
+    window.history.replaceState(null, '', '/pto?c=US&s=2027-01-01&e=2027-12-31&b=10');
+    const { result, unmount } = renderHook(() => useAppState());
+    const otherTab = encodeEmployerCalendar({ ...defaultEmployerCalendar('US'), custom: [{ date: '2027-06-01', name: 'Other tab' }] });
+    localStorage.setItem('gapless.employer.v1:US:', otherTab);
+    act(() => result.current.saveEmployerHolidays());
+    expect(result.current.employerCalendarMessage).toMatch(/Nothing was overwritten/);
+    expect(localStorage.getItem('gapless.employer.v1:US:')).toBe(otherTab);
+    act(() => result.current.saveEmployerHolidays());
+    expect(result.current.employerCalendarMessage).toBe('Employer calendar saved in this browser.');
+    unmount();
+    localStorage.clear();
+  });
+});

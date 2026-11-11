@@ -121,3 +121,32 @@ describe('date-specific forecast reuses the existing policy projection', () => {
     expect(forecastWithRequests({ ...base, waitingPeriodDays: -1 }, '2027-02-01')).toBeNull();
   });
 });
+
+describe('hourly and partial-day requests in every balance unit', () => {
+  const eightHour = { ...calendar, shiftMinutes: [480, 480, 480, 480, 480, 0, 0] };
+  const fourTens = { workWeek: [true, true, true, true, false, false, false] as typeof DEFAULT_WORK_WEEK, offDays: [], shiftMinutes: [600, 600, 600, 600, 0, 0, 0] };
+  const flat = { ...base, accrual: { kind: 'front-loaded' as const, amount: 0, grantDate: '2026-01-01' } };
+
+  it('charges a 4h request on an 8h day as 0.5 day in a day-based balance', () => {
+    const half = createPtoRequest({ start: '2027-01-04', end: '2027-01-04', status: 'approved', partialMinutes: 240 }, eightHour, 'half')!;
+    expect(forecastWithRequests(flat, '2027-02-01', [half])!.confirmed).toMatchObject({ balance: 9.5, scheduled: 0.5 });
+  });
+
+  it('charges a 5h request against a 10h shift on a 4x10 schedule as 0.5 day, and a full 10h shift as 1 day', () => {
+    const policy = { ...flat, shiftMinutes: [600, 600, 600, 600, 0, 0, 0] };
+    const partial = createPtoRequest({ start: '2027-01-04', end: '2027-01-04', status: 'approved', partialMinutes: 300 }, fourTens, 'p')!;
+    const full = createPtoRequest({ start: '2027-01-05', end: '2027-01-06', status: 'approved' }, fourTens, 'f')!;
+    expect(forecastWithRequests(policy, '2027-02-01', [partial, full])!.confirmed).toMatchObject({ balance: 7.5, scheduled: 2.5 });
+  });
+
+  it('charges a policy planned day for that weekday shift in an hours balance', () => {
+    const policy = { ...flat, unit: 'hours' as const, currentBalance: 80, hoursPerDay: 8, shiftMinutes: [600, 600, 600, 600, 0, 0, 0], plannedDays: ['2027-01-04'] };
+    expect(forecastWithRequests(policy, '2027-02-01')!.confirmed).toMatchObject({ balance: 70, scheduled: 10 });
+    // Without a per-weekday schedule the legacy hours-per-day charge is unchanged.
+    expect(forecastWithRequests({ ...policy, shiftMinutes: undefined }, '2027-02-01')!.confirmed).toMatchObject({ balance: 72, scheduled: 8 });
+  });
+
+  it('keeps a legacy whole-day request at one day per date', () => {
+    expect(forecastWithRequests(flat, '2027-02-01', [approved('w', '2027-01-04', '2027-01-05')])!.confirmed).toMatchObject({ balance: 8, scheduled: 2 });
+  });
+});

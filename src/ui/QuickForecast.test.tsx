@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { TimeOffPolicy } from '../policy/model';
 import { forecastPresets } from './forecastPresets';
 import { QuickForecast } from './QuickForecast';
+import { createPtoRequest } from '../personal/requestLedger';
 
 const policy: TimeOffPolicy = {
   unit: 'days',
@@ -18,6 +19,16 @@ const policy: TimeOffPolicy = {
 };
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
+
+describe('quick forecast with hourly requests', () => {
+  it('charges a partial day as its share of the shift in a day balance and says so', () => {
+    const half = createPtoRequest({ start: '2026-02-02', end: '2026-02-02', status: 'approved', partialMinutes: 240 },
+      { workWeek: [true, true, true, true, true, false, false], offDays: [], shiftMinutes: [480, 480, 480, 480, 480, 0, 0] }, 'half')!;
+    render(<QuickForecast policy={policy} requests={[half]} forecastDate="2026-02-15" onForecastDateChange={vi.fn()} />);
+    expect(screen.getByText('11.5 days')).toBeTruthy();
+    expect(screen.getByText(/A partial day counts as its share of that day's shift: half a shift is 0.5 day./)).toBeTruthy();
+  });
+});
 
 describe('quick forecast date shortcuts', () => {
   it('anchors shortcuts to the balance date and clamps month ends', () => {
