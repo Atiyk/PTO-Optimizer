@@ -67,6 +67,9 @@ Residual risks noted by P (not fixed): `/api/watch` and reminder-email links car
 
 - ~12:35Z — `gapless/p1-release` built from 3bae6ed + C + B + W2 + QA scoping → 0d9384a: vitest 186 files / 1998 tests pass, tsc clean, lint 0 errors, build OK. Agents S (5/6) and T (7, incl. prod forecast flake) started from 0d9384a (max 2 concurrent).
 
+- 2026-11-11 ~12:45Z–16:20Z — Plan usage limit hit again (2 agents). S and T stopped mid-work; uncommitted progress preserved in /home/user/p1s and /home/user/p1t. Hourly wakes 13:22–15:19 had nothing runnable.
+- 2026-11-11T16:20Z — Execution 3 (16:17 slot). S and T resumed with ~45 min budgets.
+
 ## Next action
 
 Merge S and T results into `gapless/p1-release` when done; then start 9 (snapshots, P) and 12 (family work calendars, C). Then critic Q on exact P1 SHA, open P1 release PR, CI, merge, prod smoke (push gapless/prod-smoke).
