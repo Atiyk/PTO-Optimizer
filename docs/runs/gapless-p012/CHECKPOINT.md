@@ -7,12 +7,12 @@ source of truth between scheduled executions. No sensitive user data belongs her
 ## Lock
 
 - Owner: Claude Code orchestrator session `session_01Fy88h8ZbDnL4WU9QaopvcP` (project thread "Ship Gapless P0, P1, P2 releases").
-- State: HELD since 2026-11-11T06:17Z.
+- State: RELEASED 2026-11-11T22:15Z (all batches released).
 - Prior lock: Codex "Timebower VC batch" lead (issue #143, PR #144). Last heartbeat 2026-11-10T13:42:57Z; its promised hourly schedule never wrote another checkpoint or commit in 16.5 hours, and its own hard stop is 2026-11-13T02:30Z. Treated as stopped. Its branch `timebower/vc-integration` is NOT pushed to by this workflow; P0 builds on a copy of its head `27e4a158` so that work is reviewed rather than discarded.
 
 ## Schedule
 
-- Scheduled task `trig_012aCT8YKo4cP88QEzmsx7Cf` "Gapless P0/P1/P2 orchestrator (5-hour cadence)", cron `19 * * * *` UTC (server-anchored hourly), bound to this session, enabled.
+- Scheduled task `trig_012aCT8YKo4cP88QEzmsx7Cf` "Gapless P0/P1/P2 orchestrator (5-hour cadence)", cron `19 * * * *` UTC (server-anchored hourly), bound to this session. DISABLED 2026-11-11T22:14Z after P2 shipped.
 - The scheduler has no native 5-hour interval: `*/5` cron resets at midnight (20:00→00:00 is 4h). So it fires hourly and each wake runs a full execution only when due on the 5-hour grid below; other wakes exit without changes.
 - 5-hour grid (UTC), anchor 2026-11-11T06:17Z: 11:17, 16:17, 21:17 (Nov 11); 02:17, 07:17, 12:17, 17:17, 22:17 (Nov 12); 03:17, 08:17, 13:17, 18:17, 23:17 (Nov 13).
 - Hard stop: 2026-11-14T02:30Z (Fri Nov 13 9:30 PM ET). Freeze new work/merges/deploys at 02:15Z.
