@@ -34,23 +34,24 @@ for (const name of selected) assert.ok(Object.hasOwn(engines, name), `Unknown en
 // axe-core is installed with the workspace (via @axe-core/playwright); fail loudly if missing.
 const axeSource = await readFile(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
 
-/** Same-origin only; the analytics script is stubbed so no request leaves the fixture.
- * Other origins answer 503 with a CORS header: the app sees an unavailable service (which it
- * handles), and WebKit does not report the test's own abort as a page error. */
+/** Same-origin only; the analytics script is stubbed so no request leaves the fixture. */
 async function isolate(context) {
   await context.route('**/*', (route) => {
     const url = new URL(route.request().url());
     if (url.origin === base.origin && url.pathname === '/_vercel/insights/script.js') {
       return route.fulfill({ contentType: 'application/javascript', body: '' });
     }
-    if (url.origin === base.origin) return route.continue();
-    return route.fulfill({ status: 503, headers: { 'access-control-allow-origin': '*' }, body: '' });
+    return url.origin === base.origin ? route.continue() : route.abort();
   });
 }
 
 /** The prerendered snapshot (scripts/prerenderShell.ts) holds disabled copies of the controls
  * until React mounts. Reading a value before then reads the snapshot, not the app. */
 const mounted = (page) => page.locator('[data-prerendered-controls]').waitFor({ state: 'detached' });
+/** Before navigating away: let the page's own requests (e.g. holiday lookups) settle. WebKit
+ * reports a cross-origin fetch cancelled by navigation as a page error, which is the test's
+ * doing, not the app's. */
+const settled = async (page) => { await mounted(page); await page.waitForLoadState('networkidle'); };
 
 const noOverflow = (page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1);
 
@@ -264,6 +265,7 @@ async function checkPolicyStorage(browser, result) {
     page.on('pageerror', (error) => result.errors.push(`storage: ${error.message}`));
     await page.goto(new URL('/policy/', base).href);
     await page.evaluate(({ key, corrupt }) => localStorage.setItem(key, corrupt), { key, corrupt });
+    await settled(page);
     await page.reload();
     await page.getByText(/Your saved policy in this browser could not be read/).waitFor({ state: 'visible' });
     const balance = page.getByRole('spinbutton', { name: 'Current PTO balance (days)' });
@@ -282,6 +284,7 @@ async function checkPolicyStorage(browser, result) {
     assert.equal(quarantined[0].raw, corrupt, 'the unreadable record is kept, byte for byte');
     assert.equal(new URL(page.url()).searchParams.has('cb'), false);
     // A fresh page restores the saved policy, with no unreadable notice.
+    await settled(page);
     await page.goto(new URL('/policy/', base).href);
     await mounted(page);
     assert.equal(await balance.inputValue(), '7');
@@ -289,11 +292,13 @@ async function checkPolicyStorage(browser, result) {
 
     const newer = JSON.stringify({ version: 2, search: 'cb=3', revision: 'future-rev', updatedAt: '2030-01-01T00:00:00Z' });
     await page.evaluate(({ key, newer }) => localStorage.setItem(key, newer), { key, newer });
+    await settled(page);
     await page.reload();
     await page.getByText(/saved by a newer version of Gapless/).first().waitFor({ state: 'visible' });
     await page.getByRole('button', { name: 'Save policy in this browser' }).click();
     await page.getByText(/A newer version of Gapless saved your policy. Nothing was overwritten/).waitFor({ state: 'visible' });
     assert.equal(await page.evaluate((key) => localStorage.getItem(key), key), newer, 'a newer-schema record is never downgraded');
+    await settled(page);
   } finally {
     await context.close();
   }
