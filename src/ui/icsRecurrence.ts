@@ -39,6 +39,20 @@ export interface RecurrenceRule {
   wkst: number;
 }
 
+/** Shared, mutable work budget. Every period visited and every candidate date examined
+ * costs one unit, including periods that produce nothing (empty months, dates rejected by
+ * BYMONTH/BYMONTHDAY limits), so a rule that never matches cannot walk for free. */
+export interface WorkBudget {
+  remaining: number;
+  exhausted: boolean;
+}
+
+function spend(budget: WorkBudget, units: number): boolean {
+  budget.remaining -= units;
+  if (budget.remaining < 0) budget.exhausted = true;
+  return !budget.exhausted;
+}
+
 export type RuleParseResult = { ok: true; rule: RecurrenceRule } | { ok: false; reason: string };
 
 export const MAX_RRULE_CHARS = 1000;
@@ -218,9 +232,10 @@ function passesLimits(rule: RecurrenceRule, iso: string): boolean {
  * (DTSTART itself is always the first instance and is added by the caller), and stops once
  * a period starts after `endDate`. When `fastForwardTo` is given the iteration may skip
  * whole periods that end before it - only valid when the rule has no COUNT, because
- * skipped periods would otherwise have to be counted.
+ * skipped periods would otherwise have to be counted. Stops early, with
+ * `budget.exhausted` set, once the work budget runs out.
  */
-export function* ruleDates(rule: RecurrenceRule, dtstart: string, endDate: string, fastForwardTo?: string): Generator<string> {
+export function* ruleDates(rule: RecurrenceRule, dtstart: string, endDate: string, fastForwardTo: string | undefined, budget: WorkBudget): Generator<string> {
   const startSerial = isoToSerial(dtstart);
   const endSerial = isoToSerial(endDate);
   const sy = Number(dtstart.slice(0, 4));
@@ -234,6 +249,7 @@ export function* ruleDates(rule: RecurrenceRule, dtstart: string, endDate: strin
     const step = periodDays * rule.interval;
     let k = ff ? Math.max(0, Math.floor((isoToSerial(ff) - firstPeriod) / step) - 1) : 0;
     for (; firstPeriod + k * step <= endSerial; k++) {
+      if (!spend(budget, 1)) return;
       const periodStart = firstPeriod + k * step;
       const candidates: number[] = [];
       if (rule.freq === 'DAILY') candidates.push(periodStart);
@@ -241,6 +257,7 @@ export function* ruleDates(rule: RecurrenceRule, dtstart: string, endDate: strin
         for (const { dow } of rule.byDay) candidates.push(periodStart + ((dow - rule.wkst + 7) % 7));
         candidates.sort((a, b) => a - b);
       } else candidates.push(periodStart + ((mondayIndexedDow(dtstart) - rule.wkst + 7) % 7));
+      if (!spend(budget, candidates.length)) return;
       let last = -Infinity;
       for (const serial of candidates) {
         if (serial === last) continue;
@@ -259,11 +276,14 @@ export function* ruleDates(rule: RecurrenceRule, dtstart: string, endDate: strin
     const firstIndex = sy * 12 + sm - 1;
     let k = ff ? Math.max(0, Math.floor(((Number(ff.slice(0, 4)) * 12 + Number(ff.slice(5, 7)) - 1) - firstIndex) / rule.interval) - 1) : 0;
     for (; firstIndex + k * rule.interval <= endMonthIndex; k++) {
+      if (!spend(budget, 1)) return;
       const index = firstIndex + k * rule.interval;
       const year = Math.floor(index / 12);
       const month = (index % 12) + 1;
       if (rule.byMonth && !rule.byMonth.includes(month)) continue;
-      for (const iso of monthCandidates(rule, year, month, sd)) {
+      const dates = monthCandidates(rule, year, month, sd);
+      if (!spend(budget, dates.length)) return;
+      for (const iso of dates) {
         if (iso > dtstart) yield iso;
       }
     }
@@ -273,11 +293,14 @@ export function* ruleDates(rule: RecurrenceRule, dtstart: string, endDate: strin
   // YEARLY
   let k = ff ? Math.max(0, Math.floor((Number(ff.slice(0, 4)) - sy) / rule.interval) - 1) : 0;
   for (; sy + k * rule.interval <= endYear; k++) {
+    if (!spend(budget, 1)) return;
     const year = sy + k * rule.interval;
     const months = rule.byMonth ?? [sm];
     for (const month of months) {
       // Without BYMONTHDAY/BYDAY, a YEARLY rule keeps DTSTART's day-of-month (RFC 5545 §3.3.10).
-      for (const iso of monthCandidates(rule, year, month, sd)) {
+      const dates = monthCandidates(rule, year, month, sd);
+      if (!spend(budget, 1 + dates.length)) return;
+      for (const iso of dates) {
         if (iso > dtstart) yield iso;
       }
     }

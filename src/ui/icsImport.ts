@@ -1,6 +1,6 @@
 import { addDays, rangeISO, isoToSerial } from '@daysoff/engine/solver/dateUtils';
 import { validCalendarDate } from '../personal/employerCalendar';
-import { parseRRule, ruleDates, type RecurrenceRule } from './icsRecurrence';
+import { parseRRule, ruleDates, type RecurrenceRule, type WorkBudget } from './icsRecurrence';
 
 /** A single .ics file is parsed entirely client-side (FileReader/`file.text()`, never
  * fetch/XHR) - nothing is uploaded anywhere, per the product's no-backend design. This
@@ -16,7 +16,19 @@ export const MAX_IMPORT_BUSY_DAYS = 4000;
 /** Issue 16: hard bounds on recurrence expansion - instances kept per series, and rule
  * candidates examined across the whole file. Hitting either reports the series as truncated. */
 export const MAX_RECURRENCE_INSTANCES = 1000;
-export const MAX_RECURRENCE_ITERATIONS = 200_000;
+/** Work units (periods visited + candidate dates examined, see WorkBudget) for the whole
+ * file and for any one series. Sized so the worst case stays well under ~100 ms. */
+export const MAX_RECURRENCE_ITERATIONS = 100_000;
+export const MAX_RECURRENCE_ITERATIONS_PER_SERIES = 20_000;
+/** RFC 5545 says RRULE SHOULD NOT occur more than once; a few are tolerated, more are refused. */
+export const MAX_RULE_LINES_PER_EVENT = 4;
+/** RDATE and EXDATE property lines per event (values within them are capped separately). */
+export const MAX_DATE_LIST_LINES_PER_EVENT = 100;
+/** RDATE + EXDATE + RECURRENCE-ID values parsed across the whole file: each zoned value
+ * costs several Intl calls, so this bounds that work too. */
+export const MAX_RECURRENCE_DATE_VALUES = 2000;
+/** Rule-generated instances in an IANA time zone across the whole file (several Intl calls each). */
+export const MAX_ZONED_RECURRENCE_INSTANCES = 1000;
 
 export class IcsParseError extends Error {}
 
@@ -42,8 +54,12 @@ export interface RecurrenceSummary {
   unsupported: number;
   /** Sorted, de-duplicated names of the unsupported features (e.g. "BYSETPOS"). */
   unsupportedReasons: string[];
-  /** Series cut short by the instance/iteration caps (or, with no window, still running at the horizon). */
+  /** Series cut short by the instance/work caps (or, with no window, still running at the horizon). */
   truncated: number;
+  /** Sorted, de-duplicated reasons for truncation (e.g. "too many repeats to check"). */
+  truncatedReasons: string[];
+  /** Work units spent expanding rules (bounded by MAX_RECURRENCE_ITERATIONS). */
+  iterations: number;
 }
 
 interface RawProp {
@@ -326,21 +342,25 @@ function propValues(prop: RawProp): RawProp[] {
 }
 
 /** UNTIL is inclusive (RFC 5545 §3.3.10). */
-function untilAllows(until: string, instance: DateTimeValue, start: DateTimeValue): boolean {
+function untilChecker(until: string, start: DateTimeValue): (instance: DateTimeValue) => boolean {
+  // Resolved once per rule: a zoned UNTIL costs several Intl calls.
   const untilDate = `${until.slice(0, 4)}-${until.slice(4, 6)}-${until.slice(6, 8)}`;
-  if (!validCalendarDate(untilDate)) return false;
-  if (until.length === 8) return instance.date <= untilDate;
+  if (!validCalendarDate(untilDate)) return () => false;
+  if (until.length === 8) return instance => instance.date <= untilDate;
   const h = Number(until.slice(9, 11)), m = Number(until.slice(11, 13)), s = Number(until.slice(13, 15));
   const utc = until.endsWith('Z');
-  if (instance.isAllDay) {
+  if (start.isAllDay) {
     // An all-day series with a date-time UTC UNTIL (a common exporter shape): compare dates.
-    return instance.date <= (utc ? new Date(utcWallMillis(untilDate, h, m, s)).toISOString().slice(0, 10) : untilDate);
+    const lastDate = utc ? new Date(utcWallMillis(untilDate, h, m, s)).toISOString().slice(0, 10) : untilDate;
+    return instance => instance.date <= lastDate;
   }
   const untilMs = utc || !start.zone || start.zone === 'UTC'
     ? utcWallMillis(untilDate, h, m, s)
     : zonedInstantCandidates(untilDate, h, m, s, start.zone)[0] ?? utcWallMillis(untilDate, h, m, s);
-  return instance.instantMs! <= untilMs;
+  return instance => instance.instantMs! <= untilMs;
 }
+
+
 
 function untilDateOf(until: string): string {
   return `${until.slice(0, 4)}-${until.slice(4, 6)}-${until.slice(6, 8)}`;
@@ -444,9 +464,9 @@ export function parseICSBusyDays(raw: string, options: ParseIcsOptions = {}): Pa
     else if (prop.name === 'DURATION') current.duration = prop.value;
     else if (prop.name === 'UID') current.uid = prop.value;
     else if (prop.name === 'STATUS') current.cancelled = prop.value.trim().toUpperCase() === 'CANCELLED';
-    else if (prop.name === 'RRULE') current.rrules.push(prop.value);
-    else if (prop.name === 'RDATE') current.rdates.push(prop);
-    else if (prop.name === 'EXDATE') current.exdates.push(prop);
+    else if (prop.name === 'RRULE') { if (current.rrules.length <= MAX_RULE_LINES_PER_EVENT) current.rrules.push(prop.value); }
+    else if (prop.name === 'RDATE') { if (current.rdates.length <= MAX_DATE_LIST_LINES_PER_EVENT) current.rdates.push(prop); }
+    else if (prop.name === 'EXDATE') { if (current.exdates.length <= MAX_DATE_LIST_LINES_PER_EVENT) current.exdates.push(prop); }
     else if (prop.name === 'EXRULE') current.exrule = true;
     else if (prop.name === 'RECURRENCE-ID') current.recurrenceId = prop;
   }
@@ -456,9 +476,12 @@ export function parseICSBusyDays(raw: string, options: ParseIcsOptions = {}): Pa
   }
 
   const busy = new Set<string>();
-  const recurrence: RecurrenceSummary = { expanded: 0, unsupported: 0, truncated: 0, unsupportedReasons: [] };
+  const recurrence: RecurrenceSummary = { expanded: 0, unsupported: 0, truncated: 0, unsupportedReasons: [], truncatedReasons: [], iterations: 0 };
   const reasons = new Set<string>();
-  let iterationBudget = MAX_RECURRENCE_ITERATIONS;
+  const truncatedReasons = new Set<string>();
+  let fileBudgetRemaining = MAX_RECURRENCE_ITERATIONS;
+  let dateValuesRemaining = MAX_RECURRENCE_DATE_VALUES;
+  let zonedInstancesRemaining = MAX_ZONED_RECURRENCE_INSTANCES;
 
   const addSingle = (ev: EventRecord): void => {
     if (ev.cancelled || !ev.dtstart) return;
@@ -506,6 +529,8 @@ export function parseICSBusyDays(raw: string, options: ParseIcsOptions = {}): Pa
 
     const reason = ((): string | null => {
       if (ev.exrule) return 'EXRULE';
+      if (ev.rrules.length > MAX_RULE_LINES_PER_EVENT) return 'too many RRULE lines';
+      if (ev.rdates.length > MAX_DATE_LIST_LINES_PER_EVENT || ev.exdates.length > MAX_DATE_LIST_LINES_PER_EVENT) return 'too many RDATE/EXDATE lines';
       for (const text of ev.rrules) {
         const parsed = parseRRule(text);
         if (!parsed.ok) return parsed.reason;
@@ -522,11 +547,14 @@ export function parseICSBusyDays(raw: string, options: ParseIcsOptions = {}): Pa
     const rules = ev.rrules.map(text => (parseRRule(text) as { ok: true; rule: RecurrenceRule }).rule);
     const rdateProps = ev.rdates.flatMap(propValues);
     const exdateProps = ev.exdates.flatMap(propValues);
-    if (rdateProps.length > MAX_RECURRENCE_INSTANCES || exdateProps.length > MAX_RECURRENCE_INSTANCES) {
+    const dateValues = rdateProps.length + exdateProps.length + overrides.length;
+    if (rdateProps.length > MAX_RECURRENCE_INSTANCES || exdateProps.length > MAX_RECURRENCE_INSTANCES
+      || dateValues > dateValuesRemaining) {
       recurrence.unsupported++;
       reasons.add('too many RDATE/EXDATE values');
       continue;
     }
+    dateValuesRemaining -= dateValues;
     const valueOf = (p: RawProp, what: string): DateTimeValue => {
       const v = parseDateTimeValue(p);
       if (!v) throw new IcsParseError(`Calendar event has an invalid ${what} date.`);
@@ -548,29 +576,40 @@ export function parseICSBusyDays(raw: string, options: ParseIcsOptions = {}): Pa
     const instances = new Map<string, DateTimeValue>();
     instances.set(exactKey(start), start); // DTSTART always counts as the first occurrence
     let truncated = false;
+    const markTruncated = (why: string) => { truncated = true; truncatedReasons.add(why); };
+    const budget: WorkBudget = { remaining: Math.min(MAX_RECURRENCE_ITERATIONS_PER_SERIES, fileBudgetRemaining), exhausted: false };
+    const budgetAtStart = budget.remaining;
+    const zoned = !start.isAllDay && start.zone !== null && start.zone !== 'UTC';
     for (const rule of rules) {
       let count = 1;
       let exhausted = rule.count !== null && count >= rule.count;
-      if (!exhausted) {
-        for (const date of ruleDates(rule, start.date, rangeEnd, generateFrom)) {
-          if (--iterationBudget < 0) { truncated = true; break; }
+      if (!exhausted && !truncated) {
+        const untilOk = rule.until !== null ? untilChecker(rule.until, start) : null;
+        for (const date of ruleDates(rule, start.date, rangeEnd, generateFrom, budget)) {
+          // Each instance in an IANA zone costs several Intl calls: separately capped per file.
+          if (zoned && --zonedInstancesRemaining < 0) { budget.exhausted = true; break; }
           const instance = instanceOn(date, start);
           if (!instance) continue; // nonexistent local time: ignored and not counted
-          if (rule.until !== null && !untilAllows(rule.until, instance, start)) { exhausted = true; break; }
+          if (untilOk && !untilOk(instance)) { exhausted = true; break; }
           count++;
           if (date >= generateFrom) {
-            if (instances.size >= MAX_RECURRENCE_INSTANCES) { truncated = true; break; }
+            if (instances.size >= MAX_RECURRENCE_INSTANCES) { markTruncated('too many instances'); break; }
             instances.set(exactKey(instance), instance);
           }
           if (rule.count !== null && count >= rule.count) { exhausted = true; break; }
         }
+        // Out of work budget before the rule finished: incomplete, never "expanded".
+        if (budget.exhausted && !exhausted) markTruncated('too many repeats to check');
       }
       // With no planning window, a rule that is still running at the horizon is incomplete.
       if (!window && !exhausted && !truncated
-        && (rule.count !== null || rule.until === null || untilDateOf(rule.until) > rangeEnd)) truncated = true;
+        && (rule.count !== null || rule.until === null || untilDateOf(rule.until) > rangeEnd)) markTruncated('repeats past the import horizon');
     }
+    const spent = budgetAtStart - Math.max(0, budget.remaining);
+    fileBudgetRemaining -= spent;
+    recurrence.iterations += spent;
     for (const v of rdates) {
-      if (instances.size >= MAX_RECURRENCE_INSTANCES) { truncated = true; break; }
+      if (instances.size >= MAX_RECURRENCE_INSTANCES) { markTruncated('too many instances'); break; }
       instances.set(exactKey(v), v); // duplicates of RRULE instances collapse (RFC 5545 §3.8.5.2)
     }
 
@@ -596,6 +635,7 @@ export function parseICSBusyDays(raw: string, options: ParseIcsOptions = {}): Pa
   }
 
   recurrence.unsupportedReasons = [...reasons].sort();
+  recurrence.truncatedReasons = [...truncatedReasons].sort();
   return {
     busyDays: Array.from(busy).sort(),
     eventCount: cappedAt !== null ? cappedAt : eventCount,
@@ -606,7 +646,7 @@ export function parseICSBusyDays(raw: string, options: ParseIcsOptions = {}): Pa
 }
 
 /** Issue 16: one plain sentence whenever repeating events were not fully imported. */
-export function incompleteRecurrenceMessage(recurrence: RecurrenceSummary): string | null {
+export function incompleteRecurrenceMessage(recurrence: Pick<RecurrenceSummary, 'expanded' | 'unsupported' | 'unsupportedReasons' | 'truncated'>): string | null {
   const parts: string[] = [];
   const events = (n: number) => `${n} repeating event${n === 1 ? '' : 's'}`;
   if (recurrence.unsupported > 0) {
