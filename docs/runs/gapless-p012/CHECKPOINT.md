@@ -53,6 +53,9 @@ Residual risks noted by P (not fixed): `/api/watch` and reminder-email links car
 
 - ~07:15Z — PR #145 opened (head 6b188a8). Required check 'Consumer browser and visual evidence' failed: journey 'Partner sharing…' finds no break card after tracking because committed cards lack data-break-* + partner action. W fixing in product. Critic Q reviewing 6b188a8. C finished 16/17 locally.
 
+- 2026-11-11T07:19Z–11:10Z — Plan usage limit (5-hour window) exhausted after ~1h with 5 parallel agents; all agents and this session stopped; hourly wakes 07:19–10:19 queued without work. Agents B(13/14) and S(5/6) died before producing commits. LESSON: run at most 2 agents concurrently; keep P1 work serialized behind P0.
+- 2026-11-11T11:20Z — Execution 2 (11:17 slot). Resumed W (committed-card partner fix) and critic Q on P0.
+
 ## Next action
 
 W follow-up (tracked breaks visible) → full checks → push gapless/p0-release, open P0 release PR → independent critic on exact SHA → fixes → GO → merge → Vercel READY → prod smoke.
