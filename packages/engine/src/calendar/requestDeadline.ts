@@ -39,7 +39,8 @@ function wholeNoticeDays(noticeDays: number): number | null {
  * .ics reminder dates, not contradict them."
  *
  * Rule:
- *  - calendar notice: break start minus N calendar days; when that day is not a working day
+ *  - calendar notice: the first working day of the break (its start, or the first working
+ *    day after any free days it opens with) minus N calendar days; when that day is not a working day
  *    (non-working weekday or an employer/observed day off) it rolls BACK to the previous
  *    working day - a deadline on a day nobody is at work is useless.
  *  - working notice: the Nth working day strictly before the break start. N = 0 is the start
@@ -50,7 +51,16 @@ function wholeNoticeDays(noticeDays: number): number | null {
 export function requestByDate(breakStart: string, noticePeriodDays: number, workWeek: WorkWeek, offDays: readonly string[] = [], unit: NoticeUnit = 'calendar'): string | null {
   const days = wholeNoticeDays(noticePeriodDays);
   if (serialToISO(isoToSerial(breakStart)) !== breakStart || days === null) return null;
-  if (unit !== 'working') return nearestPrecedingWorkday(addDays(breakStart, -days), workWeek, offDays);
+  if (unit !== 'working') {
+    // Notice runs up to the first day the person is actually away. A break that opens on a
+    // free weekend or employer day off (breaks include adjacent free days) starts its
+    // absence on the next working day, so the calendar count is anchored there.
+    const off = new Set(offDays);
+    const firstAway = isValidWorkWeek(workWeek)
+      ? searchWorkday(breakStart, 1, (day) => workWeek[mondayIndexedDow(day)] && !off.has(day)) ?? breakStart
+      : breakStart;
+    return nearestPrecedingWorkday(addDays(firstAway, -days), workWeek, offDays);
+  }
   // A working-day notice longer than the search horizon has no meaningful answer, and an
   // unbounded count would freeze the page on a hostile link.
   if (days > MAX_WORKDAY_SEARCH_DAYS || !isValidWorkWeek(workWeek)) return null;

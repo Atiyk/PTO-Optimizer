@@ -55,9 +55,9 @@ describe('nearestPrecedingWorkday', () => {
 
 describe('requestByDate', () => {
   it('subtracts the notice period and lands on the correct working day', () => {
-    // Break starts Sat 2026-12-19; 14 days before = Sat 2026-12-05 (also a Saturday) ->
-    // shifts back to Fri 2026-12-04.
-    expect(requestByDate('2026-12-19', 14, DEFAULT_WORK_WEEK)).toBe('2026-12-04');
+    // Break starts Fri 2026-12-18; 13 days before = Sat 2026-12-05 -> shifts back to
+    // Fri 2026-12-04.
+    expect(requestByDate('2026-12-18', 13, DEFAULT_WORK_WEEK)).toBe('2026-12-04');
   });
 
   it('uses the exact same subtraction the .ics reminder uses (shared noticePeriodDays)', () => {
@@ -66,7 +66,7 @@ describe('requestByDate', () => {
   });
 
   it('shifts past employer holidays and alternate Fridays as well as weekends', () => {
-    expect(requestByDate('2026-12-19', 14, DEFAULT_WORK_WEEK, ['2026-12-03', '2026-12-04'])).toBe('2026-12-02');
+    expect(requestByDate('2026-12-18', 14, DEFAULT_WORK_WEEK, ['2026-12-03', '2026-12-04'])).toBe('2026-12-02');
   });
 });
 
@@ -83,17 +83,17 @@ describe('requestByText', () => {
 
   it('switches to urgency wording naming the closing weekday within the last week', () => {
     // Deadline 2026-12-04 (Friday). today = 2026-11-30 (Monday): 4 days before deadline.
-    const text = requestByText('2026-12-19', 14, workWeek, '2026-11-30');
+    const text = requestByText('2026-12-18', 14, workWeek, '2026-11-30');
     expect(text).toBe('Request this week — the notice window closes Friday.');
   });
 
   it('says the window has already started once the deadline has passed', () => {
-    const text = requestByText('2026-12-19', 14, workWeek, '2026-12-10');
+    const text = requestByText('2026-12-18', 14, workWeek, '2026-12-10');
     expect(text).toBe('Request now — the notice window has already started.');
   });
 
   it('also treats "deadline is today" as already started, not a countdown to zero', () => {
-    const text = requestByText('2026-12-19', 14, workWeek, '2026-12-04');
+    const text = requestByText('2026-12-18', 14, workWeek, '2026-12-04');
     expect(text).toContain('already started');
   });
 });
@@ -150,8 +150,8 @@ describe('requestByDate notice unit (Issue 14)', () => {
   const MON_THU: WorkWeek = [true, true, true, true, false, false, false];
 
   it('defaults to calendar days, unchanged from before', () => {
-    expect(requestByDate('2026-12-19', 14, DEFAULT_WORK_WEEK, [], 'calendar')).toBe(requestByDate('2026-12-19', 14, DEFAULT_WORK_WEEK));
-    expect(requestByDate('2026-12-19', 14, DEFAULT_WORK_WEEK, [], 'calendar')).toBe('2026-12-04');
+    expect(requestByDate('2026-12-18', 14, DEFAULT_WORK_WEEK, [], 'calendar')).toBe(requestByDate('2026-12-18', 14, DEFAULT_WORK_WEEK));
+    expect(requestByDate('2026-12-18', 14, DEFAULT_WORK_WEEK, [], 'calendar')).toBe('2026-12-04');
   });
 
   it('counts working days, skipping employer holidays and weekends', () => {
@@ -193,5 +193,24 @@ describe('requestByDate notice unit (Issue 14)', () => {
     expect(noticePhrase(14, 'calendar')).toBe('14-day');
     expect(noticePhrase(5, 'working')).toBe('5-working-day');
     expect(noticePhrase(1, 'working')).toBe('1-working-day');
+  });
+});
+
+describe('requestByDate counts notice from the first day actually away (issue 5 follow-up)', () => {
+  // Breaks now include the free weekend before them (Sat Dec 12 - Mon Dec 14, 2026). The
+  // absence starts on Monday, so calendar notice is counted from Monday, not the Saturday.
+  it('a break starting on a free Saturday counts calendar notice from the Monday', () => {
+    expect(requestByDate('2026-12-12', 14, DEFAULT_WORK_WEEK)).toBe(requestByDate('2026-12-14', 14, DEFAULT_WORK_WEEK));
+    expect(requestByDate('2026-12-12', 14, DEFAULT_WORK_WEEK)).toBe('2026-11-30');
+  });
+  it('skips employer days off at the start of the break too', () => {
+    // Fri Dec 25 is observed; a break Fri Dec 25 - Mon Dec 28 is first away on Monday.
+    expect(requestByDate('2026-12-25', 7, DEFAULT_WORK_WEEK, ['2026-12-25'])).toBe('2026-12-21');
+  });
+  it('working-day notice is unchanged (it already counted working days before the start)', () => {
+    expect(requestByDate('2026-12-12', 5, DEFAULT_WORK_WEEK, [], 'working')).toBe(requestByDate('2026-12-14', 5, DEFAULT_WORK_WEEK, [], 'working'));
+  });
+  it('a start that is already a working day is unchanged', () => {
+    expect(requestByDate('2026-12-14', 14, DEFAULT_WORK_WEEK)).toBe('2026-11-30');
   });
 });
