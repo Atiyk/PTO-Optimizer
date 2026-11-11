@@ -59,6 +59,8 @@ Residual risks noted by P (not fixed): `/api/watch` and reminder-email links car
 - ~11:40Z — Critic Q: NO-GO on 6b188a8. W-1 P0 blocker: Family double-charges approved/tentative leave. P-1 P1: expiry handoff links carry `bo` private dates in navigable URL. X-1 P2 headline 'not placed' mislabels reserved days. W-2/P-2/P-3/X-2 P3. Verified: issue 10 bound, issue 2 surfaces, 17/17 hand arithmetic, no overflow/axe 0 at 4 widths. Routed W-1/X-1/W-2 → W, P-1/X-2 → P. 052ad15 pushed (committed-card partner fix).
 - P-3 owner question: planning budget `b` is public in links (needed for URL round-trip) — kept public.
 
+- ~11:50Z — Fixes f1bdf68 (W) + 27e67c6 (P) integrated → P0 candidate 5d4d36e (local 1862/1862, tsc, lint, build). Critic round 2: GO on 5d4d36e. P3 follow-ups H-1/H-2/P-3 deferred. Waiting on required CI for 5d4d36e.
+
 ## Next action
 
-W follow-up (tracked breaks visible) → full checks → push gapless/p0-release, open P0 release PR → independent critic on exact SHA → fixes → GO → merge → Vercel READY → prod smoke.
+When both required checks green on 5d4d36e: mark #145 ready, merge (merge commit), verify Vercel production READY on merged SHA, smoke-test prod. Then P1: integrate C (16/17, b42baa7) and start remaining P1 issues max 2 agents at a time.
