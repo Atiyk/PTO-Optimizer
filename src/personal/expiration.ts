@@ -15,6 +15,12 @@ export interface ExpirationRisk extends PolicyAlert {
   expirationDate: string;
   planningBudget: number;
   canPlan: boolean;
+  /** Dates already taken in the planning window (manual planned days and booked leave).
+   * Data only: never written into `ptoHref`. */
+  unavailableDates?: readonly string[];
+  /** Private planner inputs for the on-device hand-off (src/ui/planHandoff.ts), as a
+   * query string. Absent when the planner can derive everything itself. */
+  privatePlan?: string;
 }
 
 export function expirationRisks(policy: TimeOffPolicy, country: string, requests: readonly PtoRequest[], today: string): ExpirationRisk[] {
@@ -71,8 +77,16 @@ export function expirationRisks(policy: TimeOffPolicy, country: string, requests
     // The budget is already earned at planningStart under the exact pay schedule.
     // No monthly approximation or second accrual stream is needed in the optimizer.
     for (const key of ['ac', 'am', 'ex', 'xd', 'cc']) params.delete(key);
-    if (futurePlanned.length) params.set('bo', [...new Set(futurePlanned)].sort().join(','));
-    return { ...risk, planningBudget: bestBudget, canPlan: bestBudget > 0, ptoHref: `/pto?${params.toString()}` };
+    // Privacy (Issue 2): no reserved dates in the navigable link. /pto blocks tracked
+    // requests from the same on-device ledger itself; only manually planned days, which
+    // the planner cannot know, travel privately through the on-device hand-off.
+    params.delete('bo');
+    const manualHandoff = [...new Set(manualPlanned)].sort();
+    return {
+      ...risk, planningBudget: bestBudget, canPlan: bestBudget > 0, ptoHref: `/pto?${params.toString()}`,
+      unavailableDates: futurePlanned,
+      ...(manualHandoff.length ? { privatePlan: new URLSearchParams({ bo: manualHandoff.join(',') }).toString() } : {}),
+    };
   }).sort((a, b) => a.deadline.localeCompare(b.deadline) || b.daysAtStake - a.daysAtStake);
 }
 

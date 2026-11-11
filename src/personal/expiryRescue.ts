@@ -57,8 +57,10 @@ export interface RescuePlan {
   daysRescued: number;
   daysStillAtRisk: number;
   shortfall?: RescueShortfall;
-  /** /pto link that opens the same window, budget and reserved dates in the planner. */
+  /** /pto link that opens the same window and budget in the planner (public keys only). */
   ptoHref: string;
+  /** Private planner inputs handed over on-device when the link is followed. */
+  privatePlan?: string;
   /** The policy's own unit, so text can say "40 hours" for an hours policy. */
   unit: 'days' | 'hours';
   hoursPerDay: number;
@@ -126,6 +128,7 @@ function emptyPlan(risk: ExpirationRisk, policy: TimeOffPolicy, ptoHref: string,
   return {
     riskId: risk.id, kind: risk.kind, deadline: risk.deadline, window, breaks: [], ptoDates: [], ptoDays: 0, totalDaysOff: 0,
     daysAtRisk: risk.daysAtStake, daysRescued: 0, daysStillAtRisk: risk.daysAtStake, ...(shortfall ? { shortfall } : {}), ptoHref,
+    ...(risk.privatePlan ? { privatePlan: risk.privatePlan } : {}),
     unit: policy.unit, hoursPerDay: policy.hoursPerDay,
   };
 }
@@ -178,8 +181,10 @@ export function rescuePlan(risk: ExpirationRisk, ctx: RescueContext): RescuePlan
   // Pending (planned or requested) leave is not spent in the confirmed forecast, but a
   // rescue must not double-book those dates. Reserve them as unavailable in the link too.
   const tentative = requestDatesForScenario(requests, today, risk.deadline, true);
-  const blackouts = [...new Set([...(params.get('bo')?.split(',').filter(isValidISODate) ?? []), ...tentative])].sort();
-  if (blackouts.length) params.set('bo', blackouts.join(',')); else params.delete('bo');
+  const blackouts = [...new Set([...(risk.unavailableDates ?? []).filter(isValidISODate), ...tentative])].sort();
+  // Privacy (Issue 2): the reserved dates stay out of the navigable link. Tentative and
+  // booked requests come from the planner's own ledger; manual days use the hand-off.
+  params.delete('bo');
   if (!sameWorkWeek(workWeek, DEFAULT_WORK_WEEK)) params.set('ww', workWeek.map((day) => day ? '1' : '0').join(''));
   if (calendar.subdivision) params.set('sd', calendar.subdivision);
   const ptoHref = `/pto?${params.toString()}`;
@@ -277,7 +282,7 @@ export function rescuePlan(risk: ExpirationRisk, ctx: RescueContext): RescuePlan
     totalDaysOff: breaks.reduce((sum, brk) => sum + brk.totalDaysOff, 0),
     daysAtRisk: risk.daysAtStake, daysRescued, daysStillAtRisk,
     ...(daysStillAtRisk > EPS ? { shortfall: shortfallFor(daysStillAtRisk, ptoDates.length) } : {}),
-    ptoHref, unit: ctx.policy.unit, hoursPerDay: ctx.policy.hoursPerDay,
+    ptoHref, ...(risk.privatePlan ? { privatePlan: risk.privatePlan } : {}), unit: ctx.policy.unit, hoursPerDay: ctx.policy.hoursPerDay,
   };
 }
 

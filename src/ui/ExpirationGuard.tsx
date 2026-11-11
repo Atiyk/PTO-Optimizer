@@ -16,6 +16,7 @@ import { downloadReminderICS } from './icsExport';
 import { compactDate, compactDatesIn } from './compactDate';
 import { useTodayISO } from './useTodayISO';
 import { PRODUCT_NAME } from '../brand';
+import { handOffOnClick } from './planHandoff';
 
 const WATCH_CALENDAR_NAME = `${PRODUCT_NAME} - PTO expiry watch`;
 
@@ -78,7 +79,10 @@ function RescueDetails({ plan, risk, calendarState, onAlertAction }: { plan: Res
   }
   const short = plan?.shortfall;
   const link = (label: string) => (
-    <a href={plan?.ptoHref ?? risk.ptoHref} className="link-mark inline-flex min-h-11 items-center text-sm font-semibold" onClick={onAlertAction}>{label}</a>
+    <a href={plan?.ptoHref ?? risk.ptoHref} className="link-mark inline-flex min-h-11 items-center text-sm font-semibold" onClick={(event) => {
+      handOffOnClick(plan?.ptoHref ?? risk.ptoHref, plan ? plan.privatePlan : risk.privatePlan)(event);
+      onAlertAction?.();
+    }}>{label}</a>
   );
   if (!plan || plan.breaks.length === 0) {
     return (
@@ -226,7 +230,7 @@ function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalen
               </p>
             )}
             {planRisk && (
-              <a href={planRisk.ptoHref} onClick={onAlertAction} className="link-mark inline-flex min-h-11 items-center text-sm font-semibold">
+              <a href={planRisk.ptoHref} onClick={(event) => { handOffOnClick(planRisk.ptoHref, planRisk.privatePlan)(event); onAlertAction?.(); }} className="link-mark inline-flex min-h-11 items-center text-sm font-semibold">
                 Find possible PTO days before the deadline
               </a>
             )}
