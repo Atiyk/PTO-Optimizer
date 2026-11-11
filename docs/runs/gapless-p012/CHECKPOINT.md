@@ -82,6 +82,9 @@ Residual risks noted by P (not fixed): `/api/watch` and reminder-email links car
 
 - ~18:05Z — Critic round 2 GO on b59abcb. All required checks green on b59abcb. #146 marked ready and merged (merge commit 40b6766, sha-pinned). Vercel – pto-optimizer success. Prod smoke (run 43070390357, smoke head c89efad): routes 200, P0 privacy copy + P1 prerender guard live, private feed no-store, consumer-qa 40/40, journeys 9/9. P1 COMPLETE. P3 follow-ups: Q2-1 hourly-note copy, Q2-2 per-series ICS budget floor, Q1-5 quarantine quota lock-out, Q1-6 fieldset screen-reader check, Q1-7 date-editor QA browser path; school week Mon–Fri; verify:dist hash.
 
+- ~18:20Z–21:20Z — Usage limit hit a third time (2 P2 agents). Work preserved: p2a 6df98f1 (issue 8), 662e036 (issue 15); p2b a2273c4 (issue 19) + uncommitted cross-browser QA edits. Hourly wakes 18:19–20:19 had nothing runnable.
+- 2026-11-11T21:20Z — Execution 4 (21:17 slot). D and T resumed.
+
 ## Next action
 
 P2 from main 40b6766: agent D/S on 8 (explain missing alternatives) + 15 (zero vs unknown balance); agent T/C on 18 (Firefox/WebKit tests) + 19 (subscriptions after edits). Max 2 agents. Then P2 release PR, critic, CI, merge, prod smoke, final report, disable trigger.
