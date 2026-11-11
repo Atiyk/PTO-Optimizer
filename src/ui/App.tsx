@@ -482,6 +482,7 @@ export function App() {
                         blackouts={state.blackouts}
                         onAddBlackout={(d) => state.setBlackouts([...state.blackouts, d])}
                         onAddBlackouts={(dates) => state.setBlackouts(Array.from(new Set([...state.blackouts, ...dates])))}
+                        planningWindow={{ start: state.rangeStart, end: state.rangeEnd }}
                         onRemoveBlackout={(d) => state.setBlackouts(state.blackouts.filter((x) => x !== d))}
                         holidayEntries={state.holidayEntries}
                         sharedHolidaySnapshot={state.hasSharedHolidaySnapshot}

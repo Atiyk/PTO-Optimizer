@@ -1,5 +1,6 @@
 import { addDays, rangeISO, isoToSerial } from '@daysoff/engine/solver/dateUtils';
 import { validCalendarDate } from '../personal/employerCalendar';
+import { parseRRule, ruleDates, type RecurrenceRule } from './icsRecurrence';
 
 /** A single .ics file is parsed entirely client-side (FileReader/`file.text()`, never
  * fetch/XHR) - nothing is uploaded anywhere, per the product's no-backend design. This
@@ -12,6 +13,10 @@ export const MAX_IMPORT_CHARS = 1_000_000;
 export const MAX_IMPORT_FILE_BYTES = 1_000_000;
 export const MAX_IMPORT_SPAN_DAYS = 3660;
 export const MAX_IMPORT_BUSY_DAYS = 4000;
+/** Issue 16: hard bounds on recurrence expansion - instances kept per series, and rule
+ * candidates examined across the whole file. Hitting either reports the series as truncated. */
+export const MAX_RECURRENCE_INSTANCES = 1000;
+export const MAX_RECURRENCE_ITERATIONS = 200_000;
 
 export class IcsParseError extends Error {}
 
@@ -24,8 +29,21 @@ export interface ParsedImportResult {
   /** Non-null, equal to MAX_IMPORT_EVENTS, when the file had more events than that and
    * parsing stopped early - the caller shows this plainly rather than silently truncating. */
   cappedAt: number | null;
-  /** Recurrence rules, dates and exceptions are skipped and counted for the caller. */
+  /** Recurring series NOT fully imported: recurrence.unsupported + recurrence.truncated.
+   * Non-zero means the import is incomplete and the caller must say so. */
   skippedRecurring: number;
+  recurrence: RecurrenceSummary;
+}
+
+export interface RecurrenceSummary {
+  /** Recurring series expanded completely across the expansion window. */
+  expanded: number;
+  /** Series using a recurrence feature outside the supported subset: contribute no dates. */
+  unsupported: number;
+  /** Sorted, de-duplicated names of the unsupported features (e.g. "BYSETPOS"). */
+  unsupportedReasons: string[];
+  /** Series cut short by the instance/iteration caps (or, with no window, still running at the horizon). */
+  truncated: number;
 }
 
 interface RawProp {
@@ -113,6 +131,16 @@ function zonedWallParts(ms: number, tzid: string): WallParts {
  * reject nonexistent or repeated local hours at DST boundaries, rather than
  * silently blocking the wrong day. */
 function zonedInstantMs(date: string, hours: number, minutes: number, seconds: number, zone: string): number {
+  const candidates = zonedInstantCandidates(date, hours, minutes, seconds, zone);
+  if (candidates.length !== 1) {
+    throw new IcsParseError('Calendar contains a nonexistent or ambiguous DST time. Review this event manually.');
+  }
+  return candidates[0];
+}
+
+/** Every actual instant a civil IANA date-time maps to, earliest first: none in a DST gap,
+ * two in a repeated hour. */
+function zonedInstantCandidates(date: string, hours: number, minutes: number, seconds: number, zone: string): number[] {
   const nominal = utcWallMillis(date, hours, minutes, seconds);
   const candidates = new Set<number>();
   for (const delta of [-2, 0, 2]) {
@@ -125,10 +153,7 @@ function zonedInstantMs(date: string, hours: number, minutes: number, seconds: n
       candidates.add(instant);
     }
   }
-  if (candidates.size !== 1) {
-    throw new IcsParseError('Calendar contains a nonexistent or ambiguous DST time. Review this event manually.');
-  }
-  return [...candidates][0];
+  return [...candidates].sort((a, b) => a - b);
 }
 
 function wallAtInstant(ms: number, zone: string | null): WallParts {
@@ -189,6 +214,160 @@ function addBoundedDays(busy: Set<string>, first: string, last: string): void {
   }
 }
 
+interface EventRecord {
+  uid: string | null;
+  dtstart: RawProp | null;
+  dtend: RawProp | null;
+  duration: string | null;
+  rrules: string[];
+  rdates: RawProp[];
+  exdates: RawProp[];
+  exrule: boolean;
+  recurrenceId: RawProp | null;
+  cancelled: boolean;
+}
+
+/** How long one occurrence of an event lasts; null = it can never block a whole day. */
+type EventShape = { kind: 'all-day'; days: number } | { kind: 'timed'; minutes: number } | null;
+
+/** Same validation and the same 24-hour rule a single event always had, lifted out so every
+ * recurrence instance reuses it. */
+function eventShape(start: DateTimeValue, ev: EventRecord): EventShape {
+  if (start.isAllDay) {
+    // DTEND is EXCLUSIVE for an all-day event per RFC 5545 (the day after the last busy
+    // day) - same convention this app's own icsExport.ts uses when generating one.
+    if (ev.dtend) {
+      const end = parseDateTimeValue(ev.dtend);
+      if (!end || !end.isAllDay) throw new IcsParseError('Calendar event has an invalid all-day end date.');
+      const days = isoToSerial(end.date) - isoToSerial(start.date);
+      // DTEND == DTSTART keeps the historical one-day reading; a reversed range is rejected.
+      if (days < 0) throw new IcsParseError('Calendar event has an invalid or excessively long date range.');
+      return { kind: 'all-day', days: Math.max(1, days) };
+    }
+    if (ev.duration) {
+      const mins = parseDurationMinutes(ev.duration);
+      if (mins === null || !Number.isFinite(mins) || mins <= 0 || mins % 1440 !== 0
+        || mins / 1440 > MAX_IMPORT_SPAN_DAYS + 1) {
+        throw new IcsParseError('Calendar event has an invalid or excessive all-day duration.');
+      }
+      return { kind: 'all-day', days: mins / 1440 };
+    }
+    return { kind: 'all-day', days: 1 };
+  }
+
+  // Timed spans use real elapsed time with UTC/IANA DST awareness.
+  let durationMinutes: number | null = null;
+  if (ev.dtend) {
+    const end = parseDateTimeValue(ev.dtend);
+    if (!end || end.isAllDay) throw new IcsParseError('Calendar event has an invalid timed end date.');
+    if (start.zone !== end.zone) {
+      throw new IcsParseError('Calendar event has mismatched time zones. Export matching start/end times or review manually.');
+    }
+    durationMinutes = (end.instantMs! - start.instantMs!) / 60000;
+  } else if (ev.duration) {
+    durationMinutes = parseDurationMinutes(ev.duration);
+    if (durationMinutes !== null && (!Number.isFinite(durationMinutes) || durationMinutes < 0
+      || durationMinutes > (MAX_IMPORT_SPAN_DAYS + 1) * 1440)) {
+      throw new IcsParseError('Calendar event has an invalid or excessive timed duration.');
+    }
+  }
+  if (durationMinutes !== null && (!Number.isFinite(durationMinutes) || durationMinutes < 0)) {
+    throw new IcsParseError('Calendar event has an invalid timed date range.');
+  }
+  if (durationMinutes === null || durationMinutes < 1440) return null;
+  return { kind: 'timed', minutes: durationMinutes };
+}
+
+/** First and last busy day of one occurrence. DTEND is exclusive: a timed end at exactly
+ * midnight does not block that next day. */
+function occurrenceDays(start: DateTimeValue, shape: NonNullable<EventShape>): { first: string; last: string } {
+  if (shape.kind === 'all-day') return { first: start.date, last: addDays(start.date, shape.days - 1) };
+  const end = wallAtInstant(start.instantMs! + shape.minutes * 60000, start.zone);
+  const exclusiveMidnightEnd = end.hours === 0 && end.minutes === 0 && end.seconds === 0;
+  const last = end.date > start.date ? (exclusiveMidnightEnd ? addDays(end.date, -1) : end.date) : start.date;
+  return { first: start.date, last };
+}
+
+/** A recurrence instance on another date, keeping DTSTART's wall-clock time and zone.
+ * RFC 5545 §3.3.10: an instance at a nonexistent local time is ignored (null); a repeated
+ * local time takes its first occurrence. */
+function instanceOn(date: string, start: DateTimeValue): DateTimeValue | null {
+  if (start.isAllDay) return { ...start, date };
+  const h = Math.floor(start.minutesOfDay / 60), m = start.minutesOfDay % 60, s = start.secondsOfDay;
+  if (start.zone && start.zone !== 'UTC') {
+    const candidates = zonedInstantCandidates(date, h, m, s, start.zone);
+    return candidates.length === 0 ? null : { ...start, date, instantMs: candidates[0] };
+  }
+  return { ...start, date, instantMs: utcWallMillis(date, h, m, s) };
+}
+
+function exactKey(v: DateTimeValue): string {
+  return v.isAllDay ? `D${v.date}` : `T${v.instantMs}`;
+}
+
+/** Matches EXDATE / RECURRENCE-ID values to instances: exactly on the instant (timed) or
+ * date (all-day). A value of the other type (DATE vs DATE-TIME, which exporters mix up)
+ * matches only on the same local date - lenient on value type, never fuzzy on the day. */
+class InstanceMatcher<T> {
+  private exact = new Map<string, T>();
+  private looseDates = new Map<string, T>();
+  add(v: DateTimeValue, value: T): void {
+    this.exact.set(exactKey(v), value);
+    this.looseDates.set(`${v.isAllDay ? 'T' : 'D'}${v.date}`, value);
+  }
+  get(instance: DateTimeValue): T | undefined {
+    return this.exact.get(exactKey(instance)) ?? this.looseDates.get(`${instance.isAllDay ? 'D' : 'T'}${instance.date}`);
+  }
+}
+
+/** Splits a multi-valued RDATE/EXDATE property (comma-separated, RFC 5545 §3.8.5) into single values. */
+function propValues(prop: RawProp): RawProp[] {
+  return prop.value.split(',').map(value => ({ ...prop, value }));
+}
+
+/** UNTIL is inclusive (RFC 5545 §3.3.10). */
+function untilAllows(until: string, instance: DateTimeValue, start: DateTimeValue): boolean {
+  const untilDate = `${until.slice(0, 4)}-${until.slice(4, 6)}-${until.slice(6, 8)}`;
+  if (!validCalendarDate(untilDate)) return false;
+  if (until.length === 8) return instance.date <= untilDate;
+  const h = Number(until.slice(9, 11)), m = Number(until.slice(11, 13)), s = Number(until.slice(13, 15));
+  const utc = until.endsWith('Z');
+  if (instance.isAllDay) {
+    // An all-day series with a date-time UTC UNTIL (a common exporter shape): compare dates.
+    return instance.date <= (utc ? new Date(utcWallMillis(untilDate, h, m, s)).toISOString().slice(0, 10) : untilDate);
+  }
+  const untilMs = utc || !start.zone || start.zone === 'UTC'
+    ? utcWallMillis(untilDate, h, m, s)
+    : zonedInstantCandidates(untilDate, h, m, s, start.zone)[0] ?? utcWallMillis(untilDate, h, m, s);
+  return instance.instantMs! <= untilMs;
+}
+
+function untilDateOf(until: string): string {
+  return `${until.slice(0, 4)}-${until.slice(4, 6)}-${until.slice(6, 8)}`;
+}
+
+export interface ImportWindow { start: string; end: string }
+
+export interface ParseIcsOptions {
+  /** Recurring series are expanded only across this inclusive date range (normally the
+   * planning window). Without it each series is expanded for MAX_IMPORT_SPAN_DAYS from its
+   * own DTSTART, and a series that keeps going past that is reported as truncated. */
+  window?: ImportWindow;
+}
+
+/** A usable expansion window: real dates, in order, at most MAX_IMPORT_SPAN_DAYS long. */
+export function isValidImportWindow(window: ImportWindow | null | undefined): window is ImportWindow {
+  return Boolean(window) && typeof window!.start === 'string' && typeof window!.end === 'string'
+    && validCalendarDate(window!.start) && validCalendarDate(window!.end) && window!.end >= window!.start
+    && isoToSerial(window!.end) - isoToSerial(window!.start) <= MAX_IMPORT_SPAN_DAYS;
+}
+
+function validWindow(window: ImportWindow | undefined): ImportWindow | null {
+  if (window === undefined) return null;
+  if (!isValidImportWindow(window)) throw new IcsParseError('The planning window for this import is invalid.');
+  return window;
+}
+
 /**
  * Phase 3 item 3: an .ics import, not a live OAuth calendar sync - that needs a backend for
  * token exchange and Google's calendar-scope verification, which breaks the no-backend
@@ -198,125 +377,58 @@ function addBoundedDays(busy: Set<string>, first: string, last: string): void {
  * exactly the spec's filter: an all-day event counts regardless of length (even a single
  * day), but a timed event only counts when its REAL duration is at least 24 hours - a
  * 30-minute meeting, or even a long multi-hour one, is not a reason to block a day off.
- * Recurring events are deliberately NOT expanded - a general recurrence
- * engine is out of scope for one import feature (same judgment call as the 9/80 schedule
- * option elsewhere in this phase); they're counted and reported as skipped instead of
- * silently dropped or wrongly expanded.
+ * STATUS:CANCELLED events are not busy.
+ *
+ * Issue 16: recurring events are expanded for the bounded subset in icsRecurrence.ts
+ * (RRULE, RDATE, EXDATE, RECURRENCE-ID overrides incl. STATUS:CANCELLED), only across the
+ * planning window and with a per-series instance cap. A series using anything outside that
+ * subset is reported in `recurrence.unsupported` (with reasons) and contributes nothing,
+ * never a partial or wrong expansion. Timed series shorter than 24 hours never produce a
+ * busy day, so they are neither expanded nor reported.
  */
-export function parseICSBusyDays(raw: string): ParsedImportResult {
+export function parseICSBusyDays(raw: string, options: ParseIcsOptions = {}): ParsedImportResult {
   if (typeof raw !== 'string' || raw.length > MAX_IMPORT_CHARS) {
     throw new IcsParseError('Calendar file is too large to import safely.');
   }
+  const window = validWindow(options.window);
 
   const lines = unfoldLines(raw);
   if (lines[0] !== 'BEGIN:VCALENDAR' || lines[lines.length - 1] !== 'END:VCALENDAR') {
     throw new IcsParseError("This doesn't look like a calendar (.ics) file, or it is incomplete.");
   }
-  const busy = new Set<string>();
+  const events: EventRecord[] = [];
   let eventCount = 0;
   let cappedAt: number | null = null;
-  let skippedRecurring = 0;
 
-  let inEvent = false;
-  let dtstartProp: RawProp | null = null;
-  let dtendProp: RawProp | null = null;
-  let durationValue: string | null = null;
-  let hasRecurrence = false;
+  let current: EventRecord | null = null;
   // Depth inside a sub-component of the event (VALARM etc.): its DTSTART/DURATION are not the event's.
   let subDepth = 0;
-
-  function flushEvent(): void {
-    if (hasRecurrence) {
-      skippedRecurring++;
-      return;
-    }
-    if (!dtstartProp) return;
-    const start = parseDateTimeValue(dtstartProp);
-    if (!start) throw new IcsParseError('Calendar event has an invalid start date.');
-
-    if (start.isAllDay) {
-      // DTEND is EXCLUSIVE for an all-day event per RFC 5545 (the day after the last busy
-      // day) - same convention this app's own icsExport.ts uses when generating one.
-      let lastDay = start.date;
-      if (dtendProp) {
-        const end = parseDateTimeValue(dtendProp);
-        if (!end || !end.isAllDay) throw new IcsParseError('Calendar event has an invalid all-day end date.');
-        lastDay = addDays(end.date, -1);
-      } else if (durationValue) {
-        const mins = parseDurationMinutes(durationValue);
-        if (mins === null || !Number.isFinite(mins) || mins <= 0 || mins % 1440 !== 0
-          || mins / 1440 > MAX_IMPORT_SPAN_DAYS + 1) {
-          throw new IcsParseError('Calendar event has an invalid or excessive all-day duration.');
-        }
-        lastDay = addDays(start.date, mins / 1440 - 1);
-      }
-      addBoundedDays(busy, start.date, lastDay);
-      return;
-    }
-
-    // Timed spans use real elapsed time with UTC/IANA DST awareness.
-    // DTEND is exclusive: midnight on the next day does not block that day.
-    let durationMinutes: number | null = null;
-    let endDateForSpan: string | null = null;
-    let exclusiveMidnightEnd = false;
-    if (dtendProp) {
-      const end = parseDateTimeValue(dtendProp);
-      if (!end || end.isAllDay) throw new IcsParseError('Calendar event has an invalid timed end date.');
-      if (start.zone !== end.zone) {
-        throw new IcsParseError('Calendar event has mismatched time zones. Export matching start/end times or review manually.');
-      }
-      durationMinutes = (end.instantMs! - start.instantMs!) / 60000;
-      endDateForSpan = end.date;
-      exclusiveMidnightEnd = end.minutesOfDay === 0 && end.secondsOfDay === 0;
-    } else if (durationValue) {
-      durationMinutes = parseDurationMinutes(durationValue);
-      if (durationMinutes !== null) {
-        if (!Number.isFinite(durationMinutes) || durationMinutes < 0
-          || durationMinutes > (MAX_IMPORT_SPAN_DAYS + 1) * 1440) {
-          throw new IcsParseError('Calendar event has an invalid or excessive timed duration.');
-        }
-        const localEnd = wallAtInstant(start.instantMs! + durationMinutes * 60000, start.zone);
-        endDateForSpan = localEnd.date;
-        exclusiveMidnightEnd = localEnd.hours === 0 && localEnd.minutes === 0 && localEnd.seconds === 0;
-      }
-    }
-    if (durationMinutes !== null && (!Number.isFinite(durationMinutes) || durationMinutes < 0)) {
-      throw new IcsParseError('Calendar event has an invalid timed date range.');
-    }
-    if (durationMinutes === null || durationMinutes < 1440) return;
-    if (!endDateForSpan) return;
-    const lastDay = endDateForSpan > start.date
-      ? (exclusiveMidnightEnd ? addDays(endDateForSpan, -1) : endDateForSpan)
-      : start.date;
-    addBoundedDays(busy, start.date, lastDay);
-  }
 
   for (const line of lines) {
     const prop = parseLine(line);
     if (!prop) continue;
 
     if (prop.name === 'BEGIN' && prop.value === 'VEVENT') {
-      if (inEvent) throw new IcsParseError('Calendar has a nested event.');
-      inEvent = true;
-      dtstartProp = null;
-      dtendProp = null;
-      durationValue = null;
-      hasRecurrence = false;
-      subDepth = 0;
+      if (current) throw new IcsParseError('Calendar has a nested event.');
       eventCount++;
       if (eventCount > MAX_IMPORT_EVENTS) {
         cappedAt = MAX_IMPORT_EVENTS;
         break;
       }
+      current = {
+        uid: null, dtstart: null, dtend: null, duration: null, rrules: [], rdates: [], exdates: [],
+        exrule: false, recurrenceId: null, cancelled: false,
+      };
+      subDepth = 0;
       continue;
     }
     if (prop.name === 'END' && prop.value === 'VEVENT') {
-      if (!inEvent) throw new IcsParseError('Calendar has an unmatched event end.');
-      flushEvent();
-      inEvent = false;
+      if (!current) throw new IcsParseError('Calendar has an unmatched event end.');
+      events.push(current);
+      current = null;
       continue;
     }
-    if (!inEvent) continue;
+    if (!current) continue;
     if (prop.name === 'BEGIN') {
       subDepth++;
       continue;
@@ -327,20 +439,181 @@ export function parseICSBusyDays(raw: string): ParsedImportResult {
     }
     if (subDepth > 0) continue;
 
-    if (prop.name === 'DTSTART') dtstartProp = prop;
-    else if (prop.name === 'DTEND') dtendProp = prop;
-    else if (prop.name === 'DURATION') durationValue = prop.value;
-    else if (['RRULE', 'RDATE', 'EXDATE', 'EXRULE', 'RECURRENCE-ID'].includes(prop.name)) hasRecurrence = true;
+    if (prop.name === 'DTSTART') current.dtstart = prop;
+    else if (prop.name === 'DTEND') current.dtend = prop;
+    else if (prop.name === 'DURATION') current.duration = prop.value;
+    else if (prop.name === 'UID') current.uid = prop.value;
+    else if (prop.name === 'STATUS') current.cancelled = prop.value.trim().toUpperCase() === 'CANCELLED';
+    else if (prop.name === 'RRULE') current.rrules.push(prop.value);
+    else if (prop.name === 'RDATE') current.rdates.push(prop);
+    else if (prop.name === 'EXDATE') current.exdates.push(prop);
+    else if (prop.name === 'EXRULE') current.exrule = true;
+    else if (prop.name === 'RECURRENCE-ID') current.recurrenceId = prop;
   }
 
-  if (inEvent && cappedAt === null) {
+  if (current && cappedAt === null) {
     throw new IcsParseError('Calendar has an unclosed event.');
   }
 
+  const busy = new Set<string>();
+  const recurrence: RecurrenceSummary = { expanded: 0, unsupported: 0, truncated: 0, unsupportedReasons: [] };
+  const reasons = new Set<string>();
+  let iterationBudget = MAX_RECURRENCE_ITERATIONS;
+
+  const addSingle = (ev: EventRecord): void => {
+    if (ev.cancelled || !ev.dtstart) return;
+    const start = parseDateTimeValue(ev.dtstart);
+    if (!start) throw new IcsParseError('Calendar event has an invalid start date.');
+    const shape = eventShape(start, ev);
+    if (!shape) return;
+    const { first, last } = occurrenceDays(start, shape);
+    addBoundedDays(busy, first, last);
+  };
+
+  // RECURRENCE-ID overrides, grouped by UID, are applied to their master series (in any
+  // file order); an override whose master is absent is just an event of its own.
+  const overridesByUid = new Map<string, EventRecord[]>();
+  const masters: EventRecord[] = [];
+  for (const ev of events) {
+    if (ev.recurrenceId && ev.uid !== null) {
+      const group = overridesByUid.get(ev.uid) ?? [];
+      group.push(ev);
+      overridesByUid.set(ev.uid, group);
+    } else masters.push(ev);
+  }
+  const masterUids = new Set(masters.flatMap(ev => (ev.uid !== null && !ev.recurrenceId ? [ev.uid] : [])));
+  for (const [uid, overrides] of overridesByUid) {
+    if (!masterUids.has(uid)) overrides.forEach(addSingle);
+  }
+
+  for (const ev of masters) {
+    const overrides = ev.uid !== null ? overridesByUid.get(ev.uid) ?? [] : [];
+    const recurring = ev.rrules.length > 0 || ev.rdates.length > 0 || ev.exdates.length > 0 || ev.exrule || overrides.length > 0;
+    if (!recurring || ev.recurrenceId) {
+      addSingle(ev);
+      continue;
+    }
+    if (ev.cancelled || !ev.dtstart) continue;
+    const start = parseDateTimeValue(ev.dtstart);
+    if (!start) throw new IcsParseError('Calendar event has an invalid start date.');
+    const shape = eventShape(start, ev);
+    if (!shape) {
+      // Never busy at its own length (e.g. a weekly meeting): only an override that makes
+      // one occurrence long enough can matter.
+      overrides.forEach(addSingle);
+      continue;
+    }
+
+    const reason = ((): string | null => {
+      if (ev.exrule) return 'EXRULE';
+      for (const text of ev.rrules) {
+        const parsed = parseRRule(text);
+        if (!parsed.ok) return parsed.reason;
+      }
+      if (ev.rdates.some(p => p.params.VALUE?.toUpperCase() === 'PERIOD')) return 'RDATE;VALUE=PERIOD';
+      if (overrides.some(o => o.recurrenceId!.params.RANGE !== undefined)) return 'RANGE=THISANDFUTURE';
+      return null;
+    })();
+    if (reason) {
+      recurrence.unsupported++;
+      reasons.add(reason);
+      continue;
+    }
+    const rules = ev.rrules.map(text => (parseRRule(text) as { ok: true; rule: RecurrenceRule }).rule);
+    const rdateProps = ev.rdates.flatMap(propValues);
+    const exdateProps = ev.exdates.flatMap(propValues);
+    if (rdateProps.length > MAX_RECURRENCE_INSTANCES || exdateProps.length > MAX_RECURRENCE_INSTANCES) {
+      recurrence.unsupported++;
+      reasons.add('too many RDATE/EXDATE values');
+      continue;
+    }
+    const valueOf = (p: RawProp, what: string): DateTimeValue => {
+      const v = parseDateTimeValue(p);
+      if (!v) throw new IcsParseError(`Calendar event has an invalid ${what} date.`);
+      return v;
+    };
+    const rdates = rdateProps.map(p => valueOf(p, 'RDATE'));
+    const excluded = new InstanceMatcher<true>();
+    for (const p of exdateProps) excluded.add(valueOf(p, 'EXDATE'), true);
+    const overrideFor = new InstanceMatcher<EventRecord>();
+    for (const o of overrides) overrideFor.add(valueOf(o.recurrenceId!, 'RECURRENCE-ID'), o);
+
+    // Expansion bounds: the planning window, or a horizon from DTSTART; generation starts
+    // one occurrence-length earlier so an occurrence overlapping the window start counts.
+    const lengthDays = shape.kind === 'all-day' ? shape.days : Math.ceil(shape.minutes / 1440) + 1;
+    const rangeStart = window ? window.start : start.date;
+    const rangeEnd = window ? window.end : addDays(start.date, MAX_IMPORT_SPAN_DAYS);
+    const generateFrom = addDays(rangeStart, -lengthDays);
+
+    const instances = new Map<string, DateTimeValue>();
+    instances.set(exactKey(start), start); // DTSTART always counts as the first occurrence
+    let truncated = false;
+    for (const rule of rules) {
+      let count = 1;
+      let exhausted = rule.count !== null && count >= rule.count;
+      if (!exhausted) {
+        for (const date of ruleDates(rule, start.date, rangeEnd, generateFrom)) {
+          if (--iterationBudget < 0) { truncated = true; break; }
+          const instance = instanceOn(date, start);
+          if (!instance) continue; // nonexistent local time: ignored and not counted
+          if (rule.until !== null && !untilAllows(rule.until, instance, start)) { exhausted = true; break; }
+          count++;
+          if (date >= generateFrom) {
+            if (instances.size >= MAX_RECURRENCE_INSTANCES) { truncated = true; break; }
+            instances.set(exactKey(instance), instance);
+          }
+          if (rule.count !== null && count >= rule.count) { exhausted = true; break; }
+        }
+      }
+      // With no planning window, a rule that is still running at the horizon is incomplete.
+      if (!window && !exhausted && !truncated
+        && (rule.count !== null || rule.until === null || untilDateOf(rule.until) > rangeEnd)) truncated = true;
+    }
+    for (const v of rdates) {
+      if (instances.size >= MAX_RECURRENCE_INSTANCES) { truncated = true; break; }
+      instances.set(exactKey(v), v); // duplicates of RRULE instances collapse (RFC 5545 §3.8.5.2)
+    }
+
+    const usedOverrides = new Set<EventRecord>();
+    for (const instance of instances.values()) {
+      if (excluded.get(instance)) continue; // EXDATE wins over RRULE/RDATE (RFC 5545 §3.8.5.1)
+      const override = overrideFor.get(instance);
+      if (override) {
+        usedOverrides.add(override);
+        addSingle(override);
+        continue;
+      }
+      const { first, last } = occurrenceDays(instance, shape);
+      if (last < rangeStart || first > rangeEnd) continue;
+      addBoundedDays(busy, first, last);
+    }
+    // Overrides that matched no generated instance (e.g. outside the window) still stand
+    // on their own; cancelled ones contribute nothing either way.
+    overrides.filter(o => !usedOverrides.has(o)).forEach(addSingle);
+
+    if (truncated) recurrence.truncated++;
+    else recurrence.expanded++;
+  }
+
+  recurrence.unsupportedReasons = [...reasons].sort();
   return {
     busyDays: Array.from(busy).sort(),
     eventCount: cappedAt !== null ? cappedAt : eventCount,
     cappedAt,
-    skippedRecurring,
+    skippedRecurring: recurrence.unsupported + recurrence.truncated,
+    recurrence,
   };
+}
+
+/** Issue 16: one plain sentence whenever repeating events were not fully imported. */
+export function incompleteRecurrenceMessage(recurrence: RecurrenceSummary): string | null {
+  const parts: string[] = [];
+  const events = (n: number) => `${n} repeating event${n === 1 ? '' : 's'}`;
+  if (recurrence.unsupported > 0) {
+    parts.push(`${events(recurrence.unsupported)} ${recurrence.unsupported === 1 ? 'is' : 'are'} not included (uses ${recurrence.unsupportedReasons.join(', ')}).`);
+  }
+  if (recurrence.truncated > 0) {
+    parts.push(`${events(recurrence.truncated)} ${recurrence.truncated === 1 ? 'was' : 'were'} only partly included (too many repeats).`);
+  }
+  return parts.length === 0 ? null : `Import incomplete: ${parts.join(' ')} Add those dates by hand.`;
 }

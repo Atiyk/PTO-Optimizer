@@ -59,6 +59,8 @@ interface MoreOptionsProps {
   blackouts: string[];
   onAddBlackout: (d: string) => void;
   onAddBlackouts: (dates: string[]) => void;
+  /** The plan's date range; repeating events in an imported .ics are expanded across it. */
+  planningWindow?: { start: string; end: string };
   onRemoveBlackout: (d: string) => void;
 
   holidayEntries: HolidayEntry[];
@@ -346,7 +348,7 @@ export function MoreOptions(props: MoreOptionsProps) {
         </div>
       </section>
 
-      <ImportCalendar onImportBusyDays={props.onAddBlackouts} />
+      <ImportCalendar onImportBusyDays={props.onAddBlackouts} planningWindow={props.planningWindow} />
 
       <section className="@min-[36rem]:col-span-2">
         <h3 id="employer-holidays" className={`${H4_CLASS} scroll-mt-16`}>My employer&apos;s holidays</h3>

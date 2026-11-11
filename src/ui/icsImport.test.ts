@@ -98,33 +98,37 @@ describe('parseICSBusyDays: timed events - the 24-hour filter', () => {
   });
 });
 
-describe('parseICSBusyDays: recurring events', () => {
+describe('parseICSBusyDays: recurring events (issue 16: bounded expansion, see icsRecurrence.test.ts)', () => {
   it.each([
-    'RDATE;VALUE=DATE:20260112',
-    'EXDATE;VALUE=DATE:20260112',
-    'RECURRENCE-ID;VALUE=DATE:20260112',
-  ])('does not silently import an unsupported recurrence component %s', (property) => {
+    ['RDATE;VALUE=DATE:20260112', ['2026-01-05', '2026-01-12']],
+    ['EXDATE;VALUE=DATE:20260112', ['2026-01-05']],
+    ['EXDATE;VALUE=DATE:20260105', []],
+    ['RECURRENCE-ID;VALUE=DATE:20260112', ['2026-01-05']],
+  ])('applies the recurrence component %s instead of skipping the event', (property, expected) => {
     const ics = wrapCalendar(event(`DTSTART;VALUE=DATE:20260105\r\n${property}`));
     const result = parseICSBusyDays(ics);
-    expect(result.busyDays).toEqual([]);
-    expect(result.skippedRecurring).toBe(1);
+    expect(result.busyDays).toEqual(expected);
+    expect(result.skippedRecurring).toBe(0);
   });
 
-  it('a recurring event (RRULE present) is not expanded, and counted as skipped', () => {
+  it('a recurring event (RRULE with COUNT) is expanded, not skipped', () => {
     const ics = wrapCalendar(event('DTSTART;VALUE=DATE:20260105\r\nRRULE:FREQ=WEEKLY;COUNT=10'));
     const result = parseICSBusyDays(ics);
-    expect(result.busyDays).toEqual([]);
-    expect(result.skippedRecurring).toBe(1);
+    expect(result.busyDays).toHaveLength(10);
+    expect(result.busyDays[9]).toBe('2026-03-09');
+    expect(result.skippedRecurring).toBe(0);
+    expect(result.recurrence.expanded).toBe(1);
   });
 
-  it('a mix of one recurring and one plain event: only the plain one contributes busy days', () => {
+  it('a mix of one unsupported recurring and one plain event: only the plain one contributes busy days', () => {
     const ics = wrapCalendar(
-      event('DTSTART;VALUE=DATE:20260105\r\nRRULE:FREQ=WEEKLY;COUNT=10') +
+      event('DTSTART;VALUE=DATE:20260105\r\nRRULE:FREQ=MONTHLY;BYDAY=MO;BYSETPOS=2') +
         event('DTSTART;VALUE=DATE:20261219\r\nDTEND;VALUE=DATE:20261221'),
     );
     const result = parseICSBusyDays(ics);
     expect(result.busyDays).toEqual(['2026-12-19', '2026-12-20']);
     expect(result.skippedRecurring).toBe(1);
+    expect(result.recurrence.unsupportedReasons).toEqual(['BYSETPOS']);
     expect(result.eventCount).toBe(2);
   });
 });
