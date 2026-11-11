@@ -1,23 +1,22 @@
 import { isValidWorkWeek, type Break, type WorkWeek } from '../solver/types';
 import { addDays, isoToSerial, mondayIndexedDow, serialToISO } from '../solver/dateUtils';
 import { formatShort } from './dateFormat';
+import { searchWorkday } from './workdaySearch';
 
 const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 /**
  * Phase 4.1: a deadline landing on a day off is useless ("a deadline on a Saturday is
  * useless", per spec) - shifted back to the nearest working day per the user's own
- * workWeek and observed days off. Returns null if the schedule has no working day.
+ * workWeek and observed days off. Returns null if the schedule has no working day within
+ * MAX_WORKDAY_SEARCH_DAYS (see workdaySearch.ts).
  */
 export function nearestPrecedingWorkday(date: string, workWeek: WorkWeek, offDays: readonly string[] = []): string | null {
   if (!isValidWorkWeek(workWeek) || serialToISO(isoToSerial(date)) !== date) return null;
   const off = new Set(offDays);
-  // At least one working day per week. Every skipped week must contain a distinct off day.
-  for (let offset = 0; offset < (off.size + 1) * 7; offset++) {
-    const day = addDays(date, -offset);
-    if (workWeek[mondayIndexedDow(day)] && !off.has(day)) return day;
-  }
-  return null;
+  // Bounded (MAX_WORKDAY_SEARCH_DAYS): a schedule whose working days are all off for years
+  // has no usable deadline, so it reports none rather than a date decades back.
+  return searchWorkday(date, -1, (day) => workWeek[mondayIndexedDow(day)] && !off.has(day));
 }
 
 /**
