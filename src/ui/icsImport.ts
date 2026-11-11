@@ -240,9 +240,9 @@ function eventShape(start: DateTimeValue, ev: EventRecord): EventShape {
       const end = parseDateTimeValue(ev.dtend);
       if (!end || !end.isAllDay) throw new IcsParseError('Calendar event has an invalid all-day end date.');
       const days = isoToSerial(end.date) - isoToSerial(start.date);
-      // DTEND == DTSTART keeps the historical one-day reading; a reversed range is rejected.
-      if (days < 0) throw new IcsParseError('Calendar event has an invalid or excessively long date range.');
-      return { kind: 'all-day', days: Math.max(1, days) };
+      // An end on or before the start is rejected, as it always was.
+      if (days < 1) throw new IcsParseError('Calendar event has an invalid or excessively long date range.');
+      return { kind: 'all-day', days };
     }
     if (ev.duration) {
       const mins = parseDurationMinutes(ev.duration);

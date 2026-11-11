@@ -44,6 +44,11 @@ describe('parseICSBusyDays: all-day and multi-day events', () => {
     expect(result.busyDays).not.toContain('2026-12-28');
   });
 
+  it('rejects an all-day event whose exclusive DTEND is not after DTSTART', () => {
+    expect(() => parseICSBusyDays(wrapCalendar(event('DTSTART;VALUE=DATE:20261219\r\nDTEND;VALUE=DATE:20261219')))).toThrow(IcsParseError);
+    expect(() => parseICSBusyDays(wrapCalendar(event('DTSTART;VALUE=DATE:20261219\r\nDTEND;VALUE=DATE:20261218')))).toThrow(IcsParseError);
+  });
+
   it('an all-day event expressed with DURATION instead of DTEND', () => {
     const ics = wrapCalendar(event('DTSTART;VALUE=DATE:20261219\r\nDURATION:P3D'));
     const result = parseICSBusyDays(ics);
