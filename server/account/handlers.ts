@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { MAX_APPROVAL_INPUT, parseApprovalMessage } from '../../src/personal/approvalParser';
 import { outOfOfficeMessage } from '../../src/personal/outOfOffice';
+import { utcDateISO } from '../../src/ui/today';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { featureFlags, missingSettings, type AccountConfig } from './config';
 import type { AccountRow, AccountStore } from './db';
@@ -72,8 +73,9 @@ function siteOrigin(config: AccountConfig, request: Request): string {
   return config.appUrl ?? new URL(request.url).origin;
 }
 
+/** Server "today": UTC calendar date, since requests carry no viewer timezone (see today.ts). */
 function today(deps: AccountDeps): string {
-  return (deps.now?.() ?? new Date()).toISOString().slice(0, 10);
+  return utcDateISO(deps.now?.() ?? new Date());
 }
 
 /** The HttpOnly session plus a readable "signed in" hint (no secret in it), so signed-out
