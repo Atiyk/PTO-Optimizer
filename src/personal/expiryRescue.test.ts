@@ -147,8 +147,11 @@ describe('rescuePlan', () => {
 
 describe('reminders carry the rescue dates', () => {
   it('names the suggested dates and keeps the download honesty text', () => {
-    const { risks, plans } = plansFor(policy, '2026-12-20');
-    const reminders = expirationReminders(risks, [30, 7], '2026-12-20', rescueSuggestions(plans));
+    // Today is Monday Dec 21. (From Sunday Dec 20 the planner now also finds Sun-Mon
+    // Dec 20-21, 2 days off for 1 PTO day, which beats a lone Dec 31 - so that fixture
+    // no longer leaves a suggestion after the reminder fires.)
+    const { risks, plans } = plansFor(policy, '2026-12-21');
+    const reminders = expirationReminders(risks, [30, 7], '2026-12-21', rescueSuggestions(plans));
     // The 7-day reminder fires Dec 25: the Dec 23 break has already started by then.
     expect(reminders).toHaveLength(1);
     expect(reminders[0].date).toBe('2026-12-25');
