@@ -31,6 +31,8 @@ jobs:
           set -euo pipefail
           if curl -fsSL "$PROD/privacy" | grep -q "saved plans you pin"; then echo "privacy: P0 copy present"; else echo "privacy: P0 copy MISSING"; exit 1; fi
           if curl -fsSL "$PROD/pto" | grep -q "data-prerendered-controls"; then echo "pto: P1 prerender guard present"; else echo "pto: P1 prerender guard MISSING"; exit 1; fi
+          main_js=$(curl -fsSL "$PROD/pto" | grep -o '/assets/main-[A-Za-z0-9_-]*\.js' | head -1)
+          if [ -n "$main_js" ] && curl -fsSL "$PROD$main_js" | grep -q "Enter 0 if you have none"; then echo "pto: P2 empty-is-unknown copy present ($main_js)"; else echo "pto: P2 marker MISSING ($main_js)"; exit 1; fi
           for p in / /pto /policy /family /sabbatical /faq /privacy; do
             code=$(curl -sL -o /dev/null -w '%{http_code}' "$PROD$p"); echo "$p $code"; [ "$code" = 200 ]
           done
