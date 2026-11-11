@@ -3,6 +3,7 @@ import { MAX_FAMILY_PTO } from '../personal/familyPlan';
 import { MAX_SCHOOL_CALENDAR_DAYS } from '../personal/schoolCalendar';
 import { decodePartnerAvailability, encodePartnerAvailability, PARTNER_PARAM, type PartnerAvailability } from '../planning/partner';
 import { isValidISODate } from './urlState';
+import { partitionFamilyParams } from './shareFormat';
 
 /**
  * URL round-tripping for /family, same conventions as sabbaticalUrlState.ts: clamp numbers
@@ -198,15 +199,11 @@ export function writeFamilyStateToURL(params: URLSearchParams, state: FamilyURLW
 
 /** Allowlist the address and keep private inputs in the same tab's history entry. */
 export function writeFamilyBrowserState(state: FamilyURLWriteState): { search: string; draft: string; skipped: string[] } {
-  const publicParams = new URLSearchParams();
-  const skipped = writeFamilyStateToURL(publicParams, state);
-  const draft = new URLSearchParams();
-  for (const key of FAMILY_DRAFT_PARAMS) {
-    const value = publicParams.get(key);
-    if (value !== null) draft.set(key, value);
-    publicParams.delete(key);
-  }
-  return { search: publicParams.toString(), draft: draft.toString(), skipped };
+  const full = new URLSearchParams();
+  const skipped = writeFamilyStateToURL(full, state);
+  // Allowlist (src/ui/shareFormat.ts): unclassified keys stay in the private draft.
+  const { address, draft } = partitionFamilyParams(full);
+  return { search: address.toString(), draft: draft.toString(), skipped };
 }
 
 /**

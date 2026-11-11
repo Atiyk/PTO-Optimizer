@@ -1,5 +1,6 @@
 import { decodeEmployerCalendar } from '../personal/employerCalendar';
 import { isValidISODate, parseDateList } from './urlState';
+import { isPlanShareKey, PLAN_PRIVATE_KEYS, PUBLIC_SHARE_VERSION } from './shareFormat';
 
 /** Imported, user-authored calendar names and excluded holiday labels are private. */
 export function employerLabelsWouldBeShared(query: string): boolean {
@@ -9,9 +10,9 @@ export function employerLabelsWouldBeShared(query: string): boolean {
   return !calendar || calendar.custom.length > 0 || calendar.excluded.length > 0;
 }
 
-const PRIVATE_PLAN_FIELDS = [
-  'ac', 'am', 'ex', 'xd', 'cc', 'bo', 'od', 'ov', 'pp', 'r', 'np', 'pc', 'pcs', 'pce', 'pcm', 'up',
-];
+// Private scheduling and policy settings, from the shared classification. `eh` is
+// reported separately as a calendar omission; `hd` is a landing-preview focus date.
+const PRIVATE_PLAN_FIELDS = PLAN_PRIVATE_KEYS.filter(key => key !== 'eh' && key !== 'hd');
 const NUMBER_FIELDS = { b: 400, w: 100, count: 7, mb: 60, rv: 400 } as const;
 const DATE_FIELDS = ['s', 'e', 'afs'] as const;
 const STYLE_NAMES = ['balanced', 'long-breaks', 'more-breaks', 'custom'];
@@ -20,7 +21,7 @@ const STYLE_NAMES = ['balanced', 'long-breaks', 'more-breaks', 'custom'];
  * separate, deliberate selection, never extracted from the private query. */
 export function buildPublicPlanSearch(planSearch: string, observedHolidayDates?: readonly string[]): string {
   const source = new URLSearchParams(planSearch);
-  const params = new URLSearchParams({ sv: '1' });
+  const params = new URLSearchParams({ sv: String(PUBLIC_SHARE_VERSION) });
   const country = source.get('c');
   if (country && /^[A-Z]{2}$/.test(country)) params.set('c', country);
   const subdivision = source.get('sd');
@@ -55,6 +56,9 @@ export function buildPublicPlanSearch(planSearch: string, observedHolidayDates?:
     const dates = [...new Set(observedHolidayDates.filter(isValidISODate))].sort();
     if (dates.length <= 4000) params.set('ho', dates.join(','));
   }
+  // Defence in depth: the per-field validation above is itself an allowlist, and this
+  // final pass guarantees nothing outside the versioned share format is ever emitted.
+  for (const key of [...params.keys()]) if (!isPlanShareKey(key)) params.delete(key);
   return params.toString();
 }
 
