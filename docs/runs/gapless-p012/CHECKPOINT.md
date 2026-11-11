@@ -30,7 +30,7 @@ source of truth between scheduled executions. No sensitive user data belongs her
 |---|---|---|---|
 | P0 | 1, 2, 10, 11 | `gapless/p0-release` → PR #145, merged as `3bae6ed` (critic GO on 494d135) | DONE: merged, Vercel prod success, prod smoke passed (run 43017235618 attempt 2) |
 | P1 | 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17 | `gapless/p1-release` @ 0d9384a (pushed): C 16/17, B 13/14, W2 3/4 (2878ab3), QA account-form scoping. S 5/6 → `gapless/p1-s-solver-travel` (/home/user/p1s); T 7 → `gapless/p1-t-performance` (/home/user/p1t) | DONE: PR #146 merged as 40b6766 (critic GO on b59abcb), Vercel prod success, prod smoke run 43070390357 passed |
-| P2 | 8, 15, 18, 19 | `gapless/p2-release` → PR #147 draft @ 945ce9a | Critic reviewing |
+| P2 | 8, 15, 18, 19 | `gapless/p2-release` → PR #147 draft @ 6e5c424 | Critic reviewing 6e5c424 |
 
 ## Issue traceability
 
@@ -86,7 +86,8 @@ Residual risks noted by P (not fixed): `/api/watch` and reminder-email links car
 - 2026-11-11T21:20Z — Execution 4 (21:17 slot). D and T resumed.
 
 - ~21:50Z — T done (18/19: f19d450, a2273c4), D done (8/15: 9287fe3). Merged into `gapless/p2-release` → e74869d: vitest 195/2084, tsc, lint, build OK. Draft PR #147 opened early for Firefox/WebKit CI: chromium + firefox passed every new check; webkit failed native date typing (GTK keeps digits in month segment). 945ce9a: non-Chromium branch now asserts a valid date and that the plan link follows it; Chromium strict. Critic Q reviewing 945ce9a. Q2 for Atiyk (live subscriptions for signed-in users) in PR body.
+- ~21:55Z — Q on 945ce9a: NO-GO, only blocker Q3-1 = CI red on webkit (storage check read prerendered empty input before mount; plus webkit reports test-aborted nager fetches as pageerrors). Date-typing change judged legitimate (P3: segment-by-segment Safari typing check + manual Safari). 17cac47: QA waits for mount; isolate() answers other origins 503+CORS. 6e5c424: fixed Q3-3 (Family empty PTO field → 0) and Q3-2 (focus lost after suggestion on heavy plan), with tests; vitest 195/2087, tsc, lint, build OK; chromium cross-browser 10/10; focus probe held heading 10s. P3 from Q: Q3-4 reserve copy + "1 days" plural, Q3-5 end-date suggestions checked without extended holidays, Q3-6 suggestion search ~9s CPU, Q3-7 emptied planner field still shows old plan, other falsy-zero fields (MoreOptions notice/accrual/carry cap, reserve days, carried balance). Critic Q re-reviewing 6e5c424.
 
 ## Next action
 
-Critic verdict on 945ce9a; CI green on that SHA; ready; merge; Vercel; prod smoke (add P2 marker); then final report, disable trigger trig_012aCT8YKo4cP88QEzmsx7Cf, remove agent worktrees.
+Critic verdict on 6e5c424; CI green on that SHA (all 3 engines); ready; merge; Vercel; prod smoke (add P2 marker); then final report, disable trigger trig_012aCT8YKo4cP88QEzmsx7Cf, remove agent worktrees.
