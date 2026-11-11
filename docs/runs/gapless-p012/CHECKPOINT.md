@@ -28,7 +28,7 @@ source of truth between scheduled executions. No sensitive user data belongs her
 
 | Batch | Issues | Branch / PR | State |
 |---|---|---|---|
-| P0 | 1, 2, 10, 11 | `gapless/p0-release` → PR #145, merged as `3bae6ed` (critic GO on 494d135) | Merged; Vercel prod success; prod smoke in progress |
+| P0 | 1, 2, 10, 11 | `gapless/p0-release` → PR #145, merged as `3bae6ed` (critic GO on 494d135) | DONE: merged, Vercel prod success, prod smoke passed (run 43017235618 attempt 2) |
 | P1 | 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17 | C 16/17 @ b42baa7; B 13/14 @ dea2dcf; W2 3/4 in progress | In progress |
 | P2 | 8, 15, 18, 19 | — | Not started |
 
@@ -63,6 +63,8 @@ Residual risks noted by P (not fixed): `/api/watch` and reminder-email links car
 
 - ~12:00Z — #145 merged (merge commit 3bae6ed) after both required checks green on 494d135 (320px privacy overflow fixed). Vercel status success. Prod smoke via GitHub Actions workflow on `gapless/prod-smoke` (container cannot reach vercel.app): routes 200, P0 privacy copy live, feed with private key → `private, no-store`. consumer-qa flagged formSubmitControls=1 on /pto: the opt-in email sign-in form, which renders only where accounts are enabled (prod, not CI) and is unchanged since #142. Not a P0 regression; QA now counts it separately (7777e23), carried into P1.
 
+- ~12:25Z — Prod smoke on 7777e23: attempt 1 routes 40/40 pass, journey 8/9 (forecast step timed out waiting for the forecast figure); attempt 2 all routes and 9/9 journeys pass. Accounts-enabled local build passes the same journey, so not the account flag. Suspected timing: inputs filled before the client app mounts over prerendered HTML (createRoot, not hydrate) can be lost on slow networks. Logged for issue 7 (P1). P0 COMPLETE.
+
 ## Next action
 
-Confirm prod smoke run on 7777e23 (routes + journey). Then build `gapless/p1-release` from 3bae6ed: integrate C (b42baa7), B (dea2dcf), W2 (3/4) when done, plus the consumer-qa account-form scoping. Remaining P1 (5, 6, 7, 9, 12) at most 2 agents at a time.
+Build `gapless/p1-release` from 3bae6ed: integrate C (b42baa7), B (dea2dcf), W2 (3/4) when done, plus the consumer-qa account-form scoping. Remaining P1 (5, 6, 7, 9, 12) at most 2 agents at a time.
