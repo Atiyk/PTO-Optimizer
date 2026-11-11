@@ -21,6 +21,7 @@ import { readEmployerCalendar } from '../personal/employerCalendar';
 import { landingObservedHolidays, useLandingHolidays } from './landingCalendar';
 import { weekStartForCountry } from './locale';
 import { HOLIDAY_DOT } from './colorScheme';
+import { useWholeDayDraft } from './useWholeDayDraft';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 
 /** A control set inside the sentence: it takes the sentence's own size and weight. */
@@ -155,6 +156,8 @@ export function Landing() {
     if (!engaged.current) { engaged.current = true; track('quick_plan_engaged'); }
     setState((previous) => ({ ...previous, ...next }));
   };
+  // Issue 15: an emptied field is "not entered yet", never a 0-day plan.
+  const budgetDraft = useWholeDayDraft(state.budget, (n) => update({ budget: Math.max(0, Math.min(60, Math.round(n))) }));
 
   useEffect(() => {
     if (!validRange) return;
@@ -199,8 +202,8 @@ export function Landing() {
             <p className="min-w-0 text-[1.375rem] leading-[1.5] font-medium text-ink sm:text-[1.75rem] lg:col-start-1 lg:row-start-1">
               I have{' '}
               <input id="landing-budget" aria-label="PTO days available" type="number" inputMode="numeric" min={0} max={60} step={1}
-                className={`${INLINE_FIELD} w-[2.6em] text-center tabular-nums`} value={budget}
-                onChange={(event) => update({ budget: Math.max(0, Math.min(60, Math.round(Number(event.target.value) || 0))) })} />
+                className={`${INLINE_FIELD} w-[2.6em] text-center tabular-nums`} value={budgetDraft.text}
+                onChange={(event) => budgetDraft.onChange(event.target.value)} onBlur={budgetDraft.onBlur} />
               {' '}PTO days in{' '}
               <select id="landing-country" aria-label="Country" className="select-ink h-[1.45em] max-w-full align-baseline font-bold [field-sizing:content]" value={country}
                 onChange={(event) => update({ country: event.target.value })}>

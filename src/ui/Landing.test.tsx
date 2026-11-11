@@ -76,6 +76,18 @@ describe('live homepage planner', () => {
     expect(document.querySelector('button[type="submit"]')).toBeNull();
   });
 
+  it('keeps a cleared PTO field unknown instead of planning 0 days, and accepts a typed 0 (issue 15)', async () => {
+    await act(async () => { render(<Landing />); });
+    const field = screen.getByRole<HTMLInputElement>('spinbutton', { name: 'PTO days available' });
+    await act(async () => { fireEvent.change(field, { target: { value: '' } }); });
+    expect(field.value).toBe('');
+    expect(new URLSearchParams(window.location.search).get('b')).not.toBe('0');
+    expect(screen.queryByText('No PTO days allocated. You can still explore the holidays below.')).toBeNull();
+    await act(async () => { fireEvent.change(field, { target: { value: '0' } }); });
+    expect(field.value).toBe('0');
+    expect(screen.getByText('No PTO days allocated. You can still explore the holidays below.')).toBeTruthy();
+  });
+
   it('shows a directly visible, keyboard-friendly PTO slider that stays synchronized with the number field', async () => {
     await act(async () => { render(<Landing />); });
     const slider = screen.getByRole('slider', { name: 'Adjust PTO days available' });
