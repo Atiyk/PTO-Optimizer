@@ -1,6 +1,7 @@
 import type { ISODate } from '@daysoff/engine/solver/types';
 import { mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { isValidISODate } from '../ui/urlState';
+import { guardedWrite, stampRecord } from './storageRecord';
 import { validRequestRange, type PtoRequest, type RequestStatus, type RequestStorage } from './requestLedger';
 
 /**
@@ -235,6 +236,7 @@ interface WorkspaceRecord {
   balanceIncludesApprovedLeave?: boolean;
   workdaySchedule?: WorkdaySchedule;
 }
+// Stored with the shared revision + updatedAt stamp (src/personal/storageRecord.ts).
 
 function validSchedule(value: unknown): WorkdaySchedule | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
@@ -269,10 +271,23 @@ function updateWorkspaceRecord(patch: Partial<WorkspaceRecord>, storage: Request
   if (!storage) return false;
   try {
     const next = { ...(readWorkspaceRecord(storage) ?? {}), ...patch, version: 1 as const };
-    storage.setItem(BALANCE_BASIS_STORAGE_KEY, JSON.stringify(next));
-    return true;
+    return guardedWrite(storage, BALANCE_BASIS_STORAGE_KEY, stampRecord(next), {
+      isClean: raw => workspaceRecordVersion(raw) === 1,
+      isNewer: raw => (workspaceRecordVersion(raw) ?? 0) > 1,
+      migrates: false,
+    }).status === 'saved';
   } catch {
     return false;
+  }
+}
+
+function workspaceRecordVersion(raw: string): number | undefined {
+  try {
+    const value: unknown = JSON.parse(raw);
+    const version = value && typeof value === 'object' ? (value as Record<string, unknown>).version : undefined;
+    return typeof version === 'number' ? version : undefined;
+  } catch {
+    return undefined;
   }
 }
 

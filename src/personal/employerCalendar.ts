@@ -1,3 +1,5 @@
+import { guardedWrite, recordRevision, type GuardedWriteResult } from './storageRecord';
+
 /** Consumer-only employer calendars. Editing a shared URL never writes browser storage. */
 export interface EmployerCalendar {
   version: 1;
@@ -53,22 +55,51 @@ export function decodeEmployerCalendar(raw: string | null): EmployerCalendar | u
   } catch { return undefined; }
 }
 
+/** Per scope, the stored revision this tab last loaded or wrote (stale-save detection). */
+const loadedRevisions = new Map<string, string>();
+
 export function readEmployerCalendar(country: string, subdivision?: string): EmployerCalendar {
   try {
-    const calendar = decodeEmployerCalendar(localStorage.getItem(EMPLOYER_STORAGE_PREFIX + employerScope(country, subdivision)));
+    const key = EMPLOYER_STORAGE_PREFIX + employerScope(country, subdivision);
+    const raw = localStorage.getItem(key);
+    loadedRevisions.set(key, recordRevision(raw));
+    const calendar = decodeEmployerCalendar(raw);
     if (calendar && employerScope(calendar.country, calendar.subdivision) === employerScope(country, subdivision)) return calendar;
   } catch { /* Disabled storage leaves live planning functional. */ }
   return defaultEmployerCalendar(country, subdivision);
 }
 
-export function saveEmployerCalendar(calendar: EmployerCalendar): boolean {
+/**
+ * Explicit save. 'stale' means another tab saved this scope after this tab loaded it:
+ * nothing is overwritten, and saving again replaces it deliberately. An unreadable stored
+ * calendar is quarantined first.
+ */
+export function writeEmployerCalendar(calendar: EmployerCalendar): GuardedWriteResult['status'] {
   const value = encodeEmployerCalendar(calendar);
-  if (!value) return false;
-  try { localStorage.setItem(EMPLOYER_STORAGE_PREFIX + employerScope(calendar.country, calendar.subdivision), value); return true; }
-  catch { return false; }
+  if (!value) return 'unavailable';
+  const key = EMPLOYER_STORAGE_PREFIX + employerScope(calendar.country, calendar.subdivision);
+  let storage: Storage;
+  try { storage = localStorage; } catch { return 'unavailable'; }
+  const result = guardedWrite(storage, key, value, {
+    expectedRevision: loadedRevisions.get(key),
+    isClean: raw => decodeEmployerCalendar(raw) !== undefined,
+    migrates: false,
+  });
+  if (result.status === 'saved') loadedRevisions.set(key, result.revision);
+  else if (result.status === 'stale') { try { loadedRevisions.set(key, recordRevision(storage.getItem(key))); } catch { /* unchanged */ } }
+  return result.status;
+}
+
+export function saveEmployerCalendar(calendar: EmployerCalendar): boolean {
+  return writeEmployerCalendar(calendar) === 'saved';
 }
 
 export function deleteEmployerCalendar(country: string, subdivision?: string): boolean {
-  try { localStorage.removeItem(EMPLOYER_STORAGE_PREFIX + employerScope(country, subdivision)); return true; }
+  try {
+    const key = EMPLOYER_STORAGE_PREFIX + employerScope(country, subdivision);
+    localStorage.removeItem(key);
+    loadedRevisions.set(key, 'missing');
+    return true;
+  }
   catch { return false; }
 }

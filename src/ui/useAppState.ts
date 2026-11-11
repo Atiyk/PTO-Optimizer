@@ -2,7 +2,7 @@ import { getConsumerHolidaysWithStatus as getHolidaysWithStatus, getConsumerSubd
 import { SUBDIVISION_NAMES } from '@daysoff/engine/data/countries';
 import { planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
 import { previewPinnedDay, type PinPreview } from './pinPreview';
-import { defaultEmployerCalendar, readEmployerCalendar, saveEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
+import { defaultEmployerCalendar, readEmployerCalendar, writeEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { computeMarginalValues } from '@daysoff/engine/solver/marginalValue';
 import type { Alternative, Break, SolveInput, WorkWeek } from '@daysoff/engine/solver/types';
@@ -355,7 +355,10 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   }, [updateEmployerCalendar]);
   const saveEmployerHolidays = useCallback(() => {
     if (sharedObservedHolidays !== undefined) return;
-    setEmployerCalendarMessage(saveEmployerCalendar(employerCalendar) ? 'Employer calendar saved in this browser.' : 'Browser storage is unavailable. Your changes still apply to this tab.');
+    const saved = writeEmployerCalendar(employerCalendar);
+    setEmployerCalendarMessage(saved === 'saved' ? 'Employer calendar saved in this browser.'
+      : saved === 'stale' ? 'Another tab saved a different employer calendar after this page loaded it. Nothing was overwritten. Save again to replace it with this plan\'s calendar.'
+        : 'Browser storage is unavailable. Your changes still apply to this tab.');
   }, [employerCalendar, sharedObservedHolidays]);
   const resetEmployerHolidays = useCallback(() => {
     if (sharedObservedHolidays !== undefined) return;

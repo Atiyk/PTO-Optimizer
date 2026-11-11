@@ -124,3 +124,26 @@ describe('browser wallet import coordination', () => {
     }
   });
 });
+
+describe('wallet storage shapes and versioned writes', () => {
+  it('reads every stored wallet shape, and a wallet write is stamped with revision and updatedAt', async () => {
+    const storage = sharedBrowser();
+    const stamped = JSON.stringify({ ...JSON.parse(backup), revision: '0d9e6a43-5d8a-4b5e-9f0e-111111111111' });
+    for (const [raw, revision] of [[backup, 'legacy'], [stamped, '0d9e6a43-5d8a-4b5e-9f0e-111111111111']] as const) {
+      storage.setItem(LEAVE_WALLET_STORAGE_KEY, raw);
+      expect(readBrowserWallet(storage)).toMatchObject({ revision, banks: [{ id: bank.id }] });
+    }
+    // A corrupt wallet is reported as unreadable and is never replaced by an import.
+    storage.setItem(LEAVE_WALLET_STORAGE_KEY, '{"version":1,"banks":[');
+    expect(readBrowserWallet(storage)).toBeNull();
+    expect(await prepareBrowserWalletImport(backup, storage)).toBeNull();
+    expect(storage.getItem(LEAVE_WALLET_STORAGE_KEY)).toBe('{"version":1,"banks":[');
+
+    storage.setItem(LEAVE_WALLET_STORAGE_KEY, stamped);
+    expect(await clearBrowserWallet('0d9e6a43-5d8a-4b5e-9f0e-111111111111', storage)).toBe(true);
+    const cleared = JSON.parse(storage.getItem(LEAVE_WALLET_STORAGE_KEY)!);
+    expect(cleared).toMatchObject({ version: 1, banks: [] });
+    expect(Number.isFinite(Date.parse(cleared.updatedAt))).toBe(true);
+    expect(readBrowserWallet(storage)).toMatchObject({ banks: [] });
+  });
+});

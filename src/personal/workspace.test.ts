@@ -149,6 +149,17 @@ describe('shared balance basis preference', () => {
     saved = '{"version":1,"balanceIncludesApprovedLeave":true,"workdaySchedule":{"shiftMinutes":[1,2],"hoursPerDay":-1}}';
     expect(readWorkdaySchedulePreference(storage)).toBeUndefined();
   });
+
+  it('quarantines an unreadable workspace record and never downgrades a newer one', () => {
+    const data = new Map<string, string>([[BALANCE_BASIS_STORAGE_KEY, '{"version":1,']]);
+    const storage = { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value); } };
+    expect(writeBalanceBasisPreference(true, storage)).toBe(true);
+    expect(JSON.parse(data.get(`${BALANCE_BASIS_STORAGE_KEY}.quarantine`)!)[0].raw).toBe('{"version":1,');
+    expect(JSON.parse(data.get(BALANCE_BASIS_STORAGE_KEY)!)).toMatchObject({ version: 1, balanceIncludesApprovedLeave: true, revision: expect.any(String) });
+    data.set(BALANCE_BASIS_STORAGE_KEY, '{"version":2}');
+    expect(writeBalanceBasisPreference(false, storage)).toBe(false);
+    expect(data.get(BALANCE_BASIS_STORAGE_KEY)).toBe('{"version":2}');
+  });
 });
 
 describe('committed entries the planner keeps visible', () => {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { Policy } from './Policy';
 import { readBrowserWorkdaySchedule } from './usePersonalWorkspace';
 import { initialPolicyPreferences, readBrowserPolicyDraft, savePolicyPreferences } from '../personal/policyPreferences';
@@ -15,6 +15,21 @@ beforeEach(() => {
   window.history.replaceState(null, '', `/policy${INITIAL_SEARCH}`);
 });
 afterEach(() => { cleanup(); window.localStorage.clear(); window.history.replaceState(null, '', '/policy'); });
+
+describe('saving a policy while another tab has saved one', () => {
+  it('shows a notice, keeps the other tab\'s policy on the first save, and replaces it only on a second save', () => {
+    render(<Policy />);
+    const otherTab = JSON.stringify({ version: 1, search: 'c=US&cb=30', revision: 'other-tab-1', updatedAt: '2027-01-01T00:00:00.000Z' });
+    window.localStorage.setItem('gapless.personal.policy.v1', otherTab);
+    act(() => { window.dispatchEvent(new StorageEvent('storage', { key: 'gapless.personal.policy.v1' })); });
+    expect(screen.getByTestId('policy-storage-notice').textContent).toMatch(/changed in another tab/);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save policy in this browser' })[0]);
+    expect(window.localStorage.getItem('gapless.personal.policy.v1')).toBe(otherTab);
+    expect(screen.getAllByText(/Nothing was overwritten/).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save policy in this browser' })[0]);
+    expect(JSON.parse(window.localStorage.getItem('gapless.personal.policy.v1')!).search).toContain('cb=10');
+  });
+});
 
 describe('hourly schedule shared with the planner', () => {
   it('publishes an hours policy\'s per-weekday shifts for planners, never in the URL', () => {

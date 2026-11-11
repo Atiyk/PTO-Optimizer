@@ -1,6 +1,7 @@
 import type { LeaveBank } from '../personal/leaveWallet';
 import { decodeLeaveWallet, encodeLeaveWallet, LEAVE_WALLET_STORAGE_KEY, MAX_WALLET_JSON_LENGTH } from '../personal/leaveWalletCodec';
-import { browserRequestStorage, parseRequestLedger, REQUEST_STORAGE_KEY, writeRequestLedger, type PtoRequest, type RequestStorage } from '../personal/requestLedger';
+import { browserRequestStorage, parseRequestLedger, REQUEST_STORAGE_KEY, saveRequestLedger, type PtoRequest, type RequestStorage } from '../personal/requestLedger';
+import { stampRecord } from '../personal/storageRecord';
 import {
   acceptVersionedWalletImport, prepareVersionedWalletImport, type PreparedWalletImport, type VersionedWalletStore,
 } from './walletImportLedgerGate';
@@ -29,24 +30,16 @@ function revisionFrom(raw: string | null): string {
   return typeof revision === 'string' && /^[a-zA-Z0-9-]{1,56}$/.test(revision) ? revision : 'legacy';
 }
 
-function newRevision(): string {
-  return typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
+/** Wallet records carry the shared revision + updatedAt stamp (src/personal/storageRecord.ts). */
 function writeRevision(storage: RequestStorage, key: string, value: string, limit: number): void {
-  const encoded = `${value.slice(0, -1)},"revision":"${newRevision()}"}`;
+  const encoded = stampRecord(JSON.parse(value) as object);
   if (encoded.length > limit) throw new Error('Private storage exceeds its size limit.');
   storage.setItem(key, encoded);
 }
 
 /** Call within the same lock used for the preceding ledger read and mutation. */
-export function persistBrowserRequests(requests: readonly PtoRequest[], storage: RequestStorage | null): boolean {
-  if (!storage || !canLockWalletLedger()) return writeRequestLedger(requests, storage);
-  return writeRequestLedger(requests, {
-    getItem: (key) => storage.getItem(key),
-    setItem: (key, value) => writeRevision(storage, key, value, 1_000_000),
-  });
+export function persistBrowserRequests(requests: readonly PtoRequest[], storage: RequestStorage | null, expectedRevision?: string): boolean {
+  return saveRequestLedger(requests, storage, expectedRevision).status === 'saved';
 }
 
 function storedBanks(raw: string | null): LeaveBank[] | null {

@@ -197,7 +197,8 @@ export function PtoTracker({ ledger, calendar, calendarReady = true, calendarNot
         }}>Track these dates</Button>
       </details>
       {ledger.message && <p role="status" className="mt-4 text-sm text-muted">{compactDatesIn(ledger.message)}</p>}
-      {!ledger.storageAvailable && <p role="status" className="mt-4 border-l-2 border-ink pl-3 text-sm text-ink">Browser storage is unavailable. Your tracker works for this visit, but changes may disappear when you leave.</p>}
+      {ledger.storageNotice && <p role="status" data-testid="ledger-storage-notice" className="mt-4 border-l-2 border-ink pl-3 text-sm text-ink">{ledger.storageNotice}</p>}
+      {!ledger.storageAvailable && !ledger.storageNotice && <p role="status" className="mt-4 border-l-2 border-ink pl-3 text-sm text-ink">Browser storage is unavailable. Your tracker works for this visit, but changes may disappear when you leave.</p>}
       {conflicts.length > 0 && <p className="mt-4 flex gap-2 border-l-2 border-ink pl-3 text-sm text-ink">Some request dates overlap. They are flagged here and deducted only once in the balance forecast. Review the dates before requesting leave.</p>}
       <div className="mt-5 flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-ink">{showPast ? 'All tracked requests' : 'Upcoming requests'}</p>
