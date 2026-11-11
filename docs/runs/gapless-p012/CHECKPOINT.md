@@ -29,7 +29,7 @@ source of truth between scheduled executions. No sensitive user data belongs her
 | Batch | Issues | Branch / PR | State |
 |---|---|---|---|
 | P0 | 1, 2, 10, 11 | `gapless/p0-release` → PR #145, merged as `3bae6ed` (critic GO on 494d135) | DONE: merged, Vercel prod success, prod smoke passed (run 43017235618 attempt 2) |
-| P1 | 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17 | `gapless/p1-release` @ 0d9384a (pushed): C 16/17, B 13/14, W2 3/4 (2878ab3), QA account-form scoping. S 5/6 → `gapless/p1-s-solver-travel` (/home/user/p1s); T 7 → `gapless/p1-t-performance` (/home/user/p1t) | PR #146 draft @ 1b315a9; critic NO-GO (Q1-1); fixes in progress |
+| P1 | 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17 | `gapless/p1-release` @ 0d9384a (pushed): C 16/17, B 13/14, W2 3/4 (2878ab3), QA account-form scoping. S 5/6 → `gapless/p1-s-solver-travel` (/home/user/p1s); T 7 → `gapless/p1-t-performance` (/home/user/p1t) | PR #146 draft @ b59abcb; critic round 2 |
 | P2 | 8, 15, 18, 19 | — | Not started |
 
 ## Issue traceability
@@ -78,6 +78,8 @@ Residual risks noted by P (not fixed): `/api/watch` and reminder-email links car
 
 - ~17:25Z — Critic Q NO-GO on 1b315a9. Q1-1 (P1 blocker): ICS recurrence budget counts only yielded dates; hostile .ics freezes main thread (500 events 10.8–12.7 s). Q1-2/Q1-3 (P2, treated as blockers: arithmetic disagreement planner vs forecast vs Family on partial/overlapping days). Q1-4..7 P3 follow-ups (hoursPerDay fallback, quarantine quota lock-out, fieldset a11y check, date-editor QA ignores PW_CHROMIUM_PATH). Verified OK: 2043 tests, teams 290, consumer-qa 40/40, journey 8/8, privacy, plan parity, share round trip, Sat-start book-by. Routed Q1-1 → C (/home/user/fxc, gapless/p1-fix-ics-bound), Q1-2/3/4 → W2 (/home/user/fxw, gapless/p1-fix-charges).
 
+- ~17:45Z — Fixes merged: ea126ec (W2, Q1-2/3/4 one per-date charge rule) and 4c133ec (C, Q1-1 ICS work budget + line/value caps; 500 hostile events 8.9 s → 35 ms). Candidate b59abcb pushed: vitest 193/2058, tsc, lint, build, teams 290 pass. Critic Q round 2 started on b59abcb.
+
 ## Next action
 
-Merge both fixes into gapless/p1-release, full checks, push, critic Q round 2 on the new exact SHA, CI green, ready, merge, Vercel, prod smoke.
+Critic round 2 verdict on b59abcb; when GO and required checks green on b59abcb: mark #146 ready (CCR route), merge (merge commit, sha=b59abcb), verify Vercel, push gapless/prod-smoke (P1 markers), mark P1 complete. Then P2 (8, 15, 18, 19). P3 follow-ups: Q1-5 quarantine quota lock-out, Q1-6 fieldset a11y check, Q1-7 date-editor QA browser path.
