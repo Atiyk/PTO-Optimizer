@@ -31,7 +31,7 @@ import type { AccrualMethod, CarryoverRule, PlanYear, TimeOffPolicy } from '../p
 import { copyText } from './requestText';
 import { writePolicyStateToURL, type PolicyURLState } from './policyUrlState';
 import { isValidISODate } from './urlState';
-import { isSupportedPlanningRange } from './validation';
+import { isSupportedPlanningRange, workWeekLinkIssue } from './validation';
 import { usePinnedPlans } from './pinnedPlanStore';
 
 const HORIZON_MONTHS = 18;
@@ -132,6 +132,9 @@ export function Policy() {
 
   const [country, setCountry] = useState<string>(d.country);
   const [trackerWorkWeek, setTrackerWorkWeek] = useState<WorkWeek>(d.workWeek ?? DEFAULT_WORK_WEEK);
+  // Issue 10: policyUrlState drops a link's all-days-off work week; say so until it is changed.
+  const [linkWorkWeek] = useState(() => ({ issue: typeof window === 'undefined' ? null : workWeekLinkIssue(window.location.search), week: trackerWorkWeek }));
+  const workWeekNotice = linkWorkWeek.week === trackerWorkWeek ? linkWorkWeek.issue : null;
   const [trackerSubdivision, setTrackerSubdivision] = useState(d.subdivision);
   const [trackerAltFridayStart, setTrackerAltFridayStart] = useState(d.altFridayStart ?? '');
   const [trackerAltFridayEnabled, setTrackerAltFridayEnabled] = useState(Boolean(d.altFridayStart));
@@ -682,6 +685,7 @@ export function Policy() {
             <div id="requests" className="order-4 mt-6 min-w-0 scroll-mt-24 lg:order-none lg:col-start-1 lg:row-start-2 lg:mt-4">
               <PtoTracker today={visitDate} ledger={ledger} calendar={pricedRequestCalendar} calendarReady={!trackerCalendar.loading && !trackerCalendar.degraded} calendarNotice={trackerCalendar.loading ? 'Loading your employer calendar…' : trackerCalendar.degraded ? 'Holiday data or a calendar input is unavailable. Check the calendar settings before adding or changing request dates.' : undefined} forecastSummary={selectedForecast?.confirmed.balance === null || selectedForecast?.confirmed.balance === undefined ? undefined : `Projected balance on ${compactDate(forecastDate)} is ${new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(selectedForecast.confirmed.balance)} ${unit}.`} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
               <WalletTransfer policy={canProjectBalance ? policy : undefined} requests={ledger.requests} forecastDate={forecastDate} />
+              {workWeekNotice && <p role="status" className="mt-3 rounded-[10px] bg-surface-alt p-4 text-sm text-ink">{workWeekNotice}</p>}
               <details className="group mt-3 rounded-[10px] border border-line bg-surface">
                 <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 font-semibold text-ink sm:px-6 [&::-webkit-details-marker]:hidden">
                   My request calendar and workweek

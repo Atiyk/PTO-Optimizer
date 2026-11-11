@@ -135,7 +135,7 @@ export function readPolicyStateFromURL(search: string, defaultCountry: string, p
   const forecastDate = params.get('fd');
 
   return {
-    ...(params.get('ww') && /^[01]{7}$/.test(params.get('ww')!) ? { workWeek: [...params.get('ww')!].map(value => value === '1') as WorkWeek } : {}),
+    ...(params.get('ww') && /^[01]{7}$/.test(params.get('ww')!) && params.get('ww')!.includes('1') ? { workWeek: [...params.get('ww')!].map(value => value === '1') as WorkWeek } : {}),
     ...(params.get('sd') && /^[A-Z0-9-]{1,16}$/.test(params.get('sd')!) ? { subdivision: params.get('sd')! } : {}),
     ...(params.get('afs') && isValidISODate(params.get('afs')!) ? { altFridayStart: params.get('afs')! } : {}),
     unit: params.get('u') === '1' ? 'hours' : 'days',
