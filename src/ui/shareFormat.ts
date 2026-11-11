@@ -53,6 +53,7 @@ export const PLAN_URL_KEYS: Readonly<Record<string, UrlKeyClass>> = Object.freez
   ho: 'share-only', // observed holiday dates the sender opted to share, without labels
   er: 'share-only', // planner revision that made the link (src/ui/shareSnapshot.ts)
   hf: 'share-only', // hash of the public holiday dates the sender's planner used; never private dates
+  fc: 'share-only', // date a calendar subscription link was made (src/ui/SubscribeFeed.tsx); feed links only
   // Address bar only.
   lp: 'address-only', // arrived from the landing preview
   hx: 'address-only', // one-shot nonce for an on-device hand-off (src/ui/planHandoff.ts); stripped on load

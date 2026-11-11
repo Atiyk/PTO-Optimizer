@@ -49,8 +49,9 @@ export interface SubscribeFeedProps {
   idPrefix?: string;
 }
 
-const PLAN_DESCRIPTION = 'Subscribe to a fixed snapshot of these planning inputs. Your calendar app refreshes this link, including PTO days, holidays and “book by” reminders.';
-const PLAN_CAVEAT = 'After editing the plan, subscribe again to pick up your changes. Anyone with the link can see the snapshot.';
+const PLAN_DESCRIPTION = 'Subscribe to a fixed snapshot of this plan’s inputs as they are now. Your calendar app refreshes it with PTO days, holidays and “book by” reminders, recalculated from the refresh date.';
+/** Issue 19: nothing is stored server-side, so later edits never reach a subscription. */
+const planCaveat = (calendarName: string) => `Edits you make after subscribing are not included. To update, subscribe again, then remove the old “${calendarName}” calendar in your calendar app so the days don’t appear twice. Each event notes the day the snapshot was made. Anyone with the link can see the snapshot.`;
 
 /** Mirrors the /api/feed bound so the page never offers a link the function will refuse. */
 function tooLargeForFeed(query: string): boolean {
@@ -58,7 +59,7 @@ function tooLargeForFeed(query: string): boolean {
   return isValidISODate(state.rangeStart) && isValidISODate(state.rangeEnd) && !feedWorkloadAllowed(state);
 }
 
-export function SubscribeFeed({ planSearch, observedHolidayDates, origin, path = '/api/feed', calendarName = FEED_CALENDAR_NAME, heading = 'Keep this plan in your calendar', description = PLAN_DESCRIPTION, caveat = PLAN_CAVEAT, idPrefix = 'subscribe-feed' }: SubscribeFeedProps) {
+export function SubscribeFeed({ planSearch, observedHolidayDates, origin, path = '/api/feed', calendarName = FEED_CALENDAR_NAME, heading = 'Keep this plan in your calendar', description = PLAN_DESCRIPTION, caveat, idPrefix = 'subscribe-feed' }: SubscribeFeedProps) {
   // The links name this deployment's origin and the visitor's current plan, neither of
   // which the prerendered HTML knows, and React keeps server attributes on hydration - so
   // they render only after mount, never with a build-time host or plan baked in.
@@ -78,7 +79,11 @@ export function SubscribeFeed({ planSearch, observedHolidayDates, origin, path =
   if (!samePlan) setChoice({ mode: null, source: planSearch, dates: datesKey });
   const sharingAllowed = !requiresChoice || (samePlan && choice.mode !== null);
   const shareObservedDates = samePlan && choice.mode === 'dates';
-  const query = planFeed ? buildPublicPlanSearch(planSearch, shareObservedDates ? observedHolidayDates : undefined) : planSearch.replace(/^\?/, '');
+  // The plan feed records the day this link was made (`fc`), so its events can name it.
+  const query = planFeed
+    ? `${buildPublicPlanSearch(planSearch, shareObservedDates ? observedHolidayDates : undefined)}&fc=${todayISO()}`
+    : planSearch.replace(/^\?/, '');
+  const shownCaveat = caveat ?? (planFeed ? planCaveat(calendarName) : undefined);
   const links = resolvedOrigin && sharingAllowed ? feedLinks(resolvedOrigin, query, path, calendarName) : null;
   const tooLong = useMemo(() => query.length > MAX_FEED_QUERY_LENGTH || (planFeed && tooLargeForFeed(query)), [query, planFeed]);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
@@ -111,7 +116,7 @@ export function SubscribeFeed({ planSearch, observedHolidayDates, origin, path =
         <>
           <p className="max-w-prose text-sm text-muted">{description}</p>
           {planFeed && <p className="max-w-prose text-xs text-muted">{shareObservedDates ? 'Uses your selected observed holiday dates, without their labels.' : 'Uses public holiday defaults.'}</p>}
-          {caveat && <p className="max-w-prose text-xs leading-5 text-muted">{caveat}</p>}
+          {shownCaveat && <p className="max-w-prose text-xs leading-5 text-muted">{shownCaveat}</p>}
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" href={links.webcal}>Apple Calendar</Button>
             <Button variant="secondary" href={links.google} target="_blank" rel="noopener noreferrer">

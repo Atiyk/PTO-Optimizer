@@ -78,7 +78,7 @@ const DEFAULT_REMINDER_OPTIONS: ReminderOptions = { enabled: false, leadDays: 14
 
 /** The per-PTO-day VEVENTs, shared by the downloaded .ics and the live feed (F1) so a
  * subscribed calendar and a downloaded one carry byte-identical events for the same day. */
-export function ptoDayEventLines(breaks: Break[], isPtoDay: (iso: string) => boolean, dtstamp: string): string[] {
+export function ptoDayEventLines(breaks: Break[], isPtoDay: (iso: string) => boolean, dtstamp: string, note?: string): string[] {
   const lines: string[] = [];
   for (const brk of breaks) {
     const title = `PTO (${formatDateRange(brk.start, brk.end)})`;
@@ -92,6 +92,7 @@ export function ptoDayEventLines(breaks: Break[], isPtoDay: (iso: string) => boo
       lines.push(`DTSTART;VALUE=DATE:${dateStart}`);
       lines.push(`DTEND;VALUE=DATE:${dateEnd}`);
       lines.push(foldLine(`SUMMARY:${escapeText(title)}`));
+      if (note) lines.push(foldLine(`DESCRIPTION:${escapeText(note)}`));
       lines.push('TRANSP:TRANSPARENT');
       lines.push('END:VEVENT');
     }
@@ -126,6 +127,8 @@ export function bookByEventLines(
   workWeek?: WorkWeek,
   offDays?: readonly string[],
   noticeUnit: NoticeUnit = 'calendar',
+  /** Appended to each description, e.g. the feed's snapshot note (issue 19). */
+  note?: string,
 ): string[] {
   const lines: string[] = [];
   for (const brk of breaks) {
@@ -143,7 +146,7 @@ export function bookByEventLines(
     const timing = late
       ? `Your ${noticePhrase(leadDays, noticeUnit)} notice window has started. Book it now.`
       : `Book by ${formatShort(bookBy)} to give ${leadDays} ${noticeWord} of notice.`;
-    const description = `${brk.ptoCost} PTO ${ptoWord} -> ${brk.totalDaysOff} ${dayWord} off (${brk.multiplier.toFixed(2)}x). ${timing}`;
+    const description = `${brk.ptoCost} PTO ${ptoWord} -> ${brk.totalDaysOff} ${dayWord} off (${brk.multiplier.toFixed(2)}x). ${timing}${note ? ` ${note}` : ''}`;
     lines.push('BEGIN:VEVENT');
     lines.push(foldLine(`UID:pto-reminder-${dateStart}-${isoToICSDate(brk.start)}@pto-optimizer.app`));
     lines.push(`DTSTAMP:${dtstamp}`);
@@ -177,6 +180,8 @@ export function generateICS(
   isPtoDay: (iso: string) => boolean,
   now: Date = new Date(),
   reminderOptions: ReminderOptions = DEFAULT_REMINDER_OPTIONS,
+  /** Optional per-event note; the download passes none. Tests use it to compare with the feed. */
+  note?: string,
 ): string {
   const lines: string[] = [];
   lines.push('BEGIN:VCALENDAR');
@@ -186,11 +191,11 @@ export function generateICS(
   lines.push(foldLine(`X-WR-CALNAME:${PRODUCT_NAME} - PTO plan`));
 
   const dtstamp = dtstampNow(now);
-  lines.push(...ptoDayEventLines(breaks, isPtoDay, dtstamp));
+  lines.push(...ptoDayEventLines(breaks, isPtoDay, dtstamp, note));
   // The download runs in the browser, so "today" is the viewer's local date, matching the plan
   // on screen; the server feed passes its own day to bookByEventLines.
   if (reminderOptions.enabled) {
-    lines.push(...bookByEventLines(breaks, localDateISO(now), reminderOptions.leadDays, dtstamp, reminderOptions.workWeek, reminderOptions.offDays, reminderOptions.noticeUnit));
+    lines.push(...bookByEventLines(breaks, localDateISO(now), reminderOptions.leadDays, dtstamp, reminderOptions.workWeek, reminderOptions.offDays, reminderOptions.noticeUnit, note));
   }
 
   lines.push('END:VCALENDAR');

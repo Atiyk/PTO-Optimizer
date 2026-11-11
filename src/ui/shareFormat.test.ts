@@ -106,6 +106,14 @@ describe('versioned public share format (allowlist)', () => {
     expect(own.has('hf')).toBe(false);
   });
 
+  it('classifies the subscription date (fc) as share-only and never writes it to the address bar or a plan link', () => {
+    expect(PLAN_URL_KEYS.fc).toBe('share-only');
+    expect(PLAN_ADDRESS_KEYS).not.toContain('fc');
+    const full = new URLSearchParams();
+    writeFullStateToURL(full, maximal);
+    expect(full.has('fc')).toBe(false);
+  });
+
   it('writes only share-allowlisted keys into a copied public link, feed and email search', () => {
     const full = new URLSearchParams();
     writeFullStateToURL(full, maximal);

@@ -74,3 +74,30 @@ describe('PrimaryControls (Phase 3.1/3.2: reserve days, unlimited PTO)', () => {
     expect(on).toContain('Most people with unlimited PTO take 15 days or fewer');
   });
 });
+
+describe('PTO days: an empty field is unknown, 0 is a real balance (issue 15)', () => {
+  function LiveControls({ onBudget }: { onBudget: (n: number) => void }) {
+    const [budget, setBudget] = useState(15);
+    return <PrimaryControls {...baseProps} budget={budget} onChangeBudget={(n) => { onBudget(n); setBudget(n); }} budgetSpent={0} reserveDays={0} effectiveBudget={budget} unlimitedPto={false} />;
+  }
+  it('does not turn a cleared field into a 0-day plan, and asks for a number instead', () => {
+    const seen: number[] = [];
+    render(<LiveControls onBudget={(n) => seen.push(n)} />);
+    const exact = screen.getByRole<HTMLInputElement>('spinbutton', { name: 'PTO days available' });
+    fireEvent.change(exact, { target: { value: '' } });
+    expect(seen).toEqual([]);
+    expect(exact.value).toBe('');
+    expect(screen.getByText('Enter your PTO days. Enter 0 if you have none.')).toBeTruthy();
+    fireEvent.change(exact, { target: { value: '0' } });
+    expect(seen).toEqual([0]);
+    expect(exact.value).toBe('0');
+    expect(screen.queryByText('Enter your PTO days. Enter 0 if you have none.')).toBeNull();
+  });
+  it('restores the last entered number when the field is left empty', () => {
+    render(<LiveControls onBudget={() => {}} />);
+    const exact = screen.getByRole<HTMLInputElement>('spinbutton', { name: 'PTO days available' });
+    fireEvent.change(exact, { target: { value: '' } });
+    fireEvent.blur(exact);
+    expect(exact.value).toBe('15');
+  });
+});

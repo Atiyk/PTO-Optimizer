@@ -125,7 +125,7 @@ jobs:
           node current/scripts/consumer-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/after" after || qa_status=1
           node current/scripts/consumer-header-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/header" || qa_status=1
           node current/scripts/consumer-privacy-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/privacy" || qa_status=1
-          node current/scripts/consumer-cross-browser-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/cross-browser" || qa_status=1
+          QA_ENGINES=chromium,firefox,webkit node current/scripts/consumer-cross-browser-qa.mjs http://127.0.0.1:4173 "$GITHUB_WORKSPACE/qa-evidence/cross-browser" || qa_status=1
           exit "$qa_status"
       - name: Verify the complete consumer journey at 375 pixels
         if: ${{ !cancelled() }}

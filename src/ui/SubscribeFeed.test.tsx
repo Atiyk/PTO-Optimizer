@@ -3,11 +3,13 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { encodeEmployerCalendar } from '../personal/employerCalendar';
 import { SubscribeFeed, feedLinks } from './SubscribeFeed';
 import { buildPublicPlanSearch } from './publicSharePrivacy';
+import { todayISO } from './today';
 
 afterEach(cleanup);
 
 const SEARCH = 'c=US&s=2027-01-01&e=2027-12-31&b=20&p=2027-03-15,2027-03-16';
-const PUBLIC_SEARCH = buildPublicPlanSearch(SEARCH);
+// Issue 19: the feed link records the day it was made, so its events can say so.
+const PUBLIC_SEARCH = `${buildPublicPlanSearch(SEARCH)}&fc=${todayISO()}`;
 const ORIGIN = 'https://gapless.example';
 
 describe('feedLinks', () => {
@@ -39,8 +41,27 @@ describe('SubscribeFeed', () => {
     expect(input.value).toBe(`${ORIGIN}/api/feed?${PUBLIC_SEARCH}`);
     expect(screen.getByRole('button', { name: 'Copy calendar link' })).toBeTruthy();
     expect(document.querySelector('button[type="submit"], form')).toBeNull();
-    expect(screen.getByText(/After editing the plan, subscribe again/)).toBeTruthy();
     expect(screen.getByText(/fixed snapshot/)).toBeTruthy();
+  });
+
+  it('says what the snapshot holds, that later edits are left out, and how to update and remove it', () => {
+    render(<SubscribeFeed planSearch={SEARCH} origin={ORIGIN} />);
+    const text = document.body.textContent ?? '';
+    expect(text).toMatch(/fixed snapshot of this plan.s inputs/);
+    expect(text).toContain('PTO days, holidays and “book by” reminders');
+    expect(text).toContain('Edits you make after subscribing are not included.');
+    expect(text).toContain('To update, subscribe again, then remove the old “Timebower - PTO plan” calendar');
+    expect(text).toContain('Each event notes the day the snapshot was made.');
+  });
+
+  it('records only the creation date beside the public share keys, and never for the watch feed', () => {
+    render(<SubscribeFeed planSearch={SEARCH} origin={ORIGIN} />);
+    const query = new URL((screen.getByLabelText(/paste this link/i) as HTMLInputElement).value).searchParams;
+    expect(query.get('fc')).toBe(todayISO());
+    expect([...query.keys()].filter((key) => !new URLSearchParams(buildPublicPlanSearch(SEARCH)).has(key))).toEqual(['fc']);
+    cleanup();
+    render(<SubscribeFeed planSearch="c=US&cb=5" path="/api/watch" origin={ORIGIN} />);
+    expect((screen.getByLabelText(/paste this link/i) as HTMLInputElement).value).not.toContain('fc=');
   });
 
   it('uses this page origin once mounted (never a build-time host)', () => {
