@@ -90,7 +90,7 @@
           <tr><td><code>s</code></td><td>date, <code>YYYY-MM-DD</code></td><td>Today</td><td>Date range start.</td></tr>
           <tr><td><code>e</code></td><td>date, <code>YYYY-MM-DD</code></td><td>Dec 31 this year</td><td>Date range end.</td></tr>
           <tr><td><code>b</code></td><td>number, 0&ndash;400</td><td>A balance guess</td><td>PTO days available (the budget the solver spends).</td></tr>
-          <tr><td><code>w</code></td><td>number, 0&ndash;100, step 10</td><td><code>30</code></td><td>Weighting: <code>0</code> maximises total days off and ignores travel demand; <code>100</code> minimises travel demand and accepts fewer days off.</td></tr>
+          <tr><td><code>w</code></td><td>number, 0&ndash;100, step 10</td><td><code>30</code></td><td>Weighting: <code>0</code> maximises total days off and ignores travel demand; <code>100</code> favours the quietest estimated travel seasons and may accept fewer days off. The travel figure is a rough seasonal estimate, not a forecast or a price.</td></tr>
           <tr><td><code>count</code></td><td>number, 0&ndash;7</td><td><code>0</code></td><td>Break-count slider position. <code>0</code> lets the solver decide; <code>1</code> is one long break; <code>7</code> is as many short breaks as the calendar allows.</td></tr>
         </tbody>
       </table>

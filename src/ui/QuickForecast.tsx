@@ -116,7 +116,7 @@ export function QuickForecast({ policy, balanceEntered = true, inputIssue, reque
             ? 'Approved leave is already included in the balance you entered and is not deducted again.'
             : 'Scheduled PTO counts approved and completed requests, plus dates entered directly in your policy.'} Days on or before {compactDate(policy.balanceAsOf)} are already in your balance.</p>
           {unit === 'days' && requests.some(request => request.ptoMinutes !== undefined) && (
-            <p className="mt-2 text-xs leading-5 text-muted">This is a whole-day forecast. An hourly request counts as one day per tracked date. Select hours to forecast its recorded duration.</p>
+            <p className="mt-2 text-xs leading-5 text-muted">A full hourly day counts as one day. A partial day counts as its share of that day's shift: half a shift is 0.5 day. Select hours to forecast the recorded hours.</p>
           )}
           {confirmed.unfunded > 0.000001 && (
             <p role="status" className="mt-4 flex gap-2 rounded-[10px] border border-ink bg-accent-soft p-3 text-sm text-ink">

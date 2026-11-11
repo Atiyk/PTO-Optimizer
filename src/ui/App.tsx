@@ -1,3 +1,4 @@
+import { HolidayCoverageNotice } from './HolidayCoverageNotice';
 import { PortraitShare } from './PortraitShare';
 import { rangeISO, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { PartnerPlanner } from './PartnerPlanner';
@@ -6,7 +7,7 @@ import { PtoTracker } from './PtoTracker';
 import { usePersonalWorkspace } from './usePersonalWorkspace';
 import { settleLedgerAction } from '../integration/browserWalletStore';
 import { track, trackBreakAction } from './analytics';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SiteHeader } from './SiteHeader';
 import { CompactResultBar, Headline } from './Headline';
 import { buttonClasses } from './Button';
@@ -26,6 +27,7 @@ import { Legend } from './Legend';
 import { BreakCard } from './BreakCard';
 import { CommittedBreakCard } from './CommittedBreakCard';
 import { PinnedPlansStrip } from './PinnedPlansStrip';
+import { SharedPlanNotice } from './SharedPlanNotice';
 import { ExportBar } from './ExportBar';
 import { PartnerOverlapBanner } from './PartnerOverlapBanner';
 import { FAQ } from './FAQ';
@@ -46,6 +48,11 @@ import { readBrowserPlanSearch } from './urlState';
 import { PortfolioComparison } from '../planning/PortfolioComparison';
 import { useHasHover } from './useHasHover';
 
+const dayNumber = new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format;
+/** Day-equivalents keep a singular unit up to one: "0.5 day", "1 day", "1.5 days". */
+const dayWord = (days: number) => days > 0 && days <= 1 ? 'day' : 'days';
+const dayAmount = (days: number) => `${dayNumber(days)} ${dayWord(days)}`;
+
 export function App() {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [comparisonOpen, setComparisonOpen] = useState(false);
@@ -53,7 +60,7 @@ export function App() {
   const workspace = usePersonalWorkspace();
   const ledger = workspace.ledger;
   const today = useTodayISO();
-  const state = useAppState(workspace.requests, today, { includesApprovedLeave: workspace.includesApprovedLeave });
+  const state = useAppState(workspace.requests, today, { includesApprovedLeave: workspace.includesApprovedLeave, schedule: workspace.schedule });
   const plannable = !state.validationIssues.length && !state.solverIssue && !state.planningPending;
   const requestToolsReady = plannable && state.holidaysReady && !state.holidaysDegraded;
   const requestsByDates = useMemo(() => new Map(ledger.requests.map(request => [`${request.start}|${request.end}`, request])), [ledger.requests]);
@@ -104,10 +111,11 @@ export function App() {
     let steps = (cycle.indexOf(target ?? undefined) - cycle.indexOf(state.forced[date]) + 3) % 3;
     while (steps-- > 0) state.toggleDay(date);
   };
-  const pinPreview = (date: string) => {
-    const preview = state.previewPin(date);
-    return preview ? pinPreviewText(preview, { totalDaysOff: state.totalDaysOff, budgetSpent: state.budgetSpent }) : null;
-  };
+  const { previewPin, totalDaysOff: currentDaysOff, budgetSpent: currentBudgetSpent } = state;
+  const pinPreview = useCallback(async (date: string) => {
+    const preview = await previewPin(date);
+    return preview ? pinPreviewText(preview, { totalDaysOff: currentDaysOff, budgetSpent: currentBudgetSpent }) : null;
+  }, [previewPin, currentDaysOff, currentBudgetSpent]);
   // Opening More options from the rail scrolls the panel into view (it can open below the
   // fold inside the sticky rail).
   const optionsRef = useRef<HTMLDivElement>(null);
@@ -225,7 +233,7 @@ export function App() {
                   {!state.planningPending && !state.validationIssues.length && <a className="link-mark inline-flex min-h-11 items-center" href={`#day-${holidayFocusDate}`}>Find this date on the calendar</a>}
                 </div>
               )}
-              {(state.partnerOverlapReceived || partnerReceived.invalid || workWeekNotice || partnerReceived.availability || state.validationIssues.length > 0 || state.solverIssue || state.relaxedMinimum !== undefined || state.peakCapApplied || state.holidaysDegraded) && (
+              {(state.partnerOverlapReceived || state.sharedPlanDifferences || partnerReceived.invalid || workWeekNotice || partnerReceived.availability || state.validationIssues.length > 0 || state.solverIssue || state.relaxedMinimum !== undefined || state.peakCapApplied || state.holidaysDegraded) && (
                 <div className="flex flex-col gap-3">
                   {state.partnerOverlapReceived && (
                     <PartnerOverlapBanner overlapDayCount={state.overlapDays.length} onDismiss={state.dismissPartnerOverlapBanner} />
@@ -233,6 +241,13 @@ export function App() {
                   {partnerReceived.invalid && <p role="alert" className="rounded-[10px] border border-error bg-error-soft p-4 text-sm text-ink">This partner availability link is invalid or too large. Ask for a new link with fewer dates.</p>}
                   {partnerReceived.availability && <p role="status" className="rounded-[10px] bg-surface-alt p-4 text-sm text-ink">Someone shared {partnerReceived.availability.days.length} {partnerReceived.availability.status} available dates. Your own PTO budget and calendar apply. <a className="link-mark font-semibold" href="#partner-planner">See dates you can both take off</a></p>}
                   {workWeekNotice && <p role="status" className="rounded-[10px] bg-surface-alt p-4 text-sm text-ink">{workWeekNotice}</p>}
+                  {state.sharedPlanDifferences && (
+                    <SharedPlanNotice
+                      differences={state.sharedPlanDifferences}
+                      savedCalendarOff={state.hasSavedCalendarOffForSharedPlan && !state.hasSharedHolidaySnapshot}
+                      onUseSavedCalendar={state.restoreMyEmployerCalendar}
+                    />
+                  )}
                   <ValidationBanner issues={state.validationIssues} />
                   {state.relaxedMinimum !== undefined && (
                     <RelaxedMinimumNotice
@@ -274,6 +289,10 @@ export function App() {
                   )}
                 </div>
               )}
+              {/* Issue 17: plan years without holiday data say so; nothing renders or loads for bundled years. */}
+              {!state.hasSharedHolidaySnapshot && (
+                <HolidayCoverageNotice country={state.country} rangeStart={state.rangeStart} rangeEnd={state.rangeEnd} />
+              )}
               <section aria-labelledby="breaks-heading" id="summary-heading" className="min-w-0 scroll-mt-16">
                 <h2 id="breaks-heading" tabIndex={-1} className="scroll-mt-16 text-h2 font-bold text-ink type-condensed">Requesting each break</h2>
                 {plannable && (state.breaks.length > 0 || state.committedEntries.length > 0) ? (
@@ -313,6 +332,7 @@ export function App() {
                             reason={breakReason(brk, state.holidayNameFor)}
                             today={today}
                             noticePeriodDays={state.noticePeriodDays}
+                            noticeUnit={state.noticeUnit}
                             workWeek={state.workWeek}
                             offDays={state.effectiveOffDays}
                             defaultExpanded={index === 1}
@@ -375,16 +395,23 @@ export function App() {
                       )}
                       {state.applyTrackedRequests && (state.approvedPtoDays > 0 || state.tentativePtoDays > 0) && (
                         <p data-testid="tracked-requests-summary">
-                          Includes {state.approvedPtoDays} approved {state.approvedPtoDays === 1 ? 'day' : 'days'} off · {state.tentativePtoDays} tentative
+                          Includes {dayNumber(state.approvedPtoDays)} approved {dayWord(state.approvedPtoDays)} off · {dayNumber(state.tentativePtoDays)} tentative
                           {state.reservedPtoDays > 0 && !state.unlimitedPto ? `, ${state.reservedPtoDays} reserved from the budget` : ''}.
                         </p>
                       )}
                       {state.applyTrackedRequests && <p>Tracked approved, planned and requested time off is excluded from new breaks on this device.</p>}
-                      {state.applyTrackedRequests && state.hasHourlyBookings && <p>This planner uses whole days. <a className="link-mark" href="/policy">My PTO</a> forecasts recorded hourly costs.</p>}
+                      {state.applyTrackedRequests && state.hasHourlyBookings && (
+                        <p data-testid="tracked-hourly-note">
+                          {workspace.schedule
+                            ? <>Hourly requests count as a share of that day's shift: {dayAmount(state.reservedPtoDayEquivalent)} owed.</>
+                            : <>Hourly requests count as whole days here until <a className="link-mark" href="/policy">My PTO</a> has your work hours.</>}
+                          {!state.unlimitedPto && state.reservedPtoDayEquivalent !== state.reservedPtoDays ? ` The planner budgets whole days, so it reserves ${state.reservedPtoDays}.` : ''}
+                        </p>
+                      )}
                       {state.applyTrackedRequests && !state.unlimitedPto && state.approvedPtoDays > 0 && (
                         <label className="flex min-h-11 items-center gap-2">
                           <input type="checkbox" checked={state.reserveApprovedPto} onChange={event => state.setReserveApprovedPto(event.target.checked)} />
-                          Reserve {state.approvedPtoDays} approved PTO {state.approvedPtoDays === 1 ? 'day' : 'days'} from the entered budget
+                          Reserve {dayNumber(state.approvedPtoDays)} approved PTO {dayWord(state.approvedPtoDays)} from the entered budget
                           <span className="text-muted">(for this plan only; My PTO keeps its own setting)</span>
                         </label>
                       )}
@@ -491,6 +518,8 @@ export function App() {
                         onChangeCarryoverCap={state.setCarryoverCap}
                         noticePeriodDays={state.noticePeriodDays}
                         onChangeNoticePeriodDays={state.setNoticePeriodDays}
+                        noticeUnit={state.noticeUnit}
+                        onChangeNoticeUnit={state.setNoticeUnit}
                         peakCapEnabled={state.peakCapEnabled}
                         onTogglePeakCap={state.setPeakCapEnabled}
                         peakCapStart={state.peakCapStart}
@@ -511,6 +540,7 @@ export function App() {
                         blackouts={state.blackouts}
                         onAddBlackout={(d) => state.setBlackouts([...state.blackouts, d])}
                         onAddBlackouts={(dates) => state.setBlackouts(Array.from(new Set([...state.blackouts, ...dates])))}
+                        planningWindow={{ start: state.rangeStart, end: state.rangeEnd }}
                         onRemoveBlackout={(d) => state.setBlackouts(state.blackouts.filter((x) => x !== d))}
                         holidayEntries={state.holidayEntries}
                         sharedHolidaySnapshot={state.hasSharedHolidaySnapshot}
@@ -598,11 +628,13 @@ export function App() {
                   travelPercentile={state.scores?.travel.percentile ?? null}
                   efficiencyPercentile={state.scores?.efficiency.percentile ?? null}
                   noticePeriodDays={state.noticePeriodDays}
+                  noticeUnit={state.noticeUnit}
                   workWeek={state.workWeek}
                   offDays={state.effectiveOffDays}
                   observedHolidayDates={state.holidaysReady && !state.holidaysDegraded ? state.holidayEntries.filter(holiday => holiday.checked).map(holiday => holiday.date) : undefined}
                   onPlanWithPartner={() => openPartnerPlanner()}
                   planSearch={state.planSearch}
+                  shareSnapshot={state.shareSnapshot}
                 /> : <p className="text-sm text-muted">{
                   !plannable && !state.planningPending ? 'Check your planning inputs before exporting.'
                     : 'Calendar and sharing tools appear when a plan and its holidays are ready.'
@@ -617,7 +649,7 @@ export function App() {
               </section>
 
               <div id="requests" className="flex min-w-0 scroll-mt-16 flex-col gap-3">
-                <PtoTracker today={today} ledger={ledger} calendar={requestCalendar} noticePeriodDays={state.noticePeriodDays} calendarReady={state.holidaysReady && !state.holidaysDegraded} calendarNotice={!state.holidaysReady ? 'Loading your employer calendar…' : state.holidaysDegraded ? 'Holiday data is incomplete. Check your employer calendar before adding or changing request dates.' : undefined} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
+                <PtoTracker today={today} ledger={ledger} calendar={requestCalendar} noticePeriodDays={state.noticePeriodDays} noticeUnit={state.noticeUnit} calendarReady={state.holidaysReady && !state.holidaysDegraded} calendarNotice={!state.holidaysReady ? 'Loading your employer calendar…' : state.holidaysDegraded ? 'Holiday data is incomplete. Check your employer calendar before adding or changing request dates.' : undefined} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
                 <p className="text-sm text-muted"><a href="/policy#balance" className="link-mark font-semibold">Forecast my balance and check expiration</a></p>
               </div>
 

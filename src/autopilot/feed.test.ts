@@ -85,6 +85,18 @@ describe('buildPlanFeedICS: same events as the downloaded .ics', () => {
 });
 
 describe('F2 book-by events', () => {
+  it('honours a working-day notice unit (nu=w) with the same canonical deadline as the card', () => {
+    const { ics, plan } = feed(`${SEARCH}&np=8&nu=w`);
+    expect(plan.state.noticeUnit).toBe('working');
+    const reminders = events(ics).filter((e) => prop(e, 'UID')!.startsWith('UID:pto-reminder-'));
+    for (const brk of plan.breaks.filter((b) => b.start > TODAY)) {
+      const bookBy = requestByDate(brk.start, 8, plan.state.workWeek, plan.solveInput.offDays, 'working')!;
+      const expected = (bookBy < TODAY ? TODAY : bookBy).replace(/-/g, '');
+      expect(reminders.some((e) => prop(e, 'DTSTART') === `DTSTART;VALUE=DATE:${expected}`)).toBe(true);
+    }
+    expect(reminders.length).toBeGreaterThan(0);
+  });
+
   it('one per future break, shifted to a working date from the link schedule', () => {
     const { ics, plan } = feed(`${SEARCH}&np=21`);
     const future = plan.breaks.filter((b) => b.start > TODAY);
@@ -124,10 +136,12 @@ describe('F2 book-by events', () => {
     const early = events(feed(search, '2026-11-10').ics).filter((e) => prop(e, 'UID')!.startsWith('UID:pto-reminder-'));
     const late = events(feed(search, '2026-12-05').ics).filter((e) => prop(e, 'UID')!.startsWith('UID:pto-reminder-'));
     expect(early.some((e) => prop(e, 'SUMMARY')!.includes('book by'))).toBe(true);
-    const dec14 = (list: string[][]) => prop(list.find((e) => prop(e, 'SUMMARY')!.includes('Dec 14'))!, 'SUMMARY');
-    expect(dec14(early)).toBe('SUMMARY:Request time off: Dec 14 (book by Nov 30)');
-    expect(dec14(late)).toBe('SUMMARY:Request time off: Dec 14 (book now)');
-    expect(late.find((e) => prop(e, 'SUMMARY')!.includes('Dec 14')) && prop(late.find((e) => prop(e, 'SUMMARY')!.includes('Dec 14'))!, 'DTSTART')).toBe('DTSTART;VALUE=DATE:20261205');
+    // The pinned Monday Dec 14 now includes its free weekend: the break is Sat Dec 12-Mon
+    // Dec 14 (issue 5). Notice is counted from Monday Dec 14, the first day actually away.
+    const dec14 = (list: string[][]) => list.find((e) => prop(e, 'SUMMARY')!.includes('Dec 12 – 14'))!;
+    expect(prop(dec14(early), 'SUMMARY')).toBe('SUMMARY:Request time off: Dec 12 – 14 (book by Nov 30)');
+    expect(prop(dec14(late), 'SUMMARY')).toBe('SUMMARY:Request time off: Dec 12 – 14 (book now)');
+    expect(prop(dec14(late), 'DTSTART')).toBe('DTSTART;VALUE=DATE:20261205');
   });
 
   it('no book-by event for a break that already started', () => {

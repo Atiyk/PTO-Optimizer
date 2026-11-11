@@ -75,7 +75,7 @@ export function SummaryMetrics({ budgetSpent, totalDaysOff, breakCountActual, sc
       <Fact figure={travelFigure} label="Travel estimate" short="travel estimate">
         {scores
           ? travelBasis === 'us'
-            ? <>Relative comparison using 2025 US airport checkpoint counts. Current fares and travel volumes may differ.</>
+            ? <>Relative comparison using a 7-day seasonal average of 2025 US airport checkpoint counts. Not a forecast or a fare price.</>
             : <>Generic seasonal estimate without country-specific travel observations.</>
           : <>Appears once the plan is solved.</>}
       </Fact>

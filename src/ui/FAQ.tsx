@@ -24,7 +24,7 @@ export const ITEMS: FAQItem[] = [
   {
     question: 'Where does the travel data come from?',
     answer:
-      'The US comparison uses public TSA checkpoint counts from 2025 matched by calendar date. Weekdays and travel patterns can shift in other years. Other countries use a generic seasonal estimate without local observations. Current fares and passenger counts may differ from both estimates.',
+      'The US estimate averages public TSA checkpoint counts from 2025 over each 7-day window, so it reflects broad seasons, not particular weekdays or next year’s traffic. Other countries use a generic seasonal rule without local observations. Neither is a forecast, and neither says anything about fares or prices. Your PTO days and days off are exact; only the travel estimate is approximate.',
   },
   {
     question: 'Why are the suggestions all near holidays?',

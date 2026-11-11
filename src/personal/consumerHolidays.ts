@@ -84,7 +84,14 @@ export async function getConsumerHolidaysWithStatus(
   try {
     const result = await getHolidaysWithStatus(country, rangeStart, consumerHolidayLookupEnd(country, rangeStart, rangeEnd), subdivision);
     if (typeof result.degraded !== 'boolean') throw new Error('Holiday status is invalid.');
-    return { holidays: observedEntries(result.holidays, country, rangeStart, rangeEnd), degraded: result.degraded };
+    const holidays = observedEntries(result.holidays, country, rangeStart, rangeEnd);
+    if (!Array.isArray(result.uncoveredYears)) return { holidays, degraded: result.degraded };
+    // Issue 17: report only the plan's own years, never a lookup-only spillover year.
+    const first = Number(rangeStart.slice(0, 4)), last = Number(rangeEnd.slice(0, 4));
+    const uncoveredYears = [...new Set(result.uncoveredYears)]
+      .filter((year): year is number => Number.isSafeInteger(year) && year >= first && year <= last)
+      .sort((a, b) => a - b);
+    return { holidays, degraded: result.degraded, uncoveredYears };
   } catch {
     return { holidays: [], degraded: true };
   }

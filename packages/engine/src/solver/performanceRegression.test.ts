@@ -2,35 +2,39 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { rangeISO } from './dateUtils';
 import { solve } from './solve';
+import { PLANNER_REVISION } from './revision';
 import type { SolveInput } from './types';
 
-// Full-result fingerprints captured from the pre-optimization implementation. These
-// include alternatives, tags and tie-breaking, rather than checking totals alone.
+// Full-result fingerprints. These include alternatives, tags and tie-breaking, rather
+// than checking totals alone. Originally captured from the pre-optimization
+// implementation; re-captured once for the deliberate issue 5/6 plan changes (breaks are
+// whole, separate absences; US travel uses the seasonal figure) - see
+// breakShape.test.ts for the behaviour those changes guarantee.
 const LEGACY_RESULTS = [
-  '7c3557cba254b22085d55c0c17e1091d738696a78f88cb80f8ca146d3f0f993c',
-  'b855710a2699367b20faac4bf9e152da7cc60e921fe4a9ae8668fd95bef0df6c',
-  '4d2dcb530f94430af68f37460735ac5c2086a0ed8db296f77fc9a2a1f6a8935f',
-  '6f1cc0f1c2c7e62fcdb1ad5d56a765c4179db86a5155555d505a8ca0f63bbab4',
-  '701ba9f86e72f8d54d6ab6b1afaf18a2c609ce8a718c55a610a14bf1ece82159',
-  '80ff589a387fc0f9b11ae7c43700f5a8e934f23c4e2c3304934b23d7608de050',
-  '4dafe8a9159370153a31c9c622ae50c74533e4fb17f162507ddd63ce82577238',
-  '3b2d9e4d1133bfa050d238edbe14e7b2f3568811c6de3dc38e7c746764cafb16',
-  '9277c1513b499e901161d7d9f5246a5119c13b1b2a498f6a09b5c1556c092c95',
-  '722c8039f840d44c73048b6ef09a51f21c5c32026b8487b9de704e8f2b236973',
-  '98ea019a748c6579e153a0e7dee0b44f540667f69a3ac3ac53534049aff48bc4',
-  'dd5dac84d83602b40b6c580f447a98a51540192e48929144dc32106833b4e785',
-  'f5c5727b0b3e92c5becf6b119628731bb2335ad2745b505a26ebbcf898fe4055',
-  '47441bd50bae17501f72878ca339ba9c0b4d13fa0c7300cb8a65a80c75ff0bc4',
-  'ca54ebd7f52d3414fa5691e6dfeec21dc7745494db4cf3d1153644f06c165615',
-  '310a26e8fa279a156cccea98669a229a599e714173454f82b363ade744b6953b',
-  'a27c6ae6bf874a3819fd754c54272c12f89a6d959e44b2b7a5f3819d368abef9',
-  'b4aa8e369677698362291136d7ba21ba0d033231b7ca03093cc81159869cd493',
-  '606c2b78749f663da119a06c8b8ee2b61b9370bb2116a937623dd6edc9569693',
-  'd5e6fec008f714f71b6577fe33bd516a5a4a81b762387dd7c6ca92d3aff69884',
-  '5651833dbc61e0e1dedd3dc1c96947b71fad47acde5d4ecbc6fb6e080c7231f7',
-  '0049ffa54adcde021f64c796af0201f7f6b5c4a1e7650b63b1767394c148b1f3',
-  '249a6e9a18f62e0475602231a766410b36f77d76b4db6f5814f3ba3154980edf',
-  'f4b2802bf805b07721dbb05d5f34b43f62276f187ec5d66459da94467886d69f',
+  '20461ab1f71a161812d38661ca3e81049873ae1ccf731c34e6aabb9bb4d48f07',
+  'e5bda38c9c424b1455e910737fa2ea4dd1862590d653ca1575b1cb58e3d38918',
+  'bf054aff24e7c2061f26acd9097b3fa07e259f2a2211f3ca62378f75afd55c78',
+  'a91d212a82088d7abc4a999012e1f015ff941810a1608e71a5c2e2b5054886d6',
+  '7c9048a90bf5788e4cbd7cc04e761f41e88c1d86aaa49c0fa71763c40f4f07de',
+  '957076e9e3e77923a7afc41412355c4c7617218cefd10419901f5825454dcef9',
+  '8fc93412641dff774331ec5cf7eec79b0eea4dd97946c0ef6a95638c64e6fc42',
+  'a087d5246b13284d14b2c9ce52b5df124144e2a973cc3d125126334d0fa7ce5a',
+  '9b8323325ac5574a46234813cce3dda94eb998fcb41626f7c274abd6dd7f6ec1',
+  'db20b7b2a73cd65f4a3726e82d6d8443d560b0cbdf532b20d0f9f25897e3a78c',
+  '9a297a8d4195da4873d735f9a8a5327fb08f6c2aa8d8985583848d42439f57bf',
+  '78b597a8dcb5385836c5c5aeb8f52c6d7d57afdb3b483310af9cd9c4189a4ba7',
+  '7a3d7dc8ed59ad472c6376018fcf9404ed3d49a887106b73168152b50eba2a82',
+  '3abe1be44257eebe5eb113cc9bfceac30a93ffecae1acb853efd98eeeb7f41bb',
+  'eb998fafe6d6262cbdf8b610adfba74183f52f3ff93ee6829590e7e2b229bb3d',
+  'aaa4f64122867c3210e9016f8b4751480732d6877c0490f87d543614940ab1ea',
+  'acda7531f7abbd0daeccab7f405880c368f4dd76b0fec93a6587485c9d12e979',
+  '5a91666ba6092dfc41a33c93e313f2eff93ee6e7c952e09578d3ef04dba725ca',
+  '5cc3d47a9d7bbfea393267e7bfc3cb45a00f07c74a4f15a8be3c46638d2ab390',
+  '6e326147d8f858ac71f8d68b5dd5f5a14a2ecb2fbc7a797a342078da97571389',
+  'bbfa137ccb8abb7c83963919c535e563cb5fedc5c6598e66c240c029913713c0',
+  'e03a5c92ad0233076fdea0530c9bf8b8f5aef9abd3c7c7db9aeed3888894089c',
+  '90786deba77b5f7021fb355603e528bddf4654461729dc37a837bfb7a9da0401',
+  '424505c089f3413a06a44a50e0349e5331e5dbcaaa0874bc9e1352663c372f12',
 ];
 
 describe('DP performance optimizations preserve legacy plans', () => {
@@ -65,5 +69,16 @@ describe('DP performance optimizations preserve legacy plans', () => {
     expect(result.budgetSpent).toBe(4);
     expect(result.primary[0].start).toBe('2026-01-27');
     expect(result.primary[0].end).toBe('2026-02-01');
+  });
+});
+
+describe('planner revision (issue 9)', () => {
+  it('is bumped whenever the legacy plan fingerprints are re-captured', () => {
+    // Shared links record PLANNER_REVISION so recipients learn when a plan was
+    // recalculated. If you re-capture LEGACY_RESULTS for a deliberate plan change, bump
+    // PLANNER_REVISION in revision.ts and add the new digest here.
+    const digest = createHash('sha256').update(LEGACY_RESULTS.join(',')).digest('hex');
+    const KNOWN: Record<number, string> = { 2: 'f6f3b539770272dfe0e80c52eaab8f57fc9b05c43bcfdcab97d6933998f09c06' };
+    expect(KNOWN[PLANNER_REVISION]).toBe(digest);
   });
 });

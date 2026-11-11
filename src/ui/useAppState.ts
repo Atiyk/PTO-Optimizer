@@ -1,12 +1,13 @@
 import { getConsumerHolidaysWithStatus as getHolidaysWithStatus, getConsumerSubdivisionCandidates as getSubdivisionCandidates, readPreloadedConsumerHolidays } from '../personal/consumerHolidays';
 import { SUBDIVISION_NAMES } from '@daysoff/engine/data/countries';
 import { planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
-import { previewPinnedDay, type PinPreview } from './pinPreview';
-import { defaultEmployerCalendar, readEmployerCalendar, saveEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
+import type { PinPreview } from './pinPreview';
+import { defaultEmployerCalendar, readEmployerCalendar, writeEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { computeMarginalValues } from '@daysoff/engine/solver/marginalValue';
 import type { Alternative, Break, SolveInput, WorkWeek } from '@daysoff/engine/solver/types';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import type { NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
 import type { Holiday, HolidayFetchResult } from '@daysoff/engine/data/holidays';
 import { geolocateCountry } from './geo';
 import { activeCountryPreset } from '@daysoff/engine/data/countryPresets';
@@ -21,9 +22,12 @@ import { track } from './analytics';
 import { validateInputs, isSupportedPlanningRange } from './validation';
 import { defaultRangeEnd, defaultPlanRangeEnd, holidayEntriesFor, stateHolidayCandidatesFor, altFridayOffDatesFor, effectiveOffDaysFor, mustIncludeDaysFor, effectiveBlackoutsFor, effectiveBudgetFor, policyAccrualFieldsFor, buildSolveInput, isSuggestedPtoDay, type HolidayEntry } from '../autopilot/planFromSearch';
 import { todayISO } from './today';
+import { PLANNER_REVISION } from '@daysoff/engine/solver/revision';
+import { publicHolidayFingerprint, type ShareSnapshot } from './shareSnapshot';
 import type { PtoRequest } from '../personal/requestLedger';
-import { committedPlanEntries, planningCommitments } from '../personal/workspace';
+import { committedPlanEntries, planningCommitments, type WorkdaySchedule } from '../personal/workspace';
 import { usePlannerComputation } from '../planning/usePlannerComputation';
+import { createPinPreviewer } from '../planning/pinPreviewClient';
 import { MAX_PINNED_PLANS, usePinnedPlans } from './pinnedPlanStore';
 
 export { defaultRangeEnd };
@@ -88,6 +92,8 @@ export interface PlanSnapshot {
   reserveApprovedPto: boolean;
   unlimitedPto: boolean;
   noticePeriodDays: number;
+  /** Older pinned plans have none: calendar days. */
+  noticeUnit?: NoticeUnit;
   peakCapEnabled: boolean;
   peakCapStart: string;
   peakCapEnd: string;
@@ -111,6 +117,8 @@ interface LoadedHolidayScope extends HolidayFetchResult {
 export interface PlannerWorkspaceBasis {
   /** My PTO's "balance already includes approved leave" setting. */
   includesApprovedLeave?: boolean;
+  /** The hourly schedule My PTO priced requests with; converts hours to planner days. */
+  schedule?: WorkdaySchedule;
 }
 
 export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balanceAsOf = todayISO(), workspaceBasis: PlannerWorkspaceBasis = {}) {
@@ -157,6 +165,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
         reserveDays: 3,
         unlimitedPto: false,
         noticePeriodDays: 14,
+        noticeUnit: 'calendar' as const,
         peakCapEnabled: false,
         peakCapStart: undefined,
         peakCapEnd: undefined,
@@ -199,6 +208,12 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     typeof localApprovalOptions?.apply === 'boolean' ? localApprovalOptions.apply : initial.publicShareVersion !== 1 && !initial.landingPreview,
   );
   const [useSharedHolidaySnapshot, setUseSharedHolidaySnapshot] = useState(initial.sharedObservedHolidays !== undefined);
+  // Issue 9: a public link reproduces the sender's plan, so the recipient's own saved
+  // company calendar (their private data) is not applied until they choose it, the same
+  // opt-in rule as their tracked requests. A same-tab draft of edits still wins.
+  const [useSharedPublicCalendar, setUseSharedPublicCalendar] = useState(
+    initial.publicShareVersion === 1 && initial.sharedObservedHolidays === undefined && !initial.employerCalendar,
+  );
   // Phase 3.1: "just in case" saving is the single largest reason PTO goes unused (44%).
   // Reserve days are subtracted from the budget BEFORE it reaches the solver - a plain
   // subtraction, no new solver logic - so the plan never asks for the user's entire
@@ -221,6 +236,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   // number for both, which is what "must match the .ics reminders, not contradict them"
   // means structurally: one shared source, not two settings that could disagree.
   const [noticePeriodDays, setNoticePeriodDays] = useState(initial.noticePeriodDays ?? 14);
+  const [noticeUnit, setNoticeUnit] = useState<NoticeUnit>(initial.noticeUnit ?? 'calendar');
 
   // Phase 5.1: an employer policy cap on how much PTO can be spent inside one window (e.g.
   // "no more than 5 days between Jun and Aug") - off by default, a soft default for most
@@ -323,20 +339,28 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   const currentEmployerScope = employerScope(country, subdivision);
   const sharedObservedHolidays = useSharedHolidaySnapshot && country === initial.country && subdivision === initial.subdivision
     && rangeStart === initial.rangeStart && rangeEnd === initial.rangeEnd ? initial.sharedObservedHolidays : undefined;
-  const calendarForScope = useCallback(() => sharedObservedHolidays !== undefined
+  const sharedPublicCalendar = useSharedPublicCalendar && country === initial.country && subdivision === initial.subdivision;
+  const calendarForScope = useCallback(() => sharedObservedHolidays !== undefined || sharedPublicCalendar
     ? defaultEmployerCalendar(country, subdivision) : readEmployerCalendar(country, subdivision),
-    [sharedObservedHolidays, country, subdivision]);
+    [sharedObservedHolidays, sharedPublicCalendar, country, subdivision]);
+  const hasSavedCalendarOffForSharedPlan = useMemo(() => {
+    if (!sharedPublicCalendar && sharedObservedHolidays === undefined) return false;
+    const saved = readEmployerCalendar(country, subdivision);
+    return saved.custom.length > 0 || saved.excluded.length > 0;
+  }, [sharedPublicCalendar, sharedObservedHolidays, country, subdivision]);
   const [employerCalendars, setEmployerCalendars] = useState<Record<string, EmployerCalendar>>(() => ({
     [currentEmployerScope]: initial.employerCalendar ?? calendarForScope(),
   }));
   const employerCalendar = useMemo(() => employerCalendars[currentEmployerScope] ?? calendarForScope(), [employerCalendars, currentEmployerScope, calendarForScope]);
   const restoreMyEmployerCalendar = useCallback(() => {
     setUseSharedHolidaySnapshot(false);
+    setUseSharedPublicCalendar(false);
     setEmployerCalendars(previous => ({ ...previous, [currentEmployerScope]: readEmployerCalendar(country, subdivision) }));
   }, [currentEmployerScope, country, subdivision]);
   const [employerCalendarMessage, setEmployerCalendarMessage] = useState('');
   const updateEmployerCalendar = useCallback((update: (current: EmployerCalendar) => EmployerCalendar) => {
     setUseSharedHolidaySnapshot(false);
+    setUseSharedPublicCalendar(false);
     setEmployerCalendars(previous => {
       const next = update(previous[currentEmployerScope] ?? calendarForScope());
       if (!encodeEmployerCalendar(next)) { setEmployerCalendarMessage('This calendar is too large to share. Remove an entry before adding another.'); return previous; }
@@ -353,8 +377,16 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   }, [updateEmployerCalendar]);
   const saveEmployerHolidays = useCallback(() => {
     if (sharedObservedHolidays !== undefined) return;
-    setEmployerCalendarMessage(saveEmployerCalendar(employerCalendar) ? 'Employer calendar saved in this browser.' : 'Browser storage is unavailable. Your changes still apply to this tab.');
-  }, [employerCalendar, sharedObservedHolidays]);
+    // Saving the shared plan's public-only calendar would silently replace the saved one.
+    if (sharedPublicCalendar && hasSavedCalendarOffForSharedPlan) {
+      setEmployerCalendarMessage('Your saved calendar was not changed. This shared plan uses public holidays only. Choose "Use my saved calendar" to edit yours.');
+      return;
+    }
+    const saved = writeEmployerCalendar(employerCalendar);
+    setEmployerCalendarMessage(saved === 'saved' ? 'Employer calendar saved in this browser.'
+      : saved === 'stale' ? 'Another tab saved a different employer calendar after this page loaded it. Nothing was overwritten. Save again to replace it with this plan\'s calendar.'
+        : 'Browser storage is unavailable. Your changes still apply to this tab.');
+  }, [employerCalendar, sharedObservedHolidays, sharedPublicCalendar, hasSavedCalendarOffForSharedPlan]);
   const resetEmployerHolidays = useCallback(() => {
     if (sharedObservedHolidays !== undefined) return;
     const removed = deleteEmployerCalendar(country, subdivision);
@@ -382,6 +414,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       subdivision,
       employerCalendar,
       publicShareVersion: initial.publicShareVersion,
+      sharedSnapshot: initial.sharedSnapshot,
       sharedObservedHolidays,
       landingPreview: initial.landingPreview,
       holidayFocusDate,
@@ -408,6 +441,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       reserveDays,
       unlimitedPto,
       noticePeriodDays,
+      noticeUnit,
       peakCapEnabled,
       peakCapStart,
       peakCapEnd,
@@ -417,6 +451,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     subdivision,
     employerCalendar,
     initial.publicShareVersion,
+    initial.sharedSnapshot,
     sharedObservedHolidays,
     initial.landingPreview,
     holidayFocusDate,
@@ -443,6 +478,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     reserveDays,
     unlimitedPto,
     noticePeriodDays,
+    noticeUnit,
     peakCapEnabled,
     peakCapStart,
     peakCapEnd,
@@ -533,6 +569,26 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   const regionalHolidays = preloadedRegional ?? regional?.holidays;
   const holidaysReady = sharedObservedHolidays !== undefined || Boolean(nationalHolidays && (!subdivision || regionalHolidays));
 
+  // Issue 9: the snapshot a public link records. The fingerprint covers only the public
+  // national/regional holiday data for this scope - never the employer calendar - and is
+  // left out when the sender shares explicit dates (those already pin the holidays).
+  const publicHolidayDates = useMemo(() => !holidaysReady || sharedObservedHolidays !== undefined ? undefined
+    : holidayEntriesFor(nationalHolidays ?? NO_HOLIDAYS, regionalHolidays ?? NO_HOLIDAYS, defaultEmployerCalendar(country, subdivision), rangeStart, rangeEnd).map(entry => entry.date),
+  [holidaysReady, sharedObservedHolidays, nationalHolidays, regionalHolidays, country, subdivision, rangeStart, rangeEnd]);
+  const shareSnapshot: ShareSnapshot = useMemo(() => ({
+    plannerRevision: PLANNER_REVISION,
+    ...(publicHolidayDates ? { holidayFingerprint: publicHolidayFingerprint(publicHolidayDates) } : {}),
+  }), [publicHolidayDates]);
+  // What differs from the sender's run, for a recipient of a public link. Only public
+  // facts are compared; the sender's private adjustments are never known here.
+  const sameSharedScope = country === initial.country && subdivision === initial.subdivision
+    && rangeStart === initial.rangeStart && rangeEnd === initial.rangeEnd;
+  const sharedPlanDifferences = useMemo(() => initial.publicShareVersion !== 1 ? undefined : {
+    planner: initial.sharedSnapshot?.plannerRevision !== PLANNER_REVISION,
+    holidays: sameSharedScope && initial.sharedSnapshot?.holidayFingerprint !== undefined
+      && shareSnapshot.holidayFingerprint !== undefined && shareSnapshot.holidayFingerprint !== initial.sharedSnapshot.holidayFingerprint,
+  }, [initial.publicShareVersion, initial.sharedSnapshot, sameSharedScope, shareSnapshot]);
+
   const holidayEntries: HolidayEntry[] = useMemo(
     () => holidayEntriesFor(nationalHolidays ?? NO_HOLIDAYS, regionalHolidays ?? NO_HOLIDAYS, employerCalendar, rangeStart, rangeEnd, sharedObservedHolidays),
     [nationalHolidays, regionalHolidays, employerCalendar, rangeStart, rangeEnd, sharedObservedHolidays],
@@ -548,8 +604,8 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   const effectiveOffDays = useMemo(() => effectiveOffDaysFor(holidayEntries, altFridayOffDates), [holidayEntries, altFridayOffDates]);
 
   const commitments = useMemo(
-    () => planningCommitments(requests, { start: rangeStart, end: rangeEnd }, { asOf: balanceAsOf, includesApprovedLeave: !reserveApprovedPto }),
-    [requests, rangeStart, rangeEnd, balanceAsOf, reserveApprovedPto],
+    () => planningCommitments(requests, { start: rangeStart, end: rangeEnd }, { asOf: balanceAsOf, includesApprovedLeave: !reserveApprovedPto }, workspaceBasis.schedule),
+    [requests, rangeStart, rangeEnd, balanceAsOf, reserveApprovedPto, workspaceBasis.schedule],
   );
   const bookedDates = useMemo(() => new Set(applyTrackedRequests ? commitments.unavailableDates : []), [applyTrackedRequests, commitments]);
   // Tracked and approved requests stay visible in the results beside new breaks.
@@ -654,23 +710,20 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   const solveResult = solved.result;
 
   // The real outcome of pinning one more day, from the same planning call, cached per
-  // input so hovering across the grid never re-solves the same day twice.
-  const previewPin = useMemo(() => {
-    const cache = new Map<string, PinPreview>();
-    return (date: string): PinPreview | null => {
-      if (!isValidInput || planningPending || planningVersion !== 2) return null;
-      let hit = cache.get(date);
-      if (!hit) {
-        try {
-          hit = previewPinnedDay(solveInput, { minimumBreakDays, style: planningStyle }, date);
-        } catch {
-          return null;
-        }
-        cache.set(date, hit);
-      }
-      return hit;
-    };
-  }, [solveInput, isValidInput, planningPending, planningVersion, minimumBreakDays, planningStyle]);
+  // input so hovering across the grid never re-solves the same day twice. Solved in a
+  // worker (see pinPreviewClient.ts): a 1-2 year plan took up to 0.6 s per hover here.
+  const pinPreviewer = useMemo(
+    () => isValidInput && !planningPending && planningVersion === 2
+      ? createPinPreviewer(solveInput, { minimumBreakDays, style: planningStyle })
+      : null,
+    [solveInput, isValidInput, planningPending, planningVersion, minimumBreakDays, planningStyle],
+  );
+  // A newer input supersedes this previewer: stop its in-flight solve.
+  useEffect(() => () => pinPreviewer?.dispose(), [pinPreviewer]);
+  const previewPin = useCallback(
+    (date: string): Promise<PinPreview | null> => pinPreviewer ? pinPreviewer.preview(date) : Promise.resolve(null),
+    [pinPreviewer],
+  );
 
   const breaks = solveResult.primary;
   const alternatives = solveResult.alternatives;
@@ -886,6 +939,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       reserveApprovedPto,
       unlimitedPto,
       noticePeriodDays,
+      noticeUnit,
       peakCapEnabled,
       peakCapStart,
       peakCapEnd,
@@ -901,7 +955,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     country, subdivision, employerCalendar, planningVersion, planningStyle, minimumBreakDays, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
     weekStartOverride, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap,
     overlapDays, blackouts, workWeek, forced, altFridayEnabled, altFridayStart,
-    addPinnedPlan, canPin, reserveDays, applyTrackedRequests, reserveApprovedPto, unlimitedPto, noticePeriodDays, peakCapEnabled, peakCapStart, peakCapEnd, peakCapMaxDays,
+    addPinnedPlan, canPin, reserveDays, applyTrackedRequests, reserveApprovedPto, unlimitedPto, noticePeriodDays, noticeUnit, peakCapEnabled, peakCapStart, peakCapEnd, peakCapMaxDays,
     budgetSpent, totalDaysOff, breakCountActual, scores,
   ]);
 
@@ -941,6 +995,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       setReserveApprovedPto(snap.reserveApprovedPto);
       setUnlimitedPtoRaw(snap.unlimitedPto);
       setNoticePeriodDays(snap.noticePeriodDays);
+      setNoticeUnit(snap.noticeUnit ?? 'calendar');
       setPeakCapEnabled(snap.peakCapEnabled);
       setPeakCapStart(snap.peakCapStart);
       setPeakCapEnd(snap.peakCapEnd);
@@ -1016,6 +1071,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     approvedPtoDays: commitments.approvedPtoDays,
     tentativePtoDays: commitments.tentativePtoDays,
     reservedPtoDays: applyTrackedRequests && !unlimitedPto ? commitments.reservedPtoDays : 0,
+    reservedPtoDayEquivalent: applyTrackedRequests && !unlimitedPto ? commitments.reservedPtoDayEquivalent : 0,
     hasHourlyBookings: commitments.hasHourlyBookings,
     hasTrackedRequests: commitments.unavailableDates.length > 0,
     committedEntries,
@@ -1024,11 +1080,16 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     isSharedPlan: initial.publicShareVersion === 1,
     isLandingPreview: initial.landingPreview === true,
     hasSharedHolidaySnapshot: sharedObservedHolidays !== undefined,
+    hasSavedCalendarOffForSharedPlan,
+    sharedPlanDifferences,
+    shareSnapshot,
     restoreMyEmployerCalendar,
     reserveApprovedPto,
     setReserveApprovedPto,
     noticePeriodDays,
     setNoticePeriodDays,
+    noticeUnit,
+    setNoticeUnit,
     peakCapEnabled,
     setPeakCapEnabled,
     peakCapStart,

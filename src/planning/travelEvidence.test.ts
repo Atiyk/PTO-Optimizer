@@ -55,3 +55,12 @@ describe('consumer travel evidence provenance', () => {
     expect(travelEvidenceFor('2027-07-01', '')).toBeNull();
   });
 });
+
+describe('one US travel figure everywhere', () => {
+  it('the planner (solver) and the travel evidence report the same value', async () => {
+    const { demandFor } = await import('@daysoff/engine/data/demandIndex');
+    for (const date of ['2026-01-21', '2027-07-11', '2028-02-29', '2027-12-31']) {
+      expect(travelEvidenceFor(date, 'US')!.value).toBeCloseTo(demandFor(date, 'US').value, 12);
+    }
+  });
+});

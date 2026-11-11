@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { createPtoRequest, type PtoRequest, type RequestCalendar, type RequestStatus } from './requestLedger';
 import {
-  BALANCE_BASIS_STORAGE_KEY, chargeableRequestDates, committedPlanEntries, committedRequestDays, planningCommitments, planningRole,
-  readBalanceBasisPreference, requestDateCharge, writeBalanceBasisPreference,
+  BALANCE_BASIS_STORAGE_KEY, chargeableRequestDates, fullDayLeaveDates, committedPlanEntries, committedRequestDays, planningCommitments, planningRole,
+  readBalanceBasisPreference, readWorkdaySchedulePreference, requestDateCharge, requestDayEquivalent, writeBalanceBasisPreference, writeWorkdaySchedulePreference,
 } from './workspace';
 
 const calendar: RequestCalendar = { workWeek: DEFAULT_WORK_WEEK, offDays: ['2027-01-01'] };
@@ -52,6 +52,7 @@ describe('planner commitments from the shared rule', () => {
       unavailableDates: ['2027-01-04', '2027-01-05', '2027-01-06', '2027-01-07', '2027-01-08', '2027-01-11', '2027-01-12'],
       approvedPtoDays: 4,
       tentativePtoDays: 2,
+      reservedPtoDayEquivalent: 6,
       reservedPtoDays: 6,
       hasHourlyBookings: false,
     });
@@ -66,9 +67,55 @@ describe('planner commitments from the shared rule', () => {
     for (const status of ['canceled', 'rejected'] as const) expect(reserved(status)).toMatchObject({ unavailableDates: [], reservedPtoDays: 0 });
   });
 
-  it('keeps hourly bookings unavailable without guessing a whole-day cost', () => {
-    const hourly = createPtoRequest({ start: '2027-01-11', end: '2027-01-11', status: 'approved', partialMinutes: 120 }, { ...calendar, shiftMinutes: [480, 480, 480, 480, 480, 0, 0] }, 'h')!;
-    expect(planningCommitments([hourly], range, owes)).toEqual({ unavailableDates: ['2027-01-11'], approvedPtoDays: 0, tentativePtoDays: 0, reservedPtoDays: 0, hasHourlyBookings: true });
+  const shifts8 = { ...calendar, shiftMinutes: [480, 480, 480, 480, 480, 0, 0] };
+  const fourTens = { ...calendar, workWeek: [true, true, true, true, false, false, false] as RequestCalendar['workWeek'], shiftMinutes: [600, 600, 600, 600, 0, 0, 0] };
+  const hourly = (id: string, start: string, end: string, status: RequestStatus, cal: RequestCalendar, partialMinutes?: number) =>
+    createPtoRequest({ start, end, status, partialMinutes }, cal, id)!;
+
+  it('reserves a partial-day hourly booking as a fraction of that weekday shift, rounded up to a whole day once', () => {
+    const half = hourly('h', '2027-01-11', '2027-01-11', 'approved', shifts8, 240);
+    expect(planningCommitments([half], range, owes, { shiftMinutes: shifts8.shiftMinutes })).toEqual({
+      unavailableDates: ['2027-01-11'], approvedPtoDays: 0.5, tentativePtoDays: 0, reservedPtoDayEquivalent: 0.5, reservedPtoDays: 1, hasHourlyBookings: true,
+    });
+    // Two half days are one day-equivalent and reserve exactly one whole day, not two.
+    const second = hourly('h2', '2027-01-12', '2027-01-12', 'requested', shifts8, 240);
+    expect(planningCommitments([half, second], range, owes, { shiftMinutes: shifts8.shiftMinutes })).toMatchObject({ reservedPtoDayEquivalent: 1, reservedPtoDays: 1, tentativePtoDays: 0.5 });
+  });
+
+  it('counts a full shift on a 4x10 schedule as one planner day, and partial hours against that 10h shift', () => {
+    const fullDays = hourly('f', '2027-01-11', '2027-01-14', 'approved', fourTens);
+    const partial = hourly('p', '2027-01-18', '2027-01-18', 'approved', fourTens, 300);
+    expect(planningCommitments([fullDays, partial], range, owes, { shiftMinutes: fourTens.shiftMinutes })).toMatchObject({ approvedPtoDays: 4.5, reservedPtoDayEquivalent: 4.5, reservedPtoDays: 5 });
+  });
+
+  it('uses hours per day when there is no per-weekday schedule, and a whole day when the shift is unknown', () => {
+    const partial = hourly('p', '2027-01-11', '2027-01-11', 'approved', shifts8, 120);
+    expect(planningCommitments([partial], range, owes, { hoursPerDay: 8 })).toMatchObject({ reservedPtoDayEquivalent: 0.25, reservedPtoDays: 1 });
+    // A new request keeps the shift it was priced against, so it needs no saved schedule.
+    expect(planningCommitments([partial], range, owes)).toMatchObject({ reservedPtoDayEquivalent: 0.25 });
+    // A partial day saved before shifts were recorded, with no schedule: never a smaller guess.
+    const legacy = { ...partial, partialShiftMinutes: undefined };
+    expect(planningCommitments([legacy], range, owes)).toMatchObject({ reservedPtoDayEquivalent: 1, reservedPtoDays: 1, hasHourlyBookings: true });
+  });
+
+  it('charges a date booked both whole-day and hourly once, and skips hourly days already in the balance', () => {
+    const whole = request('w', '2027-01-11', '2027-01-11', 'approved');
+    const partial = hourly('p', '2027-01-11', '2027-01-11', 'approved', shifts8, 240);
+    expect(planningCommitments([whole, partial], range, owes, { hoursPerDay: 8 })).toMatchObject({ reservedPtoDayEquivalent: 1, reservedPtoDays: 1 });
+    expect(planningCommitments([partial], range, { ...owes, includesApprovedLeave: true }, { hoursPerDay: 8 })).toMatchObject({ reservedPtoDays: 0, approvedPtoDays: 0.5 });
+  });
+
+  it('keeps day-equivalents exact to the thousandth so thirds do not round up an extra day', () => {
+    const nineHour = { ...calendar, shiftMinutes: [540, 540, 540, 540, 540, 0, 0] };
+    const thirds = ['2027-01-11', '2027-01-12', '2027-01-13'].map((date, i) => hourly(`t${i}`, date, date, 'approved', nineHour, 180));
+    expect(planningCommitments(thirds, range, owes, { shiftMinutes: nineHour.shiftMinutes })).toMatchObject({ reservedPtoDayEquivalent: 1, reservedPtoDays: 1 });
+  });
+
+  it('reports hourly day-equivalents for other planners', () => {
+    const partial = hourly('p', '2027-01-11', '2027-01-11', 'planned', shifts8, 240);
+    expect(committedRequestDays([partial], owes, { hoursPerDay: 8 })).toEqual({ approvedDays: 0, tentativeDays: 0.5 });
+    expect(requestDayEquivalent(partial, '2027-01-11', { hoursPerDay: 8 })).toBe(0.5);
+    expect(requestDayEquivalent(request('w', '2027-01-11', '2027-01-11'), '2027-01-11', { hoursPerDay: 8 })).toBe(1);
   });
 
   it('totals committed days after a saved balance date for other planners', () => {
@@ -92,6 +139,30 @@ describe('shared balance basis preference', () => {
     expect(readBalanceBasisPreference({ getItem() { throw new Error('denied'); }, setItem() {} })).toBeUndefined();
     expect(BALANCE_BASIS_STORAGE_KEY).toBe('gapless.personal.workspace.v1');
   });
+
+  it('keeps the published workday schedule beside the balance basis without either overwriting the other', () => {
+    let saved: string | null = '{"version":1,"balanceIncludesApprovedLeave":true}';
+    const storage = { getItem: () => saved, setItem: (_key: string, value: string) => { saved = value; } };
+    expect(readWorkdaySchedulePreference(storage)).toBeUndefined();
+    expect(writeWorkdaySchedulePreference({ shiftMinutes: [600, 600, 600, 600, 0, 0, 0], hoursPerDay: 10 }, storage)).toBe(true);
+    expect(readWorkdaySchedulePreference(storage)).toEqual({ shiftMinutes: [600, 600, 600, 600, 0, 0, 0], hoursPerDay: 10 });
+    expect(readBalanceBasisPreference(storage)).toBe(true);
+    expect(writeBalanceBasisPreference(false, storage)).toBe(true);
+    expect(readWorkdaySchedulePreference(storage)).toEqual({ shiftMinutes: [600, 600, 600, 600, 0, 0, 0], hoursPerDay: 10 });
+    saved = '{"version":1,"balanceIncludesApprovedLeave":true,"workdaySchedule":{"shiftMinutes":[1,2],"hoursPerDay":-1}}';
+    expect(readWorkdaySchedulePreference(storage)).toBeUndefined();
+  });
+
+  it('quarantines an unreadable workspace record and never downgrades a newer one', () => {
+    const data = new Map<string, string>([[BALANCE_BASIS_STORAGE_KEY, '{"version":1,']]);
+    const storage = { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value); } };
+    expect(writeBalanceBasisPreference(true, storage)).toBe(true);
+    expect(JSON.parse(data.get(`${BALANCE_BASIS_STORAGE_KEY}.quarantine`)!)[0].raw).toBe('{"version":1,');
+    expect(JSON.parse(data.get(BALANCE_BASIS_STORAGE_KEY)!)).toMatchObject({ version: 1, balanceIncludesApprovedLeave: true, revision: expect.any(String) });
+    data.set(BALANCE_BASIS_STORAGE_KEY, '{"version":2}');
+    expect(writeBalanceBasisPreference(false, storage)).toBe(false);
+    expect(data.get(BALANCE_BASIS_STORAGE_KEY)).toBe('{"version":2}');
+  });
 });
 
 describe('committed entries the planner keeps visible', () => {
@@ -109,5 +180,81 @@ describe('committed entries the planner keeps visible', () => {
       ['tracked', 'tentative', 'planned', '2027-01-11', '2027-01-12', 2],
       ['later', 'booked', 'approved', '2027-01-18', '2027-01-19', 2],
     ]);
+  });
+});
+
+describe('fullDayLeaveDates: only whole days of leave mean the person is off', () => {
+  const shifts8 = { ...calendar, shiftMinutes: [480, 480, 480, 480, 480, 0, 0] };
+  const fourTens = { ...calendar, workWeek: [true, true, true, true, false, false, false] as RequestCalendar['workWeek'], shiftMinutes: [600, 600, 600, 600, 0, 0, 0] };
+  const hourly = (id: string, start: string, end: string, cal: RequestCalendar, partialMinutes?: number, status: RequestStatus = 'approved') =>
+    createPtoRequest({ start, end, status, partialMinutes }, cal, id)!;
+
+  it('keeps whole-day spans, drops a partial-day appointment, and ignores ideas and canceled requests', () => {
+    const requests = [
+      request('whole', '2027-01-08', '2027-01-11', 'approved'),
+      hourly('dentist', '2027-01-13', '2027-01-13', shifts8, 120),
+      request('idea', '2027-01-18', '2027-01-18', 'considering'),
+      request('gone', '2027-01-19', '2027-01-19', 'canceled'),
+    ];
+    expect(fullDayLeaveDates(requests, range, { shiftMinutes: shifts8.shiftMinutes }))
+      .toEqual(['2027-01-08', '2027-01-09', '2027-01-10', '2027-01-11'].filter(date => date >= range.start));
+    // Without a saved schedule a recorded partial day is still partial.
+    expect(fullDayLeaveDates(requests, range)).not.toContain('2027-01-13');
+  });
+
+  it('treats hours that fill the scheduled shift as a whole day, per weekday', () => {
+    const tenHours = hourly('ten', '2027-01-14', '2027-01-14', fourTens, 600);
+    const fiveHours = hourly('five', '2027-01-18', '2027-01-18', fourTens, 300);
+    const otherHalf = hourly('other-half', '2027-01-18', '2027-01-18', fourTens, 300, 'requested');
+    const schedule = { shiftMinutes: fourTens.shiftMinutes };
+    expect(fullDayLeaveDates([tenHours, fiveHours], range, schedule)).toEqual(['2027-01-14']);
+    // Two half-day bookings on one date add up to the whole shift.
+    expect(fullDayLeaveDates([fiveHours, otherHalf], range, schedule)).toEqual(['2027-01-18']);
+  });
+
+  it('lets a whole-day request win over an hourly one on the same date', () => {
+    const whole = request('w', '2027-01-12', '2027-01-12', 'approved');
+    const partial = hourly('p', '2027-01-12', '2027-01-12', shifts8, 60);
+    expect(fullDayLeaveDates([partial, whole], range, { shiftMinutes: shifts8.shiftMinutes })).toEqual(['2027-01-12']);
+  });
+});
+
+describe('one per-date charge rule shared by the planner, the forecast and Family', () => {
+  const shifts8 = { ...calendar, offDays: [], shiftMinutes: [480, 480, 480, 480, 480, 0, 0] };
+  const fourTens = { workWeek: [true, true, true, true, false, false, false] as RequestCalendar['workWeek'], offDays: [], shiftMinutes: [600, 600, 600, 600, 0, 0, 0] };
+  const make = (id: string, start: string, end: string, status: RequestStatus, cal: RequestCalendar, partialMinutes?: number) =>
+    createPtoRequest({ start, end, status, partialMinutes }, cal, id, '2027-01-01T00:00:00.000Z')!;
+  const basis = { asOf: '2027-02-01', includesApprovedLeave: false };
+  const march = { start: '2027-03-01', end: '2027-03-31' };
+
+  it('Q1-2: a booked 2h partial inside a tentative full week never lowers that day below one', () => {
+    const requests = [
+      make('week', '2027-03-01', '2027-03-05', 'requested', { ...calendar, offDays: [] }),
+      make('appt', '2027-03-02', '2027-03-02', 'approved', shifts8, 120),
+    ];
+    // Booked part 0.25; the tentative week adds the rest of Tuesday (0.75) plus four days.
+    expect(planningCommitments(requests, march, basis, { shiftMinutes: shifts8.shiftMinutes })).toMatchObject({
+      approvedPtoDays: 0.25, tentativePtoDays: 4.75, reservedPtoDayEquivalent: 5, reservedPtoDays: 5,
+    });
+    expect(committedRequestDays(requests, basis, { shiftMinutes: shifts8.shiftMinutes })).toEqual({ approvedDays: 0.25, tentativeDays: 4.75 });
+  });
+
+  it('Q1-3: two 4h partials on one 8h day sum to a full day for cost and for Family', () => {
+    const requests = [make('am', '2027-03-02', '2027-03-02', 'approved', shifts8, 240), make('pm', '2027-03-02', '2027-03-02', 'approved', shifts8, 240)];
+    const schedule = { shiftMinutes: shifts8.shiftMinutes };
+    expect(planningCommitments(requests, march, basis, schedule)).toMatchObject({ approvedPtoDays: 1, reservedPtoDays: 1 });
+    expect(committedRequestDays(requests, basis, schedule).approvedDays).toBe(1);
+    expect(fullDayLeaveDates(requests, march, schedule)).toEqual(['2027-03-02']);
+    // Hours beyond the shift are capped: three 4h partials still cost one day.
+    expect(planningCommitments([...requests, make('x', '2027-03-02', '2027-03-02', 'approved', shifts8, 240)], march, basis, schedule).approvedPtoDays).toBe(1);
+    // P0 guarantee: two whole-day requests on the same date still cost one day.
+    const whole = [make('w1', '2027-03-03', '2027-03-03', 'approved', shifts8), make('w2', '2027-03-03', '2027-03-03', 'approved', { ...calendar, offDays: [] })];
+    expect(planningCommitments(whole, march, basis, schedule).approvedPtoDays).toBe(1);
+  });
+
+  it('Q1-4: a partial day keeps the shift it was priced against, even when only hours per day is known', () => {
+    const fiveOfTen = make('five', '2027-03-01', '2027-03-01', 'approved', fourTens, 300);
+    expect(requestDayEquivalent(fiveOfTen, '2027-03-01', { hoursPerDay: 8 })).toBe(0.5);
+    expect(planningCommitments([fiveOfTen], march, basis, { hoursPerDay: 8 })).toMatchObject({ approvedPtoDays: 0.5 });
   });
 });

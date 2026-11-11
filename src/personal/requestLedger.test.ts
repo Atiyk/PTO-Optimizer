@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { planningCommitments } from './workspace';
-import { calendarCoversRequest, createPtoRequest, initialRequestDate, parseRequestLedger, readRequestLedger, requestConflicts, requestDatesForScenario, requestPtoDates, REQUEST_STATUSES, REQUEST_TRANSITIONS, validRequestRange, writeRequestLedger, type PtoRequest, type RequestCalendar } from './requestLedger';
+import { calendarCoversRequest, createPtoRequest, initialRequestDate, parseRequestLedger, readRequestLedger, requestConflicts, requestDatesForScenario, requestPtoDates, REQUEST_STATUSES, REQUEST_TRANSITIONS, saveRequestLedger, validRequestRange, writeRequestLedger, type PtoRequest, type RequestCalendar } from './requestLedger';
 
 const calendar: RequestCalendar = { workWeek: DEFAULT_WORK_WEEK, offDays: ['2027-01-01', '2027-01-01'] };
 function request(id: string, start = '2027-01-01', end = '2027-01-05', status: PtoRequest['status'] = 'planned'): PtoRequest {
@@ -89,6 +89,7 @@ describe('personal PTO requests', () => {
       // Completed counts as booked, as in the forecast: 01-05..01-08 once each.
       approvedPtoDays: 4,
       tentativePtoDays: 2,
+      reservedPtoDayEquivalent: 6,
       reservedPtoDays: 6,
       hasHourlyBookings: false,
     });
@@ -123,5 +124,74 @@ describe('versioned local request persistence', () => {
     expect(writeRequestLedger([request('one')], storage)).toBe(true);
     expect(readRequestLedger(storage).requests).toEqual([request('one')]);
     expect(JSON.parse(saved!).version).toBe(1);
+  });
+});
+
+describe('atomic, recoverable request persistence', () => {
+  function memory(initial: Record<string, string> = {}) {
+    const data = new Map(Object.entries(initial));
+    return { data, getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value); } };
+  }
+  const KEY = 'gapless.personal.requests.v1';
+  const hourlyCalendar: RequestCalendar = { workWeek: [true, true, true, true, true, false, false], offDays: [], shiftMinutes: [480, 480, 480, 480, 480, 0, 0] };
+  const legacyShapes: Record<string, string> = {
+    'v1 without revision (pre-P0)': JSON.stringify({ version: 1, requests: [request('one')] }),
+    'v1 with a lock revision (P0)': JSON.stringify({ version: 1, requests: [request('one')], revision: '4f7c1b2e-0000-4000-8000-000000000000' }),
+    'v1 with hourly entries': JSON.stringify({ version: 1, requests: [createPtoRequest({ start: '2027-01-04', end: '2027-01-04', partialMinutes: 240 }, hourlyCalendar, 'one', '2026-12-01T00:00:00.000Z')] }),
+  };
+
+  for (const [shape, raw] of Object.entries(legacyShapes)) {
+    it(`migrates ${shape} without changing a request, keeping a recoverable copy of a pre-revision record`, () => {
+      const storage = memory({ [KEY]: raw });
+      const loaded = readRequestLedger(storage);
+      expect(loaded.available).toBe(true);
+      expect(loaded.recovery).toBeUndefined();
+      expect(loaded.requests).toEqual(JSON.parse(raw).requests);
+      expect(saveRequestLedger([...loaded.requests, request('two', '2027-02-01', '2027-02-02')], storage, loaded.revision).status).toBe('saved');
+      const stored = JSON.parse(storage.getItem(KEY)!);
+      expect(stored).toMatchObject({ version: 1 });
+      expect(typeof stored.revision).toBe('string');
+      expect(Number.isFinite(Date.parse(stored.updatedAt))).toBe(true);
+      expect(readRequestLedger(storage).requests.map(r => r.id)).toEqual(['one', 'two']);
+      const backup = storage.getItem(`${KEY}.backup`);
+      if (JSON.parse(raw).revision) expect(backup).toBeNull();
+      else expect(JSON.parse(backup!).raw).toBe(raw);
+    });
+  }
+
+  it('detects a write based on a revision another tab has since replaced, and keeps the newer data', () => {
+    const storage = memory();
+    const tabA = readRequestLedger(storage);
+    const tabB = readRequestLedger(storage);
+    expect(saveRequestLedger([request('from-b')], storage, tabB.revision).status).toBe('saved');
+    expect(saveRequestLedger([request('from-a')], storage, tabA.revision).status).toBe('stale');
+    expect(readRequestLedger(storage).requests.map(r => r.id)).toEqual(['from-b']);
+  });
+
+  it('flags corrupt JSON instead of reading it as an empty tracker, and quarantines it before any replacement', () => {
+    const storage = memory({ [KEY]: '{"version":1,"requests":[{"id":"one"' });
+    const loaded = readRequestLedger(storage);
+    expect(loaded).toMatchObject({ requests: [], available: true, recovery: 'unreadable' });
+    expect(saveRequestLedger([request('new')], storage, loaded.revision)).toMatchObject({ status: 'saved', quarantined: true });
+    expect(JSON.parse(storage.getItem(`${KEY}.quarantine`)!)[0].raw).toBe('{"version":1,"requests":[{"id":"one"');
+  });
+
+  it('flags and quarantines a ledger with entries it cannot read, so a write never silently drops them', () => {
+    const raw = JSON.stringify({ version: 1, requests: [request('one'), { ...request('two'), status: 'employer-approved' }] });
+    const storage = memory({ [KEY]: raw });
+    const loaded = readRequestLedger(storage);
+    expect(loaded).toMatchObject({ recovery: 'partial' });
+    expect(loaded.requests.map(r => r.id)).toEqual(['one']);
+    expect(writeRequestLedger(loaded.requests, storage)).toBe(true);
+    expect(JSON.parse(storage.getItem(`${KEY}.quarantine`)!)[0].raw).toBe(raw);
+  });
+
+  it('never overwrites a ledger written by a newer app version', () => {
+    const raw = JSON.stringify({ version: 2, entries: [] });
+    const storage = memory({ [KEY]: raw });
+    expect(readRequestLedger(storage)).toMatchObject({ requests: [], recovery: 'newer-version' });
+    expect(saveRequestLedger([request('one')], storage).status).toBe('newer-version');
+    expect(writeRequestLedger([request('one')], storage)).toBe(false);
+    expect(storage.getItem(KEY)).toBe(raw);
   });
 });

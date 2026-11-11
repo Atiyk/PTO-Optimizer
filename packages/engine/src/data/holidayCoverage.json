@@ -1,4 +1,9 @@
 {
   "countriesWithData": 204,
+  "bundledYears": [
+    2026,
+    2027,
+    2028
+  ],
   "asOf": "2026-10-30"
 }

@@ -19,6 +19,7 @@ import type { Break, SolveInput, WorkWeek } from '@daysoff/engine/solver/types';
 import { rawHolidaysToHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { getStateHolidaysFallback } from '@daysoff/engine/data/usStateHolidays';
 import { isAlternatingFridayOff } from '@daysoff/engine/calendar/calendarMath';
+import type { NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
 import { isoToSerial, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { solveLegacyConsumer, type PlanningStyle } from '../planning/optimizer';
 import { solveWithPinFallback, type PlannerOutcome } from '../ui/pinPreview';
@@ -277,6 +278,7 @@ export interface PlanState {
   reserveDays: number;
   unlimitedPto: boolean;
   noticePeriodDays: number;
+  noticeUnit: NoticeUnit;
   w: number;
   breakCount: number;
   accrualEnabled: boolean;
@@ -319,6 +321,7 @@ export function planStateFromSearch(search: string, today: string, defaultCountr
     reserveDays: initial.reserveDays ?? 3,
     unlimitedPto: initial.unlimitedPto ?? false,
     noticePeriodDays: initial.noticePeriodDays ?? 14,
+    noticeUnit: initial.noticeUnit ?? 'calendar',
     w: initial.w,
     breakCount: initial.breakCount,
     accrualEnabled: initial.accrualEnabled,

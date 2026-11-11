@@ -208,6 +208,18 @@ describe('notice period in URL (Phase 4.1: "notice period encoded in the URL")',
     expect(readFullStateFromURL('?np=garbage', defaults).noticePeriodDays).toBe(14);
     expect(readFullStateFromURL('?np=-5', defaults).noticePeriodDays).toBe(14);
   });
+
+  it('round-trips a working-day notice unit as nu=w; calendar days stay implicit', () => {
+    const params = new URLSearchParams();
+    writeFullStateToURL(params, fullState({ noticePeriodDays: 10, noticeUnit: 'working' }));
+    expect(params.get('nu')).toBe('w');
+    expect(readFullStateFromURL(`?${params.toString()}`, defaults).noticeUnit).toBe('working');
+    const calendar = new URLSearchParams();
+    writeFullStateToURL(calendar, fullState({ noticeUnit: 'calendar' }));
+    expect(calendar.has('nu')).toBe(false);
+    expect(readFullStateFromURL('', defaults).noticeUnit).toBe('calendar');
+    expect(readFullStateFromURL('?nu=garbage', defaults).noticeUnit).toBe('calendar');
+  });
 });
 
 describe('partner overlap link (Phase 1D)', () => {

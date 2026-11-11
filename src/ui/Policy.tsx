@@ -18,12 +18,12 @@ import { geolocateCountry } from './geo';
 import { forecastWithRequests } from '../personal/forecast';
 import { expirationRisks } from '../personal/expiration';
 import { compactDate, compactDatesIn } from './compactDate';
-import { initialPolicyPreferences, readBrowserPolicyDraft, keepPrivatePolicyDraft, savePolicyPreferences, deletePolicyPreferences } from '../personal/policyPreferences';
+import { initialPolicyPreferences, readBrowserPolicyDraft, keepPrivatePolicyDraft, writePolicyPreferences, deletePolicyPreferences, policyStorageNotice, rememberLoadedPolicy, POLICY_STORAGE_KEY, type PolicySaveResult } from '../personal/policyPreferences';
 import { QuickForecast } from './QuickForecast';
 import { BalanceFromImage } from './BalanceFromImage';
 import { useRequestLedger } from './useRequestLedger';
 import { WalletTransfer } from './WalletTransfer';
-import { publishBalanceBasis } from './usePersonalWorkspace';
+import { publishBalanceBasis, publishWorkdaySchedule } from './usePersonalWorkspace';
 import { generateAlerts } from '../policy/alerts';
 import { generatePolicySummary } from '../policy/summary';
 import { generateHRQuestions, hrQuestionsMessage } from '../policy/hrQuestions';
@@ -123,6 +123,13 @@ function BalanceChart({ series, cap }: { series: { date: string; balance: number
 /** A small bar per PTO day analogue isn't applicable here (that's /sabbatical's marginal
  * chart) - this is the simple accrual/forfeiture timeline instead. */
 
+function savePolicyMessage(result: PolicySaveResult, setNotice: (notice: string | undefined) => void): string {
+  if (result === 'saved') { setNotice(undefined); return 'Policy saved in this browser.'; }
+  if (result === 'stale') return 'Another tab saved a different policy after this page loaded. Nothing was overwritten. Save again to replace it with the inputs on this page.';
+  if (result === 'newer-version') return 'A newer version of Gapless saved your policy. Nothing was overwritten. Reload this page to use it.';
+  return 'Browser storage is unavailable. You can still use the forecast on this page.';
+}
+
 export function Policy() {
   // Hydrate older policy links once, then keep the personal draft in the browser.
   const initial = useMemo(
@@ -130,6 +137,15 @@ export function Policy() {
     [],
   );
   const d = useMemo(() => initial ?? initialPolicyPreferences('', geolocateCountry()), [initial]);
+  // The saved revision these inputs started from, so a save never silently replaces a newer one.
+  const [storageNotice, setStorageNotice] = useState(() => { rememberLoadedPolicy(); return policyStorageNotice(); });
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === POLICY_STORAGE_KEY || event.key === null) setStorageNotice('Your saved policy changed in another tab. Your inputs here are unchanged; reload to use the saved one, or save to replace it.');
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const [country, setCountry] = useState<string>(d.country);
   const [trackerWorkWeek, setTrackerWorkWeek] = useState<WorkWeek>(d.workWeek ?? DEFAULT_WORK_WEEK);
@@ -221,6 +237,7 @@ export function Policy() {
     () => ({
       unit,
       hoursPerDay: policyHoursPerDay,
+      ...(shiftMinutes ? { shiftMinutes } : {}),
       accrual,
       planYear,
       accrualCap: accrualCapEnabled && accrualKind !== 'unlimited' ? accrualCap : undefined,
@@ -235,7 +252,7 @@ export function Policy() {
       plannedDays,
     }),
     [
-      unit, policyHoursPerDay, accrual, planYear, accrualCapEnabled, accrualKind, accrualCap, carryover,
+      unit, policyHoursPerDay, shiftMinutes, accrual, planYear, accrualCapEnabled, accrualKind, accrualCap, carryover,
       waitingPeriodEnabled, waitingPeriodDays, negativeBalanceAllowance, payoutOnLeaving, currentBalance, balanceIncludesApprovedLeave, currentCarriedBalance,
       balanceAsOf, plannedDays,
     ],
@@ -296,6 +313,11 @@ export function Policy() {
     ? shiftMinutes ?? trackerWorkWeek.map(working => working ? Math.round(hoursPerDay * 60) : 0)
     : undefined;
   const pricedRequestCalendar = { ...trackerCalendar.calendar, shiftMinutes: trackerShiftMinutes };
+  // Planners convert this tracker's hourly requests to days with the same shifts.
+  const publishedShiftKey = trackerShiftMinutes?.join(',');
+  useEffect(() => {
+    if (unit === 'hours' && publishedShiftKey) publishWorkdaySchedule({ shiftMinutes: publishedShiftKey.split(',').map(Number), hoursPerDay: policyHoursPerDay });
+  }, [unit, publishedShiftKey, policyHoursPerDay]);
 
   const decoded = useMemo(() => decodeParagraph(pastedText), [pastedText]);
   const decodedTerms = useMemo(() => uniqueMatchedTerms(decoded), [decoded]);
@@ -303,7 +325,7 @@ export function Policy() {
   const reportSave = (message: string) => setSaveFeedback({ search: privatePolicySearch, message });
   const saveButtons = (
     <div className="mt-5 flex flex-wrap gap-x-2 gap-y-1 border-t border-line pt-3 text-sm">
-      <button type="button" className="inline-flex min-h-11 items-center px-1 font-semibold text-ink underline decoration-1 underline-offset-[0.22em] transition-colors duration-150 hover:decoration-2" onClick={() => reportSave(savePolicyPreferences(privatePolicySearch) ? 'Policy saved in this browser.' : 'Browser storage is unavailable. You can still use the forecast on this page.')}>Save policy in this browser</button>
+      <button type="button" className="inline-flex min-h-11 items-center px-1 font-semibold text-ink underline decoration-1 underline-offset-[0.22em] transition-colors duration-150 hover:decoration-2" onClick={() => reportSave(savePolicyMessage(writePolicyPreferences(privatePolicySearch), setStorageNotice))}>Save policy in this browser</button>
       <button type="button" className="inline-flex min-h-11 items-center px-1 text-muted underline decoration-1 underline-offset-[0.22em] transition-colors duration-150 hover:decoration-2 hover:text-ink" onClick={() => reportSave(deletePolicyPreferences() ? 'Saved policy deleted. Your current inputs stay on this page.' : 'Browser storage is unavailable.')}>Delete saved policy</button>
     </div>
   );
@@ -352,6 +374,7 @@ export function Policy() {
                 {saveButtons}
                 <p className="text-xs leading-5 text-muted">Save here to resume on another visit from this browser. Your balance and policy stay off the page URL.</p>
                 {saveFeedback?.search === privatePolicySearch && <p role="status" className="mt-1 text-sm text-muted">{saveFeedback.message}</p>}
+                {storageNotice && <p role="status" data-testid="policy-storage-notice" className="mt-2 border-l-2 border-ink pl-3 text-sm text-ink">{storageNotice}</p>}
               </section>
 
               <details className="group min-w-0 rounded-[10px] border border-line bg-surface">

@@ -3,7 +3,7 @@ import { InfoHint } from './InfoHint';
 /** UI density pass: moved off its own permanent line, into a hover/focus hint on the label -
  * still true, just no longer worth a fourth line of prose above the calendar on every load. */
 const TRAVEL_HINT =
-  "Not travelling? Set this toward 0 — this slider is about demand on your dates, not whether you're going anywhere. US estimates use 2025 airport checkpoint counts by calendar date. Other countries use generic seasonality. Current fares and passenger counts may differ.";
+"Not travelling? Set this toward 0. This only weighs a rough travel estimate for your dates. In the US it's a 7-day average of 2025 airport checkpoint counts, so it shows seasons, not particular days. Other countries use a generic seasonal rule. It's not a forecast or a fare price.";
 
 // Captions for every step (0, 10, 20, ..., 100) of the weighting slider. The 0 and 100
 // wordings match the spec's own definitions verbatim; the rest fill in a legible gradient

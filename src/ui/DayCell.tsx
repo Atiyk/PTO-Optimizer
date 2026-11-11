@@ -43,8 +43,8 @@ interface DayCellProps {
   onSetState?: (date: string, state: 'include' | 'exclude' | null) => void;
   /** The real outcome of pinning this day, from the planner's own solve (lazy). When
    * given, it replaces the engine's marginal estimate, so a hover never promises a gain the
-   * plan cannot deliver. */
-  pinPreview?: (date: string) => string | null;
+   * plan cannot deliver. Asynchronous: the re-solve runs off the main thread. */
+  pinPreview?: (date: string) => Promise<string | null>;
 }
 
 /** A small pin glyph, not a colour, carries "pinned vs suggested" - placed beside the
@@ -179,7 +179,17 @@ export function DayCell({
   const isHolidayTip = !isOutOfRange && category === 'public-holiday' && !!holidayName;
   const hasTip = !isOutOfRange && (isHolidayTip || !!marginalValue);
   // The pin outcome is computed only while the tip is open (one solve per day, cached).
-  const previewText = tooltipOpen && !isHolidayTip && marginalValue && pinPreview ? pinPreview(date) : null;
+  const wantsPreview = tooltipOpen && !isHolidayTip && !!marginalValue && !!pinPreview;
+  // Keyed by the lookup that produced it: a preview from an older plan input (an older
+  // pinPreview) or another day can never replace the current one, however late it lands.
+  const [preview, setPreview] = useState<{ source: (date: string) => Promise<string | null>; date: string; text: string | null }>();
+  useEffect(() => {
+    if (!wantsPreview || !pinPreview) return;
+    let current = true;
+    void pinPreview(date).then((text) => { if (current) setPreview({ source: pinPreview, date, text }); });
+    return () => { current = false; };
+  }, [wantsPreview, pinPreview, date]);
+  const previewText = wantsPreview && preview?.source === pinPreview && preview.date === date ? preview.text : null;
   const tooltipText = !hasTip
     ? null
     : isHolidayTip

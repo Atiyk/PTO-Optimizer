@@ -7,6 +7,7 @@ import { buildPlanFeedICS, MAX_FEED_QUERY_LENGTH } from './feed';
 import { holidayYearsNeeded, planStateFromSearch } from './planFromSearch';
 import { isValidISODate } from '../ui/urlState';
 import { isPlanShareKey } from '../ui/shareFormat';
+import { utcDateISO } from '../ui/today';
 
 /** Resolves to the parsed JSON for that country-year (the raw Nager-shaped array), or null
  * when there is no such file. Only called with a known country code and a year inside
@@ -36,8 +37,9 @@ export function feedWorkloadAllowed(state: { rangeStart: string; rangeEnd: strin
 
 export const FEED_CACHE_CONTROL = 'public, max-age=0, s-maxage=21600, stale-while-revalidate=86400';
 
+/** No viewer timezone reaches the feed endpoint, so it uses the UTC date (see today.ts). */
 function utcToday(now: Date): string {
-  return now.toISOString().slice(0, 10);
+  return utcDateISO(now);
 }
 
 function textResponse(status: number, message: string, extra: Record<string, string> = {}): Response {

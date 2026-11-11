@@ -25,6 +25,7 @@ const maximal: WriteStateInput = {
   planningVersion: 2, planningStyle: 'custom', minimumBreakDays: 4,
   employerCalendar: { version: 1, country: 'US', excluded: ['2027-07-05|Independence Day'], custom: [{ date: '2027-12-24', name: PRIVATE_NOTE }] },
   publicShareVersion: 1, sharedObservedHolidays: ['2027-01-01'],
+  sharedSnapshot: { plannerRevision: 1, holidayFingerprint: '0badf00d' },
   landingPreview: true, holidayFocusDate: '2027-05-31',
   country: 'US', subdivision: 'US-NY',
   rangeStart: '2027-01-01', rangeEnd: '2027-12-31', budget: 12, w: 40, breakCount: 2,
@@ -35,7 +36,7 @@ const maximal: WriteStateInput = {
   workWeek: [true, true, true, true, false, false, false] as unknown as WorkWeek,
   forced: { '2027-02-02': 'include', '2027-02-09': 'exclude' },
   altFridayEnabled: true, altFridayStart: '2027-01-08',
-  reserveDays: 2, unlimitedPto: true, noticePeriodDays: 21,
+  reserveDays: 2, unlimitedPto: true, noticePeriodDays: 21, noticeUnit: 'working',
   peakCapEnabled: true, peakCapStart: '2027-06-01', peakCapEnd: '2027-08-31', peakCapMaxDays: 3,
 };
 
@@ -58,7 +59,7 @@ describe('versioned public share format (allowlist)', () => {
   });
 
   it('never classifies a known private planner key as public', () => {
-    for (const key of ['eh', 'bo', 'od', 'ov', 'pp', 'r', 'ac', 'am', 'ex', 'xd', 'cc', 'np', 'pc', 'pcs', 'pce', 'pcm', 'up']) {
+    for (const key of ['eh', 'bo', 'od', 'ov', 'pp', 'r', 'ac', 'am', 'ex', 'xd', 'cc', 'np', 'nu', 'pc', 'pcs', 'pce', 'pcm', 'up']) {
       expect(PLAN_URL_KEYS[key]).toBe('private');
       expect(PLAN_SHARE_KEYS).not.toContain(key);
       expect(PLAN_ADDRESS_KEYS).not.toContain(key);
@@ -82,6 +83,27 @@ describe('versioned public share format (allowlist)', () => {
     for (const date of ['2027-03-03', '2027-04-04', '2027-02-09', '2027-11-30', '2027-06-01', '2027-12-24']) {
       expect(params.toString()).not.toContain(date);
     }
+  });
+
+  it('classifies the issue 9 snapshot keys as share-only: never the address bar, never private data', () => {
+    expect(PLAN_URL_KEYS.er).toBe('share-only');
+    expect(PLAN_URL_KEYS.hf).toBe('share-only');
+    expect(PLAN_SHARE_KEYS).toEqual(expect.arrayContaining(['er', 'hf']));
+    expect(PLAN_ADDRESS_KEYS).not.toContain('er');
+    expect(PLAN_ADDRESS_KEYS).not.toContain('hf');
+    const full = new URLSearchParams();
+    writeFullStateToURL(full, maximal);
+    expect(full.get('er')).toBe('1');
+    expect(full.get('hf')).toBe('0badf00d');
+    const address = new URLSearchParams();
+    writeBrowserPlanStateToURL(address, maximal, null);
+    expect(address.has('er')).toBe(false);
+    expect(address.has('hf')).toBe(false);
+    // Not a share link: no snapshot is written at all.
+    const own = new URLSearchParams();
+    writeFullStateToURL(own, { ...maximal, publicShareVersion: undefined, sharedObservedHolidays: undefined });
+    expect(own.has('er')).toBe(false);
+    expect(own.has('hf')).toBe(false);
   });
 
   it('writes only share-allowlisted keys into a copied public link, feed and email search', () => {

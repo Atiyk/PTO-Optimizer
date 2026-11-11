@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultEmployerCalendar, saveEmployerCalendar } from '../personal/employerCalendar';
 import { savePolicyPreferences } from '../personal/policyPreferences';
 import { createPtoRequest, writeRequestLedger } from '../personal/requestLedger';
+import { committedRequestDays } from '../personal/workspace';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { decodePartnerAvailability } from '../planning/partner';
 import { track } from './analytics';
@@ -278,27 +279,83 @@ describe('Family planner', () => {
     await waitFor(() => expect(screen.getByText(/PTO days? used, \d+ left of 13/).textContent).toMatch(/^0 PTO days used, 13 left of 13/));
   });
 
+  it('plans around a Sunday to Thursday workweek: Friday is free, Sunday is a workday', async () => {
+    savePolicyPreferences('c=US&ww=1111001');
+    go(`c=US&s=2026-11-02&pto=0&sd=${encodeDateRanges(['2026-11-26', '2026-11-27', '2026-11-30'])}`);
+    render(<Family />);
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('2 days with your kids without using PTO.'));
+    const words = (day: number) => screen.getByText(new RegExp(`^November ${day}(,|$)`), { selector: '.sr-only' }).textContent;
+    expect(words(27)).toMatch(/school is off and you are off/);
+    expect(words(26)).toMatch(/you work: uncovered/);
+    expect(words(29)).toBe('November 29');
+    expect(screen.getByText(/school days off, you work 3/)).toBeTruthy();
+  });
+
+  it('keeps a partial-day appointment on a school closure as a coverage gap', async () => {
+    savePolicyPreferences('c=US');
+    const cal = { workWeek: DEFAULT_WORK_WEEK, offDays: [], shiftMinutes: [480, 480, 480, 480, 480, 0, 0] };
+    writeRequestLedger([
+      createPtoRequest({ start: '2026-11-30', end: '2026-11-30', status: 'approved', partialMinutes: 120 }, cal, 'dentist')!,
+      createPtoRequest({ start: '2026-11-27', end: '2026-11-27', status: 'approved' }, { workWeek: DEFAULT_WORK_WEEK, offDays: [] }, 'whole')!,
+    ]);
+    go(`c=US&s=2026-11-02&pto=0&sd=${encodeDateRanges(['2026-11-26', '2026-11-27', '2026-11-30'])}`);
+    render(<Family />);
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('3 days with your kids without using PTO.'));
+    const words = (day: number) => screen.getByText(new RegExp(`^November ${day}(,|$)`), { selector: '.sr-only' }).textContent;
+    expect(words(27)).toMatch(/school is off and you are off/);
+    expect(words(30)).toMatch(/you work: uncovered/);
+  });
+
+  it('treats two 4h partials on one 8h day as off all day, the same total the planner charges', async () => {
+    savePolicyPreferences('c=US');
+    const cal = { workWeek: DEFAULT_WORK_WEEK, offDays: [], shiftMinutes: [480, 480, 480, 480, 480, 0, 0] };
+    const requests = [
+      createPtoRequest({ start: '2026-11-30', end: '2026-11-30', status: 'approved', partialMinutes: 240 }, cal, 'am')!,
+      createPtoRequest({ start: '2026-11-30', end: '2026-11-30', status: 'approved', partialMinutes: 240 }, cal, 'pm')!,
+    ];
+    writeRequestLedger(requests);
+    expect(committedRequestDays(requests, { asOf: '2026-11-01', includesApprovedLeave: false }, { hoursPerDay: 8 }).approvedDays).toBe(1);
+    go(`c=US&s=2026-11-02&pto=0&sd=${encodeDateRanges(['2026-11-30'])}`);
+    render(<Family />);
+    const words = () => screen.getByText(/^November 30(,|$)/, { selector: '.sr-only' }).textContent;
+    await waitFor(() => expect(words()).toMatch(/school is off and you are off/));
+  });
+
   it('flags unreadable school dates in a received link instead of dropping them silently', () => {
     go('s=2026-11-02&sd=garbage');
     render(<Family />);
     expect(screen.getByRole('alert').textContent).toMatch(/school dates in this link couldn.t be read/);
   });
 
-  it('blocks a recurring school import without accepting its partial date list', async () => {
+  it('blocks a school import with an unsupported repeating pattern without accepting its partial date list', async () => {
     go('c=US&s=2026-11-02');
     render(<Family />);
     const text = [
       'BEGIN:VCALENDAR',
       'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20261120', 'END:VEVENT',
-      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20261127', 'RRULE:FREQ=WEEKLY;COUNT=3', 'END:VEVENT',
+      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20261127', 'RRULE:FREQ=MONTHLY;BYDAY=FR;BYSETPOS=-1', 'END:VEVENT',
       'END:VCALENDAR',
     ].join('\r\n');
     const file = Object.assign(new File([text], 'school.ics'), { text: async () => text });
     fireEvent.change(screen.getByLabelText('Upload a school calendar file (.ics)'), { target: { files: [file] } });
-    expect(await screen.findByText(/repeating events that cannot be imported completely/)).toBeTruthy();
+    expect(await screen.findByText(/Import incomplete: 1 repeating event uses a pattern we can.t read \(BYSETPOS\)/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Add \d checked dates?/ })).toBeNull();
     expect(screen.getByRole('heading', { name: 'Start with the school calendar' })).toBeTruthy();
     expect(new URLSearchParams(window.location.search).has('sd')).toBe(false);
+  });
+
+  it('expands a weekly repeating school closure into individual dates to confirm', async () => {
+    go('c=US&s=2026-11-02');
+    render(<Family />);
+    const text = [
+      'BEGIN:VCALENDAR',
+      'BEGIN:VEVENT', 'UID:early', 'DTSTART;VALUE=DATE:20261127', 'RRULE:FREQ=WEEKLY;COUNT=3', 'END:VEVENT',
+      'BEGIN:VEVENT', 'UID:early', 'RECURRENCE-ID;VALUE=DATE:20261204', 'DTSTART;VALUE=DATE:20261204', 'STATUS:CANCELLED', 'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+    const file = Object.assign(new File([text], 'school.ics'), { text: async () => text });
+    fireEvent.change(screen.getByLabelText('Upload a school calendar file (.ics)'), { target: { files: [file] } });
+    expect(await screen.findByText(/Found 2 date ranges/)).toBeTruthy();
   });
 });
 
