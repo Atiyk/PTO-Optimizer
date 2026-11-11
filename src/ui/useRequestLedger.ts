@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   MAX_REQUESTS, REQUEST_CHANGE_EVENT, REQUEST_STORAGE_KEY, REQUEST_STATUSES, browserRequestStorage, calendarCoversRequest, calendarForSavedRequest,
-  createPtoRequest, createSavedBreakRequest, readRequestLedger, validRequestRange,
-  type PtoRequest, type RequestCalendar, type RequestInput, type SavedBreakInput,
+  createPtoRequest, createSavedBreakRequest, readRequestLedger, saveRequestLedger, validRequestRange,
+  type LedgerRecovery, type PtoRequest, type RequestCalendar, type RequestInput, type SavedBreakInput,
 } from '../personal/requestLedger';
-import { persistBrowserRequests, withWalletLedgerLock, type LedgerAction } from '../integration/browserWalletStore';
+import { withWalletLedgerLock, type LedgerAction } from '../integration/browserWalletStore';
 
-type LedgerChange = { requests: PtoRequest[]; available: boolean };
+type LedgerChange = { requests: PtoRequest[]; available: boolean; recovery?: LedgerRecovery; quarantined?: boolean };
 export interface LedgerActionResult {
   ok: boolean;
   id?: string;
@@ -16,8 +16,22 @@ export interface LedgerActionResult {
 }
 const WRITE_FAILED = 'Browser storage could not be coordinated. Your saved requests are unchanged. Try again.';
 
+/** Non-destructive notice when stored requests could not be fully read. */
+export function ledgerStorageNotice(state: Pick<LedgerChange, 'recovery' | 'quarantined'>): string | undefined {
+  if (state.quarantined) return 'Some saved requests in this browser could not be read. A copy of them was kept in this browser before your change was saved; nothing was deleted.';
+  if (state.recovery === 'newer-version') return 'Your requests were saved by a newer version of Gapless in another tab. Reload this page to see and edit them; changes here apply to this visit only and never overwrite them.';
+  if (state.recovery) return 'Some saved requests in this browser could not be read. They stay saved as they are, and a copy is kept in this browser before any change replaces them.';
+  return undefined;
+}
+
+function initialLedger(): LedgerChange {
+  const stored = readRequestLedger();
+  // A ledger from a newer schema is shown as unavailable so nothing here writes over it.
+  return stored.recovery === 'newer-version' ? { ...stored, available: false } : stored;
+}
+
 export function useRequestLedger() {
-  const [state, setState] = useState(() => readRequestLedger());
+  const [state, setState] = useState<LedgerChange>(initialLedger);
   const live = useRef(state);
   const [message, setMessage] = useState('');
 
@@ -31,9 +45,9 @@ export function useRequestLedger() {
       if (change) apply(change);
     };
     const onStorage = (event: StorageEvent) => {
-      if (live.current.available && (event.key === REQUEST_STORAGE_KEY || event.key === null)) {
-        const stored = readRequestLedger();
-        if (stored.available) apply(stored);
+      if (event.key === REQUEST_STORAGE_KEY || event.key === null) {
+        const stored = initialLedger();
+        if (stored.available || stored.recovery === 'newer-version') apply(stored);
       }
     };
     window.addEventListener(REQUEST_CHANGE_EVENT, onChange);
@@ -50,11 +64,17 @@ export function useRequestLedger() {
       const result = withWalletLedgerLock(() => {
         const storage = browserRequestStorage();
         const stored = readRequestLedger(storage);
-        const canPersist = live.current.available && stored.available;
+        const canPersist = live.current.available && stored.available && stored.recovery !== 'newer-version';
         const requests = canPersist ? stored.requests : live.current.requests;
         return apply(requests, (updated) => {
-          const available = canPersist && persistBrowserRequests(updated, storage);
-          const next = { requests: updated, available };
+          // Read-modify-write against the revision just read, inside the same lock or task.
+          const saved = canPersist ? saveRequestLedger(updated, storage, stored.revision) : null;
+          const available = saved?.status === 'saved';
+          const next: LedgerChange = {
+            requests: updated, available,
+            ...(stored.recovery === 'newer-version' ? { recovery: stored.recovery } : {}),
+            ...((saved?.status === 'saved' && saved.quarantined) || live.current.quarantined ? { quarantined: true } : {}),
+          };
           live.current = next;
           setState(next);
           if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent<LedgerChange>(REQUEST_CHANGE_EVENT, { detail: next }));
@@ -180,7 +200,7 @@ export function useRequestLedger() {
     }, undefined);
   }
 
-  return { requests: state.requests, storageAvailable: state.available, message, addRequest, saveBreak, updateRequest, deleteRequest };
+  return { requests: state.requests, storageAvailable: state.available, storageNotice: ledgerStorageNotice(state), message, addRequest, saveBreak, updateRequest, deleteRequest };
 }
 
 export type RequestLedgerState = ReturnType<typeof useRequestLedger>;

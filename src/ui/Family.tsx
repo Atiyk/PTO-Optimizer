@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { initialPolicyPreferences } from '../personal/policyPreferences';
 import { buildSchoolCalendar } from '../personal/schoolCalendar';
-import { MAX_FAMILY_PTO, planFamilyTime, type FamilyPlanResult, type SchoolBreak, type FamilyBreakPlan } from '../personal/familyPlan';
+import { familyParentFreeDays, MAX_FAMILY_PTO, planFamilyTime, type FamilyPlanResult, type SchoolBreak, type FamilyBreakPlan } from '../personal/familyPlan';
 import { findDistrictPreset, presetLabels, presetOffDays } from '../content/schoolDistricts';
 import type { PartnerAvailability } from '../planning/partner';
-import { addDays, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
+import { addDays, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { formatCardDateRange, formatLong, formatShort, formatShortWithYear } from '@daysoff/engine/calendar/dateFormat';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { SiteHeader } from './SiteHeader';
@@ -25,7 +25,7 @@ import { FamilyShare } from './FamilyShare';
 import { FAMILY_FAQ_ITEMS } from './familyFaqItems';
 import { useRequestCalendar } from './useRequestCalendar';
 import { usePersonalWorkspace } from './usePersonalWorkspace';
-import { committedRequestDays, planningCommitments } from '../personal/workspace';
+import { committedRequestDays, fullDayLeaveDates } from '../personal/workspace';
 import { ShareDatePreview } from './ShareDatePreview';
 import { track } from './analytics';
 
@@ -84,8 +84,8 @@ export function Family() {
   // Tracked requests after the saved balance date are deducted once (workspace rule),
   // using the basis the balance was saved with.
   const committed = useMemo(() => savedBalance
-    ? committedRequestDays(workspace.requests, { asOf: savedBalance.balanceAsOf, includesApprovedLeave: savedBalance.balanceIncludesApprovedLeave === true })
-    : { approvedDays: 0, tentativeDays: 0 }, [savedBalance, workspace.requests]);
+    ? committedRequestDays(workspace.requests, { asOf: savedBalance.balanceAsOf, includesApprovedLeave: savedBalance.balanceIncludesApprovedLeave === true }, workspace.schedule)
+    : { approvedDays: 0, tentativeDays: 0 }, [savedBalance, workspace.requests, workspace.schedule]);
   const balanceInDays = savedBalance
     ? savedBalance.currentBalance / (savedBalance.unit === 'hours' ? savedBalance.hoursPerDay : 1) - committed.approvedDays - committed.tentativeDays : null;
   const savedBudget = balanceInDays !== null && Number.isFinite(balanceInDays)
@@ -133,17 +133,18 @@ export function Family() {
   }, [preset, presetDates, customOffDays, schoolOffDays]);
   const schoolLabels = useMemo(() => (preset ? presetLabels(preset) : {}), [preset]);
 
-  // Tracked approved and tentative requests are already off (workspace rule), so the
-  // family plan never spends PTO on them again; their cost is deducted from the saved
-  // balance above, once.
+  // Whole days of tracked approved and tentative leave are already off (workspace rule), so
+  // the family plan never spends PTO on them again; their cost is deducted from the saved
+  // balance above, once. A partly booked day (an hourly appointment) is still a workday:
+  // someone has to have the kids, so it stays a coverage gap.
   const committedOffDays = useMemo(
-    () => planningCommitments(workspace.requests, { start, end }, { asOf: savedBalance?.balanceAsOf ?? today, includesApprovedLeave: savedBalance?.balanceIncludesApprovedLeave === true }).unavailableDates,
-    [workspace.requests, start, end, savedBalance, today],
+    () => fullDayLeaveDates(workspace.requests, { start, end }, workspace.schedule),
+    [workspace.requests, workspace.schedule, start, end],
   );
-  const parentFreeDays = useMemo(() => {
-    const offDays = new Set([...calendar.offDays, ...committedOffDays]);
-    return rangeISO(start, end).filter((date) => !calendar.workWeek[mondayIndexedDow(date)] || offDays.has(date));
-  }, [start, end, calendar.offDays, calendar.workWeek, committedOffDays]);
+  const parentFreeDays = useMemo(
+    () => familyParentFreeDays({ start, end, workWeek: calendar.workWeek, offDays: [...calendar.offDays, ...committedOffDays] }),
+    [start, end, calendar.offDays, calendar.workWeek, committedOffDays],
+  );
   const parentFreeSet = useMemo(() => new Set(parentFreeDays), [parentFreeDays]);
   const otherAdultDays = received.availability?.days;
   const otherAdultConfirmed = received.availability?.status === 'confirmed';

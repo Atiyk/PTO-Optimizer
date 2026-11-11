@@ -176,13 +176,16 @@ describe('whole-plan consumer recommendations', () => {
     const result = analyzeCanonicalPortfolios(input, empty, {
       candidateEligible: candidate => candidate.breaks.every(break_ => break_.start >= '2027-01-08'),
     });
+    // Issue 5: Fri-Mon (Jan 8-11) is now reachable, so the later window spends the
+    // whole budget for 4 days off instead of leaving 1 PTO day unused.
     expect(result?.portfolios).toEqual([
-      expect.objectContaining({ ptoDays: 1, budgetRemaining: 1, breaks: [
-        { start: '2027-01-08', end: '2027-01-10', ptoDays: 1, calendarDays: 3 },
+      expect.objectContaining({ ptoDays: 2, budgetRemaining: 0, breaks: [
+        { start: '2027-01-08', end: '2027-01-11', ptoDays: 2, calendarDays: 4 },
       ] }),
     ]);
-    expect(result?.feasiblePlanCount).toBe(1);
-    expect(result?.shortfalls).toContainEqual(expect.objectContaining({ kind: 'one-plan-found' }));
+    // Two funded later plans now exist, and every objective picks the same one.
+    expect(result?.feasiblePlanCount).toBe(2);
+    expect(result?.shortfalls).toContainEqual(expect.objectContaining({ kind: 'shared-objective-winners' }));
   });
 
   it('reports missing evidence and no feasible plan without including private source descriptions', () => {

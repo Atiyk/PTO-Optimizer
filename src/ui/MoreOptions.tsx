@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { WorkWeek } from '@daysoff/engine/solver/types';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import { addDays, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
+import type { NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
 import { formatShortWithYear } from '@daysoff/engine/calendar/dateFormat';
 import { isValidISODate } from './urlState';
 import { DateListEditor } from './DateListEditor';
@@ -34,6 +35,9 @@ interface MoreOptionsProps {
 
   noticePeriodDays: number;
   onChangeNoticePeriodDays: (v: number) => void;
+  /** Calendar or working days. Optional so older callers keep calendar days. */
+  noticeUnit?: NoticeUnit;
+  onChangeNoticeUnit?: (v: NoticeUnit) => void;
 
   peakCapEnabled: boolean;
   onTogglePeakCap: (v: boolean) => void;
@@ -59,6 +63,8 @@ interface MoreOptionsProps {
   blackouts: string[];
   onAddBlackout: (d: string) => void;
   onAddBlackouts: (dates: string[]) => void;
+  /** The plan's date range; repeating events in an imported .ics are expanded across it. */
+  planningWindow?: { start: string; end: string };
   onRemoveBlackout: (d: string) => void;
 
   holidayEntries: HolidayEntry[];
@@ -174,13 +180,21 @@ export function MoreOptions(props: MoreOptionsProps) {
               aria-label="Notice period in days"
               className={`${FIELD_CLASS} w-20`}
             />
-            calendar days
           </label>
+          <select
+            aria-label="Notice period counted in"
+            value={props.noticeUnit ?? 'calendar'}
+            onChange={(e) => props.onChangeNoticeUnit?.(e.target.value === 'working' ? 'working' : 'calendar')}
+            className="select-ink min-w-0 max-w-full text-[15px] font-normal"
+          >
+            <option value="calendar">calendar days</option>
+            <option value="working">working days</option>
+          </select>
           <Term id="notice-period">?</Term>
         </div>
         <p className={NOTE}>
-          Drives the &quot;Request by&quot; date on each break card, and the lead time for the .ics reminder under Take it with you
-          &mdash; the same number for both.
+          Drives the &quot;Request by&quot; date on each break card, the email draft, the tracker&apos;s &quot;Submit by&quot; and the .ics reminder
+          &mdash; the same date for all. Working days skip your days off and employer holidays; a calendar-day deadline that falls on a day off moves to the working day before.
         </p>
       </section>
 
@@ -346,7 +360,7 @@ export function MoreOptions(props: MoreOptionsProps) {
         </div>
       </section>
 
-      <ImportCalendar onImportBusyDays={props.onAddBlackouts} />
+      <ImportCalendar onImportBusyDays={props.onAddBlackouts} planningWindow={props.planningWindow} />
 
       <section className="@min-[36rem]:col-span-2">
         <h3 id="employer-holidays" className={`${H4_CLASS} scroll-mt-16`}>My employer&apos;s holidays</h3>

@@ -1,4 +1,5 @@
 import { addDays, mondayIndexedDow } from '../solver/dateUtils';
+import holidayCoverage from './holidayCoverage.json';
 
 const CACHE_PREFIX = 'pto-optimizer:holidays:v1:';
 const API_BASE = 'https://date.nager.at/api/v3/PublicHolidays';
@@ -83,7 +84,8 @@ async function fetchYear(countryCode: string, year: number): Promise<YearFetch> 
     const res = await fetch(`${API_BASE}/${year}/${countryCode}`);
     if (!res.ok) return { data: [], failed: true };
     const data = (await res.json()) as RawHoliday[];
-    writeCache(countryCode, year, data);
+    // Issue 17: an empty answer is "no data for this year", not a fact worth caching forever.
+    if (Array.isArray(data) && data.length > 0) writeCache(countryCode, year, data);
     return { data, failed: false };
   } catch {
     return { data: [], failed: true };
@@ -156,6 +158,24 @@ export interface HolidayFetchResult {
    * success, not a degraded fallback, under this cache-forever-per-country-year design.
    */
   degraded: boolean;
+  /**
+   * Issue 17: calendar years in the requested range for which no source (cache, bundled
+   * static file, live lookup) returned any public holidays. Every supported country has
+   * public holidays every year, so an empty year means "data not available", and callers
+   * must say so ("results assume no public holidays in 2029") instead of presenting it as
+   * a holiday-free calendar. Optional only so hand-built results stay assignable.
+   */
+  uncoveredYears?: number[];
+}
+
+/** Issue 17: years scripts/build-holidays.ts bundled for every country in this build. */
+export function bundledHolidayYears(): number[] {
+  const years = (holidayCoverage as { bundledYears?: unknown }).bundledYears;
+  return Array.isArray(years) ? years.filter((y): y is number => Number.isSafeInteger(y)).sort((a, b) => a - b) : [];
+}
+
+export function isBundledHolidayYear(year: number): boolean {
+  return bundledHolidayYears().includes(year);
 }
 
 function filterAndSort(holidays: Holiday[], rangeStart: string, rangeEnd: string, subdivision: string | undefined): Holiday[] {
@@ -165,7 +185,7 @@ function filterAndSort(holidays: Holiday[], rangeStart: string, rangeEnd: string
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-async function fetchYears(countryCode: string, rangeStart: string, rangeEnd: string): Promise<{ holidays: Holiday[]; degraded: boolean }> {
+async function fetchYears(countryCode: string, rangeStart: string, rangeEnd: string): Promise<{ holidays: Holiday[]; degraded: boolean; uncoveredYears: number[] }> {
   const startYear = Number(rangeStart.slice(0, 4));
   const endYear = Number(rangeEnd.slice(0, 4));
   const years: number[] = [];
@@ -174,7 +194,8 @@ async function fetchYears(countryCode: string, rangeStart: string, rangeEnd: str
   const perYear = await Promise.all(years.map((y) => fetchYear(countryCode, y)));
   const holidays = perYear.flatMap((y) => y.data).map(toHoliday);
   const degraded = perYear.some((y) => y.failed);
-  return { holidays, degraded };
+  const uncoveredYears = years.filter((_, i) => !Array.isArray(perYear[i].data) || perYear[i].data.length === 0);
+  return { holidays, degraded, uncoveredYears };
 }
 
 /**
@@ -203,8 +224,8 @@ export async function getHolidaysWithStatus(
   rangeEnd: string,
   subdivision?: string,
 ): Promise<HolidayFetchResult> {
-  const { holidays, degraded } = await fetchYears(countryCode, rangeStart, rangeEnd);
-  return { holidays: filterAndSort(holidays, rangeStart, rangeEnd, subdivision), degraded };
+  const { holidays, degraded, uncoveredYears } = await fetchYears(countryCode, rangeStart, rangeEnd);
+  return { holidays: filterAndSort(holidays, rangeStart, rangeEnd, subdivision), degraded, uncoveredYears };
 }
 
 /**

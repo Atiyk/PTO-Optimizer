@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
 import type { DayCategory } from './types';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
+import type { NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
 import { downloadICS } from './icsExport';
 import { copyShareImage, buildShareImageMonths } from './imageExport';
 import { copyText } from './requestText';
@@ -12,6 +13,7 @@ import { SubscribeFeed } from './SubscribeFeed';
 import { EmailReminders } from './EmailReminders';
 import { ordinal } from './scoreFormat';
 import { buildPublicPlanLink, buildPublicPlanSearch, publicPlanOmissions } from './publicSharePrivacy';
+import type { ShareSnapshot } from './shareSnapshot';
 
 interface ExportBarProps {
   breaks: Break[];
@@ -28,6 +30,8 @@ interface ExportBarProps {
    * "Request by" date on every break card (see requestDeadline.ts), so this panel no
    * longer owns an independent 7/14/30 choice that could silently disagree with it. */
   noticePeriodDays: number;
+  /** Calendar or working days; default calendar. */
+  noticeUnit?: NoticeUnit;
   workWeek?: WorkWeek;
   offDays?: readonly string[];
   /** Opens the "Plan with someone" panel, where the person chooses which dates to share
@@ -37,6 +41,8 @@ interface ExportBarProps {
   planSearch?: string;
   /** The checked holiday dates for this plan, when calendar coverage is known. */
   observedHolidayDates?: readonly string[];
+  /** Public, non-identifying planner revision and holiday fingerprint (issue 9). */
+  shareSnapshot?: ShareSnapshot;
 }
 
 export interface ActionResult {
@@ -115,7 +121,7 @@ export function ExportBar(props: ExportBarProps) {
   const copyPlan = async (dates?: readonly string[]): Promise<ActionResult> => {
     if (typeof window === 'undefined') return { ok: false, message: "Couldn't copy — try again" };
     if (planSearch === undefined) return { ok: false, message: 'Plan link unavailable' };
-    const share = buildPublicPlanLink(window.location.href, planSearch, dates);
+    const share = buildPublicPlanLink(window.location.href, planSearch, dates, props.shareSnapshot);
     const ok = await copyText(share.url);
     if (ok) track('URL shared');
     return ok
@@ -133,7 +139,7 @@ export function ExportBar(props: ExportBarProps) {
           onClick={async () => {
             const reminderOptions = {
               enabled: remindersEnabled, leadDays: props.noticePeriodDays,
-              workWeek: props.workWeek, offDays: props.offDays,
+              workWeek: props.workWeek, offDays: props.offDays, noticeUnit: props.noticeUnit,
             };
             downloadICS(props.breaks, props.isSuggestedPto, reminderOptions);
             track('ICS downloaded');
@@ -186,7 +192,7 @@ export function ExportBar(props: ExportBarProps) {
         Remind me to request time off
         {remindersEnabled && (
           <span className="text-muted">
-            &mdash; {props.noticePeriodDays} {props.noticePeriodDays === 1 ? 'day' : 'days'} before, matching your
+            &mdash; {props.noticePeriodDays} {props.noticeUnit === 'working' ? 'working ' : ''}{props.noticePeriodDays === 1 ? 'day' : 'days'} before, matching your
             notice period in More options
           </span>
         )}

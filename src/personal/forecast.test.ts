@@ -4,6 +4,7 @@ import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { projectBalance } from '../policy/projection';
 import { createPtoRequest } from './requestLedger';
 import { forecastWithRequests } from './forecast';
+import { planningCommitments } from './workspace';
 
 const base: TimeOffPolicy = {
   unit: 'days', hoursPerDay: 8, accrual: { kind: 'per-pay-period', amount: 1.25, frequency: 'monthly', payDateAnchor: '2027-01-15' },
@@ -119,5 +120,59 @@ describe('date-specific forecast reuses the existing policy projection', () => {
     expect(forecastWithRequests({ ...base, hoursPerDay: 0 }, '2027-02-01')).toBeNull();
     expect(forecastWithRequests({ ...base, waitingPeriodDays: Infinity }, '2027-02-01')).toBeNull();
     expect(forecastWithRequests({ ...base, waitingPeriodDays: -1 }, '2027-02-01')).toBeNull();
+  });
+});
+
+describe('hourly and partial-day requests in every balance unit', () => {
+  const eightHour = { ...calendar, shiftMinutes: [480, 480, 480, 480, 480, 0, 0] };
+  const fourTens = { workWeek: [true, true, true, true, false, false, false] as typeof DEFAULT_WORK_WEEK, offDays: [], shiftMinutes: [600, 600, 600, 600, 0, 0, 0] };
+  const flat = { ...base, accrual: { kind: 'front-loaded' as const, amount: 0, grantDate: '2026-01-01' } };
+
+  it('charges a 4h request on an 8h day as 0.5 day in a day-based balance', () => {
+    const half = createPtoRequest({ start: '2027-01-04', end: '2027-01-04', status: 'approved', partialMinutes: 240 }, eightHour, 'half')!;
+    expect(forecastWithRequests(flat, '2027-02-01', [half])!.confirmed).toMatchObject({ balance: 9.5, scheduled: 0.5 });
+  });
+
+  it('charges a 5h request against a 10h shift on a 4x10 schedule as 0.5 day, and a full 10h shift as 1 day', () => {
+    const policy = { ...flat, shiftMinutes: [600, 600, 600, 600, 0, 0, 0] };
+    const partial = createPtoRequest({ start: '2027-01-04', end: '2027-01-04', status: 'approved', partialMinutes: 300 }, fourTens, 'p')!;
+    const full = createPtoRequest({ start: '2027-01-05', end: '2027-01-06', status: 'approved' }, fourTens, 'f')!;
+    expect(forecastWithRequests(policy, '2027-02-01', [partial, full])!.confirmed).toMatchObject({ balance: 7.5, scheduled: 2.5 });
+  });
+
+  it('charges a policy planned day for that weekday shift in an hours balance', () => {
+    const policy = { ...flat, unit: 'hours' as const, currentBalance: 80, hoursPerDay: 8, shiftMinutes: [600, 600, 600, 600, 0, 0, 0], plannedDays: ['2027-01-04'] };
+    expect(forecastWithRequests(policy, '2027-02-01')!.confirmed).toMatchObject({ balance: 70, scheduled: 10 });
+    // Without a per-weekday schedule the legacy hours-per-day charge is unchanged.
+    expect(forecastWithRequests({ ...policy, shiftMinutes: undefined }, '2027-02-01')!.confirmed).toMatchObject({ balance: 72, scheduled: 8 });
+  });
+
+  it('keeps a legacy whole-day request at one day per date', () => {
+    expect(forecastWithRequests(flat, '2027-02-01', [approved('w', '2027-01-04', '2027-01-05')])!.confirmed).toMatchObject({ balance: 8, scheduled: 2 });
+  });
+});
+
+describe('forecast uses the planner per-date charge rule', () => {
+  const eight = { workWeek: DEFAULT_WORK_WEEK, offDays: [], shiftMinutes: [480, 480, 480, 480, 480, 0, 0] };
+  const flat: TimeOffPolicy = { ...base, accrual: { kind: 'front-loaded', amount: 0, grantDate: '2026-01-01' }, currentBalance: 20, balanceAsOf: '2027-02-01' };
+  const make = (id: string, start: string, end: string, status: 'requested' | 'approved', partialMinutes?: number) =>
+    createPtoRequest({ start, end, status, partialMinutes }, partialMinutes === undefined ? calendar : eight, id)!;
+
+  it('Q1-2: tentative week plus a booked 2h partial matches planningCommitments in both units', () => {
+    const requests = [make('week', '2027-03-01', '2027-03-05', 'requested'), make('appt', '2027-03-02', '2027-03-02', 'approved', 120)];
+    const commitments = planningCommitments(requests, { start: '2027-02-02', end: '2027-12-31' }, { asOf: '2027-02-01', includesApprovedLeave: false }, { shiftMinutes: eight.shiftMinutes, hoursPerDay: 8 });
+    const days = forecastWithRequests(flat, '2027-12-31', requests)!;
+    expect(days.confirmed.scheduled).toBe(commitments.approvedPtoDays);
+    expect(days.tentative.scheduled).toBe(commitments.reservedPtoDayEquivalent);
+    expect(days.tentative.scheduled).toBe(5);
+    const hours = forecastWithRequests({ ...flat, unit: 'hours', currentBalance: 160 }, '2027-12-31', requests)!;
+    expect(hours.confirmed.scheduled).toBe(2);
+    expect(hours.tentative.scheduled).toBe(40);
+  });
+
+  it('Q1-3: two 4h partials on one 8h day charge one day (8 hours), as in the planner and Family', () => {
+    const requests = [make('am', '2027-03-02', '2027-03-02', 'approved', 240), make('pm', '2027-03-02', '2027-03-02', 'approved', 240)];
+    expect(forecastWithRequests(flat, '2027-12-31', requests)!.confirmed.scheduled).toBe(1);
+    expect(forecastWithRequests({ ...flat, unit: 'hours', currentBalance: 160 }, '2027-12-31', requests)!.confirmed.scheduled).toBe(8);
   });
 });

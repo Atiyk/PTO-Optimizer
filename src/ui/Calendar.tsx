@@ -32,7 +32,7 @@ interface CalendarProps {
    * of pinning a day (see DayCell). The sabbatical page omits them. */
   forcedStateOf?: (iso: string) => 'include' | 'exclude' | undefined;
   onSetDayState?: (date: string, state: 'include' | 'exclude' | null) => void;
-  pinPreview?: (date: string) => string | null;
+  pinPreview?: (date: string) => Promise<string | null>;
 }
 
 export function Calendar({

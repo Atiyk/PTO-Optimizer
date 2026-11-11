@@ -5,6 +5,7 @@ import { FEED_CALENDAR_NAME, MAX_FEED_QUERY_LENGTH } from '../autopilot/feed';
 import { feedWorkloadAllowed } from '../autopilot/feedHandler';
 import { planStateFromSearch } from '../autopilot/planFromSearch';
 import { isValidISODate } from './urlState';
+import { todayISO } from './today';
 import { buildPublicPlanSearch, publicPlanOmissions } from './publicSharePrivacy';
 
 export interface FeedLinks {
@@ -53,7 +54,7 @@ const PLAN_CAVEAT = 'After editing the plan, subscribe again to pick up your cha
 
 /** Mirrors the /api/feed bound so the page never offers a link the function will refuse. */
 function tooLargeForFeed(query: string): boolean {
-  const state = planStateFromSearch(query, new Date().toISOString().slice(0, 10));
+  const state = planStateFromSearch(query, todayISO());
   return isValidISODate(state.rangeStart) && isValidISODate(state.rangeEnd) && !feedWorkloadAllowed(state);
 }
 

@@ -1,12 +1,15 @@
 import { useId, useState } from 'react';
 import { REQUEST_STATUSES, calendarCoversRequest, calendarForSavedRequest, createPtoRequest, initialRequestDate, requestCalendarCoverageHint, requestConflicts, requestPtoDates, requestPtoMinutes, validRequestRange, type PtoRequest, type RequestCalendar, type RequestStatus } from '../personal/requestLedger';
 import type { RequestLedgerState } from './useRequestLedger';
+import { partialShiftMinutes, requestDayEquivalent, type WorkdaySchedule } from '../personal/workspace';
 import { Button } from './Button';
 import { compactDate, compactDatesIn } from './compactDate';
 import { formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
 import { DEFAULT_NOTICE_PERIOD_DAYS, submitByDate } from '../personal/outOfOffice';
+import { noticePhrase, type NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
 import { ApprovalAssistant } from './ApprovalAssistant';
 import { useTodayISO } from './useTodayISO';
+import { localDateISO } from './today';
 import { settleLedgerAction } from '../integration/browserWalletStore';
 
 const fieldClass = 'h-11 w-full min-w-0 rounded-[6px] border border-line-strong bg-surface px-3 text-[15px] font-normal text-ink';
@@ -22,22 +25,32 @@ const STATUS_COPY: Record<RequestStatus, { label: string; description: string }>
 
 const durationFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
 
-function requestCostLabel(days: number, minutes?: Readonly<Record<string, number>>) {
+/** Hours are the recorded unit; a partial day also shows its share of that day's shift. */
+function requestCostLabel(days: number, minutes?: Readonly<Record<string, number>>, partialDay?: { request: PtoRequest; schedule: WorkdaySchedule }) {
   if (minutes === undefined) return `${days} PTO ${days === 1 ? 'day' : 'days'}`;
   const hours = Object.values(minutes).reduce((sum, duration) => sum + duration, 0) / 60;
-  return `${durationFormat.format(hours)} PTO ${hours === 1 ? 'hour' : 'hours'}`;
+  const label = `${durationFormat.format(hours)} PTO ${hours === 1 ? 'hour' : 'hours'}`;
+  const date = partialDay?.request.partialMinutes !== undefined ? partialDay.request.start : undefined;
+  if (!partialDay || !date || partialShiftMinutes(partialDay.request, date, partialDay.schedule) === undefined) return label;
+  return `${label} · ${durationFormat.format(requestDayEquivalent(partialDay.request, date, partialDay.schedule))} day`;
 }
 
-function SubmitBy({ start, noticePeriodDays, calendar, today }: { start: string; noticePeriodDays: number; calendar: RequestCalendar; today: string }) {
-  const deadline = submitByDate(start, noticePeriodDays, calendar.workWeek, calendar.offDays);
+/** A stored ISO timestamp as the viewer's local calendar date (not its UTC date). */
+function updatedOn(timestamp: string): string {
+  const instant = new Date(timestamp);
+  return Number.isFinite(instant.getTime()) ? localDateISO(instant) : timestamp.slice(0, 10);
+}
+
+function SubmitBy({ start, noticePeriodDays, noticeUnit, calendar, today }: { start: string; noticePeriodDays: number; noticeUnit: NoticeUnit; calendar: RequestCalendar; today: string }) {
+  const deadline = submitByDate(start, noticePeriodDays, calendar.workWeek, calendar.offDays, noticeUnit);
   if (!deadline) return <p className="mt-1 text-sm text-muted">Submit-by date is unavailable for this work schedule.</p>;
-  const notice = `${noticePeriodDays}-day notice`;
+  const notice = `${noticePhrase(noticePeriodDays, noticeUnit)} notice`;
   return deadline < today
     ? <p className="mt-1 text-sm text-ink"><strong>Submit now</strong>: the {notice} window opened {compactDate(deadline)}.</p>
     : <p className="mt-1 text-sm text-muted"><strong className="font-semibold text-ink">Submit by {compactDate(deadline)}</strong> · {notice}</p>;
 }
 
-function RequestRow({ request, ledger, calendar, calendarReady, onStatusChanged, noticePeriodDays, today }: { request: PtoRequest; ledger: RequestLedgerState; calendar: RequestCalendar; calendarReady: boolean; onStatusChanged?: () => void; noticePeriodDays: number; today: string }) {
+function RequestRow({ request, ledger, calendar, calendarReady, onStatusChanged, noticePeriodDays, noticeUnit, today }: { request: PtoRequest; ledger: RequestLedgerState; calendar: RequestCalendar; calendarReady: boolean; onStatusChanged?: () => void; noticePeriodDays: number; noticeUnit: NoticeUnit; today: string }) {
   const id = useId();
   const [start, setStart] = useState(request.start);
   const [end, setEnd] = useState(request.end);
@@ -50,14 +63,14 @@ function RequestRow({ request, ledger, calendar, calendarReady, onStatusChanged,
   const preview = changedDates && calendarReady && pricedCalendar && !invalid && !outsideCoverage
     ? createPtoRequest({ ...request, start, end }, pricedCalendar, request.id, request.updatedAt)
     : null;
-  const savedCost = requestCostLabel(request.ptoDays, request.ptoMinutes);
+  const savedCost = requestCostLabel(request.ptoDays, request.ptoMinutes, { request, schedule: { shiftMinutes: calendar.shiftMinutes } });
   return (
     <article className="min-w-0 border-t border-line pt-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-lg font-bold text-ink type-condensed">{validRequestRange(request.start, request.end) ? formatCardDateRange(request.start, request.end) : `${compactDate(request.start)} – ${compactDate(request.end)}`}</h3>
         <p className="text-sm text-muted">{savedCost}</p>
       </div>
-      {request.status === 'planned' && request.start >= today && validRequestRange(request.start, request.end) && <SubmitBy start={request.start} noticePeriodDays={noticePeriodDays} calendar={calendar} today={today} />}
+      {request.status === 'planned' && request.start >= today && validRequestRange(request.start, request.end) && <SubmitBy start={request.start} noticePeriodDays={noticePeriodDays} noticeUnit={noticeUnit} calendar={calendar} today={today} />}
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <label className="min-w-0 text-sm text-muted">Start date
           <input type="date" aria-label={`Start date for request ${request.start}`} className={`${fieldClass} mt-1`} value={start} min={calendar.rangeStart} max={calendar.rangeEnd} disabled={!calendarReady || !pricedCalendar || savingDates} onChange={event => setStart(event.target.value)} />
@@ -105,7 +118,7 @@ function RequestRow({ request, ledger, calendar, calendarReady, onStatusChanged,
         }} />
       </details>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-muted">Updated {compactDate(request.updatedAt.slice(0, 10))}</p>
+        <p className="text-xs text-muted">Updated {compactDate(updatedOn(request.updatedAt))}</p>
         <Button variant="quiet" size="sm" onClick={() => ledger.deleteRequest(request.id)} aria-label={`Delete request ${request.start}`}>Delete request</Button>
       </div>
     </article>
@@ -122,11 +135,13 @@ export interface PtoTrackerProps {
   today?: string;
   /** The planner's notice period (/pto). /policy has none, so the submit-by date uses the 14-day default there. */
   noticePeriodDays?: number;
+  /** Calendar or working days; default calendar. */
+  noticeUnit?: NoticeUnit;
   onTrackingStarted?: () => void;
   onStatusChanged?: () => void;
 }
 
-export function PtoTracker({ ledger, calendar, calendarReady = true, calendarNotice, forecastSummary, remainingPto, today, noticePeriodDays = DEFAULT_NOTICE_PERIOD_DAYS, onTrackingStarted, onStatusChanged }: PtoTrackerProps) {
+export function PtoTracker({ ledger, calendar, calendarReady = true, calendarNotice, forecastSummary, remainingPto, today, noticePeriodDays = DEFAULT_NOTICE_PERIOD_DAYS, noticeUnit = 'calendar', onTrackingStarted, onStatusChanged }: PtoTrackerProps) {
   const id = useId();
   const effectiveToday = useTodayISO(today);
   const [start, setStart] = useState(() => initialRequestDate(effectiveToday, calendar));
@@ -192,7 +207,8 @@ export function PtoTracker({ ledger, calendar, calendarReady = true, calendarNot
         }}>Track these dates</Button>
       </details>
       {ledger.message && <p role="status" className="mt-4 text-sm text-muted">{compactDatesIn(ledger.message)}</p>}
-      {!ledger.storageAvailable && <p role="status" className="mt-4 border-l-2 border-ink pl-3 text-sm text-ink">Browser storage is unavailable. Your tracker works for this visit, but changes may disappear when you leave.</p>}
+      {ledger.storageNotice && <p role="status" data-testid="ledger-storage-notice" className="mt-4 border-l-2 border-ink pl-3 text-sm text-ink">{ledger.storageNotice}</p>}
+      {!ledger.storageAvailable && !ledger.storageNotice && <p role="status" className="mt-4 border-l-2 border-ink pl-3 text-sm text-ink">Browser storage is unavailable. Your tracker works for this visit, but changes may disappear when you leave.</p>}
       {conflicts.length > 0 && <p className="mt-4 flex gap-2 border-l-2 border-ink pl-3 text-sm text-ink">Some request dates overlap. They are flagged here and deducted only once in the balance forecast. Review the dates before requesting leave.</p>}
       <div className="mt-5 flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-ink">{showPast ? 'All tracked requests' : 'Upcoming requests'}</p>
@@ -200,7 +216,7 @@ export function PtoTracker({ ledger, calendar, calendarReady = true, calendarNot
       </div>
       <div className="mt-3 space-y-3">
         {visible.length === 0 ? <p className="text-sm leading-6 text-muted">No {showPast ? '' : 'upcoming '}time off saved. Save a recommended break from the planner or add dates above.</p>
-          : visible.map((request) => <RequestRow key={`${request.id}:${request.start}:${request.end}`} request={request} ledger={ledger} calendar={calendar} calendarReady={calendarReady} onStatusChanged={onStatusChanged} noticePeriodDays={noticePeriodDays} today={effectiveToday} />)}
+          : visible.map((request) => <RequestRow key={`${request.id}:${request.start}:${request.end}`} request={request} ledger={ledger} calendar={calendar} calendarReady={calendarReady} onStatusChanged={onStatusChanged} noticePeriodDays={noticePeriodDays} noticeUnit={noticeUnit} today={effectiveToday} />)}
       </div>
       <p className="mt-4 text-xs leading-5 text-muted">Saved in this browser. Notes and statuses stay private. You can review the updated PTO cost before saving date edits.</p>
     </section>

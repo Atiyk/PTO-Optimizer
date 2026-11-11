@@ -1,4 +1,5 @@
-import { isoToSerial, mondayIndexedDow, serialToISO } from '@daysoff/engine/solver/dateUtils';
+import { isoToSerial, mondayIndexedDow, rangeISO, serialToISO } from '@daysoff/engine/solver/dateUtils';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { isValidISODate } from '../ui/urlState';
 import { MAX_SCHOOL_CALENDAR_DAYS } from './schoolCalendar';
 
@@ -12,6 +13,22 @@ export const MAX_FAMILY_PTO = 60;
 export const MAX_FAMILY_WINDOW_DAYS = 1096;
 const MAX_LABEL_LENGTH = 200;
 
+/**
+ * The days a parent is already off in [start, end]: every day their own workweek does not
+ * work (Monday-indexed, so a Sunday to Thursday or weekend-shift week is modelled as is),
+ * plus `offDays` (observed public and employer holidays, alternate Fridays, whole days of
+ * approved or tentative leave). An invalid or all-zero week falls back to Monday to Friday,
+ * the same bounded substitution links get, so a parent never reads as never working.
+ */
+export function familyParentFreeDays({ start, end, workWeek, offDays }: {
+  start: string; end: string; workWeek: readonly boolean[]; offDays: Iterable<string>;
+}): string[] {
+  if (!isValidISODate(start) || !isValidISODate(end) || end < start) return [];
+  const week = workWeek.length === 7 && workWeek.some(Boolean) ? workWeek : DEFAULT_WORK_WEEK;
+  const off = new Set(offDays);
+  return rangeISO(start, end).filter(date => !week[mondayIndexedDow(date)] || off.has(date));
+}
+
 export interface FamilyPlanInput {
   /** Inclusive planning window, at most 1096 days. */
   start: string;
@@ -20,7 +37,8 @@ export interface FamilyPlanInput {
   schoolOffDays: readonly string[];
   /** Public preset labels, date -> label. Optional. */
   schoolLabels?: Readonly<Record<string, string>>;
-  /** Dates the parent is already off: weekends per their workweek + public/employer holidays. */
+  /** Dates the parent is already off (familyParentFreeDays): rest days of their own workweek,
+   * observed public/employer holidays and whole days of tracked leave. */
   parentFreeDays: readonly string[];
   /** PTO days the parent is willing to spend on school breaks, 0..MAX_FAMILY_PTO. */
   ptoBudget: number;

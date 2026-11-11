@@ -36,7 +36,7 @@ interface MonthGridProps {
   onArrow?: (from: string, direction: 'left' | 'right' | 'up' | 'down' | 'home' | 'end') => void;
   forcedStateOf?: (iso: string) => 'include' | 'exclude' | undefined;
   onSetDayState?: (date: string, state: 'include' | 'exclude' | null) => void;
-  pinPreview?: (date: string) => string | null;
+  pinPreview?: (date: string) => Promise<string | null>;
 }
 
 const WEEKDAY_LABELS_MONDAY = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];

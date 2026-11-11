@@ -214,14 +214,18 @@ describe('legacy consumer URLs keep valid plans and repair unsafe outcomes', () 
     }
   });
 
-  it('removes unfunded February alternatives while preserving the valid March primary', () => {
+  it('removes unfunded early alternatives while preserving the valid funded primary', () => {
     const policy: SolveInput = {
       offDays: ['2027-02-15'], rangeStart: '2027-01-01', rangeEnd: '2027-03-31',
       budget: 2, accrualPerMonth: 1.25, w: 10, breakCount: 1, country: 'US',
     };
     const legacy = solve(policy);
-    expect(legacy.primary[0].start).toBe('2027-03-04');
-    expect(legacy.alternatives.some((alternative) => alternative.start === '2027-02-18' && alternative.end === '2027-02-21')).toBe(true);
+    // Fri Feb 26-Mon Mar 1 (2 PTO, 4 days) ties the old Mar 4-7 and starts earlier; it
+    // is funded day by day (1.25 earned by Feb 26, 2.5 by Mar 1).
+    expect(legacy.primary[0].start).toBe('2027-02-26');
+    // The legacy alternatives fall in January, before any PTO has accrued.
+    expect(legacy.alternatives.length).toBeGreaterThan(0);
+    expect(legacy.alternatives.every((alternative) => alternative.start < '2027-02-01')).toBe(true);
     const safe = solveLegacyConsumer(policy);
     expect(safe.issue).toBeUndefined();
     expect(safe.result.primary).toEqual(legacy.primary);

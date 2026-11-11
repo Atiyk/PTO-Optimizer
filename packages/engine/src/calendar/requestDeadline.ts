@@ -1,7 +1,7 @@
 import { isValidWorkWeek, type Break, type WorkWeek } from '../solver/types';
 import { addDays, isoToSerial, mondayIndexedDow, serialToISO } from '../solver/dateUtils';
 import { formatShort } from './dateFormat';
-import { searchWorkday } from './workdaySearch';
+import { MAX_WORKDAY_SEARCH_DAYS, searchWorkday } from './workdaySearch';
 
 const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -20,17 +20,67 @@ export function nearestPrecedingWorkday(date: string, workWeek: WorkWeek, offDay
 }
 
 /**
- * The request-by date: `noticePeriodDays` before the break starts, shifted to a working
- * day. Deliberately the exact same subtraction icsExport.ts's reminder uses - per spec,
- * "the request-by date must match the .ics reminder dates, not contradict them." Both read
- * from the SAME noticePeriodDays number (see useAppState.ts), which is what makes
- * agreement structural rather than something that could drift apart.
+ * How a notice period is counted.
+ *  - 'calendar': N calendar days before the break starts.
+ *  - 'working': N of the user's own working days before the break starts (their workweek,
+ *    alternate Fridays and employer-observed days off all excluded).
  */
-export function requestByDate(breakStart: string, noticePeriodDays: number, workWeek: WorkWeek, offDays: readonly string[] = []): string | null {
-  if (serialToISO(isoToSerial(breakStart)) !== breakStart
-    || !Number.isSafeInteger(noticePeriodDays) || noticePeriodDays < 0) return null;
-  const raw = addDays(breakStart, -noticePeriodDays);
-  return nearestPrecedingWorkday(raw, workWeek, offDays);
+export type NoticeUnit = 'calendar' | 'working';
+
+/** Whole days of notice: fractions round UP, so a deadline is never later than the policy. */
+function wholeNoticeDays(noticeDays: number): number | null {
+  return Number.isFinite(noticeDays) && noticeDays >= 0 ? Math.ceil(noticeDays) : null;
+}
+
+/**
+ * THE request-by date - the one canonical deadline every surface uses (break card, email
+ * draft, PTO tracker "Submit by", .ics/feed "book by" reminders and reminder emails), so
+ * they cannot disagree for the same inputs. Per spec, "the request-by date must match the
+ * .ics reminder dates, not contradict them."
+ *
+ * Rule:
+ *  - calendar notice: the first working day of the break (its start, or the first working
+ *    day after any free days it opens with) minus N calendar days; when that day is not a working day
+ *    (non-working weekday or an employer/observed day off) it rolls BACK to the previous
+ *    working day - a deadline on a day nobody is at work is useless.
+ *  - working notice: the Nth working day strictly before the break start. N = 0 is the start
+ *    day itself if worked, else the previous working day (same as calendar N = 0).
+ * Returns null for an invalid date/notice, or when no working day is found within the
+ * bounded search (MAX_WORKDAY_SEARCH_DAYS per step, see workdaySearch.ts).
+ */
+export function requestByDate(breakStart: string, noticePeriodDays: number, workWeek: WorkWeek, offDays: readonly string[] = [], unit: NoticeUnit = 'calendar'): string | null {
+  const days = wholeNoticeDays(noticePeriodDays);
+  if (serialToISO(isoToSerial(breakStart)) !== breakStart || days === null) return null;
+  if (unit !== 'working') {
+    // Notice runs up to the first day the person is actually away. A break that opens on a
+    // free weekend or employer day off (breaks include adjacent free days) starts its
+    // absence on the next working day, so the calendar count is anchored there.
+    const off = new Set(offDays);
+    const firstAway = isValidWorkWeek(workWeek)
+      ? searchWorkday(breakStart, 1, (day) => workWeek[mondayIndexedDow(day)] && !off.has(day)) ?? breakStart
+      : breakStart;
+    return nearestPrecedingWorkday(addDays(firstAway, -days), workWeek, offDays);
+  }
+  // A working-day notice longer than the search horizon has no meaningful answer, and an
+  // unbounded count would freeze the page on a hostile link.
+  if (days > MAX_WORKDAY_SEARCH_DAYS || !isValidWorkWeek(workWeek)) return null;
+  let date = nearestPrecedingWorkday(breakStart, workWeek, offDays);
+  if (date === null) return null;
+  // Already on/before the start; when the start itself is a working day it is day zero,
+  // not one of the N notice days.
+  let counted = date === breakStart ? 0 : 1;
+  if (days === 0) return date;
+  while (counted < days) {
+    date = nearestPrecedingWorkday(addDays(date, -1), workWeek, offDays);
+    if (date === null) return null;
+    counted++;
+  }
+  return date;
+}
+
+/** The notice period as an adjective: "14-day", "5-working-day". */
+export function noticePhrase(noticeDays: number, unit: NoticeUnit = 'calendar'): string {
+  return unit === 'working' ? `${noticeDays}-working-day` : `${noticeDays}-day`;
 }
 
 /** Exported (landing page): the countdown and holiday list both need a full weekday name -
@@ -46,8 +96,8 @@ export function weekdayName(iso: string): string {
  *    example ("Request this week - the notice window closes Friday").
  *  - otherwise: the plain "Request by <date> - N days from now" countdown.
  */
-export function requestByText(breakStart: string, noticePeriodDays: number, workWeek: WorkWeek, today: string, offDays: readonly string[] = []): string {
-  const deadline = requestByDate(breakStart, noticePeriodDays, workWeek, offDays);
+export function requestByText(breakStart: string, noticePeriodDays: number, workWeek: WorkWeek, today: string, offDays: readonly string[] = [], unit: NoticeUnit = 'calendar'): string {
+  const deadline = requestByDate(breakStart, noticePeriodDays, workWeek, offDays, unit);
   if (!deadline) return 'Request deadline is unavailable for these dates and work schedule.';
   const daysUntil = isoToSerial(deadline) - isoToSerial(today);
   if (daysUntil <= 0) {

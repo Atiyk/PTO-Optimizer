@@ -1,6 +1,7 @@
 import type { ISODate, WorkWeek } from '@daysoff/engine/solver/types';
 import { addDays, isoToSerial, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { isValidISODate } from '../ui/urlState';
+import { guardedWrite, recordRevision, stampRecord, type GuardedWriteResult } from './storageRecord';
 
 export const REQUEST_STORAGE_KEY = 'gapless.personal.requests.v1';
 export const REQUEST_CHANGE_EVENT = 'gapless:requests-changed';
@@ -38,6 +39,9 @@ export interface PtoRequest {
   /** When present, actual native hours priced with the request calendar. */
   ptoMinutes?: Readonly<Record<ISODate, number>>;
   partialMinutes?: number;
+  /** For a partial day: the scheduled shift it was priced against, so its day share never
+   * depends on a schedule saved later. Absent on requests saved before P1 fixes. */
+  partialShiftMinutes?: number;
   status: RequestStatus;
   note: string;
   createdAt: string;
@@ -131,6 +135,8 @@ export function createPtoRequest(input: RequestInput, calendar: RequestCalendar,
     id, start: input.start, end: input.end, ptoDates, ptoDays: ptoDates.length,
     ...(ptoMinutes ? { ptoMinutes } : {}),
     ...(input.partialMinutes !== undefined ? { partialMinutes: input.partialMinutes } : {}),
+    ...(input.partialMinutes !== undefined && validMinutes(calendar.shiftMinutes?.[mondayIndexedDow(input.start)])
+      ? { partialShiftMinutes: calendar.shiftMinutes![mondayIndexedDow(input.start)] } : {}),
     status, note: (input.note ?? '').slice(0, 1000), createdAt: now, updatedAt: now,
   };
 }
@@ -153,12 +159,23 @@ export function calendarForSavedRequest(request: PtoRequest, calendar: RequestCa
   return calendar.shiftMinutes === undefined ? null : calendar;
 }
 
+export type LedgerRecovery = 'unreadable' | 'partial' | 'newer-version';
+
 export function parseRequestLedger(raw: string | null): PtoRequest[] {
-  if (!raw || raw.length > 1_000_000) return [];
+  return parseLedgerRecord(raw).requests;
+}
+
+/** Parse and say whether anything stored was left unread, so a write can preserve it first. */
+export function parseLedgerRecord(raw: string | null): { requests: PtoRequest[]; recovery?: LedgerRecovery } {
+  if (raw === null) return { requests: [] };
+  if (!raw || raw.length > 1_000_000) return { requests: [], recovery: 'unreadable' };
   try {
     const envelope: unknown = JSON.parse(raw);
+    if (envelope && typeof envelope === 'object' && 'version' in envelope && typeof envelope.version === 'number' && envelope.version > 1) {
+      return { requests: [], recovery: 'newer-version' };
+    }
     if (!envelope || typeof envelope !== 'object' || !('version' in envelope) || envelope.version !== 1
-      || !('requests' in envelope) || !Array.isArray(envelope.requests)) return [];
+      || !('requests' in envelope) || !Array.isArray(envelope.requests)) return { requests: [], recovery: 'unreadable' };
     const seen = new Set<string>();
     const result: PtoRequest[] = [];
     for (const item of envelope.requests.slice(0, MAX_REQUESTS)) {
@@ -177,18 +194,21 @@ export function parseRequestLedger(raw: string | null): PtoRequest[] {
         || !ptoDates.every(date => Object.hasOwn(minutes, date) && validMinutes(minutes[date])))) continue;
       if (item.partialMinutes !== undefined && (!validMinutes(item.partialMinutes) || item.start !== item.end
         || ptoDates.length !== 1 || minutes?.[item.start] !== item.partialMinutes)) continue;
+      if (item.partialShiftMinutes !== undefined && (item.partialMinutes === undefined || !validMinutes(item.partialShiftMinutes)
+        || item.partialShiftMinutes < item.partialMinutes)) continue;
       result.push({
         id: item.id, start: item.start, end: item.end, status: item.status,
         ptoDates, ptoDays: ptoDates.length, note: item.note.slice(0, 1000),
         ...(minutes === undefined ? {} : { ptoMinutes: Object.fromEntries(ptoDates.map(date => [date, minutes[date]])) }),
         ...(item.partialMinutes === undefined ? {} : { partialMinutes: item.partialMinutes }),
+        ...(item.partialShiftMinutes === undefined ? {} : { partialShiftMinutes: item.partialShiftMinutes }),
         createdAt: item.createdAt, updatedAt: item.updatedAt,
       });
       seen.add(item.id);
     }
-    return result;
+    return result.length === envelope.requests.length ? { requests: result } : { requests: result, recovery: 'partial' };
   } catch {
-    return [];
+    return { requests: [], recovery: 'unreadable' };
   }
 }
 
@@ -196,20 +216,46 @@ export function browserRequestStorage(): RequestStorage | null {
   try { return typeof window === 'undefined' ? null : window.localStorage; } catch { return null; }
 }
 
-export function readRequestLedger(storage: RequestStorage | null = browserRequestStorage()): { requests: PtoRequest[]; available: boolean } {
+export interface StoredLedger {
+  requests: PtoRequest[];
+  available: boolean;
+  /** The stored revision this read was based on; pass it back to saveRequestLedger. */
+  revision?: string;
+  /** Stored data this read could not use. It is preserved before any write. */
+  recovery?: LedgerRecovery;
+}
+
+export function readRequestLedger(storage: RequestStorage | null = browserRequestStorage()): StoredLedger {
   if (!storage) return { requests: [], available: false };
-  try { return { requests: parseRequestLedger(storage.getItem(REQUEST_STORAGE_KEY)), available: true }; }
+  try {
+    const raw = storage.getItem(REQUEST_STORAGE_KEY);
+    const { requests, recovery } = parseLedgerRecord(raw);
+    return { requests, available: true, revision: recordRevision(raw), ...(recovery ? { recovery } : {}) };
+  }
   catch { return { requests: [], available: false }; }
 }
 
-export function writeRequestLedger(requests: readonly PtoRequest[], storage: RequestStorage | null = browserRequestStorage()): boolean {
-  if (!storage) return false;
-  try {
-    const serialized = JSON.stringify({ version: 1, requests: requests.slice(0, MAX_REQUESTS) });
-    if (serialized.length > 1_000_000) return false;
-    storage.setItem(REQUEST_STORAGE_KEY, serialized);
-    return true;
-  } catch { return false; }
+/**
+ * Versioned write: refuses a stale revision and a newer schema, quarantines anything the
+ * stored ledger held that this version could not read, and backs up a pre-revision record.
+ */
+export function saveRequestLedger(
+  requests: readonly PtoRequest[], storage: RequestStorage | null = browserRequestStorage(), expectedRevision?: string,
+): GuardedWriteResult {
+  if (!storage) return { status: 'unavailable' };
+  let serialized: string;
+  try { serialized = stampRecord({ version: 1, requests: requests.slice(0, MAX_REQUESTS) }); }
+  catch { return { status: 'unavailable' }; }
+  if (serialized.length > 1_000_000) return { status: 'unavailable' };
+  return guardedWrite(storage, REQUEST_STORAGE_KEY, serialized, {
+    expectedRevision,
+    isClean: raw => parseLedgerRecord(raw).recovery === undefined,
+    isNewer: raw => parseLedgerRecord(raw).recovery === 'newer-version',
+  });
+}
+
+export function writeRequestLedger(requests: readonly PtoRequest[], storage: RequestStorage | null = browserRequestStorage(), expectedRevision?: string): boolean {
+  return saveRequestLedger(requests, storage, expectedRevision).status === 'saved';
 }
 
 export function isActiveRequest(request: PtoRequest): boolean {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { defaultEmployerCalendar, encodeEmployerCalendar, decodeEmployerCalendar, readEmployerCalendar, saveEmployerCalendar, deleteEmployerCalendar, validCalendarDate } from './employerCalendar';
+import { defaultEmployerCalendar, encodeEmployerCalendar, decodeEmployerCalendar, readEmployerCalendar, saveEmployerCalendar, deleteEmployerCalendar, validCalendarDate, writeEmployerCalendar, EMPLOYER_STORAGE_PREFIX } from './employerCalendar';
 
 describe('employer calendar storage and shared state', () => {
   beforeEach(() => localStorage.clear());
@@ -36,5 +36,28 @@ describe('employer calendar storage and shared state', () => {
     const set = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('disabled'); });
     expect(saveEmployerCalendar(defaultEmployerCalendar('US'))).toBe(false);
     set.mockRestore();
+  });
+});
+
+describe('employer calendar saves across tabs', () => {
+  beforeEach(() => localStorage.clear());
+  const key = `${EMPLOYER_STORAGE_PREFIX}US:`;
+  const withHoliday = (name: string) => ({ ...defaultEmployerCalendar('US'), custom: [{ date: '2027-06-01', name }] });
+
+  it('refuses to overwrite a calendar another tab saved after this one loaded it, then replaces it on a second save', () => {
+    readEmployerCalendar('US');
+    const otherTab = encodeEmployerCalendar(withHoliday('Other tab'));
+    localStorage.setItem(key, otherTab);
+    expect(writeEmployerCalendar(withHoliday('This tab'))).toBe('stale');
+    expect(localStorage.getItem(key)).toBe(otherTab);
+    expect(writeEmployerCalendar(withHoliday('This tab'))).toBe('saved');
+    expect(readEmployerCalendar('US').custom[0].name).toBe('This tab');
+  });
+
+  it('quarantines an unreadable saved calendar before replacing it', () => {
+    localStorage.setItem(key, '1.["US",');
+    expect(readEmployerCalendar('US')).toEqual(defaultEmployerCalendar('US'));
+    expect(writeEmployerCalendar(withHoliday('Fresh'))).toBe('saved');
+    expect(JSON.parse(localStorage.getItem(`${key}.quarantine`)!)[0].raw).toBe('1.["US",');
   });
 });

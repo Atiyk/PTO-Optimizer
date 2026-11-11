@@ -165,11 +165,18 @@ export function ImportSources({
   };
 
   const acceptIcs = (text: string, source: string) => {
-    const result = parseICSBusyDays(text);
+    // Issue 16: repeating closures are expanded across this school year (Jul 1 to Sep 30
+    // of the next year, so a late summer start is included). Anything not fully imported
+    // blocks the whole import rather than offering a partial list as if it were complete.
+    const result = parseICSBusyDays(text, { window: { start: `${schoolYearStart}-07-01`, end: `${schoolYearStart + 1}-09-30` } });
     if (result.skippedRecurring > 0 || result.cappedAt !== null) {
-      setIcsError(result.skippedRecurring > 0
-        ? 'This calendar contains repeating events that cannot be imported completely. Export individual dates from your school calendar or add the closure dates below.'
-        : 'This calendar has more events than can be imported completely. Export just the school year you need or add the closure dates below.');
+      const { unsupported, unsupportedReasons, truncated } = result.recurrence;
+      const plural = (n: number) => `${n} repeating event${n === 1 ? '' : 's'}`;
+      setIcsError(unsupported > 0
+        ? `Import incomplete: ${plural(unsupported)} ${unsupported === 1 ? 'uses a pattern' : 'use patterns'} we can’t read (${unsupportedReasons.join(', ')}). Export individual dates from your school calendar or add the closure dates below.`
+        : truncated > 0
+          ? `Import incomplete: ${plural(truncated)} ${truncated === 1 ? 'repeats' : 'repeat'} too many times to import completely. Export just the school year you need or add the closure dates below.`
+          : 'This calendar has more events than can be imported completely. Export just the school year you need or add the closure dates below.');
       return;
     }
     if (result.busyDays.length === 0) {

@@ -94,7 +94,8 @@ describe('tracker employer calendar coverage', () => {
     expect(button.disabled).toBe(false);
     fireEvent.click(button);
     expect(saved()[0]).toMatchObject({ partialMinutes: 240, ptoMinutes: { '2027-01-04': 240 } });
-    expect(screen.getByText('4 PTO hours')).toBeTruthy();
+    // Hours stay the recorded unit; the day share uses that weekday's 9h shift.
+    expect(screen.getByText('4 PTO hours · 0.44 day')).toBeTruthy();
   });
   it('keeps historical costs when status changes under a different ready employer calendar', () => {
     seed();

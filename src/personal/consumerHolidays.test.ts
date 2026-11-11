@@ -101,6 +101,24 @@ describe('consumer nominal-year holiday lookup', () => {
     expect(provider.withStatus).toHaveBeenCalledExactlyOnceWith('US', '2026-01-01', '2026-12-31', undefined);
   });
 
+  it('passes uncovered years through, limited to the years the plan range itself touches (issue 17)', async () => {
+    provider.withStatus.mockResolvedValue({ holidays: [], degraded: false, uncoveredYears: [2029, 2030] });
+    expect(await getConsumerHolidaysWithStatus('US', '2029-01-01', '2029-12-31'))
+      .toEqual({ holidays: [], degraded: false, uncoveredYears: [2029] });
+    // A range ending Dec 31, 2032 also looks up Jan 1, 2033 (a Saturday) for the observed day;
+    // that lookup-only year is not part of the plan and is not reported.
+    provider.withStatus.mockResolvedValue({ holidays: [], degraded: false, uncoveredYears: [2032, 2033] });
+    expect(await getConsumerHolidaysWithStatus('US', '2032-01-01', '2032-12-31'))
+      .toEqual({ holidays: [], degraded: false, uncoveredYears: [2032] });
+    expect(provider.withStatus).toHaveBeenLastCalledWith('US', '2032-01-01', '2033-01-01', undefined);
+  });
+
+  it('drops malformed uncovered-year data rather than inventing coverage claims', async () => {
+    provider.withStatus.mockResolvedValue({ holidays: [], degraded: false, uncoveredYears: ['2029', 2029.5, 2029] });
+    expect(await getConsumerHolidaysWithStatus('US', '2029-01-01', '2029-12-31'))
+      .toEqual({ holidays: [], degraded: false, uncoveredYears: [2029] });
+  });
+
   it('returns a degraded empty calendar when an unexpected provider rejection occurs', async () => {
     provider.withStatus.mockRejectedValue(new Error('Malformed cached holiday payload'));
     await expect(getConsumerHolidaysWithStatus('US', '2027-12-01', '2027-12-31'))

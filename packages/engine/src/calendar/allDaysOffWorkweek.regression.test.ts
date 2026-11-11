@@ -62,8 +62,9 @@ describe('no user-controlled schedule starts an unbounded search', () => {
     const offDays = rangeISO('2000-01-03', '2030-12-30').filter((d) => mondayIndexedDow(d) === 0);
     expect(nearestPrecedingWorkday('2030-12-31', MONDAY_ONLY, offDays)).toBeNull();
     expect(requestByDate('2030-12-31', 14, MONDAY_ONLY, offDays)).toBeNull();
-    // rangeISO above does not go through addDays; only the searches count.
-    expect(guard.calls).toBeLessThanOrEqual(2 * (MAX_WORKDAY_SEARCH_DAYS + 1));
+    // rangeISO above does not go through addDays; only the searches count: one forward
+    // search for the first day away, then the backward deadline search.
+    expect(guard.calls).toBeLessThanOrEqual(3 * (MAX_WORKDAY_SEARCH_DAYS + 1));
   });
 
   it('keeps the existing answers for ordinary schedules', () => {
