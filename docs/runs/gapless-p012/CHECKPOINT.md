@@ -34,12 +34,22 @@ source of truth between scheduled executions. No sensitive user data belongs her
 
 ## Issue traceability
 
-(filled during audit; one row per issue: current behavior, evidence, root cause, owner, files, tests, critic, batch)
+| # | Sev | Owner | Branch @ SHA | Root cause / finding | Fix | Tests | Critic | Batch |
+|---|---|---|---|---|---|---|---|---|
+| 10 | P0 | B | p0-b-workweek @ 5c252f0 | Real infinite loop in engine `teamPlan.ts` blocksFor with workweek 0000000 (B2B planShape); deadline search walked ~11k days; `returnToWorkDate` invented end+1; `/policy` accepted ww=0000000 | `workdaySearch.ts` 732-day bound returning null; null handled in OOO/approval/ICS; link notice for invalid workweek | 5 engine + 9 consumer, failing first | pending | P0 |
+| 2 | P0 | P | p0-p-share-privacy @ 60c76b9 | Much fixed by #131/#134/#137/#140. Remaining: address bar blocklist (not allowlist); feed CDN-cached legacy private params; Vercel beforeSend spread extra fields; 3 drifting private-key lists | `shareFormat.ts` v1 allowlist, partitions, feed private no-store, analytics {type,url} | 23 added | pending | P0 |
+| 1 | P0 | W | p0-w-workspace-ledger @ 76274c2 | Forecast, expiry guard, planner, family each had own request-charge rules | `src/personal/workspace.ts` single deduction rule + `usePersonalWorkspace` | 15 added | pending | P0 |
+| 11 | P0 | W | same | Planner ignored planned/requested; approved reserve default off (disagreed with My PTO); expiry guard double-counted; family ignored ledger | same | same | pending | P0 |
+| 16, 17 | P1 | C | p1-c-ics-holidays (in progress) | — | — | — | — | P1 |
+
+Residual risks noted by P (not fixed): `/api/watch` and reminder-email links carry balance by design after opt-in; `/api/inbound` secret in query string; browser history keeps originally-opened URLs.
 
 ## Log
 
 - 2026-11-11T06:17Z — Execution 1 started. Repo inspected, scheduler created, checkpoint created.
 
+- 2026-11-11 ~06:50Z — B, P, W reports in; merged locally into gapless/p0-release. W asked to keep tracked breaks visible (override of 'disappear on track').
+
 ## Next action
 
-Audit issues 1, 2, 10, 11 against `27e4a158`; implement P0.
+W follow-up (tracked breaks visible) → full checks → push gapless/p0-release, open P0 release PR → independent critic on exact SHA → fixes → GO → merge → Vercel READY → prod smoke.
