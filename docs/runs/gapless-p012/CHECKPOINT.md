@@ -70,6 +70,8 @@ Residual risks noted by P (not fixed): `/api/watch` and reminder-email links car
 - 2026-11-11 ~12:45Z–16:20Z — Plan usage limit hit again (2 agents). S and T stopped mid-work; uncommitted progress preserved in /home/user/p1s and /home/user/p1t. Hourly wakes 13:22–15:19 had nothing runnable.
 - 2026-11-11T16:20Z — Execution 3 (16:17 slot). S and T resumed with ~45 min budgets.
 
+- ~16:40Z — T done (issue 7): root cause of prod forecast flake = prerendered enabled inputs replaced by createRoot; fixed by wrapping prerendered snapshot in disabled fieldset (5d1cd70). Hover pin previews moved to a worker with stale-result guard (6119c58); worst long task 1747 ms → 61 ms (4x CPU, 2y, b=60). Vitest 2006 pass, tsc, lint 0 err, build OK, journey 8/8 product, consumer-qa 40/40. Fast-forwarded into `gapless/p1-release` @ 6119c58 (pushed). Note: `npm run verify:dist` hash would need `--write` (manual script, not a CI gate). Agent C started on issue 12 in /home/user/p1c.
+
 ## Next action
 
 Merge S and T results into `gapless/p1-release` when done; then start 9 (snapshots, P) and 12 (family work calendars, C). Then critic Q on exact P1 SHA, open P1 release PR, CI, merge, prod smoke (push gapless/prod-smoke).
