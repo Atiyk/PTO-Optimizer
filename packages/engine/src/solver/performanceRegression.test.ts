@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { rangeISO } from './dateUtils';
 import { solve } from './solve';
+import { PLANNER_REVISION } from './revision';
 import type { SolveInput } from './types';
 
 // Full-result fingerprints. These include alternatives, tags and tie-breaking, rather
@@ -68,5 +69,16 @@ describe('DP performance optimizations preserve legacy plans', () => {
     expect(result.budgetSpent).toBe(4);
     expect(result.primary[0].start).toBe('2026-01-27');
     expect(result.primary[0].end).toBe('2026-02-01');
+  });
+});
+
+describe('planner revision (issue 9)', () => {
+  it('is bumped whenever the legacy plan fingerprints are re-captured', () => {
+    // Shared links record PLANNER_REVISION so recipients learn when a plan was
+    // recalculated. If you re-capture LEGACY_RESULTS for a deliberate plan change, bump
+    // PLANNER_REVISION in revision.ts and add the new digest here.
+    const digest = createHash('sha256').update(LEGACY_RESULTS.join(',')).digest('hex');
+    const KNOWN: Record<number, string> = { 2: 'f6f3b539770272dfe0e80c52eaab8f57fc9b05c43bcfdcab97d6933998f09c06' };
+    expect(KNOWN[PLANNER_REVISION]).toBe(digest);
   });
 });

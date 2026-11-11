@@ -22,6 +22,8 @@ import { track } from './analytics';
 import { validateInputs, isSupportedPlanningRange } from './validation';
 import { defaultRangeEnd, defaultPlanRangeEnd, holidayEntriesFor, stateHolidayCandidatesFor, altFridayOffDatesFor, effectiveOffDaysFor, mustIncludeDaysFor, effectiveBlackoutsFor, effectiveBudgetFor, policyAccrualFieldsFor, buildSolveInput, isSuggestedPtoDay, type HolidayEntry } from '../autopilot/planFromSearch';
 import { todayISO } from './today';
+import { PLANNER_REVISION } from '@daysoff/engine/solver/revision';
+import { publicHolidayFingerprint, type ShareSnapshot } from './shareSnapshot';
 import type { PtoRequest } from '../personal/requestLedger';
 import { committedPlanEntries, planningCommitments, type WorkdaySchedule } from '../personal/workspace';
 import { usePlannerComputation } from '../planning/usePlannerComputation';
@@ -206,6 +208,12 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     typeof localApprovalOptions?.apply === 'boolean' ? localApprovalOptions.apply : initial.publicShareVersion !== 1 && !initial.landingPreview,
   );
   const [useSharedHolidaySnapshot, setUseSharedHolidaySnapshot] = useState(initial.sharedObservedHolidays !== undefined);
+  // Issue 9: a public link reproduces the sender's plan, so the recipient's own saved
+  // company calendar (their private data) is not applied until they choose it, the same
+  // opt-in rule as their tracked requests. A same-tab draft of edits still wins.
+  const [useSharedPublicCalendar, setUseSharedPublicCalendar] = useState(
+    initial.publicShareVersion === 1 && initial.sharedObservedHolidays === undefined && !initial.employerCalendar,
+  );
   // Phase 3.1: "just in case" saving is the single largest reason PTO goes unused (44%).
   // Reserve days are subtracted from the budget BEFORE it reaches the solver - a plain
   // subtraction, no new solver logic - so the plan never asks for the user's entire
@@ -331,20 +339,28 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   const currentEmployerScope = employerScope(country, subdivision);
   const sharedObservedHolidays = useSharedHolidaySnapshot && country === initial.country && subdivision === initial.subdivision
     && rangeStart === initial.rangeStart && rangeEnd === initial.rangeEnd ? initial.sharedObservedHolidays : undefined;
-  const calendarForScope = useCallback(() => sharedObservedHolidays !== undefined
+  const sharedPublicCalendar = useSharedPublicCalendar && country === initial.country && subdivision === initial.subdivision;
+  const calendarForScope = useCallback(() => sharedObservedHolidays !== undefined || sharedPublicCalendar
     ? defaultEmployerCalendar(country, subdivision) : readEmployerCalendar(country, subdivision),
-    [sharedObservedHolidays, country, subdivision]);
+    [sharedObservedHolidays, sharedPublicCalendar, country, subdivision]);
+  const hasSavedCalendarOffForSharedPlan = useMemo(() => {
+    if (!sharedPublicCalendar && sharedObservedHolidays === undefined) return false;
+    const saved = readEmployerCalendar(country, subdivision);
+    return saved.custom.length > 0 || saved.excluded.length > 0;
+  }, [sharedPublicCalendar, sharedObservedHolidays, country, subdivision]);
   const [employerCalendars, setEmployerCalendars] = useState<Record<string, EmployerCalendar>>(() => ({
     [currentEmployerScope]: initial.employerCalendar ?? calendarForScope(),
   }));
   const employerCalendar = useMemo(() => employerCalendars[currentEmployerScope] ?? calendarForScope(), [employerCalendars, currentEmployerScope, calendarForScope]);
   const restoreMyEmployerCalendar = useCallback(() => {
     setUseSharedHolidaySnapshot(false);
+    setUseSharedPublicCalendar(false);
     setEmployerCalendars(previous => ({ ...previous, [currentEmployerScope]: readEmployerCalendar(country, subdivision) }));
   }, [currentEmployerScope, country, subdivision]);
   const [employerCalendarMessage, setEmployerCalendarMessage] = useState('');
   const updateEmployerCalendar = useCallback((update: (current: EmployerCalendar) => EmployerCalendar) => {
     setUseSharedHolidaySnapshot(false);
+    setUseSharedPublicCalendar(false);
     setEmployerCalendars(previous => {
       const next = update(previous[currentEmployerScope] ?? calendarForScope());
       if (!encodeEmployerCalendar(next)) { setEmployerCalendarMessage('This calendar is too large to share. Remove an entry before adding another.'); return previous; }
@@ -361,11 +377,16 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   }, [updateEmployerCalendar]);
   const saveEmployerHolidays = useCallback(() => {
     if (sharedObservedHolidays !== undefined) return;
+    // Saving the shared plan's public-only calendar would silently replace the saved one.
+    if (sharedPublicCalendar && hasSavedCalendarOffForSharedPlan) {
+      setEmployerCalendarMessage('Your saved calendar was not changed. This shared plan uses public holidays only. Choose "Use my saved calendar" to edit yours.');
+      return;
+    }
     const saved = writeEmployerCalendar(employerCalendar);
     setEmployerCalendarMessage(saved === 'saved' ? 'Employer calendar saved in this browser.'
       : saved === 'stale' ? 'Another tab saved a different employer calendar after this page loaded it. Nothing was overwritten. Save again to replace it with this plan\'s calendar.'
         : 'Browser storage is unavailable. Your changes still apply to this tab.');
-  }, [employerCalendar, sharedObservedHolidays]);
+  }, [employerCalendar, sharedObservedHolidays, sharedPublicCalendar, hasSavedCalendarOffForSharedPlan]);
   const resetEmployerHolidays = useCallback(() => {
     if (sharedObservedHolidays !== undefined) return;
     const removed = deleteEmployerCalendar(country, subdivision);
@@ -393,6 +414,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       subdivision,
       employerCalendar,
       publicShareVersion: initial.publicShareVersion,
+      sharedSnapshot: initial.sharedSnapshot,
       sharedObservedHolidays,
       landingPreview: initial.landingPreview,
       holidayFocusDate,
@@ -429,6 +451,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     subdivision,
     employerCalendar,
     initial.publicShareVersion,
+    initial.sharedSnapshot,
     sharedObservedHolidays,
     initial.landingPreview,
     holidayFocusDate,
@@ -545,6 +568,26 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   const nationalHolidays = preloadedNational ?? national?.holidays;
   const regionalHolidays = preloadedRegional ?? regional?.holidays;
   const holidaysReady = sharedObservedHolidays !== undefined || Boolean(nationalHolidays && (!subdivision || regionalHolidays));
+
+  // Issue 9: the snapshot a public link records. The fingerprint covers only the public
+  // national/regional holiday data for this scope - never the employer calendar - and is
+  // left out when the sender shares explicit dates (those already pin the holidays).
+  const publicHolidayDates = useMemo(() => !holidaysReady || sharedObservedHolidays !== undefined ? undefined
+    : holidayEntriesFor(nationalHolidays ?? NO_HOLIDAYS, regionalHolidays ?? NO_HOLIDAYS, defaultEmployerCalendar(country, subdivision), rangeStart, rangeEnd).map(entry => entry.date),
+  [holidaysReady, sharedObservedHolidays, nationalHolidays, regionalHolidays, country, subdivision, rangeStart, rangeEnd]);
+  const shareSnapshot: ShareSnapshot = useMemo(() => ({
+    plannerRevision: PLANNER_REVISION,
+    ...(publicHolidayDates ? { holidayFingerprint: publicHolidayFingerprint(publicHolidayDates) } : {}),
+  }), [publicHolidayDates]);
+  // What differs from the sender's run, for a recipient of a public link. Only public
+  // facts are compared; the sender's private adjustments are never known here.
+  const sameSharedScope = country === initial.country && subdivision === initial.subdivision
+    && rangeStart === initial.rangeStart && rangeEnd === initial.rangeEnd;
+  const sharedPlanDifferences = useMemo(() => initial.publicShareVersion !== 1 ? undefined : {
+    planner: initial.sharedSnapshot?.plannerRevision !== PLANNER_REVISION,
+    holidays: sameSharedScope && initial.sharedSnapshot?.holidayFingerprint !== undefined
+      && shareSnapshot.holidayFingerprint !== undefined && shareSnapshot.holidayFingerprint !== initial.sharedSnapshot.holidayFingerprint,
+  }, [initial.publicShareVersion, initial.sharedSnapshot, sameSharedScope, shareSnapshot]);
 
   const holidayEntries: HolidayEntry[] = useMemo(
     () => holidayEntriesFor(nationalHolidays ?? NO_HOLIDAYS, regionalHolidays ?? NO_HOLIDAYS, employerCalendar, rangeStart, rangeEnd, sharedObservedHolidays),
@@ -1037,6 +1080,9 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     isSharedPlan: initial.publicShareVersion === 1,
     isLandingPreview: initial.landingPreview === true,
     hasSharedHolidaySnapshot: sharedObservedHolidays !== undefined,
+    hasSavedCalendarOffForSharedPlan,
+    sharedPlanDifferences,
+    shareSnapshot,
     restoreMyEmployerCalendar,
     reserveApprovedPto,
     setReserveApprovedPto,

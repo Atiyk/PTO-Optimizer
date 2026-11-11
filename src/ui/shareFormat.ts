@@ -11,7 +11,9 @@
  *
  * Public share format, version 1 (`sv=1`): the PLAN_SHARE_KEYS below, each validated by
  * buildPublicPlanSearch (src/ui/publicSharePrivacy.ts). `ho` (observed holiday dates, no
- * labels) is written only when the sender explicitly opts in for that copy.
+ * labels) is written only when the sender explicitly opts in for that copy. `er` and `hf`
+ * (src/ui/shareSnapshot.ts) let the recipient detect a recalculated plan; both are derived
+ * from public data only.
  *
  * This module is a leaf (no imports) so urlState, publicSharePrivacy and familyUrlState
  * can all depend on it without cycles.
@@ -49,6 +51,8 @@ export const PLAN_URL_KEYS: Readonly<Record<string, UrlKeyClass>> = Object.freez
   // Share-link only.
   sv: 'share-only', // public share format version
   ho: 'share-only', // observed holiday dates the sender opted to share, without labels
+  er: 'share-only', // planner revision that made the link (src/ui/shareSnapshot.ts)
+  hf: 'share-only', // hash of the public holiday dates the sender's planner used; never private dates
   // Address bar only.
   lp: 'address-only', // arrived from the landing preview
   hx: 'address-only', // one-shot nonce for an on-device hand-off (src/ui/planHandoff.ts); stripped on load

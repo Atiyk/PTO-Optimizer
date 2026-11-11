@@ -410,7 +410,7 @@ try {
     await noOverflow(main); await forecastRegion(main).screenshot({ path: resolve(out, '02-approved-forecast-375.png') });
   });
 
-  await check('Employer calendar saves, resets, and public share preserves recipient preferences', async () => {
+  await check('Employer calendar saves, resets, and public share reproduces the sender plan without overwriting recipient preferences', async () => {
     const recipientContext = await mobileContext();
     const recipient = await open(recipientContext, holidayPath);
     await eventually(async () => assert.match(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Public holidays should load');
@@ -430,7 +430,12 @@ try {
     assert.equal(new URL(sharedDefault).searchParams.has('eh'), false, 'Copied public plans must not expose employer calendar overrides.');
     await recipient.goto(sharedDefault, { waitUntil: 'domcontentloaded' });
     await waitForPlanner(recipient);
-    await eventually(async () => assert.doesNotMatch(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Public plans must preserve the recipient saved holiday exclusions.');
+    // Issue 9: the shared plan is the sender's (public holidays); the recipient's saved
+    // calendar is offered, applied only on request, and never overwritten.
+    await eventually(async () => assert.match(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Public plans must reproduce the sender plan, not apply the recipient saved calendar.');
+    assert.match(await recipient.getByTestId('shared-plan-notice').innerText(), /saved company calendar isn.t applied/);
+    await recipient.getByRole('button', { name: 'Use my saved calendar', exact: true }).click();
+    await eventually(async () => assert.doesNotMatch(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Use my saved calendar must apply the recipient saved holiday exclusions.');
     assert.equal(await recipient.evaluate(() => localStorage.getItem('gapless.employer.v1:US:')), saved);
     await recipient.goto(new URL(holidayPath, origin).href, { waitUntil: 'domcontentloaded' });
     await waitForPlanner(recipient);

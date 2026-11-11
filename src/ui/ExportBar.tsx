@@ -13,6 +13,7 @@ import { SubscribeFeed } from './SubscribeFeed';
 import { EmailReminders } from './EmailReminders';
 import { ordinal } from './scoreFormat';
 import { buildPublicPlanLink, buildPublicPlanSearch, publicPlanOmissions } from './publicSharePrivacy';
+import type { ShareSnapshot } from './shareSnapshot';
 
 interface ExportBarProps {
   breaks: Break[];
@@ -40,6 +41,8 @@ interface ExportBarProps {
   planSearch?: string;
   /** The checked holiday dates for this plan, when calendar coverage is known. */
   observedHolidayDates?: readonly string[];
+  /** Public, non-identifying planner revision and holiday fingerprint (issue 9). */
+  shareSnapshot?: ShareSnapshot;
 }
 
 export interface ActionResult {
@@ -118,7 +121,7 @@ export function ExportBar(props: ExportBarProps) {
   const copyPlan = async (dates?: readonly string[]): Promise<ActionResult> => {
     if (typeof window === 'undefined') return { ok: false, message: "Couldn't copy — try again" };
     if (planSearch === undefined) return { ok: false, message: 'Plan link unavailable' };
-    const share = buildPublicPlanLink(window.location.href, planSearch, dates);
+    const share = buildPublicPlanLink(window.location.href, planSearch, dates, props.shareSnapshot);
     const ok = await copyText(share.url);
     if (ok) track('URL shared');
     return ok
