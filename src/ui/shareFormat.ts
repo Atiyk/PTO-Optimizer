@@ -66,6 +66,7 @@ export const PLAN_URL_KEYS: Readonly<Record<string, UrlKeyClass>> = Object.freez
   xd: 'private', // expiry date
   cc: 'private', // carryover cap
   np: 'private', // employer notice period
+  nu: 'private', // notice period unit: working days (absent = calendar days)
   pc: 'private', // employer peak cap
   pcs: 'private',
   pce: 'private',

@@ -35,7 +35,7 @@ const maximal: WriteStateInput = {
   workWeek: [true, true, true, true, false, false, false] as unknown as WorkWeek,
   forced: { '2027-02-02': 'include', '2027-02-09': 'exclude' },
   altFridayEnabled: true, altFridayStart: '2027-01-08',
-  reserveDays: 2, unlimitedPto: true, noticePeriodDays: 21,
+  reserveDays: 2, unlimitedPto: true, noticePeriodDays: 21, noticeUnit: 'working',
   peakCapEnabled: true, peakCapStart: '2027-06-01', peakCapEnd: '2027-08-31', peakCapMaxDays: 3,
 };
 
@@ -58,7 +58,7 @@ describe('versioned public share format (allowlist)', () => {
   });
 
   it('never classifies a known private planner key as public', () => {
-    for (const key of ['eh', 'bo', 'od', 'ov', 'pp', 'r', 'ac', 'am', 'ex', 'xd', 'cc', 'np', 'pc', 'pcs', 'pce', 'pcm', 'up']) {
+    for (const key of ['eh', 'bo', 'od', 'ov', 'pp', 'r', 'ac', 'am', 'ex', 'xd', 'cc', 'np', 'nu', 'pc', 'pcs', 'pce', 'pcm', 'up']) {
       expect(PLAN_URL_KEYS[key]).toBe('private');
       expect(PLAN_SHARE_KEYS).not.toContain(key);
       expect(PLAN_ADDRESS_KEYS).not.toContain(key);

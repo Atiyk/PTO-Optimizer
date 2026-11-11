@@ -3,6 +3,7 @@ import { decodeEmployerCalendar, encodeEmployerCalendar, employerScope, type Emp
 import type { WorkWeek } from '@daysoff/engine/solver/types';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
+import type { NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
 import type { ForcedState } from './types';
 import { isPlanAddressKey, partitionPlanParams, PLAN_URL_KEYS } from './shareFormat';
 
@@ -153,6 +154,8 @@ export interface FullURLState {
   reserveDays: number;
   unlimitedPto: boolean;
   noticePeriodDays: number;
+  /** How the notice period is counted (`nu=w`: working days; absent: calendar days). */
+  noticeUnit: NoticeUnit;
   peakCapEnabled: boolean;
   peakCapStart?: string;
   peakCapEnd?: string;
@@ -241,6 +244,7 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
   const npRaw = params.get('np');
   const npParsed = npRaw !== null ? Number(npRaw) : NaN;
   const noticePeriodDays = Number.isFinite(npParsed) && npParsed >= 0 ? npParsed : 14;
+  const noticeUnit: NoticeUnit = params.get('nu') === 'w' ? 'working' : 'calendar';
 
   const peakCapEnabled = params.get('pc') === '1';
   const pcs = params.get('pcs');
@@ -281,6 +285,7 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
     reserveDays,
     unlimitedPto,
     noticePeriodDays,
+    noticeUnit,
     peakCapEnabled,
     peakCapStart,
     peakCapEnd,
@@ -319,6 +324,7 @@ export interface WriteStateInput {
   reserveDays: number;
   unlimitedPto: boolean;
   noticePeriodDays: number;
+  noticeUnit?: NoticeUnit;
   peakCapEnabled: boolean;
   peakCapStart: string;
   peakCapEnd: string;
@@ -422,6 +428,9 @@ export function writeFullStateToURL(params: URLSearchParams, state: WriteStateIn
 
   if (state.noticePeriodDays !== 14) params.set('np', String(state.noticePeriodDays));
   else params.delete('np');
+
+  if (state.noticeUnit === 'working') params.set('nu', 'w');
+  else params.delete('nu');
 
   if (state.peakCapEnabled && state.peakCapStart && state.peakCapEnd) {
     params.set('pc', '1');

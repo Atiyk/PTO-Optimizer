@@ -318,6 +318,7 @@ export function App() {
                             reason={breakReason(brk, state.holidayNameFor)}
                             today={today}
                             noticePeriodDays={state.noticePeriodDays}
+                            noticeUnit={state.noticeUnit}
                             workWeek={state.workWeek}
                             offDays={state.effectiveOffDays}
                             defaultExpanded={index === 1}
@@ -496,6 +497,8 @@ export function App() {
                         onChangeCarryoverCap={state.setCarryoverCap}
                         noticePeriodDays={state.noticePeriodDays}
                         onChangeNoticePeriodDays={state.setNoticePeriodDays}
+                        noticeUnit={state.noticeUnit}
+                        onChangeNoticeUnit={state.setNoticeUnit}
                         peakCapEnabled={state.peakCapEnabled}
                         onTogglePeakCap={state.setPeakCapEnabled}
                         peakCapStart={state.peakCapStart}
@@ -604,6 +607,7 @@ export function App() {
                   travelPercentile={state.scores?.travel.percentile ?? null}
                   efficiencyPercentile={state.scores?.efficiency.percentile ?? null}
                   noticePeriodDays={state.noticePeriodDays}
+                  noticeUnit={state.noticeUnit}
                   workWeek={state.workWeek}
                   offDays={state.effectiveOffDays}
                   observedHolidayDates={state.holidaysReady && !state.holidaysDegraded ? state.holidayEntries.filter(holiday => holiday.checked).map(holiday => holiday.date) : undefined}
@@ -623,7 +627,7 @@ export function App() {
               </section>
 
               <div id="requests" className="flex min-w-0 scroll-mt-16 flex-col gap-3">
-                <PtoTracker today={today} ledger={ledger} calendar={requestCalendar} noticePeriodDays={state.noticePeriodDays} calendarReady={state.holidaysReady && !state.holidaysDegraded} calendarNotice={!state.holidaysReady ? 'Loading your employer calendar…' : state.holidaysDegraded ? 'Holiday data is incomplete. Check your employer calendar before adding or changing request dates.' : undefined} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
+                <PtoTracker today={today} ledger={ledger} calendar={requestCalendar} noticePeriodDays={state.noticePeriodDays} noticeUnit={state.noticeUnit} calendarReady={state.holidaysReady && !state.holidaysDegraded} calendarNotice={!state.holidaysReady ? 'Loading your employer calendar…' : state.holidaysDegraded ? 'Holiday data is incomplete. Check your employer calendar before adding or changing request dates.' : undefined} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
                 <p className="text-sm text-muted"><a href="/policy#balance" className="link-mark font-semibold">Forecast my balance and check expiration</a></p>
               </div>
 

@@ -39,6 +39,7 @@ function parseSnapshot(value: unknown): PlanSnapshot | null {
     || !BOOLEAN_FIELDS.every(key => typeof value[key] === 'boolean')
     || !NUMBER_FIELDS.every(key => amount(value[key]))
     || (value.noticePeriodDays !== undefined && !amount(value.noticePeriodDays))
+    || (value.noticeUnit !== undefined && value.noticeUnit !== 'calendar' && value.noticeUnit !== 'working')
     || !date(value.rangeStart) || !date(value.rangeEnd)
     || typeof value.expiryDate !== 'string'
     || ![value.expiryDate, value.altFridayStart, value.peakCapStart, value.peakCapEnd].every(v => v === '' || date(v))

@@ -7,6 +7,7 @@ import { rawHolidaysToHolidays, type Holiday } from '@daysoff/engine/data/holida
 import { handleFeedRequest, type HolidayReader } from '../src/autopilot/feedHandler';
 import { buildWatchFeedICS, watchFeedHolidayYears } from '../src/autopilot/watchFeed';
 import { loadHolidayFile } from './holidayData';
+import { utcDateISO } from '../src/ui/today';
 
 const COUNTRY = /^[A-Z]{2}$/;
 
@@ -30,7 +31,8 @@ export async function handleWatch(request: Request, now: Date = new Date()): Pro
   if (request.method !== 'GET' && request.method !== 'HEAD') return text(405, 'Method not allowed.');
   const url = new URL(request.url);
   const query = url.search.replace(/^\?/, '');
-  const today = now.toISOString().slice(0, 10);
+  // No viewer timezone reaches this endpoint: UTC calendar date, documented in today.ts.
+  const today = utcDateISO(now);
   const country = url.searchParams.get('c') ?? '';
   const loaded = new Map<string, Holiday[]>();
   if (COUNTRY.test(country) && query.length <= 4096) {

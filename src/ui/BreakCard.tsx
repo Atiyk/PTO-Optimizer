@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useId, type KeyboardEvent as ReactKeyboard
 import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
 import { formatWorkingDaysList, formatManagerEmailShort, formatManagerEmailDetailed, copyText } from './requestText';
 import { formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
-import { requestByText, isContested } from '@daysoff/engine/calendar/requestDeadline';
+import { requestByText, isContested, type NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
 import { buttonClasses } from './Button';
 import { Chevron } from './Chevron';
 import { settleLedgerAction, type LedgerAction } from '../integration/browserWalletStore';
@@ -36,6 +36,8 @@ interface BreakCardProps {
   reason: string;
   today: string;
   noticePeriodDays: number;
+  /** Calendar or working days; default calendar. */
+  noticeUnit?: NoticeUnit;
   workWeek: WorkWeek;
   offDays?: readonly string[];
   /** UI density pass: whether the request tools (request-by line + copy dropdown) start
@@ -200,6 +202,7 @@ export function BreakCard({
   reason,
   today,
   noticePeriodDays,
+  noticeUnit = 'calendar',
   workWeek,
   offDays,
   defaultExpanded = false,
@@ -248,7 +251,7 @@ export function BreakCard({
   const dayWord = brk.totalDaysOff === 1 ? 'day' : 'days';
   const ptoWord = brk.ptoCost === 1 ? 'day' : 'days';
   const contested = isContested(brk);
-  const requestLine = requestByText(brk.start, noticePeriodDays, workWeek, today, offDays);
+  const requestLine = requestByText(brk.start, noticePeriodDays, workWeek, today, offDays, noticeUnit);
   const startYear = brk.start.slice(0, 4);
   const breakRange = formatCardDateRange(brk.start, brk.end);
   const datedRange = brk.end.startsWith(startYear) ? `${breakRange}, ${startYear}` : breakRange;
@@ -346,12 +349,12 @@ export function BreakCard({
                 options={[
                   { label: 'Copy date list', text: formatWorkingDaysList(brk, isPtoDay) },
                   { label: 'Copy email draft', text: formatManagerEmailShort(brk, isPtoDay) },
-                  { label: 'Copy detailed email draft', text: formatManagerEmailDetailed(brk, isPtoDay, noticePeriodDays, workWeek, offDays) },
+                  { label: 'Copy detailed email draft', text: formatManagerEmailDetailed(brk, isPtoDay, noticePeriodDays, workWeek, offDays, noticeUnit) },
                 ]}
               />
               <ActionButton label="Export this break (.ics)" onClick={async () => {
                 try {
-                  downloadICS([brk], isPtoDay, { enabled: true, leadDays: noticePeriodDays, workWeek, offDays }, `pto-break-${brk.start}.ics`);
+                  downloadICS([brk], isPtoDay, { enabled: true, leadDays: noticePeriodDays, workWeek, offDays, noticeUnit }, `pto-break-${brk.start}.ics`);
                   trackBreakAction('exported');
                   return { ok: true, message: 'Downloaded' };
                 } catch {
