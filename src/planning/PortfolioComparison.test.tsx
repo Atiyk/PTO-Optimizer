@@ -17,8 +17,9 @@ class ComparisonWorker {
   onmessage?: (event: MessageEvent) => void;
 
   constructor() { ComparisonWorker.current = this; }
+  terminated = false;
   postMessage(job: PortfolioComparisonJob) { this.job = job; }
-  terminate() {}
+  terminate() { this.terminated = true; }
   /** Mirrors the real worker: the report first, then its verified suggestions. */
   publish(withSuggestions = true) {
     if (!this.job) throw new Error('missing comparison job');
@@ -26,7 +27,8 @@ class ComparisonWorker {
     const constraints = { dates: [], partial: calendarIncomplete, missingSources: [] };
     const report = analyzeCanonicalPortfolios(input, constraints);
     this.onmessage?.(new MessageEvent('message', { data: { report } }));
-    if (withSuggestions && report) {
+    // A terminated worker delivers nothing more, as in a browser.
+    if (withSuggestions && report && !this.terminated) {
       const suggestions = suggestPortfolioChanges(input, constraints, report, { allowBudgetChange });
       this.onmessage?.(new MessageEvent('message', { data: { report, suggestions } }));
     }
@@ -70,7 +72,7 @@ it('offers verified changes that update the inputs live, and moves focus to the 
   const onAddPto = vi.fn();
   const onExtendEnd = vi.fn();
   const zero: SolveInput = { rangeStart: '2027-03-02', rangeEnd: '2027-03-02', budget: 0, offDays: [], w: 0, breakCount: 3 };
-  render(<PortfolioComparison input={zero} minimumBreakDays={0} calendarIncomplete={false} onAddPto={onAddPto} onExtendEnd={onExtendEnd} />);
+  render(<PortfolioComparison input={zero} minimumBreakDays={0} calendarIncomplete={false} budget={0} reservedDays={0} onSetBudget={onAddPto} onExtendEnd={onExtendEnd} />);
   act(() => vi.runOnlyPendingTimers());
   act(() => ComparisonWorker.current.publish());
   expect(screen.getByText('You have 0 PTO days to plan with, so there are no plans to compare.')).toBeTruthy();
@@ -89,7 +91,7 @@ it('offers verified changes that update the inputs live, and moves focus to the 
 it('shows an end-date suggestion only when it was verified, and none while suggestions are pending', () => {
   const onExtendEnd = vi.fn();
   const tiny: SolveInput = { rangeStart: '2027-03-02', rangeEnd: '2027-03-02', budget: 3, offDays: [], w: 0, breakCount: 3 };
-  render(<PortfolioComparison input={tiny} minimumBreakDays={0} calendarIncomplete={false} onAddPto={vi.fn()} onExtendEnd={onExtendEnd} />);
+  render(<PortfolioComparison input={tiny} minimumBreakDays={0} calendarIncomplete={false} budget={0} reservedDays={0} onSetBudget={vi.fn()} onExtendEnd={onExtendEnd} />);
   act(() => vi.runOnlyPendingTimers());
   act(() => ComparisonWorker.current.publish(false));
   expect(screen.getByText('Only one plan fits these settings, so there is nothing to compare it with.')).toBeTruthy();
@@ -101,8 +103,19 @@ it('shows an end-date suggestion only when it was verified, and none while sugge
 
 it('never offers a PTO change for unlimited PTO', () => {
   const zero: SolveInput = { rangeStart: '2027-03-02', rangeEnd: '2027-03-02', budget: 0, offDays: [], w: 0, breakCount: 3 };
-  render(<PortfolioComparison input={zero} minimumBreakDays={0} calendarIncomplete={false} allowBudgetChange={false} onAddPto={vi.fn()} onExtendEnd={vi.fn()} />);
+  render(<PortfolioComparison input={zero} minimumBreakDays={0} calendarIncomplete={false} allowBudgetChange={false} budget={0} reservedDays={0} onSetBudget={vi.fn()} onExtendEnd={vi.fn()} />);
   act(() => vi.runOnlyPendingTimers());
   act(() => ComparisonWorker.current.publish());
   expect(screen.queryByRole('button', { name: /PTO day/ })).toBeNull();
+});
+
+it('names the field value to set when reserved days would absorb an added day', () => {
+  const onSetBudget = vi.fn();
+  const zero: SolveInput = { rangeStart: '2027-03-02', rangeEnd: '2027-03-02', budget: 0, offDays: [], w: 0, breakCount: 3 };
+  render(<PortfolioComparison input={zero} minimumBreakDays={0} calendarIncomplete={false} budget={0} reservedDays={3} onSetBudget={onSetBudget} onExtendEnd={vi.fn()} />);
+  act(() => vi.runOnlyPendingTimers());
+  act(() => ComparisonWorker.current.publish());
+  fireEvent.click(screen.getByRole('button', { name: 'Set PTO days to 4' }));
+  expect(screen.getByText('· 1 plan · 3 kept in reserve')).toBeTruthy();
+  expect(onSetBudget).toHaveBeenCalledWith(4);
 });

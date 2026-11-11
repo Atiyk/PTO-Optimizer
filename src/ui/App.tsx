@@ -572,9 +572,9 @@ export function App() {
                     minimumBreakDays={state.minimumBreakDays}
                     calendarIncomplete={state.holidaysDegraded || uncoveredHolidayYears.length > 0}
                     allowBudgetChange={!state.unlimitedPto}
-                    // effectiveBudget = max(0, budget - reserved); start from the reserved
-                    // floor so the planner gains exactly the verified number of days.
-                    onAddPto={extraDays => state.setBudget(Math.max(state.budget, state.reserveDays + state.reservedPtoDays) + extraDays)}
+                    budget={state.budget}
+                    reservedDays={state.reserveDays + state.reservedPtoDays}
+                    onSetBudget={state.setBudget}
                     onExtendEnd={state.setRangeEnd}
                   />
                 ) : <p className="mb-2 text-sm text-muted">Comparison is available when your plan is ready.</p>)}

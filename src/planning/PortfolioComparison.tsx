@@ -19,21 +19,35 @@ interface PortfolioComparisonProps {
   /** False for unlimited PTO, so no different day count is suggested. */
   allowBudgetChange?: boolean;
   /** Suggestion actions. They change the same live, URL-backed inputs as the controls. */
-  onAddPto?: (extraDays: number) => void;
+  onSetBudget?: (budget: number) => void;
+  /** The PTO days field value, and the days kept back from it (reserve and booked
+   * requests). The planner uses max(0, budget - reservedDays), so an added day starts
+   * from the reserved floor. */
+  budget?: number;
+  reservedDays?: number;
   onExtendEnd?: (rangeEnd: string) => void;
 }
 
-function suggestionLabel(suggestion: PortfolioSuggestion): string {
-  return suggestion.kind === 'add-pto'
+/** The PTO days field value that gives the planner `extraDays` more days. */
+function budgetAfter(extraDays: number, budget: number, reservedDays: number): number {
+  return Math.max(budget, reservedDays) + extraDays;
+}
+
+function suggestionLabel(suggestion: PortfolioSuggestion, budget: number, reservedDays: number): string {
+  if (suggestion.kind === 'extend-end') return `End on ${formatShortWithYear(suggestion.rangeEnd)}`;
+  const target = budgetAfter(suggestion.extraDays, budget, reservedDays);
+  return target - budget === suggestion.extraDays
     ? `Add ${suggestion.extraDays} PTO ${suggestion.extraDays === 1 ? 'day' : 'days'}`
-    : `End on ${formatShortWithYear(suggestion.rangeEnd)}`;
+    : `Set PTO days to ${target}`;
 }
 
-function suggestionResult(suggestion: PortfolioSuggestion): string {
-  return `· ${suggestion.portfolioCount} ${suggestion.portfolioCount === 1 ? 'plan' : 'plans'}`;
+function suggestionResult(suggestion: PortfolioSuggestion, budget: number, reservedDays: number): string {
+  const plans = `· ${suggestion.portfolioCount} ${suggestion.portfolioCount === 1 ? 'plan' : 'plans'}`;
+  return suggestion.kind === 'add-pto' && budget < reservedDays && reservedDays > 0
+    ? `${plans} · ${reservedDays} kept in reserve` : plans;
 }
 
-export function PortfolioComparison({ input, minimumBreakDays, calendarIncomplete, allowBudgetChange = true, onAddPto, onExtendEnd }: PortfolioComparisonProps) {
+export function PortfolioComparison({ input, minimumBreakDays, calendarIncomplete, allowBudgetChange = true, onSetBudget, onExtendEnd, budget = input.budget, reservedDays = 0 }: PortfolioComparisonProps) {
   const job = useMemo<PortfolioComparisonJob>(
     () => ({ input: { ...input, minimumBreakDays }, calendarIncomplete, allowBudgetChange }),
     [input, minimumBreakDays, calendarIncomplete, allowBudgetChange],
@@ -43,8 +57,12 @@ export function PortfolioComparison({ input, minimumBreakDays, calendarIncomplet
   useEffect(() => {
     let cancelled = false;
     let worker: Worker | undefined;
-    const finish = (report: CanonicalPortfolioReport | null, suggestions: PortfolioSuggestion[] | undefined = []) => {
-      if (!cancelled) setCompleted({ job, report, suggestions });
+    // `suggestions` undefined = the first of the worker's two messages (see the worker).
+    let shown: CanonicalPortfolioReport | null = null;
+    const finish = (report: CanonicalPortfolioReport | null, suggestions?: PortfolioSuggestion[]) => {
+      // A failure while checking suggestions keeps the plans already shown.
+      shown = report ?? shown;
+      if (!cancelled) setCompleted({ job, report: shown, suggestions });
       // The first message carries the plans; keep the worker for its verified suggestions.
       if (suggestions === undefined && report) return;
       worker?.terminate();
@@ -53,15 +71,15 @@ export function PortfolioComparison({ input, minimumBreakDays, calendarIncomplet
     const timer = setTimeout(() => {
       // The calendar's individual alternatives remain available when workers
       // are unavailable. A full multi-objective search can take several seconds.
-      if (typeof Worker === 'undefined') { finish(null); return; }
+      if (typeof Worker === 'undefined') { finish(null, []); return; }
       try {
         worker = new Worker(new URL('./portfolioComparison.worker.ts', import.meta.url), { type: 'module' });
         worker.onmessage = (event: MessageEvent<PortfolioComparisonResult>) => finish(event.data?.report ?? null, event.data?.suggestions);
-        worker.onerror = () => finish(null);
-        worker.onmessageerror = () => finish(null);
+        worker.onerror = () => finish(null, []);
+        worker.onmessageerror = () => finish(null, []);
         worker.postMessage(job);
       } catch {
-        finish(null);
+        finish(null, []);
       }
     }, 150);
     return () => {
@@ -72,9 +90,9 @@ export function PortfolioComparison({ input, minimumBreakDays, calendarIncomplet
   }, [job]);
 
   const current = completed?.job === job ? completed : undefined;
-  const suggestions = (current?.suggestions ?? []).filter(s => s.kind === 'add-pto' ? onAddPto : onExtendEnd);
+  const suggestions = (current?.suggestions ?? []).filter(s => s.kind === 'add-pto' ? onSetBudget : onExtendEnd);
   const apply = (suggestion: PortfolioSuggestion) => {
-    if (suggestion.kind === 'add-pto') onAddPto?.(suggestion.extraDays);
+    if (suggestion.kind === 'add-pto') onSetBudget?.(budgetAfter(suggestion.extraDays, budget, reservedDays));
     else onExtendEnd?.(suggestion.rangeEnd);
     // The clicked button is replaced by the new result; keep keyboard focus in this panel.
     headingRef.current?.focus();
@@ -113,8 +131,8 @@ export function PortfolioComparison({ input, minimumBreakDays, calendarIncomplet
                 <ul className="m-0 mt-1 flex list-none flex-wrap gap-x-5 p-0">
                   {suggestions.map(suggestion => (
                     <li key={suggestion.kind} className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-                      <button type="button" className="link-mark min-h-11 font-semibold" onClick={() => apply(suggestion)}>{suggestionLabel(suggestion)}</button>
-                      <span className="text-muted tabular-nums">{suggestionResult(suggestion)}</span>
+                      <button type="button" className="link-mark min-h-11 font-semibold" onClick={() => apply(suggestion)}>{suggestionLabel(suggestion, budget, reservedDays)}</button>
+                      <span className="text-muted tabular-nums">{suggestionResult(suggestion, budget, reservedDays)}</span>
                     </li>
                   ))}
                 </ul>
