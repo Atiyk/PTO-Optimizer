@@ -284,21 +284,35 @@ describe('Family planner', () => {
     expect(screen.getByRole('alert').textContent).toMatch(/school dates in this link couldn.t be read/);
   });
 
-  it('blocks a recurring school import without accepting its partial date list', async () => {
+  it('blocks a school import with an unsupported repeating pattern without accepting its partial date list', async () => {
     go('c=US&s=2026-11-02');
     render(<Family />);
     const text = [
       'BEGIN:VCALENDAR',
       'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20261120', 'END:VEVENT',
-      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20261127', 'RRULE:FREQ=WEEKLY;COUNT=3', 'END:VEVENT',
+      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20261127', 'RRULE:FREQ=MONTHLY;BYDAY=FR;BYSETPOS=-1', 'END:VEVENT',
       'END:VCALENDAR',
     ].join('\r\n');
     const file = Object.assign(new File([text], 'school.ics'), { text: async () => text });
     fireEvent.change(screen.getByLabelText('Upload a school calendar file (.ics)'), { target: { files: [file] } });
-    expect(await screen.findByText(/repeating events that cannot be imported completely/)).toBeTruthy();
+    expect(await screen.findByText(/Import incomplete: 1 repeating event uses a pattern we can.t read \(BYSETPOS\)/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Add \d checked dates?/ })).toBeNull();
     expect(screen.getByRole('heading', { name: 'Start with the school calendar' })).toBeTruthy();
     expect(new URLSearchParams(window.location.search).has('sd')).toBe(false);
+  });
+
+  it('expands a weekly repeating school closure into individual dates to confirm', async () => {
+    go('c=US&s=2026-11-02');
+    render(<Family />);
+    const text = [
+      'BEGIN:VCALENDAR',
+      'BEGIN:VEVENT', 'UID:early', 'DTSTART;VALUE=DATE:20261127', 'RRULE:FREQ=WEEKLY;COUNT=3', 'END:VEVENT',
+      'BEGIN:VEVENT', 'UID:early', 'RECURRENCE-ID;VALUE=DATE:20261204', 'DTSTART;VALUE=DATE:20261204', 'STATUS:CANCELLED', 'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+    const file = Object.assign(new File([text], 'school.ics'), { text: async () => text });
+    fireEvent.change(screen.getByLabelText('Upload a school calendar file (.ics)'), { target: { files: [file] } });
+    expect(await screen.findByText(/Found 2 date ranges/)).toBeTruthy();
   });
 });
 

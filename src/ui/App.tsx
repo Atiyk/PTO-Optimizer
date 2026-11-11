@@ -1,3 +1,4 @@
+import { HolidayCoverageNotice } from './HolidayCoverageNotice';
 import { PortraitShare } from './PortraitShare';
 import { rangeISO, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { PartnerPlanner } from './PartnerPlanner';
@@ -274,6 +275,10 @@ export function App() {
                   )}
                 </div>
               )}
+              {/* Issue 17: plan years without holiday data say so; nothing renders or loads for bundled years. */}
+              {!state.hasSharedHolidaySnapshot && (
+                <HolidayCoverageNotice country={state.country} rangeStart={state.rangeStart} rangeEnd={state.rangeEnd} />
+              )}
               <section aria-labelledby="breaks-heading" id="summary-heading" className="min-w-0 scroll-mt-16">
                 <h2 id="breaks-heading" tabIndex={-1} className="scroll-mt-16 text-h2 font-bold text-ink type-condensed">Requesting each break</h2>
                 {plannable && (state.breaks.length > 0 || state.committedEntries.length > 0) ? (
@@ -511,6 +516,7 @@ export function App() {
                         blackouts={state.blackouts}
                         onAddBlackout={(d) => state.setBlackouts([...state.blackouts, d])}
                         onAddBlackouts={(dates) => state.setBlackouts(Array.from(new Set([...state.blackouts, ...dates])))}
+                        planningWindow={{ start: state.rangeStart, end: state.rangeEnd }}
                         onRemoveBlackout={(d) => state.setBlackouts(state.blackouts.filter((x) => x !== d))}
                         holidayEntries={state.holidayEntries}
                         sharedHolidaySnapshot={state.hasSharedHolidaySnapshot}

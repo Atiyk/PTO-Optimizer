@@ -179,7 +179,11 @@ async function main(): Promise<void> {
   // demandIndex.json.
   const countriesWithData = new Set(results.filter((r) => r.outcome === 'written' || r.outcome === 'kept-existing').map((r) => r.task.code)).size;
   const coveragePath = resolve(projectRoot, 'packages/engine/src/data/holidayCoverage.json');
-  writeFileSync(coveragePath, `${JSON.stringify({ countriesWithData, asOf: new Date().toISOString().slice(0, 10) }, null, 2)}\n`, 'utf-8');
+  // Issue 17: the years every country has a committed file for. Lookups outside these years
+  // depend on a live fetch, and a year with no data is reported to the user as uncovered.
+  const candidateYears = Array.from({ length: years.length + 4 }, (_, i) => currentYear - 2 + i);
+  const bundledYears = candidateYears.filter((year) => countries.every((c) => (readExisting(c.code, year)?.length ?? 0) > 0));
+  writeFileSync(coveragePath, `${JSON.stringify({ countriesWithData, bundledYears, asOf: new Date().toISOString().slice(0, 10) }, null, 2)}\n`, 'utf-8');
   console.log(`  ${countriesWithData} countries have real holiday data (packages/engine/src/data/holidayCoverage.json updated).`);
 
   // Never fail the build over this - a stale or absent static snapshot degrades to a live

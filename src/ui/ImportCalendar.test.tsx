@@ -6,12 +6,12 @@ import { ImportCalendar } from './ImportCalendar';
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-function mount(onImportBusyDays = vi.fn()) {
+function mount(onImportBusyDays = vi.fn(), planningWindow?: { start: string; end: string }) {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
   act(() => {
-    root!.render(<ImportCalendar onImportBusyDays={onImportBusyDays} />);
+    root!.render(<ImportCalendar onImportBusyDays={onImportBusyDays} planningWindow={planningWindow} />);
   });
   return { onImportBusyDays };
 }
@@ -108,4 +108,34 @@ describe('ImportCalendar', () => {
     await selectFile(emptyIcs);
     expect(container!.textContent).toContain('No all-day or multi-day events found');
   });
+
+  it('expands a repeating all-day event across the planning window', async () => {
+    const { onImportBusyDays } = mount(vi.fn(), { start: '2026-09-01', end: '2026-09-30' });
+    await selectFile(ics(['DTSTART;VALUE=DATE:20260907', 'RRULE:FREQ=WEEKLY']));
+    expect(container!.textContent).toContain('Found 4 busy days');
+    expect(container!.textContent).not.toContain('Import incomplete');
+    act(() => [...container!.querySelectorAll('button')].find((b) => b.textContent === 'Add')!.click());
+    expect(onImportBusyDays).toHaveBeenCalledWith(['2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28']);
+  });
+
+  it('says plainly that the import is incomplete when a repeating pattern is unsupported', async () => {
+    mount(vi.fn(), { start: '2026-09-01', end: '2027-06-30' });
+    await selectFile(ics(
+      ['DTSTART;VALUE=DATE:20261123', 'DTEND;VALUE=DATE:20261125'],
+      ['DTSTART;VALUE=DATE:20260907', 'RRULE:FREQ=MONTHLY;BYDAY=MO;BYSETPOS=1'],
+    ));
+    expect(container!.textContent).toContain('Found 2 busy days');
+    expect(container!.textContent).toContain('Import incomplete: 1 repeating event is not included (uses BYSETPOS). Add those dates by hand.');
+  });
+
+  it('shows the incomplete-import message, not "nothing found", when only unsupported repeats exist', async () => {
+    mount(vi.fn(), { start: '2026-09-01', end: '2027-06-30' });
+    await selectFile(ics(['DTSTART;VALUE=DATE:20260907', 'RRULE:FREQ=YEARLY;BYWEEKNO=20']));
+    expect(container!.textContent).toContain('Import incomplete: 1 repeating event is not included (uses BYWEEKNO).');
+    expect(container!.textContent).not.toContain('No all-day or multi-day events found');
+  });
 });
+
+function ics(...events: string[][]): string {
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', ...events.flatMap(lines => ['BEGIN:VEVENT', ...lines, 'END:VEVENT']), 'END:VCALENDAR', ''].join('\r\n');
+}

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { parseICSBusyDays, IcsParseError, MAX_IMPORT_FILE_BYTES, type ParsedImportResult } from './icsImport';
+import { parseICSBusyDays, IcsParseError, incompleteRecurrenceMessage, isValidImportWindow, MAX_IMPORT_FILE_BYTES, type ImportWindow, type ParsedImportResult } from './icsImport';
 import { monthShortName } from '@daysoff/engine/calendar/dateFormat';
 import { buttonClasses } from './Button';
 
@@ -7,6 +7,9 @@ interface ImportCalendarProps {
   /** Reuses the same bulk handler "Block the next N days" already uses - an .ics import is
    * just another source of "Days I can't take off" dates, not a separate concept. */
   onImportBusyDays: (dates: string[]) => void;
+  /** Repeating events are expanded across this range (the plan's dates). Without it each
+   * series is expanded for ten years from its start and open-ended ones read as incomplete. */
+  planningWindow?: ImportWindow;
 }
 
 type ImportState = { kind: 'idle' } | { kind: 'error'; message: string } | { kind: 'preview'; result: ParsedImportResult };
@@ -29,7 +32,7 @@ function summarizeMonths(dates: string[]): string {
  * fire during parsing (see NOTES.md). Never silently rewrites the user's inputs: the parsed
  * result is always shown as a preview the user explicitly confirms or cancels first.
  */
-export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
+export function ImportCalendar({ onImportBusyDays, planningWindow }: ImportCalendarProps) {
   const [state, setState] = useState<ImportState>({ kind: 'idle' });
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -45,9 +48,9 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
         return;
       }
       const text = await file.text();
-      const result = parseICSBusyDays(text);
+      const result = parseICSBusyDays(text, { window: isValidImportWindow(planningWindow) ? planningWindow : undefined });
       if (result.busyDays.length === 0) {
-        setState({ kind: 'error', message: 'No all-day or multi-day events found in this file.' });
+        setState({ kind: 'error', message: incompleteRecurrenceMessage(result.recurrence) ?? 'No all-day or multi-day events found in this file.' });
         return;
       }
       setState({ kind: 'preview', result });
@@ -77,7 +80,8 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
       <p className="mb-2 text-sm text-muted">
         Parsed in your browser. Nothing is uploaded. All-day and multi-day events become days you can&apos;t take
         off; short, timed meetings are ignored. Timed events use their stated UTC or IANA time zone;
-        unsupported or ambiguous time zones are rejected rather than guessed. Check the dates before adding.
+        unsupported or ambiguous time zones are rejected rather than guessed. Repeating events are expanded
+        across your plan dates. Check the dates before adding.
       </p>
       <input
         ref={inputRef}
@@ -115,11 +119,8 @@ export function ImportCalendar({ onImportBusyDays }: ImportCalendarProps) {
                 : ''}
             </p>
           </details>
-          {state.result.skippedRecurring > 0 && (
-            <p>
-              {state.result.skippedRecurring} recurring event{state.result.skippedRecurring === 1 ? '' : 's'} skipped (not
-              expanded).
-            </p>
+          {incompleteRecurrenceMessage(state.result.recurrence) && (
+            <p role="status" className="font-semibold">{incompleteRecurrenceMessage(state.result.recurrence)}</p>
           )}
           <div className="flex gap-2">
             <button
