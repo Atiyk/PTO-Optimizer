@@ -7,6 +7,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { computeMarginalValues } from '@daysoff/engine/solver/marginalValue';
 import type { Alternative, Break, SolveInput, WorkWeek } from '@daysoff/engine/solver/types';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import type { NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
 import type { Holiday, HolidayFetchResult } from '@daysoff/engine/data/holidays';
 import { geolocateCountry } from './geo';
 import { activeCountryPreset } from '@daysoff/engine/data/countryPresets';
@@ -88,6 +89,8 @@ export interface PlanSnapshot {
   reserveApprovedPto: boolean;
   unlimitedPto: boolean;
   noticePeriodDays: number;
+  /** Older pinned plans have none: calendar days. */
+  noticeUnit?: NoticeUnit;
   peakCapEnabled: boolean;
   peakCapStart: string;
   peakCapEnd: string;
@@ -157,6 +160,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
         reserveDays: 3,
         unlimitedPto: false,
         noticePeriodDays: 14,
+        noticeUnit: 'calendar' as const,
         peakCapEnabled: false,
         peakCapStart: undefined,
         peakCapEnd: undefined,
@@ -221,6 +225,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   // number for both, which is what "must match the .ics reminders, not contradict them"
   // means structurally: one shared source, not two settings that could disagree.
   const [noticePeriodDays, setNoticePeriodDays] = useState(initial.noticePeriodDays ?? 14);
+  const [noticeUnit, setNoticeUnit] = useState<NoticeUnit>(initial.noticeUnit ?? 'calendar');
 
   // Phase 5.1: an employer policy cap on how much PTO can be spent inside one window (e.g.
   // "no more than 5 days between Jun and Aug") - off by default, a soft default for most
@@ -408,6 +413,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       reserveDays,
       unlimitedPto,
       noticePeriodDays,
+      noticeUnit,
       peakCapEnabled,
       peakCapStart,
       peakCapEnd,
@@ -443,6 +449,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     reserveDays,
     unlimitedPto,
     noticePeriodDays,
+    noticeUnit,
     peakCapEnabled,
     peakCapStart,
     peakCapEnd,
@@ -886,6 +893,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       reserveApprovedPto,
       unlimitedPto,
       noticePeriodDays,
+      noticeUnit,
       peakCapEnabled,
       peakCapStart,
       peakCapEnd,
@@ -901,7 +909,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     country, subdivision, employerCalendar, planningVersion, planningStyle, minimumBreakDays, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
     weekStartOverride, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap,
     overlapDays, blackouts, workWeek, forced, altFridayEnabled, altFridayStart,
-    addPinnedPlan, canPin, reserveDays, applyTrackedRequests, reserveApprovedPto, unlimitedPto, noticePeriodDays, peakCapEnabled, peakCapStart, peakCapEnd, peakCapMaxDays,
+    addPinnedPlan, canPin, reserveDays, applyTrackedRequests, reserveApprovedPto, unlimitedPto, noticePeriodDays, noticeUnit, peakCapEnabled, peakCapStart, peakCapEnd, peakCapMaxDays,
     budgetSpent, totalDaysOff, breakCountActual, scores,
   ]);
 
@@ -941,6 +949,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       setReserveApprovedPto(snap.reserveApprovedPto);
       setUnlimitedPtoRaw(snap.unlimitedPto);
       setNoticePeriodDays(snap.noticePeriodDays);
+      setNoticeUnit(snap.noticeUnit ?? 'calendar');
       setPeakCapEnabled(snap.peakCapEnabled);
       setPeakCapStart(snap.peakCapStart);
       setPeakCapEnd(snap.peakCapEnd);
@@ -1029,6 +1038,8 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     setReserveApprovedPto,
     noticePeriodDays,
     setNoticePeriodDays,
+    noticeUnit,
+    setNoticeUnit,
     peakCapEnabled,
     setPeakCapEnabled,
     peakCapStart,

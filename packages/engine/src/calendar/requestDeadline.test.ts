@@ -8,6 +8,7 @@ import {
   isContested,
   isQuietWindow,
   mostContestedBreakId,
+  noticePhrase,
 } from './requestDeadline';
 
 function makeBreak(overrides: Partial<Break> = {}): Break {
@@ -138,5 +139,59 @@ describe('mostContestedBreakId', () => {
   it('still picks a "most contested" break even when none crosses the contested threshold', () => {
     const breaks = [makeBreak({ id: 'a', meanDemand: 1.0 }), makeBreak({ id: 'b', meanDemand: 1.05 })];
     expect(mostContestedBreakId(breaks)).toBe('b');
+  });
+});
+
+describe('requestByDate notice unit (Issue 14)', () => {
+  // Rule: calendar-day notice subtracts N calendar days from the break start and, if that
+  // lands on a non-working day, rolls back to the previous working day. Working-day notice
+  // counts N working days strictly before the break start (skipping non-working weekdays and
+  // employer days off), so it always lands on a working day.
+  const MON_THU: WorkWeek = [true, true, true, true, false, false, false];
+
+  it('defaults to calendar days, unchanged from before', () => {
+    expect(requestByDate('2026-12-19', 14, DEFAULT_WORK_WEEK, [], 'calendar')).toBe(requestByDate('2026-12-19', 14, DEFAULT_WORK_WEEK));
+    expect(requestByDate('2026-12-19', 14, DEFAULT_WORK_WEEK, [], 'calendar')).toBe('2026-12-04');
+  });
+
+  it('counts working days, skipping employer holidays and weekends', () => {
+    // Break starts Mon 2026-12-28. Back from it: Sun 27, Sat 26, Fri 25 (holiday), Thu 24
+    // (holiday), Wed 23 (1), Tue 22 (2), Mon 21 (3).
+    expect(requestByDate('2026-12-28', 3, DEFAULT_WORK_WEEK, ['2026-12-24', '2026-12-25'], 'working')).toBe('2026-12-21');
+  });
+
+  it('counts working days, skipping a non-working weekday in the workweek', () => {
+    // Mon-Thu schedule, break starts Mon 2027-01-11: Thu Jan 7 (1), Wed Jan 6 (2).
+    expect(requestByDate('2027-01-11', 2, MON_THU, [], 'working')).toBe('2027-01-06');
+    // Ten working days on a four-day week: Jan 7,6,5,4, Dec 31,30,29,28, 24, 23.
+    expect(requestByDate('2027-01-11', 10, MON_THU, [], 'working')).toBe('2026-12-23');
+  });
+
+  it('zero working days is the start day itself when it is a working day, else the previous one', () => {
+    expect(requestByDate('2027-01-11', 0, MON_THU, [], 'working')).toBe('2027-01-11');
+    expect(requestByDate('2027-01-09', 0, MON_THU, [], 'working')).toBe('2027-01-07');
+  });
+
+  it('a calendar-day deadline on a non-working weekday rolls to the previous working day', () => {
+    // Mon-Thu: 2027-01-11 - 3 = Fri 2027-01-08 (not worked) -> Thu 2027-01-07.
+    expect(requestByDate('2027-01-11', 3, MON_THU, [], 'calendar')).toBe('2027-01-07');
+  });
+
+  it('rounds a fractional notice period up to whole days (never a later deadline)', () => {
+    expect(requestByDate('2026-12-01', 13.5, DEFAULT_WORK_WEEK)).toBe('2026-11-17');
+    expect(requestByDate('2026-12-28', 2.2, DEFAULT_WORK_WEEK, ['2026-12-24', '2026-12-25'], 'working')).toBe('2026-12-21');
+  });
+
+  it('is bounded: no deadline for a schedule with no working day, or a huge working-day notice', () => {
+    const none: WorkWeek = [false, false, false, false, false, false, false];
+    expect(requestByDate('2027-01-11', 5, none, [], 'working')).toBeNull();
+    expect(requestByDate('2027-01-11', 1e9, DEFAULT_WORK_WEEK, [], 'working')).toBeNull();
+  });
+
+  it('requestByText and noticePhrase name the unit', () => {
+    expect(requestByText('2027-03-01', 10, DEFAULT_WORK_WEEK, '2026-10-25', [], 'working')).toBe(`Request by ${'Feb 15'} — 113 days from now.`);
+    expect(noticePhrase(14, 'calendar')).toBe('14-day');
+    expect(noticePhrase(5, 'working')).toBe('5-working-day');
+    expect(noticePhrase(1, 'working')).toBe('1-working-day');
   });
 });

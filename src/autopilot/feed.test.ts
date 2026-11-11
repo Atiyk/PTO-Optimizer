@@ -85,6 +85,18 @@ describe('buildPlanFeedICS: same events as the downloaded .ics', () => {
 });
 
 describe('F2 book-by events', () => {
+  it('honours a working-day notice unit (nu=w) with the same canonical deadline as the card', () => {
+    const { ics, plan } = feed(`${SEARCH}&np=8&nu=w`);
+    expect(plan.state.noticeUnit).toBe('working');
+    const reminders = events(ics).filter((e) => prop(e, 'UID')!.startsWith('UID:pto-reminder-'));
+    for (const brk of plan.breaks.filter((b) => b.start > TODAY)) {
+      const bookBy = requestByDate(brk.start, 8, plan.state.workWeek, plan.solveInput.offDays, 'working')!;
+      const expected = (bookBy < TODAY ? TODAY : bookBy).replace(/-/g, '');
+      expect(reminders.some((e) => prop(e, 'DTSTART') === `DTSTART;VALUE=DATE:${expected}`)).toBe(true);
+    }
+    expect(reminders.length).toBeGreaterThan(0);
+  });
+
   it('one per future break, shifted to a working date from the link schedule', () => {
     const { ics, plan } = feed(`${SEARCH}&np=21`);
     const future = plan.breaks.filter((b) => b.start > TODAY);

@@ -1,10 +1,11 @@
 import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
 import { parseISO, addDays } from '@daysoff/engine/solver/dateUtils';
 import { formatDateRange, formatCardDateRange, formatShort } from '@daysoff/engine/calendar/dateFormat';
-import { requestByDate } from '@daysoff/engine/calendar/requestDeadline';
+import { noticePhrase, requestByDate, type NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
 import type { Holiday } from '@daysoff/engine/data/holidays';
 import { PRODUCT_NAME } from '../brand';
 import { isValidISODate } from './urlState';
+import { localDateISO } from './today';
 
 /** RFC 5545 TEXT escaping: backslash, comma, semicolon, and newline must be escaped. */
 export function escapeText(s: string): string {
@@ -52,10 +53,9 @@ export function dtstampNow(now: Date): string {
   return now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 }
 
-/** `now` as the viewer's local calendar date, the same "today" the planner on screen uses. */
-export function localDateISO(now: Date): string {
-  return `${String(now.getFullYear()).padStart(4, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-}
+/** `now` as the viewer's local calendar date, the same "today" the planner on screen uses
+ * (re-exported from the shared helper in today.ts). */
+export { localDateISO };
 
 export interface ReminderOptions {
   enabled: boolean;
@@ -66,6 +66,8 @@ export interface ReminderOptions {
   leadDays: number;
   workWeek?: WorkWeek;
   offDays?: readonly string[];
+  /** Calendar or working days, the same unit as the break card's "Request by". */
+  noticeUnit?: NoticeUnit;
 }
 
 /** Disabled by default at this level, deliberately - the product default (on, 14 days) is a
@@ -123,11 +125,12 @@ export function bookByEventLines(
   dtstamp: string,
   workWeek?: WorkWeek,
   offDays?: readonly string[],
+  noticeUnit: NoticeUnit = 'calendar',
 ): string[] {
   const lines: string[] = [];
   for (const brk of breaks) {
     if (brk.start <= todayIso) continue; // already underway or past - nothing left to request
-    const bookBy = workWeek ? requestByDate(brk.start, leadDays, workWeek, offDays) : addDays(brk.start, -leadDays);
+    const bookBy = workWeek ? requestByDate(brk.start, leadDays, workWeek, offDays, noticeUnit) : addDays(brk.start, -leadDays);
     if (!bookBy) continue;
     const late = bookBy < todayIso;
     const eventIso = late ? todayIso : bookBy; // never place a reminder in the past
@@ -136,9 +139,9 @@ export function bookByEventLines(
     const title = `Request time off: ${formatCardDateRange(brk.start, brk.end)} (${late ? 'book now' : `book by ${formatShort(bookBy)}`})`;
     const dayWord = brk.totalDaysOff === 1 ? 'day' : 'days';
     const ptoWord = brk.ptoCost === 1 ? 'day' : 'days';
-    const noticeWord = leadDays === 1 ? 'day' : 'days';
+    const noticeWord = `${noticeUnit === 'working' ? 'working ' : ''}${leadDays === 1 ? 'day' : 'days'}`;
     const timing = late
-      ? `Your ${leadDays}-day notice window has started. Book it now.`
+      ? `Your ${noticePhrase(leadDays, noticeUnit)} notice window has started. Book it now.`
       : `Book by ${formatShort(bookBy)} to give ${leadDays} ${noticeWord} of notice.`;
     const description = `${brk.ptoCost} PTO ${ptoWord} -> ${brk.totalDaysOff} ${dayWord} off (${brk.multiplier.toFixed(2)}x). ${timing}`;
     lines.push('BEGIN:VEVENT');
@@ -187,7 +190,7 @@ export function generateICS(
   // The download runs in the browser, so "today" is the viewer's local date, matching the plan
   // on screen; the server feed passes its own day to bookByEventLines.
   if (reminderOptions.enabled) {
-    lines.push(...bookByEventLines(breaks, localDateISO(now), reminderOptions.leadDays, dtstamp, reminderOptions.workWeek, reminderOptions.offDays));
+    lines.push(...bookByEventLines(breaks, localDateISO(now), reminderOptions.leadDays, dtstamp, reminderOptions.workWeek, reminderOptions.offDays, reminderOptions.noticeUnit));
   }
 
   lines.push('END:VCALENDAR');

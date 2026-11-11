@@ -1,7 +1,7 @@
 import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
 import { mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { formatShort, formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
-import { requestByDate, isQuietWindow } from '@daysoff/engine/calendar/requestDeadline';
+import { requestByDate, isQuietWindow, noticePhrase, type NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
 
 const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -87,15 +87,16 @@ export function formatManagerEmailDetailed(
   noticePeriodDays: number,
   workWeek: WorkWeek,
   offDays?: readonly string[],
+  noticeUnit: NoticeUnit = 'calendar',
 ): string {
   const dates = ptoDatesOf(brk, isPtoDay);
   const freeDays = Math.max(0, brk.totalDaysOff - dates.length);
   const sentence1 = coverageSentence(brk, dates.length);
   const sentence2 = specificsSentence(dates, freeDays);
-  const deadline = requestByDate(brk.start, noticePeriodDays, workWeek, offDays);
+  const deadline = requestByDate(brk.start, noticePeriodDays, workWeek, offDays, noticeUnit);
 
   const sentences = [sentence1, sentence2];
-  if (deadline) sentences.push(`I'd like to confirm this by ${formatShort(deadline)} to stay within our ${noticePeriodDays}-day notice period.`);
+  if (deadline) sentences.push(`I'd like to confirm this by ${formatShort(deadline)} to stay within our ${noticePhrase(noticePeriodDays, noticeUnit)} notice period.`);
   if (isQuietWindow(brk)) sentences.push(quietWindowSentence());
   sentences.push(CLOSING_SENTENCE);
   return sentences.join(' ');
