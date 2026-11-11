@@ -29,8 +29,8 @@ source of truth between scheduled executions. No sensitive user data belongs her
 | Batch | Issues | Branch / PR | State |
 |---|---|---|---|
 | P0 | 1, 2, 10, 11 | `gapless/p0-release` → PR #145, merged as `3bae6ed` (critic GO on 494d135) | DONE: merged, Vercel prod success, prod smoke passed (run 43017235618 attempt 2) |
-| P1 | 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17 | `gapless/p1-release` @ 0d9384a (pushed): C 16/17, B 13/14, W2 3/4 (2878ab3), QA account-form scoping. S 5/6 → `gapless/p1-s-solver-travel` (/home/user/p1s); T 7 → `gapless/p1-t-performance` (/home/user/p1t) | PR #146 draft @ b59abcb; critic round 2 |
-| P2 | 8, 15, 18, 19 | — | Not started |
+| P1 | 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17 | `gapless/p1-release` @ 0d9384a (pushed): C 16/17, B 13/14, W2 3/4 (2878ab3), QA account-form scoping. S 5/6 → `gapless/p1-s-solver-travel` (/home/user/p1s); T 7 → `gapless/p1-t-performance` (/home/user/p1t) | DONE: PR #146 merged as 40b6766 (critic GO on b59abcb), Vercel prod success, prod smoke run 43070390357 passed |
+| P2 | 8, 15, 18, 19 | from main 40b6766 | In progress |
 
 ## Issue traceability
 
@@ -80,6 +80,8 @@ Residual risks noted by P (not fixed): `/api/watch` and reminder-email links car
 
 - ~17:45Z — Fixes merged: ea126ec (W2, Q1-2/3/4 one per-date charge rule) and 4c133ec (C, Q1-1 ICS work budget + line/value caps; 500 hostile events 8.9 s → 35 ms). Candidate b59abcb pushed: vitest 193/2058, tsc, lint, build, teams 290 pass. Critic Q round 2 started on b59abcb.
 
+- ~18:05Z — Critic round 2 GO on b59abcb. All required checks green on b59abcb. #146 marked ready and merged (merge commit 40b6766, sha-pinned). Vercel – pto-optimizer success. Prod smoke (run 43070390357, smoke head c89efad): routes 200, P0 privacy copy + P1 prerender guard live, private feed no-store, consumer-qa 40/40, journeys 9/9. P1 COMPLETE. P3 follow-ups: Q2-1 hourly-note copy, Q2-2 per-series ICS budget floor, Q1-5 quarantine quota lock-out, Q1-6 fieldset screen-reader check, Q1-7 date-editor QA browser path; school week Mon–Fri; verify:dist hash.
+
 ## Next action
 
-Critic round 2 verdict on b59abcb; when GO and required checks green on b59abcb: mark #146 ready (CCR route), merge (merge commit, sha=b59abcb), verify Vercel, push gapless/prod-smoke (P1 markers), mark P1 complete. Then P2 (8, 15, 18, 19). P3 follow-ups: Q1-5 quarantine quota lock-out, Q1-6 fieldset a11y check, Q1-7 date-editor QA browser path.
+P2 from main 40b6766: agent D/S on 8 (explain missing alternatives) + 15 (zero vs unknown balance); agent T/C on 18 (Firefox/WebKit tests) + 19 (subscriptions after edits). Max 2 agents. Then P2 release PR, critic, CI, merge, prod smoke, final report, disable trigger.
