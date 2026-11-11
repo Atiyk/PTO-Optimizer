@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
-import { calendarCoversRequest, createPtoRequest, initialRequestDate, parseRequestLedger, plannerRequestCommitments, readRequestLedger, requestConflicts, requestDatesForScenario, requestPtoDates, REQUEST_STATUSES, REQUEST_TRANSITIONS, validRequestRange, writeRequestLedger, type PtoRequest, type RequestCalendar } from './requestLedger';
+import { planningCommitments } from './workspace';
+import { calendarCoversRequest, createPtoRequest, initialRequestDate, parseRequestLedger, readRequestLedger, requestConflicts, requestDatesForScenario, requestPtoDates, REQUEST_STATUSES, REQUEST_TRANSITIONS, validRequestRange, writeRequestLedger, type PtoRequest, type RequestCalendar } from './requestLedger';
 
 const calendar: RequestCalendar = { workWeek: DEFAULT_WORK_WEEK, offDays: ['2027-01-01', '2027-01-01'] };
 function request(id: string, start = '2027-01-01', end = '2027-01-05', status: PtoRequest['status'] = 'planned'): PtoRequest {
@@ -72,7 +73,10 @@ describe('personal PTO requests', () => {
     expect(requestDatesForScenario(entries, '2026-12-31', '2027-01-31')).toEqual([]);
     expect(requestDatesForScenario(entries, '2026-12-31', '2027-01-31', true)).toEqual(['2027-01-04', '2027-01-05', '2027-01-06']);
   });
-  it('reserves booked spans without recharging past, overlapping, tentative or out-of-range PTO', () => {
+  // Planner commitments moved to the shared workspace rule (workspace.ts). Tentative
+  // (requested) leave is now already-off and reserved, labelled separately, and a
+  // completed request after the as-of date is charged like an approved one.
+  it('reserves booked spans without recharging past, overlapping or out-of-range PTO', () => {
     const entries = [
       request('approved', '2027-01-03', '2027-01-06', 'approved'),
       request('overlap', '2027-01-05', '2027-01-07', 'approved'),
@@ -80,9 +84,12 @@ describe('personal PTO requests', () => {
       request('tentative', '2027-01-11', '2027-01-12', 'requested'),
       request('far', '2027-02-01', '2027-02-02', 'approved'),
     ];
-    expect(plannerRequestCommitments(entries, '2027-01-04', '2027-01-31', '2027-01-04')).toEqual({
-      unavailableDates: ['2027-01-04', '2027-01-05', '2027-01-06', '2027-01-07', '2027-01-08'],
-      approvedPtoDays: 3,
+    expect(planningCommitments(entries, { start: '2027-01-04', end: '2027-01-31' }, { asOf: '2027-01-04', includesApprovedLeave: false })).toEqual({
+      unavailableDates: ['2027-01-04', '2027-01-05', '2027-01-06', '2027-01-07', '2027-01-08', '2027-01-11', '2027-01-12'],
+      // Completed counts as booked, as in the forecast: 01-05..01-08 once each.
+      approvedPtoDays: 4,
+      tentativePtoDays: 2,
+      reservedPtoDays: 6,
       hasHourlyBookings: false,
     });
   });

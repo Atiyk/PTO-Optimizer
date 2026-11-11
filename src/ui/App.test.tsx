@@ -51,13 +51,18 @@ describe('planner result actions', () => {
     const first = render(<App />);
     const track = await screen.findByRole('button', { name: 'Track this PTO request' });
     fireEvent.click(track);
-    await screen.findByText('Tracked', { exact: true });
+    // The break becomes tentative time off at once, so the confirmation lives in the tracker.
+    await screen.findByText('PTO request tracked in this browser.');
     first.unmount();
     render(<App />);
-    const requests = screen.getByRole('region', { name: 'Requesting each break' });
-    const link = await within(requests).findByRole('link', { name: 'See My PTO requests' });
-    expect(link.getAttribute('href')).toBe('#requests');
-    expect(within(requests).queryByRole('button', { name: 'Track this PTO request' })).toBeNull();
+    // A tracked (planned) break is tentative time off: already off, its PTO reserved once,
+    // so the planner neither recommends nor offers to track those days again.
+    const summary = await screen.findByTestId('tracked-requests-summary');
+    expect(summary.textContent).toBe('Includes 0 approved days off · 1 tentative, 1 reserved from the budget.');
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Your plan' }).getAttribute('data-plan-result')).not.toBe('pending'));
+    expect(screen.queryByRole('button', { name: 'Track this PTO request' })).toBeNull();
+    const tracker = screen.getByRole('region', { name: 'My PTO requests' });
+    expect(within(tracker).getByRole<HTMLSelectElement>('combobox', { name: /^Status for request / }).value).toBe('planned');
   });
 
   it('saves a break as Considering and restores its saved state on a new visit', async () => {

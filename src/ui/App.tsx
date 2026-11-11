@@ -3,7 +3,7 @@ import { rangeISO, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { PartnerPlanner } from './PartnerPlanner';
 import { readPartnerAvailability } from '../planning/partner';
 import { PtoTracker } from './PtoTracker';
-import { useRequestLedger } from './useRequestLedger';
+import { usePersonalWorkspace } from './usePersonalWorkspace';
 import { settleLedgerAction } from '../integration/browserWalletStore';
 import { track, trackBreakAction } from './analytics';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -48,9 +48,10 @@ export function App() {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const resultRef = useRef<HTMLElement>(null);
-  const ledger = useRequestLedger();
+  const workspace = usePersonalWorkspace();
+  const ledger = workspace.ledger;
   const today = useTodayISO();
-  const state = useAppState(ledger.requests, today);
+  const state = useAppState(workspace.requests, today, { includesApprovedLeave: workspace.includesApprovedLeave });
   const plannable = !state.validationIssues.length && !state.solverIssue && !state.planningPending;
   const requestToolsReady = plannable && state.holidaysReady && !state.holidaysDegraded;
   const requestsByDates = useMemo(() => new Map(ledger.requests.map(request => [`${request.start}|${request.end}`, request])), [ledger.requests]);
@@ -342,7 +343,13 @@ export function App() {
                           Apply my tracked requests
                         </label>
                       )}
-                      {state.applyTrackedRequests && <p>Tracked approved time off is excluded from new breaks on this device.</p>}
+                      {state.applyTrackedRequests && (state.approvedPtoDays > 0 || state.tentativePtoDays > 0) && (
+                        <p data-testid="tracked-requests-summary">
+                          Includes {state.approvedPtoDays} approved {state.approvedPtoDays === 1 ? 'day' : 'days'} off · {state.tentativePtoDays} tentative
+                          {state.reservedPtoDays > 0 && !state.unlimitedPto ? `, ${state.reservedPtoDays} reserved from the budget` : ''}.
+                        </p>
+                      )}
+                      {state.applyTrackedRequests && <p>Tracked approved, planned and requested time off is excluded from new breaks on this device.</p>}
                       {state.applyTrackedRequests && state.hasHourlyBookings && <p>This planner uses whole days. <a className="link-mark" href="/policy">My PTO</a> forecasts recorded hourly costs.</p>}
                       {state.applyTrackedRequests && !state.unlimitedPto && state.approvedPtoDays > 0 && (
                         <label className="flex min-h-11 items-center gap-2">

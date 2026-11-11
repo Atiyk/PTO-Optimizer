@@ -21,7 +21,8 @@ import { track } from './analytics';
 import { validateInputs, isSupportedPlanningRange } from './validation';
 import { defaultRangeEnd, defaultPlanRangeEnd, holidayEntriesFor, stateHolidayCandidatesFor, altFridayOffDatesFor, effectiveOffDaysFor, mustIncludeDaysFor, effectiveBlackoutsFor, effectiveBudgetFor, policyAccrualFieldsFor, buildSolveInput, isSuggestedPtoDay, type HolidayEntry } from '../autopilot/planFromSearch';
 import { todayISO } from './today';
-import { plannerRequestCommitments, type PtoRequest } from '../personal/requestLedger';
+import type { PtoRequest } from '../personal/requestLedger';
+import { planningCommitments } from '../personal/workspace';
 import { usePlannerComputation } from '../planning/usePlannerComputation';
 import { MAX_PINNED_PLANS, usePinnedPlans } from './pinnedPlanStore';
 
@@ -106,7 +107,13 @@ interface LoadedHolidayScope extends HolidayFetchResult {
   scope: string;
 }
 
-export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balanceAsOf = todayISO()) {
+/** Local-only personal context from the shared workspace (never part of the plan URL). */
+export interface PlannerWorkspaceBasis {
+  /** My PTO's "balance already includes approved leave" setting. */
+  includesApprovedLeave?: boolean;
+}
+
+export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balanceAsOf = todayISO(), workspaceBasis: PlannerWorkspaceBasis = {}) {
   const initial = useMemo<FullURLState>(() => {
     const defaults = {
       rangeStart: todayISO(),
@@ -182,7 +189,12 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   const [rangeEnd, setRangeEnd] = useState(initial.rangeEnd);
   const [budget, setBudget] = useState(initial.budget);
   const localApprovalOptions = typeof window === 'undefined' ? undefined : window.history.state?.plannerApprovalOptions;
-  const [reserveApprovedPto, setReserveApprovedPto] = useState(localApprovalOptions?.reserve === true);
+  // Reserve approved PTO unless the balance already includes it (the shared My PTO
+  // setting). The legacy `reserve` history flag defaulted to false on every visit, so it
+  // is not read back; only an explicit choice under the current rule is.
+  const [reserveApprovedPto, setReserveApprovedPto] = useState(
+    typeof localApprovalOptions?.reserveApproved === 'boolean' ? localApprovalOptions.reserveApproved : workspaceBasis.includesApprovedLeave !== true,
+  );
   const [applyTrackedRequests, setApplyTrackedRequests] = useState(
     typeof localApprovalOptions?.apply === 'boolean' ? localApprovalOptions.apply : initial.publicShareVersion !== 1 && !initial.landingPreview,
   );
@@ -442,7 +454,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     const historyState = writeBrowserPlanStateToURL(url.searchParams, urlWriteState, window.history.state);
     window.history.replaceState({
       ...historyState,
-      plannerApprovalOptions: { apply: applyTrackedRequests, reserve: reserveApprovedPto },
+      plannerApprovalOptions: { apply: applyTrackedRequests, reserveApproved: reserveApprovedPto },
     }, '', url);
   }, [urlWriteState, applyTrackedRequests, reserveApprovedPto]);
   // F1: just this plan's own parameters (no utm or other stray params from the address
@@ -536,8 +548,8 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   const effectiveOffDays = useMemo(() => effectiveOffDaysFor(holidayEntries, altFridayOffDates), [holidayEntries, altFridayOffDates]);
 
   const commitments = useMemo(
-    () => plannerRequestCommitments(requests, rangeStart, rangeEnd, balanceAsOf),
-    [requests, rangeStart, rangeEnd, balanceAsOf],
+    () => planningCommitments(requests, { start: rangeStart, end: rangeEnd }, { asOf: balanceAsOf, includesApprovedLeave: !reserveApprovedPto }),
+    [requests, rangeStart, rangeEnd, balanceAsOf, reserveApprovedPto],
   );
   const bookedDates = useMemo(() => new Set(applyTrackedRequests ? commitments.unavailableDates : []), [applyTrackedRequests, commitments]);
   const mustIncludeDays = useMemo(
@@ -549,9 +561,9 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     [blackouts, bookedDates, forced],
   );
 
-  // A remaining balance may already account for bookings. Only reserve their cost
-  // when the user confirms the entered budget still includes that approved time.
-  const approvedPtoCharge = applyTrackedRequests && reserveApprovedPto && !unlimitedPto ? commitments.approvedPtoDays : 0;
+  // Workspace deduction rule: approved and tentative request days are already off and
+  // their PTO is reserved once; approved days are skipped when the balance includes them.
+  const approvedPtoCharge = applyTrackedRequests && !unlimitedPto ? commitments.reservedPtoDays : 0;
   const effectiveBudget = effectiveBudgetFor(budget, reserveDays + approvedPtoCharge);
 
   // Feature 1 Stage 2A follow-through: routed through the shared policy model
@@ -997,6 +1009,8 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     setUnlimitedPto,
     effectiveBudget,
     approvedPtoDays: commitments.approvedPtoDays,
+    tentativePtoDays: commitments.tentativePtoDays,
+    reservedPtoDays: applyTrackedRequests && !unlimitedPto ? commitments.reservedPtoDays : 0,
     hasHourlyBookings: commitments.hasHourlyBookings,
     hasTrackedRequests: commitments.unavailableDates.length > 0,
     applyTrackedRequests,
