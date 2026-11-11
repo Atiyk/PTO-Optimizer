@@ -45,6 +45,7 @@ import { ENTRIES, type Entry, type ComponentKind } from './routes.ts';
 import { PRODUCT_NAME, PRODUCT_SHORT_NAME } from '../src/brand.ts';
 import { todayISO } from '../src/ui/today.ts';
 import { prerenderAppGuard } from './prerenderAppGuard.ts';
+import { lockPrerenderedControls } from './prerenderShell.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '..');
@@ -306,7 +307,8 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
   }
   const hasDefaultPlan = entry.component === 'app' || entry.component === 'landing';
   const content = hasDefaultPlan ? `<p data-prerendered-plan-loading role="status" class="p-6 text-ink">Loading your plan…</p><noscript><p>Enable JavaScript to open a linked plan or change these dates.</p></noscript><div data-prerendered-plan>${html}</div>` : html;
-  const withRoot = original.replace(marker, `<div id="root">${content}</div>`);
+  // Typed input before the client mounts would be discarded: see prerenderShell.ts.
+  const withRoot = original.replace(marker, `<div id="root">${lockPrerenderedControls(content)}</div>`);
 
   const meta = extractMeta(original, url);
   const jsonLdScripts = buildJsonLd(entry, meta)
