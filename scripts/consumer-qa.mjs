@@ -123,7 +123,13 @@ try {
             unlabeledInputs: inputs.filter((item) => !nameOf(item)).map((item) => ({ tag: item.tagName, type: item.type, id: item.id })),
             unnamedButtons: buttons.filter((item) => !nameOf(item)).map((item) => ({ id: item.id })),
             canonical: document.querySelector('link[rel="canonical"]')?.getAttribute('href') || null,
-            formSubmitControls: [...document.querySelectorAll('button[type="submit"],input[type="submit"]')].filter(visible).length,
+            // Planning must never sit behind a submit action. The optional email sign-in form
+            // (#account, rendered only when the deployment has accounts enabled) is the one
+            // permitted form: it gates reminders, never a result. It is counted separately.
+            formSubmitControls: [...document.querySelectorAll('button[type="submit"],input[type="submit"]')]
+              .filter((item) => visible(item) && !item.closest('#account form')).length,
+            accountSignInSubmitControls: [...document.querySelectorAll('#account form button[type="submit"],#account form input[type="submit"]')]
+              .filter(visible).length,
           };
         }));
         result.correctRoute = route.title.test(result.title);
