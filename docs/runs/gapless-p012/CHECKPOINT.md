@@ -72,6 +72,8 @@ Residual risks noted by P (not fixed): `/api/watch` and reminder-email links car
 
 - ~16:40Z — T done (issue 7): root cause of prod forecast flake = prerendered enabled inputs replaced by createRoot; fixed by wrapping prerendered snapshot in disabled fieldset (5d1cd70). Hover pin previews moved to a worker with stale-result guard (6119c58); worst long task 1747 ms → 61 ms (4x CPU, 2y, b=60). Vitest 2006 pass, tsc, lint 0 err, build OK, journey 8/8 product, consumer-qa 40/40. Fast-forwarded into `gapless/p1-release` @ 6119c58 (pushed). Note: `npm run verify:dist` hash would need `--write` (manual script, not a CI gate). Agent C started on issue 12 in /home/user/p1c.
 
+- ~16:50Z — S done (5/6, 40d41b7): breaks include adjacent free days and never touch; US travel demand = centred 7-day seasonal mean shared by solver and evidence panel; copy says estimate, not forecast/fare. Merged → 89ace0b. O follow-up: calendar-day notice counted from first working day of the break (requestByDate; was counting from the free Saturday). C done (12, 10ef0fa): partial-day leave no longer counts as a parent's day off in Family; per-parent workweek tests. Merged → 7432f38 (pushed): vitest 190/2033 pass, tsc, lint 0 err, build OK. apps/teams 289/290 with coverageEvents hook flake (passes alone). Solve perf test exceeded 1000 ms once at load 7, passes alone. Agent P on issue 9 in /home/user/p1p (base 89ace0b).
+
 ## Next action
 
-Merge S and T results into `gapless/p1-release` when done; then start 9 (snapshots, P) and 12 (family work calendars, C). Then critic Q on exact P1 SHA, open P1 release PR, CI, merge, prod smoke (push gapless/prod-smoke).
+When P (issue 9) reports: merge into `gapless/p1-release`, full checks, open P1 release PR (draft→ready), run critic Q on exact SHA, fix, CI, merge, Vercel, prod smoke. Follow-ups noted: school week Mon–Fri assumption (Sun–Thu countries); partial-day booking overcount in Family; verify:dist hash.
