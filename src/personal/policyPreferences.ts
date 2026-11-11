@@ -1,9 +1,12 @@
 import { findTerm } from '../content/glossary/terms';
+import { POLICY_PRIVATE_KEYS } from '../ui/shareFormat';
 import { defaultPolicyURLState, readPolicyStateFromURL, type PolicyURLState } from '../ui/policyUrlState';
 
 const KEY = 'gapless.personal.policy.v1';
 const HISTORY_KEY = 'timeOffPolicyDraft';
-const PARAMS = new Set(['ak', 'am', 'cb', 'bao', 'c', 'u', 'hpd', 'fq', 'pda', 'gd', 'hr', 'twh', 'edy', 'py', 'as', 'crd', 'ace', 'ac', 'cm', 'cc', 'cue', 'cub', 'wpe', 'wpd', 'nba', 'pol', 'pd', 'car', 'ww', 'sd', 'afs', 'bap', 'shm']);
+// Saved/draft policy keys: the country plus every private policy key except the
+// forecast date, which is handled on its own (src/ui/shareFormat.ts).
+const PARAMS = new Set<string>(['c', ...POLICY_PRIVATE_KEYS.filter(key => key !== 'fd')]);
 
 export function initialPolicyPreferences(search: string, country: string, draftSearch?: unknown): PolicyURLState {
   const incoming = new URLSearchParams(search);

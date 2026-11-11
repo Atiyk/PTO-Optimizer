@@ -89,4 +89,17 @@ describe('handleFeedRequest', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('cache-control')).toBe('private, no-store');
   });
+
+  it.each(['np=21', 'ac=1&am=1.5', 'ex=1&xd=2027-03-01&cc=2', 'pc=1&pcs=2027-02-01&pce=2027-02-28&pcm=2', 'up=1', 'r=2026-12-02', 'salary=91000'])(
+    'keeps any private or unclassified legacy key out of a shared cache: %s', async (extra) => {
+      const res = await handleFeedRequest(new Request(`${URL_OK}&${extra}`), reader, NOW);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('cache-control')).toBe('private, no-store');
+    },
+  );
+
+  it('keeps the CDN cache for a current public share-format feed', async () => {
+    const res = await handleFeedRequest(new Request(`${URL_OK}&sv=1&w=30&count=0`), reader, NOW);
+    expect(res.headers.get('cache-control')).toBe(FEED_CACHE_CONTROL);
+  });
 });

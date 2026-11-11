@@ -4,6 +4,7 @@ import type { WorkWeek } from '@daysoff/engine/solver/types';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import type { ForcedState } from './types';
+import { isPlanAddressKey, partitionPlanParams } from './shareFormat';
 
 // Maps the old, now-removed named objectives and shape presets to a sensible (w, breakCount)
 // pair, so a previously-shared link still opens to something reasonable instead of erroring
@@ -439,10 +440,6 @@ export function writeFullStateToURL(params: URLSearchParams, state: WriteStateIn
   params.delete('ov');
 }
 
-const PRIVATE_PLAN_KEYS = new Set([
-  'eh', 'sv', 'ho', 'hd', 'pp', 'ov', 'od', 'bo', 'r',
-  'ac', 'am', 'ex', 'xd', 'cc', 'np', 'pc', 'pcs', 'pce', 'pcm', 'up',
-]);
 const PRIVATE_PLAN_HISTORY_KEY = 'gaplessPrivatePlanV1';
 
 function publicPlanFingerprint(params: URLSearchParams): string {
@@ -466,7 +463,7 @@ export function readBrowserPlanSearch(search: string, historyState: unknown): st
   if (typeof draft.privateSearch !== 'string' || draft.privateSearch.length > 180_000
     || draft.publicSearch !== publicPlanFingerprint(params)) return search;
   for (const [key, value] of new URLSearchParams(draft.privateSearch)) {
-    if (PRIVATE_PLAN_KEYS.has(key) && !params.has(key)) params.set(key, value);
+    if (!isPlanAddressKey(key) && !params.has(key)) params.set(key, value);
   }
   return params.toString();
 }
@@ -488,12 +485,15 @@ export function writeBrowserPlanStateToURL(params: URLSearchParams, state: Write
   const previous = new URLSearchParams(readBrowserPlanSearch(params.toString(), historyState));
   const full = new URLSearchParams();
   writeFullStateToURL(full, state);
-  const draft = new URLSearchParams();
+  // Allowlist (src/ui/shareFormat.ts): only public planning keys reach the address bar.
+  // Everything else, including any key added later without classification, stays in
+  // this tab's history entry.
+  const { address, draft } = partitionPlanParams(full);
   for (const key of [...params.keys()]) params.delete(key);
-  for (const [key, value] of full) {
+  for (const [key, value] of address) {
     if (key === 'c' && !/^[A-Z]{2}$/.test(value)) continue;
     if (key === 'sd' && !/^[A-Z0-9-]{1,16}$/.test(value)) continue;
-    (PRIVATE_PLAN_KEYS.has(key) ? draft : params).set(key, value);
+    params.set(key, value);
   }
   // The recipient's incoming partner payload remains usable after refresh. The
   // current overlap date state has already consumed the legacy ov payload.
