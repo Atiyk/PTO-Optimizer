@@ -37,6 +37,7 @@ jobs:
       - name: Consumer routes at 1440/768/375/320 against production
         run: node scripts/consumer-qa.mjs "$PROD" qa-prod after
       - name: Consumer journey against production
+        if: ${{ !cancelled() }}
         run: node scripts/consumer-journey.mjs "$PROD" qa-prod-journey
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
