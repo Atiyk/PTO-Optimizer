@@ -7,7 +7,7 @@ import { PtoTracker } from './PtoTracker';
 import { usePersonalWorkspace } from './usePersonalWorkspace';
 import { settleLedgerAction } from '../integration/browserWalletStore';
 import { track, trackBreakAction } from './analytics';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SiteHeader } from './SiteHeader';
 import { CompactResultBar, Headline } from './Headline';
 import { buttonClasses } from './Button';
@@ -110,10 +110,11 @@ export function App() {
     let steps = (cycle.indexOf(target ?? undefined) - cycle.indexOf(state.forced[date]) + 3) % 3;
     while (steps-- > 0) state.toggleDay(date);
   };
-  const pinPreview = (date: string) => {
-    const preview = state.previewPin(date);
-    return preview ? pinPreviewText(preview, { totalDaysOff: state.totalDaysOff, budgetSpent: state.budgetSpent }) : null;
-  };
+  const { previewPin, totalDaysOff: currentDaysOff, budgetSpent: currentBudgetSpent } = state;
+  const pinPreview = useCallback(async (date: string) => {
+    const preview = await previewPin(date);
+    return preview ? pinPreviewText(preview, { totalDaysOff: currentDaysOff, budgetSpent: currentBudgetSpent }) : null;
+  }, [previewPin, currentDaysOff, currentBudgetSpent]);
   // Opening More options from the rail scrolls the panel into view (it can open below the
   // fold inside the sticky rail).
   const optionsRef = useRef<HTMLDivElement>(null);

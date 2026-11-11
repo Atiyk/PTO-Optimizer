@@ -1,7 +1,7 @@
 import { getConsumerHolidaysWithStatus as getHolidaysWithStatus, getConsumerSubdivisionCandidates as getSubdivisionCandidates, readPreloadedConsumerHolidays } from '../personal/consumerHolidays';
 import { SUBDIVISION_NAMES } from '@daysoff/engine/data/countries';
 import { planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
-import { previewPinnedDay, type PinPreview } from './pinPreview';
+import type { PinPreview } from './pinPreview';
 import { defaultEmployerCalendar, readEmployerCalendar, writeEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { computeMarginalValues } from '@daysoff/engine/solver/marginalValue';
@@ -25,6 +25,7 @@ import { todayISO } from './today';
 import type { PtoRequest } from '../personal/requestLedger';
 import { committedPlanEntries, planningCommitments, type WorkdaySchedule } from '../personal/workspace';
 import { usePlannerComputation } from '../planning/usePlannerComputation';
+import { createPinPreviewer } from '../planning/pinPreviewClient';
 import { MAX_PINNED_PLANS, usePinnedPlans } from './pinnedPlanStore';
 
 export { defaultRangeEnd };
@@ -666,23 +667,20 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   const solveResult = solved.result;
 
   // The real outcome of pinning one more day, from the same planning call, cached per
-  // input so hovering across the grid never re-solves the same day twice.
-  const previewPin = useMemo(() => {
-    const cache = new Map<string, PinPreview>();
-    return (date: string): PinPreview | null => {
-      if (!isValidInput || planningPending || planningVersion !== 2) return null;
-      let hit = cache.get(date);
-      if (!hit) {
-        try {
-          hit = previewPinnedDay(solveInput, { minimumBreakDays, style: planningStyle }, date);
-        } catch {
-          return null;
-        }
-        cache.set(date, hit);
-      }
-      return hit;
-    };
-  }, [solveInput, isValidInput, planningPending, planningVersion, minimumBreakDays, planningStyle]);
+  // input so hovering across the grid never re-solves the same day twice. Solved in a
+  // worker (see pinPreviewClient.ts): a 1-2 year plan took up to 0.6 s per hover here.
+  const pinPreviewer = useMemo(
+    () => isValidInput && !planningPending && planningVersion === 2
+      ? createPinPreviewer(solveInput, { minimumBreakDays, style: planningStyle })
+      : null,
+    [solveInput, isValidInput, planningPending, planningVersion, minimumBreakDays, planningStyle],
+  );
+  // A newer input supersedes this previewer: stop its in-flight solve.
+  useEffect(() => () => pinPreviewer?.dispose(), [pinPreviewer]);
+  const previewPin = useCallback(
+    (date: string): Promise<PinPreview | null> => pinPreviewer ? pinPreviewer.preview(date) : Promise.resolve(null),
+    [pinPreviewer],
+  );
 
   const breaks = solveResult.primary;
   const alternatives = solveResult.alternatives;
