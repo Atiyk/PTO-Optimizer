@@ -1,3 +1,4 @@
+import { HolidayCoverageNotice } from './HolidayCoverageNotice';
 import { PortraitShare } from './PortraitShare';
 import { rangeISO, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { PartnerPlanner } from './PartnerPlanner';
@@ -261,6 +262,10 @@ export function App() {
                     </p>
                   )}
                 </div>
+              )}
+              {/* Issue 17: plan years without holiday data say so; nothing renders or loads for bundled years. */}
+              {!state.hasSharedHolidaySnapshot && (
+                <HolidayCoverageNotice country={state.country} rangeStart={state.rangeStart} rangeEnd={state.rangeEnd} />
               )}
               <section aria-labelledby="breaks-heading" id="summary-heading" className="min-w-0 scroll-mt-16">
                 <h2 id="breaks-heading" tabIndex={-1} className="scroll-mt-16 text-h2 font-bold text-ink type-condensed">Requesting each break</h2>
