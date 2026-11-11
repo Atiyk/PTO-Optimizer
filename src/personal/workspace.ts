@@ -184,6 +184,41 @@ export function planningCommitments(
   };
 }
 
+/**
+ * The dates in `range` the person is off for the whole day because of approved or tentative
+ * leave. `planningCommitments().unavailableDates` also holds partly booked days (an hourly
+ * appointment), which no planner may book again but on which the person still works, so a
+ * coverage question (is anyone with the kids?) must use this narrower list. Hours on a
+ * date count as a whole day when they fill that weekday's scheduled shift, summed across
+ * requests; with no known shift, a recorded partial day stays partial.
+ */
+export function fullDayLeaveDates(
+  requests: readonly PtoRequest[], range: { start: ISODate; end: ISODate }, schedule?: WorkdaySchedule,
+): ISODate[] {
+  const { start, end } = range;
+  if (!isValidISODate(start) || !isValidISODate(end) || start > end) return [];
+  const whole = new Set<ISODate>();
+  const minutes = new Map<ISODate, number>();
+  for (const request of requests) {
+    const role = planningRole(request.status);
+    if ((role !== 'booked' && role !== 'tentative') || !validRequestRange(request.start, request.end)) continue;
+    const first = request.start > start ? request.start : start;
+    const last = request.end < end ? request.end : end;
+    if (first > last) continue;
+    for (const date of rangeISO(first, last)) {
+      const booked = request.ptoMinutes?.[date];
+      // A date in the span with no hours recorded is not a workday of the request: off anyway.
+      if (booked === undefined || (request.partialMinutes === undefined && scheduledMinutesOn(date, schedule) === undefined)) whole.add(date);
+      else minutes.set(date, (minutes.get(date) ?? 0) + booked);
+    }
+  }
+  for (const [date, booked] of minutes) {
+    const scheduled = scheduledMinutesOn(date, schedule);
+    if (scheduled !== undefined && booked >= scheduled) whole.add(date);
+  }
+  return [...whole].sort();
+}
+
 export interface CommittedPlanEntry {
   id: string;
   role: 'booked' | 'tentative';

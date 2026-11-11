@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { createPtoRequest, type PtoRequest, type RequestCalendar, type RequestStatus } from './requestLedger';
 import {
-  BALANCE_BASIS_STORAGE_KEY, chargeableRequestDates, committedPlanEntries, committedRequestDays, planningCommitments, planningRole,
+  BALANCE_BASIS_STORAGE_KEY, chargeableRequestDates, fullDayLeaveDates, committedPlanEntries, committedRequestDays, planningCommitments, planningRole,
   readBalanceBasisPreference, readWorkdaySchedulePreference, requestDateCharge, requestDayEquivalent, writeBalanceBasisPreference, writeWorkdaySchedulePreference,
 } from './workspace';
 
@@ -177,5 +177,41 @@ describe('committed entries the planner keeps visible', () => {
       ['tracked', 'tentative', 'planned', '2027-01-11', '2027-01-12', 2],
       ['later', 'booked', 'approved', '2027-01-18', '2027-01-19', 2],
     ]);
+  });
+});
+
+describe('fullDayLeaveDates: only whole days of leave mean the person is off', () => {
+  const shifts8 = { ...calendar, shiftMinutes: [480, 480, 480, 480, 480, 0, 0] };
+  const fourTens = { ...calendar, workWeek: [true, true, true, true, false, false, false] as RequestCalendar['workWeek'], shiftMinutes: [600, 600, 600, 600, 0, 0, 0] };
+  const hourly = (id: string, start: string, end: string, cal: RequestCalendar, partialMinutes?: number, status: RequestStatus = 'approved') =>
+    createPtoRequest({ start, end, status, partialMinutes }, cal, id)!;
+
+  it('keeps whole-day spans, drops a partial-day appointment, and ignores ideas and canceled requests', () => {
+    const requests = [
+      request('whole', '2027-01-08', '2027-01-11', 'approved'),
+      hourly('dentist', '2027-01-13', '2027-01-13', shifts8, 120),
+      request('idea', '2027-01-18', '2027-01-18', 'considering'),
+      request('gone', '2027-01-19', '2027-01-19', 'canceled'),
+    ];
+    expect(fullDayLeaveDates(requests, range, { shiftMinutes: shifts8.shiftMinutes }))
+      .toEqual(['2027-01-08', '2027-01-09', '2027-01-10', '2027-01-11'].filter(date => date >= range.start));
+    // Without a saved schedule a recorded partial day is still partial.
+    expect(fullDayLeaveDates(requests, range)).not.toContain('2027-01-13');
+  });
+
+  it('treats hours that fill the scheduled shift as a whole day, per weekday', () => {
+    const tenHours = hourly('ten', '2027-01-14', '2027-01-14', fourTens, 600);
+    const fiveHours = hourly('five', '2027-01-18', '2027-01-18', fourTens, 300);
+    const otherHalf = hourly('other-half', '2027-01-18', '2027-01-18', fourTens, 300, 'requested');
+    const schedule = { shiftMinutes: fourTens.shiftMinutes };
+    expect(fullDayLeaveDates([tenHours, fiveHours], range, schedule)).toEqual(['2027-01-14']);
+    // Two half-day bookings on one date add up to the whole shift.
+    expect(fullDayLeaveDates([fiveHours, otherHalf], range, schedule)).toEqual(['2027-01-18']);
+  });
+
+  it('lets a whole-day request win over an hourly one on the same date', () => {
+    const whole = request('w', '2027-01-12', '2027-01-12', 'approved');
+    const partial = hourly('p', '2027-01-12', '2027-01-12', shifts8, 60);
+    expect(fullDayLeaveDates([partial, whole], range, { shiftMinutes: shifts8.shiftMinutes })).toEqual(['2027-01-12']);
   });
 });
