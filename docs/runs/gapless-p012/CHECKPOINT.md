@@ -29,7 +29,7 @@ source of truth between scheduled executions. No sensitive user data belongs her
 | Batch | Issues | Branch / PR | State |
 |---|---|---|---|
 | P0 | 1, 2, 10, 11 | `gapless/p0-release` → PR #145, merged as `3bae6ed` (critic GO on 494d135) | DONE: merged, Vercel prod success, prod smoke passed (run 43017235618 attempt 2) |
-| P1 | 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17 | C 16/17 @ b42baa7; B 13/14 @ dea2dcf; W2 3/4 in progress | In progress |
+| P1 | 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17 | `gapless/p1-release` @ 0d9384a (pushed): C 16/17, B 13/14, W2 3/4 (2878ab3), QA account-form scoping. S 5/6 → `gapless/p1-s-solver-travel` (/home/user/p1s); T 7 → `gapless/p1-t-performance` (/home/user/p1t) | Integrating |
 | P2 | 8, 15, 18, 19 | — | Not started |
 
 ## Issue traceability
@@ -65,6 +65,8 @@ Residual risks noted by P (not fixed): `/api/watch` and reminder-email links car
 
 - ~12:25Z — Prod smoke on 7777e23: attempt 1 routes 40/40 pass, journey 8/9 (forecast step timed out waiting for the forecast figure); attempt 2 all routes and 9/9 journeys pass. Accounts-enabled local build passes the same journey, so not the account flag. Suspected timing: inputs filled before the client app mounts over prerendered HTML (createRoot, not hydrate) can be lost on slow networks. Logged for issue 7 (P1). P0 COMPLETE.
 
+- ~12:35Z — `gapless/p1-release` built from 3bae6ed + C + B + W2 + QA scoping → 0d9384a: vitest 186 files / 1998 tests pass, tsc clean, lint 0 errors, build OK. Agents S (5/6) and T (7, incl. prod forecast flake) started from 0d9384a (max 2 concurrent).
+
 ## Next action
 
-Build `gapless/p1-release` from 3bae6ed: integrate C (b42baa7), B (dea2dcf), W2 (3/4) when done, plus the consumer-qa account-form scoping. Remaining P1 (5, 6, 7, 9, 12) at most 2 agents at a time.
+Merge S and T results into `gapless/p1-release` when done; then start 9 (snapshots, P) and 12 (family work calendars, C). Then critic Q on exact P1 SHA, open P1 release PR, CI, merge, prod smoke (push gapless/prod-smoke).
