@@ -102,3 +102,13 @@ describe('/policy URL round-trip (Stage 4A follow-through)', () => {
 it('rejects oversized private-policy date lists', () => {
   expect(readPolicyStateFromURL('?pd=' + Array(5000).fill('2027-01-04').join(','), 'US').plannedDays).toEqual([]);
 });
+
+describe('work week from a /policy link (Issue 10)', () => {
+  it('rejects a work week with no working days instead of loading an all-off schedule', () => {
+    expect(readPolicyStateFromURL('?ww=0000000', 'US').workWeek).toBeUndefined();
+    expect(readPolicyStateFromURL('?ww=0000000', 'US', true).workWeek).toBeUndefined();
+  });
+  it('still reads a valid custom work week', () => {
+    expect(readPolicyStateFromURL('?ww=0111110', 'US').workWeek).toEqual([false, true, true, true, true, true, false]);
+  });
+});

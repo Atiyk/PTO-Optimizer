@@ -31,6 +31,7 @@ import { FAQ } from './FAQ';
 import { Footer } from './Footer';
 import { CalendarErrorBoundary } from './CalendarErrorBoundary';
 import { ValidationBanner } from './ValidationBanner';
+import { workWeekLinkIssue } from './validation';
 import { PlanRecoveryNotice } from './PlanRecoveryNotice';
 import { PeakCapBanner } from './PeakCapBanner';
 import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
@@ -55,6 +56,13 @@ export function App() {
   const requestToolsReady = plannable && state.holidaysReady && !state.holidaysDegraded;
   const requestsByDates = useMemo(() => new Map(ledger.requests.map(request => [`${request.start}|${request.end}`, request])), [ledger.requests]);
   const partnerReceived = useMemo(() => readPartnerAvailability(typeof window === 'undefined' ? '' : readBrowserPlanSearch(window.location.search, window.history.state)), []);
+  // Issue 10: a link's all-days-off work week was replaced with Monday to Friday at decode.
+  // Say so until the person picks their own working days.
+  const [linkWorkWeek] = useState(() => ({
+    issue: typeof window === 'undefined' ? null : workWeekLinkIssue(readBrowserPlanSearch(window.location.search, window.history.state)),
+    week: state.workWeek,
+  }));
+  const workWeekNotice = linkWorkWeek.week === state.workWeek ? linkWorkWeek.issue : null;
   const freeDays = useMemo(() => {
     if (state.validationIssues.length) return [];
     const off = new Set(state.effectiveOffDays);
@@ -205,13 +213,14 @@ export function App() {
                   {!state.planningPending && !state.validationIssues.length && <a className="link-mark inline-flex min-h-11 items-center" href={`#day-${holidayFocusDate}`}>Find this date on the calendar</a>}
                 </div>
               )}
-              {(state.partnerOverlapReceived || partnerReceived.invalid || partnerReceived.availability || state.validationIssues.length > 0 || state.solverIssue || state.relaxedMinimum !== undefined || state.peakCapApplied || state.holidaysDegraded) && (
+              {(state.partnerOverlapReceived || partnerReceived.invalid || workWeekNotice || partnerReceived.availability || state.validationIssues.length > 0 || state.solverIssue || state.relaxedMinimum !== undefined || state.peakCapApplied || state.holidaysDegraded) && (
                 <div className="flex flex-col gap-3">
                   {state.partnerOverlapReceived && (
                     <PartnerOverlapBanner overlapDayCount={state.overlapDays.length} onDismiss={state.dismissPartnerOverlapBanner} />
                   )}
                   {partnerReceived.invalid && <p role="alert" className="rounded-[10px] border border-error bg-error-soft p-4 text-sm text-ink">This partner availability link is invalid or too large. Ask for a new link with fewer dates.</p>}
                   {partnerReceived.availability && <p role="status" className="rounded-[10px] bg-surface-alt p-4 text-sm text-ink">Someone shared {partnerReceived.availability.days.length} {partnerReceived.availability.status} available dates. Your own PTO budget and calendar apply. <a className="link-mark font-semibold" href="#partner-planner">See dates you can both take off</a></p>}
+                  {workWeekNotice && <p role="status" className="rounded-[10px] bg-surface-alt p-4 text-sm text-ink">{workWeekNotice}</p>}
                   <ValidationBanner issues={state.validationIssues} />
                   {state.relaxedMinimum !== undefined && (
                     <RelaxedMinimumNotice

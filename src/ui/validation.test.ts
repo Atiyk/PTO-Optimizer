@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateInputs } from './validation';
+import { validateInputs, workWeekLinkIssue, WORK_WEEK_LINK_ISSUE } from './validation';
 
 function valid() {
   return { rangeStart: '2026-01-01', rangeEnd: '2026-12-31', budget: 15, expiryEnabled: false, expiryDate: '2026-12-31' };
@@ -76,5 +76,23 @@ describe('untrusted calendar range bounds', () => {
     expect(validateInputs({ ...base, rangeStart: '0100-01-01', rangeEnd: '9999-12-31' })).toContain('Choose a planning window of ten years or less.');
     expect(validateInputs({ ...base, rangeStart: '2050-01-01', rangeEnd: '2050-12-31' })).toEqual([]);
     expect(validateInputs({ ...base, rangeStart: '2028-02-29', rangeEnd: '2038-02-28' })).toEqual([]);
+  });
+});
+
+describe('workWeekLinkIssue (Issue 10: links with no working day)', () => {
+  it('explains a link whose work week has no working day', () => {
+    expect(workWeekLinkIssue('?c=US&ww=0000000')).toBe(WORK_WEEK_LINK_ISSUE);
+    expect(WORK_WEEK_LINK_ISSUE).toMatch(/no working days/);
+    expect(WORK_WEEK_LINK_ISSUE).toMatch(/Monday to Friday/);
+  });
+  it('explains an unreadable work week', () => {
+    expect(workWeekLinkIssue('?ww=11111')).toBe(WORK_WEEK_LINK_ISSUE);
+    expect(workWeekLinkIssue('?ww=abcdefg')).toBe(WORK_WEEK_LINK_ISSUE);
+  });
+  it('says nothing for a valid or absent work week', () => {
+    expect(workWeekLinkIssue('?ww=1111100')).toBeNull();
+    expect(workWeekLinkIssue('?ww=0000001')).toBeNull();
+    expect(workWeekLinkIssue('?c=US')).toBeNull();
+    expect(workWeekLinkIssue('')).toBeNull();
   });
 });

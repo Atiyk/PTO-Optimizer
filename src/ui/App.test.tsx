@@ -89,6 +89,17 @@ describe('planner result actions', () => {
     expect(await screen.findByRole('list', { name: 'Saved plans' })).toBeTruthy();
   });
 
+  it('explains a link with no working days and keeps planning live on Monday to Friday (Issue 10)', async () => {
+    window.history.replaceState(null, '', `${scenario}&ww=0000000`);
+    render(<App />);
+    const notice = screen.getByText(/This link’s work week had no working days/);
+    expect(notice.getAttribute('role')).toBe('status');
+    const summary = screen.getByRole('region', { name: 'Your plan' });
+    await waitFor(() => expect(summary.getAttribute('data-plan-result')).toBe('ready'));
+    expect(screen.queryByText('Choose at least one working day each week.')).toBeNull();
+    await waitFor(() => expect(new URLSearchParams(window.location.search).has('ww')).toBe(false));
+  });
+
   it('keeps save and public link controls for a settled plan with no PTO', async () => {
     window.history.replaceState(null, '', scenario.replace('b=1', 'b=0'));
     render(<App />);

@@ -162,6 +162,17 @@ describe('quick policy forecast in the real consumer page', () => {
     expectForecast('0 days');
   });
 
+  it('does not load a work week with no working days from a link (Issue 10)', () => {
+    window.history.replaceState(null, '', `/policy${INITIAL_SEARCH}&ww=0000000`);
+    render(<Policy />);
+    expect(screen.getByText(/This link’s work week had no working days/).getAttribute('role')).toBe('status');
+    const days = within(screen.getByRole('group', { name: 'Working days' }));
+    expect((days.getByLabelText('Mon') as HTMLInputElement).checked).toBe(true);
+    expect((days.getByLabelText('Fri') as HTMLInputElement).checked).toBe(true);
+    expect((days.getByLabelText('Sun') as HTMLInputElement).checked).toBe(false);
+    expectForecast('13 days');
+  });
+
   it('restores cleared accrual and dates as missing, without resetting them to examples', () => {
     const first = render(<Policy />);
     fireEvent.change(quickInputs().getByLabelText('Days earned each pay period'), { target: { value: '' } });

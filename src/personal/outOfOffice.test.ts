@@ -17,12 +17,21 @@ describe('returnToWorkDate', () => {
     const tueSat: WorkWeek = [false, true, true, true, true, true, false];
     expect(returnToWorkDate('2026-12-19', { workWeek: tueSat, offDays: [] })).toBe('2026-12-22'); // Sat -> Tue
   });
-  it('falls back to the next day for an empty work week', () => {
-    expect(returnToWorkDate('2026-12-19', { workWeek: [false, false, false, false, false, false, false], offDays: [] })).toBe('2026-12-20');
+  it('reports no return date for an empty work week instead of inventing one', () => {
+    expect(returnToWorkDate('2026-12-19', { workWeek: [false, false, false, false, false, false, false], offDays: [] })).toBeNull();
+  });
+  it('reports no return date when every working day for years is a day off', () => {
+    const offDays = Array.from({ length: 400 }, (_, i) => new Date(Date.UTC(2026, 11, 21 + i * 7)).toISOString().slice(0, 10));
+    expect(returnToWorkDate('2026-12-19', { workWeek: [true, false, false, false, false, false, false], offDays })).toBeNull();
   });
 });
 
 describe('outOfOfficeMessage', () => {
+  it('does not name a return date the schedule cannot produce', () => {
+    const message = outOfOfficeMessage({ start: '2026-12-22', end: '2026-12-24' }, { workWeek: [false, false, false, false, false, false, false], offDays: [] });
+    expect(message).toContain("with limited access to email. I'll reply when I'm back.");
+    expect(message).not.toContain("I'll be back on");
+  });
   it('states the dates, the return date and editable placeholders', () => {
     const message = outOfOfficeMessage({ start: '2026-12-22', end: '2026-12-24' }, calendar);
     expect(message).toContain("I'm out of the office from Tuesday, December 22, 2026 through Thursday, December 24, 2026");
