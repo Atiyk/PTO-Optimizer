@@ -145,14 +145,23 @@ describe('employer calendar integrated with the live consumer state', () => {
     expect(result.current.effectiveOffDays).toContain('2027-12-24');
   });
 
-  it('uses the local employer calendar for public links without shared holiday dates', async () => {
+  // Issue 9: a public link reproduces the sender's plan, so the recipient's saved
+  // calendar is opt-in (like their tracked requests), and is never overwritten.
+  it('opens public links without shared holiday dates on public holidays until the recipient applies their saved calendar', async () => {
     const saved = { ...defaultEmployerCalendar('US'), excluded: ['2027-12-24|Christmas Day'] };
     expect(saveEmployerCalendar(saved)).toBe(true);
+    const before = localStorage.getItem(EMPLOYER_STORAGE_PREFIX + 'US:');
     navigate('?c=US&s=2027-12-20&e=2027-12-31&b=4&sv=1');
     const { result } = renderHook(() => useAppState());
     await waitFor(() => expect(result.current.holidaysReady).toBe(true));
-    expect(result.current.holidayEntries[0]?.checked).toBe(false);
+    expect(result.current.holidayEntries[0]?.checked).toBe(true);
     expect(result.current.hasSharedHolidaySnapshot).toBe(false);
+    expect(result.current.hasSavedCalendarOffForSharedPlan).toBe(true);
+    act(() => result.current.saveEmployerHolidays());
+    expect(localStorage.getItem(EMPLOYER_STORAGE_PREFIX + 'US:')).toBe(before);
+    expect(result.current.employerCalendarMessage).toMatch(/Your saved calendar was not changed/);
+    act(() => result.current.restoreMyEmployerCalendar());
+    expect(result.current.holidayEntries[0]?.checked).toBe(false);
   });
 
   it('protects the saved calendar while viewing an explicit shared snapshot', async () => {

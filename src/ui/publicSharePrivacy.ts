@@ -1,6 +1,8 @@
 import { decodeEmployerCalendar } from '../personal/employerCalendar';
 import { isValidISODate, parseDateList } from './urlState';
 import { isPlanShareKey, PLAN_PRIVATE_KEYS, PUBLIC_SHARE_VERSION } from './shareFormat';
+import { PLANNER_REVISION } from '@daysoff/engine/solver/revision';
+import { validHolidayFingerprint, type ShareSnapshot } from './shareSnapshot';
 
 /** Imported, user-authored calendar names and excluded holiday labels are private. */
 export function employerLabelsWouldBeShared(query: string): boolean {
@@ -18,8 +20,10 @@ const DATE_FIELDS = ['s', 'e', 'afs'] as const;
 const STYLE_NAMES = ['balanced', 'long-breaks', 'more-breaks', 'custom'];
 
 /** Build the versioned, allowlisted public scenario. The optional dates are a
- * separate, deliberate selection, never extracted from the private query. */
-export function buildPublicPlanSearch(planSearch: string, observedHolidayDates?: readonly string[]): string {
+ * separate, deliberate selection, never extracted from the private query. The planner
+ * revision is always recorded; the public holiday fingerprint only when the caller
+ * supplies it and no explicit dates are shared (those already pin the holidays). */
+export function buildPublicPlanSearch(planSearch: string, observedHolidayDates?: readonly string[], snapshot?: ShareSnapshot): string {
   const source = new URLSearchParams(planSearch);
   const params = new URLSearchParams({ sv: String(PUBLIC_SHARE_VERSION) });
   const country = source.get('c');
@@ -56,6 +60,9 @@ export function buildPublicPlanSearch(planSearch: string, observedHolidayDates?:
     const dates = [...new Set(observedHolidayDates.filter(isValidISODate))].sort();
     if (dates.length <= 4000) params.set('ho', dates.join(','));
   }
+  params.set('er', String(PLANNER_REVISION));
+  const fingerprint = validHolidayFingerprint(snapshot?.holidayFingerprint ?? null);
+  if (fingerprint && !params.has('ho')) params.set('hf', fingerprint);
   // Defence in depth: the per-field validation above is itself an allowlist, and this
   // final pass guarantees nothing outside the versioned share format is ever emitted.
   for (const key of [...params.keys()]) if (!isPlanShareKey(key)) params.delete(key);
@@ -71,7 +78,7 @@ export function publicPlanOmissions(search: string): { calendar: boolean; settin
 }
 
 /** Never copy incidental browser query keys or fragments. */
-export function buildPublicPlanLink(currentHref: string, planSearch: string, observedHolidayDates?: readonly string[]): {
+export function buildPublicPlanLink(currentHref: string, planSearch: string, observedHolidayDates?: readonly string[], snapshot?: ShareSnapshot): {
   url: string;
   omittedPrivateCalendar: boolean;
 } {
@@ -79,7 +86,7 @@ export function buildPublicPlanLink(currentHref: string, planSearch: string, obs
   // Fix the origin first: a pathname beginning // must never replace the host.
   const result = new URL(original.origin);
   result.pathname = original.pathname;
-  result.search = buildPublicPlanSearch(planSearch, observedHolidayDates);
+  result.search = buildPublicPlanSearch(planSearch, observedHolidayDates, snapshot);
   return {
     url: result.toString(),
     omittedPrivateCalendar: observedHolidayDates === undefined && publicPlanOmissions(planSearch).calendar,

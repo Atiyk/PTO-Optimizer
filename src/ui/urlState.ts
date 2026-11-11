@@ -6,6 +6,7 @@ import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import type { NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
 import type { ForcedState } from './types';
 import { isPlanAddressKey, partitionPlanParams, PLAN_URL_KEYS } from './shareFormat';
+import { readShareSnapshot, writeShareSnapshot, type ShareSnapshot } from './shareSnapshot';
 
 // Maps the old, now-removed named objectives and shape presets to a sensible (w, breakCount)
 // pair, so a previously-shared link still opens to something reasonable instead of erroring
@@ -127,6 +128,9 @@ export interface FullURLState {
   minimumBreakDays?: number;
   employerCalendar?: EmployerCalendar;
   publicShareVersion?: 1;
+  /** What the sender's planner recorded in a public link (planner revision, public
+   * holiday fingerprint), so the recipient can be told when the plan was recalculated. */
+  sharedSnapshot?: ShareSnapshot;
   /** Observed dates intentionally shared by the sender, without employer labels. */
   sharedObservedHolidays?: string[];
   landingPreview?: true;
@@ -200,6 +204,7 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
   const sharedCalendar = decodeEmployerCalendar(params.get('eh'));
   const publicShareVersion = params.get('sv') === '1' ? 1 : undefined;
   const holidayDates = publicShareVersion ? params.get('ho') : null;
+  const sharedSnapshot = publicShareVersion ? readShareSnapshot(params) : undefined;
   const sharedObservedHolidays = holidayDates !== null && (
     holidayDates === '' || (holidayDates.length <= 44_000 && holidayDates.split(',').every(isValidISODate))
   ) ? parseDateList(holidayDates).filter(date => date >= rangeStart && date <= rangeEnd) : undefined;
@@ -260,6 +265,7 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
     subdivision,
     ...(employerCalendar ? { employerCalendar } : {}),
     ...(publicShareVersion ? { publicShareVersion } : {}),
+    ...(sharedSnapshot ? { sharedSnapshot } : {}),
     ...(sharedObservedHolidays !== undefined ? { sharedObservedHolidays } : {}),
     ...(landingPreview ? { landingPreview: true as const } : {}),
     ...(holidayFocusDate ? { holidayFocusDate } : {}),
@@ -299,6 +305,7 @@ export interface WriteStateInput {
   minimumBreakDays?: number;
   employerCalendar?: EmployerCalendar;
   publicShareVersion?: 1;
+  sharedSnapshot?: ShareSnapshot;
   sharedObservedHolidays?: readonly string[];
   landingPreview?: true;
   holidayFocusDate?: string;
@@ -348,6 +355,7 @@ export function writeFullStateToURL(params: URLSearchParams, state: WriteStateIn
   else params.delete('eh');
   if (state.publicShareVersion === 1 || state.sharedObservedHolidays !== undefined) params.set('sv', '1');
   else params.delete('sv');
+  writeShareSnapshot(params, state.publicShareVersion === 1 ? state.sharedSnapshot : undefined);
   if (state.sharedObservedHolidays !== undefined) {
     params.set('ho', encodeDateList([...new Set(state.sharedObservedHolidays)].sort()));
   } else {

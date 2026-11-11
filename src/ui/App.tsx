@@ -27,6 +27,7 @@ import { Legend } from './Legend';
 import { BreakCard } from './BreakCard';
 import { CommittedBreakCard } from './CommittedBreakCard';
 import { PinnedPlansStrip } from './PinnedPlansStrip';
+import { SharedPlanNotice } from './SharedPlanNotice';
 import { ExportBar } from './ExportBar';
 import { PartnerOverlapBanner } from './PartnerOverlapBanner';
 import { FAQ } from './FAQ';
@@ -232,7 +233,7 @@ export function App() {
                   {!state.planningPending && !state.validationIssues.length && <a className="link-mark inline-flex min-h-11 items-center" href={`#day-${holidayFocusDate}`}>Find this date on the calendar</a>}
                 </div>
               )}
-              {(state.partnerOverlapReceived || partnerReceived.invalid || workWeekNotice || partnerReceived.availability || state.validationIssues.length > 0 || state.solverIssue || state.relaxedMinimum !== undefined || state.peakCapApplied || state.holidaysDegraded) && (
+              {(state.partnerOverlapReceived || state.sharedPlanDifferences || partnerReceived.invalid || workWeekNotice || partnerReceived.availability || state.validationIssues.length > 0 || state.solverIssue || state.relaxedMinimum !== undefined || state.peakCapApplied || state.holidaysDegraded) && (
                 <div className="flex flex-col gap-3">
                   {state.partnerOverlapReceived && (
                     <PartnerOverlapBanner overlapDayCount={state.overlapDays.length} onDismiss={state.dismissPartnerOverlapBanner} />
@@ -240,6 +241,13 @@ export function App() {
                   {partnerReceived.invalid && <p role="alert" className="rounded-[10px] border border-error bg-error-soft p-4 text-sm text-ink">This partner availability link is invalid or too large. Ask for a new link with fewer dates.</p>}
                   {partnerReceived.availability && <p role="status" className="rounded-[10px] bg-surface-alt p-4 text-sm text-ink">Someone shared {partnerReceived.availability.days.length} {partnerReceived.availability.status} available dates. Your own PTO budget and calendar apply. <a className="link-mark font-semibold" href="#partner-planner">See dates you can both take off</a></p>}
                   {workWeekNotice && <p role="status" className="rounded-[10px] bg-surface-alt p-4 text-sm text-ink">{workWeekNotice}</p>}
+                  {state.sharedPlanDifferences && (
+                    <SharedPlanNotice
+                      differences={state.sharedPlanDifferences}
+                      savedCalendarOff={state.hasSavedCalendarOffForSharedPlan && !state.hasSharedHolidaySnapshot}
+                      onUseSavedCalendar={state.restoreMyEmployerCalendar}
+                    />
+                  )}
                   <ValidationBanner issues={state.validationIssues} />
                   {state.relaxedMinimum !== undefined && (
                     <RelaxedMinimumNotice
@@ -626,6 +634,7 @@ export function App() {
                   observedHolidayDates={state.holidaysReady && !state.holidaysDegraded ? state.holidayEntries.filter(holiday => holiday.checked).map(holiday => holiday.date) : undefined}
                   onPlanWithPartner={() => openPartnerPlanner()}
                   planSearch={state.planSearch}
+                  shareSnapshot={state.shareSnapshot}
                 /> : <p className="text-sm text-muted">{
                   !plannable && !state.planningPending ? 'Check your planning inputs before exporting.'
                     : 'Calendar and sharing tools appear when a plan and its holidays are ready.'
