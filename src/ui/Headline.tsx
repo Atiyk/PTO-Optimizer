@@ -14,8 +14,12 @@ interface HeadlineProps {
   canPin: boolean;
   onPin: () => void;
   pinnedCount: number;
+  pending?: boolean;
+  unavailable?: boolean;
   /** "target days" instead of "PTO days" in the balance line for unlimited-PTO plans. */
   unlimitedPto?: boolean;
+  /** PTO the planner reserves once for approved and tentative tracked requests. */
+  trackedReservedDays?: number;
 }
 
 /**
@@ -36,13 +40,17 @@ export function headlineText(budgetSpent: number, budget: number, reserveDays: n
 }
 
 /** The supporting line under the figure: break count, then how the balance was used. */
-export function balanceLine(budgetSpent: number, budget: number, reserveDays: number, breakCountActual: number, unlimitedPto = false): string {
+export function balanceLine(budgetSpent: number, budget: number, reserveDays: number, breakCountActual: number, unlimitedPto = false, trackedReservedDays = 0): string {
   const breaks = `${breakCountActual} ${breakCountActual === 1 ? 'break' : 'breaks'}`;
   const unit = unlimitedPto ? 'target' : 'PTO';
   const dayWord = budget === 1 ? 'day' : 'days';
   const parts = [breaks, `${budgetSpent} of ${budget} ${unit} ${dayWord} planned`];
-  if (reserveDays > 0) parts.push(`${Math.min(budget, reserveDays)} kept in reserve`);
-  const unplanned = Math.max(0, budget - budgetSpent - Math.min(budget, reserveDays));
+  const reserve = Math.min(budget, reserveDays);
+  // PTO already promised to tracked requests (workspace rule) is not "not placed".
+  const tracked = Math.min(Math.max(0, budget - reserve), trackedReservedDays);
+  if (reserveDays > 0) parts.push(`${reserve} kept in reserve`);
+  if (tracked > 0) parts.push(`${tracked} reserved for tracked requests`);
+  const unplanned = Math.max(0, budget - budgetSpent - reserve - tracked);
   if (unplanned > 0) parts.push(`${unplanned} not placed`);
   return parts.join(' · ');
 }
@@ -50,22 +58,22 @@ export function balanceLine(budgetSpent: number, budget: number, reserveDays: nu
 /**
  * The answer, put first: the plan's result as a marked figure ("27 days off") with what it
  * costs beside it ("from 12 PTO days"). This is the page's single h1 and sits inside a polite
- * live region, so a screen reader hears the new result as the sliders move. Pin this plan is
- * a secondary control beside it (the one primary action on the page is the calendar export).
+ * live region, so a screen reader hears the new result as the sliders move.
  */
-export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, reserveDays, canPin, onPin, pinnedCount, unlimitedPto = false }: HeadlineProps) {
-  const pinTitle =
-    pinnedCount === 0
-      ? 'Pin up to two plans to compare side by side.'
-      : canPin
-        ? 'Pin this plan'
-        : 'Two pinned — remove one to pin another.';
+export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, reserveDays, canPin, onPin, pinnedCount, pending, unavailable, unlimitedPto = false, trackedReservedDays = 0 }: HeadlineProps) {
+  if (pending || unavailable) {
+    return <div className="min-w-0">
+      <h1 className="text-h2 font-bold text-ink type-condensed">Your PTO plan</h1>
+      {pending && <p role="status" className="mt-2 text-sm text-muted">Updating your plan…</p>}
+    </div>;
+  }
+  const saveTitle = pinnedCount >= 2 ? 'Remove a saved plan to make room for another.' : undefined;
   const offWord = totalDaysOff === 1 ? 'day' : 'days';
   const spentWord = budgetSpent === 1 ? 'day' : 'days';
   return (
-    <div role="status" className="min-w-0">
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-        <h1 className="m-0 min-w-0 text-ink">
+    <div className="min-w-0">
+      <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-x-6">
+        <h1 className="m-0 min-w-0 text-ink" aria-live="polite">
           <span className="block text-display-sm type-display tabular-nums">
             <span className="mark">{totalDaysOff} {offWord} off</span>
           </span>{' '}
@@ -73,11 +81,11 @@ export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, 
             from {budgetSpent} {unlimitedPto ? 'target' : 'PTO'} {spentWord}
           </span>
         </h1>
-        <Button variant="secondary" size="md" onClick={onPin} disabled={!canPin} title={pinTitle} className="mt-1 shrink-0">
-          Pin this plan
+        <Button variant="secondary" size="md" onClick={onPin} disabled={!canPin} title={saveTitle} className="mt-1 shrink-0 px-3! text-sm!">
+          Save this plan
         </Button>
       </div>
-      <p className="mt-3 text-sm tabular-nums text-muted">{balanceLine(budgetSpent, budget, reserveDays, breakCountActual, unlimitedPto)}</p>
+      <p className="mt-3 text-sm tabular-nums text-muted">{balanceLine(budgetSpent, budget, reserveDays, breakCountActual, unlimitedPto, trackedReservedDays)}</p>
     </div>
   );
 }

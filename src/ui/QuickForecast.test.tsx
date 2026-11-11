@@ -74,8 +74,10 @@ describe('quick forecast date shortcuts', () => {
   it('keeps the unlimited-PTO caveat and supports year-end shortcuts', () => {
     const onForecastDateChange = vi.fn();
     render(<QuickForecast policy={{ ...policy, accrual: { kind: 'unlimited', expectedDaysPerYear: 20 } }}
-      forecastDate="2026-03-01" onForecastDateChange={onForecastDateChange} />);
+      balanceEntered={false} forecastDate="2026-03-01" onForecastDateChange={onForecastDateChange} />);
     expect(screen.getByText(/Unlimited PTO has no banked balance/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Explain this forecast using my policy' }));
+    expect(screen.getByText('How time is earned')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Year-end' }));
     expect(onForecastDateChange).toHaveBeenCalledWith('2026-12-31');
   });

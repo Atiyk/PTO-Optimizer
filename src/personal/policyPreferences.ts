@@ -1,9 +1,12 @@
 import { findTerm } from '../content/glossary/terms';
+import { POLICY_PRIVATE_KEYS } from '../ui/shareFormat';
 import { defaultPolicyURLState, readPolicyStateFromURL, type PolicyURLState } from '../ui/policyUrlState';
 
 const KEY = 'gapless.personal.policy.v1';
 const HISTORY_KEY = 'timeOffPolicyDraft';
-const PARAMS = new Set(['ak', 'am', 'cb', 'bao', 'c', 'u', 'hpd', 'fq', 'pda', 'gd', 'hr', 'twh', 'edy', 'py', 'as', 'crd', 'ace', 'ac', 'cm', 'cc', 'cue', 'cub', 'wpe', 'wpd', 'nba', 'pol', 'pd', 'car', 'ww', 'sd', 'afs', 'bap', 'shm']);
+// Saved/draft policy keys: the country plus every private policy key except the
+// forecast date, which is handled on its own (src/ui/shareFormat.ts).
+const PARAMS = new Set<string>(['c', ...POLICY_PRIVATE_KEYS.filter(key => key !== 'fd')]);
 
 export function initialPolicyPreferences(search: string, country: string, draftSearch?: unknown): PolicyURLState {
   const incoming = new URLSearchParams(search);
@@ -13,18 +16,22 @@ export function initialPolicyPreferences(search: string, country: string, draftS
   const restore = (savedSearch: string) => {
     const params = new URLSearchParams(savedSearch);
     for (const key of ['c', 'fd']) if (incoming.has(key)) params.set(key, incoming.get(key)!);
-    return readPolicyStateFromURL(params.toString(), country);
+    return readPolicyStateFromURL(params.toString(), country, true);
   };
   if (typeof draftSearch === 'string' && draftSearch.length <= 14000) return restore(draftSearch);
   try {
     const raw = localStorage.getItem(KEY);
     if (raw && raw.length <= 16000) {
       const saved = JSON.parse(raw);
-      if (saved.version === 1 && typeof saved.search === 'string') return restore(saved.search);
+      if (saved.version === 1 && typeof saved.search === 'string' && saved.search.length <= 14000) return restore(saved.search);
     }
   } catch { /* The quick forecast also works without browser storage. */ }
   const publicState = readPolicyStateFromURL(search, country);
-  return { ...defaultPolicyURLState(), country: publicState.country, currentBalance: 0, balanceEntered: false, carryoverMode: 'all', accrualCapEnabled: false, forecastDate: publicState.forecastDate };
+  return {
+    ...defaultPolicyURLState(), country: publicState.country, currentBalance: 0, balanceEntered: false,
+    amount: NaN, payDateAnchor: '', grantDate: '', hourlyRate: NaN, typicalWeeklyHours: NaN,
+    carryoverMode: 'all', accrualCapEnabled: false, forecastDate: publicState.forecastDate,
+  };
 }
 
 /** A history entry keeps the same-tab draft on reload without making it shareable

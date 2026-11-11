@@ -16,8 +16,8 @@ describe('Legend', () => {
     expect(html).not.toContain('Overlap day');
   });
 
-  it('renders the five required entries, in order', () => {
-    const labels = ['Public holiday', 'Suggested PTO', 'Pinned by you', 'Alternative', 'Recommended break'];
+  it('shows the four usual calendar markings', () => {
+    const labels = ['Public holiday', 'PTO to request', 'Suggested break', 'Today'];
     let lastIndex = -1;
     for (const label of labels) {
       const idx = html.indexOf(label);
@@ -33,11 +33,14 @@ describe('Legend', () => {
     expect(beforeHoliday).not.toContain(COLORS.ptoBg);
   });
 
-  it('Pinned by you reuses the exact Suggested PTO fill, plus the pin glyph', () => {
-    expect(html).toContain('<svg');
-    // Count every occurrence of the shared PTO fill class - both "Suggested PTO" and
-    // "Pinned by you" swatches must use it, confirming they share the one PTO colour.
-    const fillOccurrences = html.split(COLORS.ptoBg).length - 1;
+  it('shows pin and alternative markings only when requested', () => {
+    expect(html).not.toContain('Pinned PTO');
+    expect(html).not.toContain('Alternative');
+    const full = renderToStaticMarkup(<Legend showPinned showAlternatives />);
+    expect(full).toContain('Pinned PTO');
+    expect(full).toContain('Alternative');
+    expect(full).toContain('<svg');
+    const fillOccurrences = full.split(COLORS.ptoBg).length - 1;
     expect(fillOccurrences).toBeGreaterThanOrEqual(2);
   });
 
@@ -53,11 +56,11 @@ describe('Legend', () => {
 
   it('adds employer days off and blackouts only when the plan has them, as shapes plus words', () => {
     expect(html).not.toContain('Employer day off');
-    expect(html).not.toContain('Blackout');
+    expect(html).not.toContain('Unavailable');
     const full = renderToStaticMarkup(<Legend showCompany showBlackout />);
     expect(full).toContain('Employer day off');
     expect(full).toContain('rounded-[1px]'); // the square marker, not the round holiday dot
-    expect(full).toContain('Blackout, no PTO');
+    expect(full).toContain('Unavailable');
     expect(full).toContain('repeating-linear-gradient'); // hatching, not a hue
   });
 });

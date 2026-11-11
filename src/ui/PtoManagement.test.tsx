@@ -23,6 +23,7 @@ function Harness() {
   const [date, setDate] = useState('2027-01-14');
   return <>
     <button onClick={() => ledger.addRequest({ start: '2027-01-01', end: '2027-01-05' }, calendar)}>Track recommended break</button>
+    <button onClick={() => ledger.saveBreak({ start: '2027-01-01', end: '2027-01-05', ptoDates: ['2027-01-05'] }, calendar)}>Save exact recommended break</button>
     <QuickForecast policy={policy} requests={ledger.requests} forecastDate={date} onForecastDateChange={setDate} />
     <PtoTracker ledger={ledger} calendar={calendar} today="2026-12-31" />
   </>;
@@ -60,7 +61,40 @@ describe('personal tracker and forecast workflow', () => {
     fireEvent.click(screen.getByText('Track recommended break'));
     expect(screen.getAllByLabelText('Status for request 2027-01-01')).toHaveLength(1);
     fireEvent.change(screen.getByLabelText('End date for request 2027-01-01'), { target: { value: '2027-01-06' } });
+    expect(screen.getByText(/these dates use 3 PTO days. Saved cost is 2 PTO days/)).toBeTruthy();
+    expect(screen.getByText('2 PTO days')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save dates' }));
     expect(screen.getByText('3 PTO days')).toBeTruthy();
+  });
+  it('saves a recommendation for consideration at the exact planner cost and resumes its lifecycle', () => {
+    const first = render(<Harness />);
+    fireEvent.click(screen.getByText('Save exact recommended break'));
+    expect(screen.getByText('1 PTO day')).toBeTruthy();
+    expect(screen.queryByText(/Including planned and requested leave/)).toBeNull();
+    expect(forecastBalance()).toBe('10 days');
+    const saved = () => parseRequestLedger(window.localStorage.getItem(REQUEST_STORAGE_KEY));
+    expect(saved()[0]).toMatchObject({ status: 'considering', ptoDates: ['2027-01-05'] });
+
+    first.unmount();
+    render(<Harness />);
+    const status = screen.getByLabelText('Status for request 2027-01-01') as HTMLSelectElement;
+    expect(status.value).toBe('considering');
+    for (const next of ['planned', 'requested']) {
+      fireEvent.change(status, { target: { value: next } });
+      expect(forecastBalance()).toBe('10 days');
+      expect(screen.getByText(/Including planned and requested leave/).textContent).toContain('9 days');
+    }
+    for (const next of ['approved', 'completed']) {
+      fireEvent.change(status, { target: { value: next } });
+      expect(forecastBalance()).toBe('9 days');
+    }
+    fireEvent.click(screen.getByText('Save exact recommended break'));
+    expect(saved()).toHaveLength(1);
+    expect(status.value).toBe('completed');
+    fireEvent.change(status, { target: { value: 'canceled' } });
+    expect(status.selectedOptions[0]?.textContent).toBe('Cancelled');
+    expect(forecastBalance()).toBe('10 days');
+    expect(saved()[0]).toMatchObject({ status: 'canceled', ptoDates: ['2027-01-05'] });
   });
   it('keeps request edits in memory and clearly reports storage failure', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('disabled'); });

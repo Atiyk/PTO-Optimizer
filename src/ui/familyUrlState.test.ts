@@ -58,9 +58,9 @@ describe('readFamilyStateFromURL', () => {
   });
 
   it('reads every param', () => {
-    const state = readFamilyStateFromURL('?c=US&s=2026-08-17&pto=15&d=nyc-doe-2026-27&sd=20261221.c&x=20261219.1&ask=1&pp=1:p:20261221~20261223:-');
+    const state = readFamilyStateFromURL('?c=US&s=2026-08-17&pto=15&cp=1&d=nyc-doe-2026-27&sd=20261221.c&x=20261219.1&ask=1&pp=1:p:20261221~20261223:-');
     expect(state).toEqual({
-      country: 'US', start: '2026-08-17', ptoBudget: 15, districtId: 'nyc-doe-2026-27',
+      country: 'US', start: '2026-08-17', ptoBudget: 15, prioritizeCoverage: true, districtId: 'nyc-doe-2026-27',
       customOffDays: WINTER, excludedBreaks: ['2026-12-19'], ask: true, invalid: [],
       availability: { days: ['2026-12-21', '2026-12-22', '2026-12-23'], freeDays: null, status: 'proposed' },
     });
@@ -93,7 +93,7 @@ describe('writeFamilyStateToURL', () => {
   const base = { ptoBudget: DEFAULT_FAMILY_PTO, customOffDays: [], excludedBreaks: [] };
 
   it('writes nothing for defaults and removes stale params', () => {
-    const params = new URLSearchParams('pto=20&sd=20261221.c&x=20261219.1&ask=1&pp=1:p:20261221:-&s=2026-11-04&d=old');
+    const params = new URLSearchParams('pto=20&cp=1&sd=20261221.c&x=20261219.1&ask=1&pp=1:p:20261221:-&s=2026-11-04&d=old');
     writeFamilyStateToURL(params, { ...base, start: '2026-11-04', defaultStart: '2026-11-04' });
     expect(params.toString()).toBe('');
   });
@@ -102,13 +102,13 @@ describe('writeFamilyStateToURL', () => {
     const availability: PartnerAvailability = { days: ['2026-12-28', '2026-12-29'], freeDays: ['2026-12-28'], status: 'confirmed' };
     const params = new URLSearchParams('utm=keep');
     const skipped = writeFamilyStateToURL(params, {
-      country: 'GB', start: '2026-09-01', defaultStart: '2026-11-04', ptoBudget: 25, districtId: 'nyc-doe-2026-27',
+      country: 'GB', start: '2026-09-01', defaultStart: '2026-11-04', ptoBudget: 25, prioritizeCoverage: true, districtId: 'nyc-doe-2026-27',
       customOffDays: WINTER, excludedBreaks: ['2027-02-13', '2026-12-19'], availability, ask: true,
     });
     expect(skipped).toEqual([]);
     expect(params.get('utm')).toBe('keep');
     expect(readFamilyStateFromURL(params.toString())).toEqual({
-      country: 'GB', start: '2026-09-01', ptoBudget: 25, districtId: 'nyc-doe-2026-27',
+      country: 'GB', start: '2026-09-01', ptoBudget: 25, prioritizeCoverage: true, districtId: 'nyc-doe-2026-27',
       customOffDays: WINTER, excludedBreaks: ['2026-12-19', '2027-02-13'], availability, ask: true, invalid: [],
     });
   });

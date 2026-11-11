@@ -1,13 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  MAX_REQUESTS, REQUEST_CHANGE_EVENT, REQUEST_STORAGE_KEY, REQUEST_STATUSES, browserRequestStorage, calendarCoversRequest, createPtoRequest,
-  readRequestLedger, validRequestRange,
-  type PtoRequest, type RequestCalendar, type RequestInput,
+  MAX_REQUESTS, REQUEST_CHANGE_EVENT, REQUEST_STORAGE_KEY, REQUEST_STATUSES, browserRequestStorage, calendarCoversRequest, calendarForSavedRequest,
+  createPtoRequest, createSavedBreakRequest, readRequestLedger, validRequestRange,
+  type PtoRequest, type RequestCalendar, type RequestInput, type SavedBreakInput,
 } from '../personal/requestLedger';
 import { persistBrowserRequests, withWalletLedgerLock, type LedgerAction } from '../integration/browserWalletStore';
 
 type LedgerChange = { requests: PtoRequest[]; available: boolean };
-export interface LedgerActionResult { ok: boolean; id?: string; message: string }
+export interface LedgerActionResult {
+  ok: boolean;
+  id?: string;
+  message: string;
+  persisted?: boolean;
+  existing?: boolean;
+}
 const WRITE_FAILED = 'Browser storage could not be coordinated. Your saved requests are unchanged. Try again.';
 
 export function useRequestLedger() {
@@ -61,11 +67,22 @@ export function useRequestLedger() {
     }
   }
 
-  function addRequest(input: RequestInput, calendar: RequestCalendar): LedgerAction<LedgerActionResult> {
+  function addEntry(
+    input: Pick<RequestInput, 'start' | 'end'>,
+    calendar: RequestCalendar,
+    create: (id: string) => PtoRequest | null,
+    savedBreak = false,
+  ): LedgerAction<LedgerActionResult> {
     return mutate<LedgerActionResult>((requests, persist) => {
       const duplicate = requests.find((r) => r.start === input.start && r.end === input.end);
       if (duplicate) {
-        const result = { ok: false, id: duplicate.id, message: 'These dates are already tracked. You can edit their status below.' };
+        const result = {
+          ok: savedBreak,
+          id: duplicate.id,
+          existing: true,
+          persisted: live.current.available,
+          message: 'These dates are already in My PTO. You can review their status and saved cost there.',
+        };
         setMessage(result.message);
         return result;
       }
@@ -81,17 +98,30 @@ export function useRequestLedger() {
       }
       const id = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? crypto.randomUUID() : `pto-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-      const request = createPtoRequest(input, calendar, id);
+      const request = create(id);
       if (!request) {
-        const result = { ok: false, message: 'Choose valid dates and, for hourly requests, enter hours that fit the configured work shifts.' };
+        const result = { ok: false, message: savedBreak
+          ? 'The break no longer matches the loaded work calendar. Review the latest plan and try again.'
+          : 'Choose valid dates and, for hourly requests, enter hours that fit the configured work shifts.' };
         setMessage(result.message);
         return result;
       }
-      const saved = persist([...requests, request]);
-      const result = { ok: true, id, message: saved ? 'PTO request tracked in this browser.' : 'PTO request tracked for this visit. Browser storage is unavailable.' };
+      const persisted = persist([...requests, request]);
+      const label = savedBreak ? 'Break saved as Considering' : 'PTO request tracked';
+      const result = { ok: true, id, persisted, existing: false, message: persisted
+        ? `${label} in this browser.`
+        : `${label} for this visit. Browser storage is unavailable.` };
       setMessage(result.message);
       return result;
     }, { ok: false, message: WRITE_FAILED });
+  }
+
+  function addRequest(input: RequestInput, calendar: RequestCalendar) {
+    return addEntry(input, calendar, id => createPtoRequest(input, calendar, id));
+  }
+
+  function saveBreak(input: SavedBreakInput, calendar: RequestCalendar) {
+    return addEntry(input, calendar, id => createSavedBreakRequest(input, calendar, id), true);
   }
 
   function updateRequest(id: string, patch: Partial<RequestInput>, calendar: RequestCalendar, expectedUpdatedAt?: string): LedgerAction<boolean> {
@@ -108,10 +138,11 @@ export function useRequestLedger() {
         setMessage('Choose valid start and end dates in order. The saved dates have not changed.');
         return false;
       }
-      const editsDates = patch.start !== undefined || patch.end !== undefined;
+      const editsDates = start !== current.start || end !== current.end;
       let updated: PtoRequest;
       if (editsDates) {
-        if (current.ptoMinutes !== undefined && calendar.shiftMinutes === undefined) {
+        const pricedCalendar = calendarForSavedRequest(current, calendar);
+        if (!pricedCalendar) {
           setMessage('To change these hourly request dates, open My PTO and use its hourly request calendar.');
           return false;
         }
@@ -119,7 +150,11 @@ export function useRequestLedger() {
           setMessage('These dates are outside the employer calendar loaded on this page. The saved request and PTO cost have not changed.');
           return false;
         }
-        const recalculated = createPtoRequest({ ...current, ...patch, start, end }, calendar, id);
+        if (requests.some((r) => r.id !== id && r.start === start && r.end === end)) {
+          setMessage('Another request already uses those dates. Choose a different range.');
+          return false;
+        }
+        const recalculated = createPtoRequest({ ...current, ...patch, start, end }, pricedCalendar, id);
         if (!recalculated) {
           setMessage('These dates or hours do not fit the configured work shifts. The saved request has not changed.');
           return false;
@@ -145,7 +180,7 @@ export function useRequestLedger() {
     }, undefined);
   }
 
-  return { requests: state.requests, storageAvailable: state.available, message, addRequest, updateRequest, deleteRequest };
+  return { requests: state.requests, storageAvailable: state.available, message, addRequest, saveBreak, updateRequest, deleteRequest };
 }
 
 export type RequestLedgerState = ReturnType<typeof useRequestLedger>;

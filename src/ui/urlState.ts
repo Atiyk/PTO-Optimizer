@@ -4,6 +4,7 @@ import type { WorkWeek } from '@daysoff/engine/solver/types';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import type { ForcedState } from './types';
+import { isPlanAddressKey, partitionPlanParams, PLAN_URL_KEYS } from './shareFormat';
 
 // Maps the old, now-removed named objectives and shape presets to a sensible (w, breakCount)
 // pair, so a previously-shared link still opens to something reasonable instead of erroring
@@ -127,6 +128,8 @@ export interface FullURLState {
   publicShareVersion?: 1;
   /** Observed dates intentionally shared by the sender, without employer labels. */
   sharedObservedHolidays?: string[];
+  landingPreview?: true;
+  holidayFocusDate?: string;
   country?: string;
   subdivision?: string;
   rangeStart: string;
@@ -200,6 +203,10 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
   const employerCalendar = publicShareVersion === undefined && sharedCalendar
     && employerScope(sharedCalendar.country, sharedCalendar.subdivision) === employerScope(country, subdivision)
     ? sharedCalendar : undefined;
+  const landingPreview = params.get('lp') === '1';
+  const holidayFocus = landingPreview ? params.get('hd') : null;
+  const holidayFocusDate = holidayFocus && isValidISODate(holidayFocus)
+    && holidayFocus >= rangeStart && holidayFocus <= rangeEnd ? holidayFocus : undefined;
 
   const wsRaw = params.get('ws');
   const weekStartOverride: WeekStart | 'auto' = wsRaw === '0' ? 0 : wsRaw === '1' ? 1 : 'auto';
@@ -250,6 +257,8 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
     ...(employerCalendar ? { employerCalendar } : {}),
     ...(publicShareVersion ? { publicShareVersion } : {}),
     ...(sharedObservedHolidays !== undefined ? { sharedObservedHolidays } : {}),
+    ...(landingPreview ? { landingPreview: true as const } : {}),
+    ...(holidayFocusDate ? { holidayFocusDate } : {}),
     rangeStart,
     rangeEnd,
     budget,
@@ -286,6 +295,8 @@ export interface WriteStateInput {
   employerCalendar?: EmployerCalendar;
   publicShareVersion?: 1;
   sharedObservedHolidays?: readonly string[];
+  landingPreview?: true;
+  holidayFocusDate?: string;
   country: string;
   subdivision: string | undefined;
   rangeStart: string;
@@ -336,6 +347,10 @@ export function writeFullStateToURL(params: URLSearchParams, state: WriteStateIn
   } else {
     params.delete('ho');
   }
+  if (state.landingPreview) params.set('lp', '1');
+  else params.delete('lp');
+  if (state.landingPreview && state.holidayFocusDate) params.set('hd', state.holidayFocusDate);
+  else params.delete('hd');
 
   params.set('c', state.country);
   params.set('s', state.rangeStart);
@@ -425,10 +440,6 @@ export function writeFullStateToURL(params: URLSearchParams, state: WriteStateIn
   params.delete('ov');
 }
 
-const PRIVATE_PLAN_KEYS = new Set([
-  'eh', 'sv', 'ho', 'pp', 'ov', 'od', 'bo', 'r',
-  'ac', 'am', 'ex', 'xd', 'cc', 'np', 'pc', 'pcs', 'pce', 'pcm', 'up',
-]);
 const PRIVATE_PLAN_HISTORY_KEY = 'gaplessPrivatePlanV1';
 
 function publicPlanFingerprint(params: URLSearchParams): string {
@@ -444,6 +455,20 @@ function browserHistoryRecord(value: unknown): Record<string, unknown> {
     ? value as Record<string, unknown> : {};
 }
 
+/** History state that carries `privateSearch` as this entry's private draft for the
+ * public `search`, so readBrowserPlanSearch restores it. Only private (non-address) keys
+ * are kept: a hand-off can add private inputs but never override public ones. */
+export function historyWithPrivatePlanDraft(search: string, historyState: unknown, privateSearch: string): Record<string, unknown> {
+  const draft = new URLSearchParams();
+  for (const [key, value] of new URLSearchParams(privateSearch)) {
+    if (!isPlanAddressKey(key) && PLAN_URL_KEYS[key] === 'private') draft.set(key, value);
+  }
+  return {
+    ...browserHistoryRecord(historyState),
+    [PRIVATE_PLAN_HISTORY_KEY]: { publicSearch: publicPlanFingerprint(new URLSearchParams(search)), privateSearch: draft.toString() },
+  };
+}
+
 /** Restore a draft from the current history entry after refresh. An incoming link
  * has its own history entry, and explicit URL fields always take precedence. */
 export function readBrowserPlanSearch(search: string, historyState: unknown): string {
@@ -452,9 +477,20 @@ export function readBrowserPlanSearch(search: string, historyState: unknown): st
   if (typeof draft.privateSearch !== 'string' || draft.privateSearch.length > 180_000
     || draft.publicSearch !== publicPlanFingerprint(params)) return search;
   for (const [key, value] of new URLSearchParams(draft.privateSearch)) {
-    if (PRIVATE_PLAN_KEYS.has(key) && !params.has(key)) params.set(key, value);
+    if (!isPlanAddressKey(key) && !params.has(key)) params.set(key, value);
   }
   return params.toString();
+}
+
+/** A public link cannot carry employer settings. The current tab can still
+ * restore the employer edits it stored privately after opening that link. */
+export function readBrowserFullState(search: string, historyState: unknown, defaults: FullURLDefaults): FullURLState {
+  const merged = readBrowserPlanSearch(search, historyState);
+  const plan = readFullStateFromURL(merged, defaults);
+  if (plan.publicShareVersion !== 1 || plan.sharedObservedHolidays !== undefined || new URLSearchParams(search).has('eh')) return plan;
+  const employerCalendar = decodeEmployerCalendar(new URLSearchParams(merged).get('eh'));
+  if (!employerCalendar || employerScope(employerCalendar.country, employerCalendar.subdivision) !== employerScope(plan.country ?? defaults.country, plan.subdivision)) return plan;
+  return { ...plan, employerCalendar };
 }
 
 /** Write public controls into the address bar and private draft state into the
@@ -463,12 +499,15 @@ export function writeBrowserPlanStateToURL(params: URLSearchParams, state: Write
   const previous = new URLSearchParams(readBrowserPlanSearch(params.toString(), historyState));
   const full = new URLSearchParams();
   writeFullStateToURL(full, state);
-  const draft = new URLSearchParams();
+  // Allowlist (src/ui/shareFormat.ts): only public planning keys reach the address bar.
+  // Everything else, including any key added later without classification, stays in
+  // this tab's history entry.
+  const { address, draft } = partitionPlanParams(full);
   for (const key of [...params.keys()]) params.delete(key);
-  for (const [key, value] of full) {
+  for (const [key, value] of address) {
     if (key === 'c' && !/^[A-Z]{2}$/.test(value)) continue;
     if (key === 'sd' && !/^[A-Z0-9-]{1,16}$/.test(value)) continue;
-    (PRIVATE_PLAN_KEYS.has(key) ? draft : params).set(key, value);
+    params.set(key, value);
   }
   // The recipient's incoming partner payload remains usable after refresh. The
   // current overlap date state has already consumed the legacy ov payload.

@@ -48,6 +48,16 @@ describe('analytics URL boundary', () => {
     expect(analyticsBeforeSend({ type: 'event', url: 'https://gapless.example/pto?b=17' })).toBeNull();
   });
 
+  it('forwards only the event type and sanitized URL, dropping any other field a future SDK adds', () => {
+    vi.spyOn(document, 'referrer', 'get').mockReturnValue('');
+    const event = {
+      type: 'pageview' as const, url: 'https://gapless.example/pto?b=17&eh=private',
+      path: '/pto?b=17&eh=private', route: '/pto?bo=2027-02-04', properties: { balance: 17 },
+    };
+    expect(analyticsBeforeSend(event)).toStrictEqual({ type: 'pageview', url: 'https://gapless.example/pto' });
+    expect(analyticsBeforeSend({ type: 'mystery' as 'event', url: 'https://gapless.example/pto' })).toBeNull();
+  });
+
   it('cancels malformed Vercel event URLs', () => {
     vi.spyOn(document, 'referrer', 'get').mockReturnValue('');
     expect(analyticsBeforeSend({ type: 'pageview', url: 'malformed' })).toBeNull();

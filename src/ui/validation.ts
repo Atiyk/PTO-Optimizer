@@ -13,6 +13,21 @@ export function isSupportedPlanningRange(start: string, end: string): boolean {
   return years < 10 || (years === 10 && end.slice(5) <= start.slice(5));
 }
 
+/** Shown when a link (or saved preference) carried a work week the app refused to load. */
+export const WORK_WEEK_LINK_ISSUE = 'This link’s work week had no working days or couldn’t be read, so Monday to Friday is used instead. Change your working days to match your schedule.';
+
+/**
+ * Issue 10: a work week with no working day has no request deadline, return date or PTO
+ * cost, so URL decoding drops it (urlState/policyUrlState fall back to Monday to Friday).
+ * This explains that substitution instead of applying it silently. Null when the link has
+ * no `ww` or a valid one.
+ */
+export function workWeekLinkIssue(search: string): string | null {
+  const raw = new URLSearchParams(search).get('ww');
+  if (raw === null) return null;
+  return /^[01]{7}$/.test(raw) && raw.includes('1') ? null : WORK_WEEK_LINK_ISSUE;
+}
+
 export interface ValidationInputs {
   rangeStart: string;
   rangeEnd: string;

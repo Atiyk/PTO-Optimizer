@@ -1,6 +1,7 @@
 import { addDays, mondayIndexedDow, rangeISO } from '../solver/dateUtils';
 import type { ISODate } from '../solver/types';
 import { isScheduled, ruleApplies, type CoverageMember, type CoverageRuleInput } from './coverage';
+import { MAX_WORKDAY_SEARCH_DAYS } from '../calendar/workdaySearch';
 
 /*
  * Team planner ("clear expiring leave"): place each person's at-risk days so that
@@ -212,10 +213,13 @@ function blocksFor(m: PlannerMember, days: readonly ISODate[]): PlannedBlock[] {
   const seen = new Set<ISODate>();
   for (const d of days) {
     if (seen.has(d)) continue;
+    // Bounded: a member with no working days (work week "0000000") is "free" on every
+    // date, so an unbounded walk here never ended. A block stops MAX_WORKDAY_SEARCH_DAYS out.
+    const off = (x: ISODate) => planned.has(x) || freeOff(m, x);
     let s = d;
-    while (planned.has(addDays(s, -1)) || freeOff(m, addDays(s, -1))) s = addDays(s, -1);
+    for (let i = 0; i < MAX_WORKDAY_SEARCH_DAYS && off(addDays(s, -1)); i++) s = addDays(s, -1);
     let e = d;
-    while (planned.has(addDays(e, 1)) || freeOff(m, addDays(e, 1))) e = addDays(e, 1);
+    for (let i = 0; i < MAX_WORKDAY_SEARCH_DAYS && off(addDays(e, 1)); i++) e = addDays(e, 1);
     const span = rangeISO(s, e);
     for (const x of span) if (planned.has(x)) seen.add(x);
     blocks.push({ start: s, end: e, leaveDays: span.filter((x) => planned.has(x)).length, daysOff: span.length });

@@ -22,9 +22,13 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-11-02T12:00:00Z'));
   window.history.replaceState(null, '', '/');
+  window.__PTO_PRELOADED_HOLIDAY_YEARS__ = { US: [2026, 2027] };
   localStorage.clear();
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); delete window.plausible; });
+afterEach(() => {
+  cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); delete window.plausible;
+  delete window.__PTO_PRELOADED_HOLIDAY_YEARS__;
+});
 
 describe('live homepage planner', () => {
   it('prerenders a real planning preview from embedded holiday data', () => {
@@ -140,7 +144,7 @@ describe('live homepage planner', () => {
     await act(async () => { render(<Landing />); });
     const list = screen.getByRole('list', { name: /upcoming holidays/ });
     expect(list.querySelectorAll('li').length).toBe(3);
-    expect(screen.getAllByRole('link', { name: /Plan around this holiday|Connect a \d+-day break/ }).length).toBe(3);
+    expect(screen.getAllByRole('link', { name: /View this holiday in the planner|Plan around this holiday|Connect a \d+-day break/ }).length).toBe(3);
     expect(screen.getByRole('button', { name: 'Download holidays (.ics)' })).toBeTruthy();
   });
 
@@ -163,6 +167,18 @@ describe('live homepage planner', () => {
     expect(screen.getByRole('link', { name: /^Forecast my balance/ }).getAttribute('href')).toBe('/policy#balance');
     expect(screen.getByRole('link', { name: /^Check my policy/ }).getAttribute('href')).toBe('/policy');
     expect(screen.getByText(/Preview assumes a Monday–Friday workweek/)).toBeTruthy();
+  });
+
+  it('restores the homepage scenario on back navigation before rebuilding its planner link', async () => {
+    await act(async () => { render(<Landing />); });
+    await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '6' } }); });
+    await act(async () => {
+      window.history.replaceState(null, '', '/?home=1&c=US&b=15&s=2026-11-02&e=2027-11-01');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    expect((screen.getByRole('spinbutton') as HTMLInputElement).value).toBe('15');
+    const link = screen.getAllByRole('link', { name: 'See the full plan →' })[0] as HTMLAnchorElement;
+    expect(link.search).toContain('b=15');
   });
 
   it('applies the saved employer calendar without putting it in links or rewriting preferences', async () => {

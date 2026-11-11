@@ -6,11 +6,20 @@ import { requestByText, isContested } from '@daysoff/engine/calendar/requestDead
 import { buttonClasses } from './Button';
 import { Chevron } from './Chevron';
 import { settleLedgerAction, type LedgerAction } from '../integration/browserWalletStore';
+import { ActionButton } from './ExportBar';
+import { downloadICS } from './icsExport';
+import { trackBreakAction } from './analytics';
+
+type RequestAction = () => LedgerAction<{ ok: boolean; message: string }>;
 
 interface BreakCardProps {
   brk: Break;
-  /** Returns false when the request could not be added (the card then says so). */
-  onTrack?: (brk: Break) => LedgerAction<boolean | void>;
+  onTrack?: RequestAction;
+  onSave?: RequestAction;
+  requestState?: 'saved' | 'tracked';
+  requestDatesChanged?: boolean;
+  onPlanWithPartner?: () => void;
+  requestToolsReady?: boolean;
   /** Lets the compact summary above the calendar link straight to this card. */
   anchorId?: string;
   /** 1-based, chronological - the same number its calendar badge shows (see
@@ -195,11 +204,31 @@ export function BreakCard({
   offDays,
   defaultExpanded = false,
   onTrack,
+  onSave,
+  requestState,
+  requestDatesChanged,
+  onPlanWithPartner,
+  requestToolsReady = true,
   anchorId,
 }: BreakCardProps) {
-  // Tracking confirms in place; the page no longer jumps to the tracker.
-  const [tracked, setTracked] = useState<'yes' | 'no' | null>(null);
-  const [tracking, setTracking] = useState(false);
+  const [requestMessage, setRequestMessage] = useState('');
+  const [requestActionPending, setRequestActionPending] = useState(false);
+  const requestLinkRef = useRef<HTMLAnchorElement>(null);
+  const focusRequestLink = useRef(false);
+  useEffect(() => {
+    if (focusRequestLink.current && requestState) {
+      focusRequestLink.current = false;
+      requestLinkRef.current?.focus({ preventScroll: true });
+    }
+  }, [requestMessage, requestState]);
+  const runRequestAction = (action: RequestAction) => {
+    setRequestActionPending(true);
+    void settleLedgerAction(action(), (result) => {
+      focusRequestLink.current = result.ok;
+      setRequestMessage(result.message);
+      setRequestActionPending(false);
+    });
+  };
   // BUG FOUND: a plain `useState(defaultExpanded)` captures its initial value once, at
   // mount, and never again - but holidays load asynchronously (see useAppState.ts), so the
   // very first render solves without them, producing a different/smaller break set than
@@ -220,6 +249,10 @@ export function BreakCard({
   const ptoWord = brk.ptoCost === 1 ? 'day' : 'days';
   const contested = isContested(brk);
   const requestLine = requestByText(brk.start, noticePeriodDays, workWeek, today, offDays);
+  const startYear = brk.start.slice(0, 4);
+  const breakRange = formatCardDateRange(brk.start, brk.end);
+  const datedRange = brk.end.startsWith(startYear) ? `${breakRange}, ${startYear}` : breakRange;
+  const requestToolsId = useId();
 
   return (
     <div
@@ -228,7 +261,7 @@ export function BreakCard({
       onMouseLeave={() => onHover(null)}
       onFocus={() => onHover(brk.id)}
       onBlur={() => onHover(null)}
-      className={`grid grid-cols-1 gap-x-3 rounded-[10px] px-3 py-4 sm:grid-cols-[auto_minmax(0,1fr)] transition-colors duration-150 ease-[var(--ease-out)] sm:gap-x-4 sm:px-4 ${
+      className={`grid scroll-mt-16 grid-cols-1 gap-x-3 rounded-[10px] px-3 py-4 sm:grid-cols-[auto_minmax(0,1fr)] transition-colors duration-150 ease-[var(--ease-out)] sm:gap-x-4 sm:px-4 ${
         // The hovered break gets one tone step (chrome never takes the marker; its days get
         // the stronger marker pass on the calendar at the same moment).
         highlighted ? 'bg-surface-alt' : 'bg-transparent'
@@ -242,17 +275,13 @@ export function BreakCard({
         <h3 className="text-xl font-bold leading-7 text-ink type-condensed">
           <span className="sr-only">Break {index}: </span>
           <span aria-hidden="true" className="mr-2 inline-flex h-6 min-w-6 -translate-y-0.5 items-center justify-center rounded-[6px] bg-accent px-1 align-middle text-sm font-bold tabular-nums text-white sm:hidden">{index}</span>
-          {formatCardDateRange(brk.start, brk.end)}
+          {datedRange}
         </h3>
-        {/* What it costs and what it buys, in words; the multiplier figure is kept beside
-            its plain reading ("each PTO day buys 2.25 days off"). */}
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] tabular-nums text-ink">
           <span>
             <span className="mark font-semibold">{brk.totalDaysOff} {dayWord} off</span> for {brk.ptoCost} PTO {ptoWord}
           </span>
-          <span className="text-sm text-muted">
-            {brk.multiplier.toFixed(2)}× · {lowValue ? 'no extra days beyond the PTO itself' : `each PTO day buys ${brk.multiplier.toFixed(2)} days off`}
-          </span>
+          {lowValue && <span className="text-sm text-muted">All days off come from PTO.</span>}
           {brk.tags.map((tag) => (
             <span key={tag} className="rounded-[6px] bg-surface-alt px-2 py-0.5 text-xs font-medium text-ink">
               {travelTagLabels[tag] ?? tag}
@@ -266,50 +295,52 @@ export function BreakCard({
         {/* Every recommendation states its own reasoning, visibly, not in a tooltip. */}
         <p className="text-sm text-muted">{reason}</p>
 
+        {requestToolsReady && (
+          <p className="text-sm text-ink">
+            <strong className="font-semibold">PTO dates to request</strong>
+            <span className="block tabular-nums">{formatWorkingDaysList(brk, isPtoDay)}</span>
+          </p>
+        )}
+
         {/* Advice, not an error: the single most contested break in the plan. */}
-        {isMostContested && (
+        {contested && isMostContested && (
           <p className="text-sm text-muted">
             This break falls in a busier period in the travel model. Your employer&apos;s availability is separate.
           </p>
         )}
 
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          {onTrack && tracked !== 'yes' && (
+        {requestToolsReady && <div className="mt-1 flex flex-wrap items-center gap-2">
+          {onSave && !requestState && (
             <button
               type="button"
-              disabled={tracking}
-              onClick={() => {
-                setTracking(true);
-                void settleLedgerAction(onTrack(brk), (ok) => {
-                  setTracked(ok === false ? 'no' : 'yes');
-                  setTracking(false);
-                });
-              }}
-              className={buttonClasses('secondary', 'md', 'min-h-11 px-4')}
+              disabled={requestActionPending}
+              onClick={() => runRequestAction(onSave)}
+              className={buttonClasses('secondary', 'md', 'min-h-11 px-3! text-sm!')}
             >
+              Save break
+            </button>
+          )}
+          {onTrack && !requestState && (
+            <button type="button" disabled={requestActionPending} onClick={() => runRequestAction(onTrack)} className={buttonClasses('quiet', 'md', 'min-h-11 px-2! text-sm!')}>
               Track this PTO request
             </button>
           )}
-          {tracked === 'yes' && (
+          {requestState && (
             <p className="flex min-h-11 items-center gap-2 text-sm text-ink">
               <svg aria-hidden="true" viewBox="0 0 12 12" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 6.2 5 8.5l4.5-5" /></svg>
-              <span className="font-semibold">Tracked</span>
-              <a href="#requests" className="link-mark">See My PTO requests</a>
+              <span className="font-semibold">{requestState === 'saved' ? 'Saved' : 'Tracked'}</span>
+              <a ref={requestLinkRef} href="#requests" className="link-mark inline-flex min-h-11 items-center">See My PTO requests</a>
             </p>
           )}
-          {tracked !== null && <span role="status" className="sr-only">{tracked === 'yes' ? 'Request tracked in My PTO requests.' : 'This request could not be added. See My PTO requests.'}</span>}
-          {tracked === 'no' && <a href="#requests" className="link-mark flex min-h-11 items-center text-sm">Not added: see My PTO requests</a>}
-          {/* The request tools (request-by date and the copy menu) open per break, so a
-              ten-break plan does not repeat ten menus. */}
-          {!expanded && (
-            <button type="button" aria-expanded="false" onClick={() => setUserExpanded(true)} className={buttonClasses('quiet', 'md', 'min-h-11')}>
-              Request this time off <Chevron />
-            </button>
-          )}
-        </div>
-        {expanded && (
-          <div className="flex flex-col gap-2 border-t border-line pt-3">
-            <p className="text-sm text-muted">{requestLine}</p>
+          <button type="button" aria-expanded={expanded} aria-controls={requestToolsId} onClick={() => setUserExpanded(!expanded)} className={buttonClasses('quiet', 'md', 'min-h-11 px-2! text-sm!')}>
+            {expanded ? 'Hide request tools' : 'Request this time off'} <Chevron direction={expanded ? 'up' : 'down'} />
+          </button>
+        </div>}
+        {requestMessage && <p role="status" className="text-sm text-muted">{requestMessage}</p>}
+        {requestToolsReady && requestDatesChanged && <p className="text-sm text-muted">The PTO dates for this break have changed. Review your saved request in My PTO.</p>}
+        <div id={requestToolsId} hidden={!requestToolsReady || !expanded} className="border-t border-line pt-3">
+          {requestToolsReady && expanded && <>
+            <p className="mb-2 text-sm text-muted">{requestLine}</p>
             <div className="flex flex-wrap items-center gap-2">
               <CopyRequestDropdown
                 options={[
@@ -318,12 +349,21 @@ export function BreakCard({
                   { label: 'Copy detailed email draft', text: formatManagerEmailDetailed(brk, isPtoDay, noticePeriodDays, workWeek, offDays) },
                 ]}
               />
-              <button type="button" aria-expanded="true" onClick={() => setUserExpanded(false)} className={buttonClasses('quiet', 'md', 'min-h-11')}>
-                Hide request tools <Chevron direction="up" />
-              </button>
+              <ActionButton label="Export this break (.ics)" onClick={async () => {
+                try {
+                  downloadICS([brk], isPtoDay, { enabled: true, leadDays: noticePeriodDays, workWeek, offDays }, `pto-break-${brk.start}.ics`);
+                  trackBreakAction('exported');
+                  return { ok: true, message: 'Downloaded' };
+                } catch {
+                  return { ok: false, message: 'Could not download' };
+                }
+              }} />
+              {onPlanWithPartner && <button type="button" onClick={onPlanWithPartner} className={buttonClasses('quiet', 'md', 'min-h-11')}>
+                Plan this break with a partner
+              </button>}
             </div>
-          </div>
-        )}
+          </>}
+        </div>
       </div>
     </div>
   );

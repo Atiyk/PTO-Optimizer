@@ -200,18 +200,15 @@ export function solvePlan(solveInput: SolveInput, planningVersion: 2 | undefined
 
 export interface PtoDayContext {
   blackoutSet: Set<string>;
-  forced: Record<string, ForcedState>;
   baseOffSet: Set<string>;
   workWeek: WorkWeek;
   chosenDaySet: Set<string>;
 }
 
-/** A day the plan actually converted from work to PTO, or one the user pinned in. */
+/** The dates charged to the break's PTO budget, shared by requests and exports. */
 export function isSuggestedPtoDay(iso: string, c: PtoDayContext): boolean {
-  if (c.blackoutSet.has(iso)) return false;
-  if (c.forced[iso] === 'include') return true;
-  const wasOff = c.baseOffSet.has(iso) || !c.workWeek[mondayIndexedDow(iso)];
-  return !wasOff && c.chosenDaySet.has(iso);
+  return c.chosenDaySet.has(iso) && !c.blackoutSet.has(iso)
+    && !c.baseOffSet.has(iso) && c.workWeek[mondayIndexedDow(iso)];
 }
 
 // ---------------------------------------------------------------------------------------
@@ -387,7 +384,6 @@ export function planFromSearch(search: string, today: string, holidays: HolidayS
   const breaks = outcome.result.primary;
   const ctx: PtoDayContext = {
     blackoutSet: new Set(effectiveBlackouts),
-    forced: state.forced,
     baseOffSet: new Set(effectiveOffDays),
     workWeek: state.workWeek,
     chosenDaySet: new Set(breaks.flatMap((b) => b.days)),

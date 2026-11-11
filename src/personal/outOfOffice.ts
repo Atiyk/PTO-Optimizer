@@ -2,6 +2,7 @@ import type { ISODate, WorkWeek } from '@daysoff/engine/solver/types';
 import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { formatLong } from '@daysoff/engine/calendar/dateFormat';
 import { requestByDate, weekdayName } from '@daysoff/engine/calendar/requestDeadline';
+import { searchWorkday } from '@daysoff/engine/calendar/workdaySearch';
 import type { PtoRequest, RequestCalendar } from './requestLedger';
 
 /**
@@ -15,22 +16,18 @@ import type { PtoRequest, RequestCalendar } from './requestLedger';
  * reminder); /policy has no notice-period setting, so it uses this default.
  */
 export const DEFAULT_NOTICE_PERIOD_DAYS = 14;
-const MAX_LOOKAHEAD_DAYS = 120;
 
 /**
  * The first working day after `end`: on the request calendar's work week and not one of its
  * off days (employer holidays, alternating Fridays). Past the calendar's loaded range only
- * the work week is known, so holidays there cannot be skipped.
+ * the work week is known, so holidays there cannot be skipped. Null when the schedule has no
+ * working day within MAX_WORKDAY_SEARCH_DAYS (for example a work week with every day off):
+ * callers say the return date is unknown rather than show a day the person is still off.
  */
-export function returnToWorkDate(end: ISODate, calendar: Pick<RequestCalendar, 'workWeek' | 'offDays'>): ISODate {
+export function returnToWorkDate(end: ISODate, calendar: Pick<RequestCalendar, 'workWeek' | 'offDays'>): ISODate | null {
+  if (!calendar.workWeek.some(Boolean)) return null;
   const off = new Set(calendar.offDays);
-  const hasWorkday = calendar.workWeek.some(Boolean);
-  let date = addDays(end, 1);
-  for (let i = 0; hasWorkday && i < MAX_LOOKAHEAD_DAYS; i++) {
-    if (calendar.workWeek[mondayIndexedDow(date)] && !off.has(date)) return date;
-    date = addDays(date, 1);
-  }
-  return addDays(end, 1);
+  return searchWorkday(addDays(end, 1), 1, (date) => calendar.workWeek[mondayIndexedDow(date)] && !off.has(date));
 }
 
 /** "Monday, December 22, 2026" - spelled out, because the reader may use another date order. */
@@ -68,7 +65,7 @@ export function outOfOfficeMessage(
   return [
     'Hello,',
     '',
-    `Thanks for your message. ${away}, with limited access to email. I'll be back on ${formatOooDate(back)} and will reply then.`,
+    `Thanks for your message. ${away}, with limited access to email. ${back ? `I'll be back on ${formatOooDate(back)} and will reply then.` : "I'll reply when I'm back."}`,
     '',
     `For anything urgent, please contact ${contactName} at ${contactDetail}.`,
     '',

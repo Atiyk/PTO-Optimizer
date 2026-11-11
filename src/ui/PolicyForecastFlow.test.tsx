@@ -57,11 +57,20 @@ describe('quick policy forecast in the real consumer page', () => {
     expect(initialPolicyPreferences(window.location.search, 'US', readBrowserPolicyDraft()).negativeBalanceAllowance).toBe(2);
   });
 
+  it('offers the same-browser saved-plan return path without including private inputs', () => {
+    render(<Policy />);
+    const savedPlans = within(screen.getByRole('complementary', { name: 'Saved plans' }));
+    expect(savedPlans.getByText('0 saved plans in this browser.')).toBeTruthy();
+    expect(savedPlans.getByRole('link', { name: 'View saved plans' }).getAttribute('href')).toBe('/pto#saved-plans');
+  });
+
   it('saves an optional local policy and restores it on a clean revisit', () => {
     const first = render(<Policy />);
     fireEvent.change(quickInputs().getByLabelText('Current PTO balance (days)'), { target: { value: '17' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save policy in this browser' }));
     expect(screen.getByText('Policy saved in this browser.')).toBeTruthy();
+    fireEvent.change(quickInputs().getByLabelText('Current PTO balance (days)'), { target: { value: '19' } });
+    expect(screen.queryByText('Policy saved in this browser.')).toBeNull();
     first.unmount();
     window.history.replaceState(null, '', '/policy');
     render(<Policy />);
@@ -119,15 +128,63 @@ describe('quick policy forecast in the real consumer page', () => {
     const first = render(<Policy />);
     const input = quickInputs().getByLabelText('Current PTO balance (days)') as HTMLInputElement;
     expect(input.value).toBe('0');
-    expect(forecastOutput().queryByText('Current balance (not entered yet)')).toBeNull();
+    expectForecast('3 days');
     fireEvent.change(input, { target: { value: '' } });
-    expect(screen.getByText(/Starts at 0 until you enter yours/)).toBeTruthy();
-    expect(forecastOutput().getByText('Current balance (not entered yet)')).toBeTruthy();
+    expect(forecastOutput().getByText(/Enter your current PTO balance to see a forecast/)).toBeTruthy();
+    expect(forecastOutput().queryByText(/Estimated available PTO/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Review next policy reset' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'PTO balance and policy' }).getAttribute('href')).toBe('#balance');
     fireEvent.change(input, { target: { value: '0' } });
-    expect(forecastOutput().queryByText('Current balance (not entered yet)')).toBeNull();
+    expectForecast('3 days');
     first.unmount();
     render(<Policy />);
     expect((quickInputs().getByLabelText('Current PTO balance (days)') as HTMLInputElement).value).toBe('0');
-    expect(forecastOutput().queryByText('Current balance (not entered yet)')).toBeNull();
+    expectForecast('3 days');
+  });
+
+  it('keeps a fresh policy blank until accrual is supplied and saves explicit zero without a pay date', () => {
+    window.history.replaceState(null, '', '/policy?c=US');
+    const first = render(<Policy />);
+    const amount = quickInputs().getByLabelText('Days earned each pay period') as HTMLInputElement;
+    expect(amount.value).toBe('');
+    fireEvent.change(quickInputs().getByLabelText('Current PTO balance (days)'), { target: { value: '0' } });
+    expect(forecastOutput().getByText(/Enter how much PTO you earn/)).toBeTruthy();
+    fireEvent.change(amount, { target: { value: '1' } });
+    expect(forecastOutput().getByText(/Enter a known pay date/)).toBeTruthy();
+    fireEvent.change(amount, { target: { value: '0' } });
+    expectForecast('0 days');
+    fireEvent.click(screen.getByRole('button', { name: 'Save policy in this browser' }));
+    first.unmount();
+    window.history.replaceState(null, '', '/policy');
+    render(<Policy />);
+    expect((quickInputs().getByLabelText('Days earned each pay period') as HTMLInputElement).value).toBe('0');
+    expect((quickInputs().getByLabelText('Known pay date') as HTMLInputElement).value).toBe('');
+    expectForecast('0 days');
+  });
+
+  it('does not load a work week with no working days from a link (Issue 10)', () => {
+    window.history.replaceState(null, '', `/policy${INITIAL_SEARCH}&ww=0000000`);
+    render(<Policy />);
+    expect(screen.getByText(/This link’s work week had no working days/).getAttribute('role')).toBe('status');
+    const days = within(screen.getByRole('group', { name: 'Working days' }));
+    expect((days.getByLabelText('Mon') as HTMLInputElement).checked).toBe(true);
+    expect((days.getByLabelText('Fri') as HTMLInputElement).checked).toBe(true);
+    expect((days.getByLabelText('Sun') as HTMLInputElement).checked).toBe(false);
+    expectForecast('13 days');
+  });
+
+  it('restores cleared accrual and dates as missing, without resetting them to examples', () => {
+    const first = render(<Policy />);
+    fireEvent.change(quickInputs().getByLabelText('Days earned each pay period'), { target: { value: '' } });
+    fireEvent.change(quickInputs().getByLabelText('Known pay date'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Forecast my balance on'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save policy in this browser' }));
+    first.unmount();
+    window.history.replaceState(null, '', '/policy');
+    render(<Policy />);
+    expect((quickInputs().getByLabelText('Days earned each pay period') as HTMLInputElement).value).toBe('');
+    expect((quickInputs().getByLabelText('Known pay date') as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText('Forecast my balance on') as HTMLInputElement).value).toBe('');
+    expect(forecastOutput().getByText(/Enter how much PTO you earn/)).toBeTruthy();
   });
 });

@@ -19,10 +19,11 @@ const units = (value: number) => new Intl.NumberFormat('en', { maximumFractionDi
  * No pay, jurisdiction, balance or request input is written to URLs or analytics here.
  */
 export function DeparturePayoutEstimator({
-  policy, requests = [],
-}: { policy: TimeOffPolicy; requests?: readonly PtoRequest[] }) {
+  policy, requests = [], policyReady = true,
+}: { policy: TimeOffPolicy; requests?: readonly PtoRequest[]; policyReady?: boolean }) {
   const id = useId();
-  const [departureDate, setDepartureDate] = useState(policy.balanceAsOf);
+  const [departureDateOverride, setDepartureDate] = useState<string>();
+  const departureDate = departureDateOverride ?? policy.balanceAsOf;
   const [workJurisdiction, setWorkJurisdiction] = useState('');
   const [currency, setCurrency] = useState('USD');
   const [payMode, setPayMode] = useState<PayMode>('hourly');
@@ -40,7 +41,7 @@ export function DeparturePayoutEstimator({
   const complete = workJurisdiction.trim().length > 0 && payAmount.trim() !== ''
     && Number.isFinite(Number(payAmount)) && Number(payAmount) > 0
     && (companyRule !== 'pays-up-to' || cap.trim() !== '');
-  const result = complete ? estimateDeparturePayout({
+  const result = complete && policyReady ? estimateDeparturePayout({
     departureDate, workJurisdiction: workJurisdiction.trim(), currency, pay,
     lines: [{ category: 'vacation', policy, requests: includeTrackedVacation ? requests : [], companyRule: rule }],
   }) : null;
@@ -120,7 +121,12 @@ export function DeparturePayoutEstimator({
           </p>
         </div>
         <div className="min-w-0 self-start border-t-2 border-ink pt-4 lg:border-l lg:border-t-0 lg:border-line lg:pl-6 lg:pt-0">
-          {!complete ? (
+          {!policyReady ? (
+            <p role="status" className="text-sm text-ink">
+              {policy.accrual.kind === 'unlimited' ? 'Unlimited vacation has no banked cash balance to estimate.'
+                : <>Enter your <a href="#balance" className="link-mark font-semibold">PTO balance and policy</a> to estimate a payout.</>}
+            </p>
+          ) : !complete ? (
             <p role="status" className="text-sm text-ink">
               Enter your work jurisdiction and pay rate to see a company-policy scenario. An unknown employer rule cannot produce a payout amount.
             </p>

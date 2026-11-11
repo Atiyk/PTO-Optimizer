@@ -41,7 +41,7 @@ describe('Headline render', () => {
   it('sets the result as one h1 with the marked figure first, inside a live status region', () => {
     const html = renderToStaticMarkup(<Headline {...props} />);
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    expect(html).toContain('role="status"');
+    expect(html).toContain('aria-live="polite"');
     expect(html).toContain('<span class="mark">26 days off</span>');
     expect(html).toMatch(/from 12 PTO days/);
     // The figure comes before what it costs.
@@ -62,7 +62,7 @@ describe('Headline render', () => {
     expect(html).not.toContain('Efficiency 100th');
   });
 
-  it('renders "Pin this plan" as a small control, disabled once two plans are already pinned', () => {
+  it('disables saving once two plans are saved', () => {
     const enabled = renderToStaticMarkup(
       <Headline
         budgetSpent={12}
@@ -76,7 +76,7 @@ describe('Headline render', () => {
         pinnedCount={0}
       />,
     );
-    expect(enabled).toContain('Pin this plan');
+    expect(enabled).toContain('Save this plan');
     expect(enabled).not.toContain('disabled=""');
 
     const disabled = renderToStaticMarkup(
@@ -93,7 +93,14 @@ describe('Headline render', () => {
       />,
     );
     expect(disabled).toContain('disabled=""');
-    expect(disabled).toContain('title="Two pinned');
+    expect(disabled).toContain('Remove a saved plan');
+  });
+
+  it('hides old numbers and save controls while the new plan is pending', () => {
+    const html = renderToStaticMarkup(<Headline {...props} pending />);
+    expect(html).toContain('Updating your plan');
+    expect(html).not.toContain('26 days off');
+    expect(html).not.toContain('Save this plan');
   });
 });
 
@@ -102,5 +109,12 @@ describe('balanceLine', () => {
     expect(balanceLine(12, 15, 3, 3)).toBe('3 breaks · 12 of 15 PTO days planned · 3 kept in reserve');
     expect(balanceLine(10, 15, 3, 1)).toBe('1 break · 10 of 15 PTO days planned · 3 kept in reserve · 2 not placed');
     expect(balanceLine(15, 15, 0, 4, true)).toBe('4 breaks · 15 of 15 target days planned');
+  });
+  it('labels days reserved for tracked requests instead of calling them not placed', () => {
+    expect(balanceLine(2, 12, 3, 1, false, 7)).toBe('1 break · 2 of 12 PTO days planned · 3 kept in reserve · 7 reserved for tracked requests');
+    expect(balanceLine(0, 1, 0, 0, false, 1)).toBe('0 breaks · 0 of 1 PTO day planned · 1 reserved for tracked requests');
+    const html = renderToStaticMarkup(<Headline budgetSpent={2} totalDaysOff={4} breakCountActual={1} scores={null} budget={12} reserveDays={3} trackedReservedDays={7} canPin={false} onPin={() => {}} pinnedCount={0} />);
+    expect(html).toContain('7 reserved for tracked requests');
+    expect(html).not.toContain('not placed');
   });
 });

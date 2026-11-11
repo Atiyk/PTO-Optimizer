@@ -69,6 +69,7 @@ export function ApprovalAssistant({ ledger, calendar, today, locale, onStatusCha
   const related = result?.relatedRequestId ? ledger.requests.find((r) => r.id === result.relatedRequestId) : undefined;
 
   useEffect(() => { if (confirmed) doneRef.current?.focus(); }, [confirmed]);
+  const backAtWork = confirmed ? returnToWorkDate(confirmed.request.end, calendar) : null;
 
   function confirm() {
     if (!result || !matched || result.decision === 'unclear') return;
@@ -146,9 +147,9 @@ export function ApprovalAssistant({ ledger, calendar, today, locale, onStatusCha
             Marked as {confirmed.status}: {rangeText(confirmed.request.start, confirmed.request.end)}
           </h3>
           {confirmed.status === 'approved' ? <>
-            <p className="mt-1 text-sm text-muted">Back at work {formatOooDate(returnToWorkDate(confirmed.request.end, calendar))}. Two things worth doing now:</p>
+            <p className="mt-1 text-sm text-muted">{backAtWork ? `Back at work ${formatOooDate(backAtWork)}.` : 'Your return date can’t be worked out because this work schedule has no working days.'} Two things worth doing now:</p>
             <button type="button" className={buttonClasses('secondary', 'md', `mt-3 ${wrapButton}`)}
-              onClick={() => downloadOutOfOfficeICS({ requestId: confirmed.request.id, start: confirmed.request.start, end: confirmed.request.end, description: `Back on ${formatOooDate(returnToWorkDate(confirmed.request.end, calendar))}.` })}>
+              onClick={() => downloadOutOfOfficeICS({ requestId: confirmed.request.id, start: confirmed.request.start, end: confirmed.request.end, description: backAtWork ? `Back on ${formatOooDate(backAtWork)}.` : 'Out of office.' })}>
               Add out-of-office to your calendar (.ics)
             </button>
             <label htmlFor={`${id}-ooo`} className="mt-4 block text-sm font-semibold text-ink">Out-of-office message</label>

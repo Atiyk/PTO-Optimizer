@@ -35,6 +35,19 @@ try {
         result.status = 'captured';
         continue;
       }
+      const forecast = page.getByRole('region', { name: 'PTO balance forecast' });
+      const quick = page.getByRole('region', { name: 'Quick balance forecast' });
+      const balance = quick.getByLabel('Current PTO balance (days)', { exact: true });
+      const earned = quick.getByLabel('Days earned each pay period', { exact: true });
+      result.blankBalanceWithholdsProjection = await forecast.getByText(/Enter your current PTO balance/).isVisible()
+        && await forecast.getByText(/Estimated available PTO on/).count() === 0;
+      await page.screenshot({ path: resolve(output, `policy-forecast-blank-${width}.png`), fullPage: true });
+      await balance.fill('0');
+      result.blankAccrualWithholdsProjection = await forecast.getByText(/Enter how much PTO you earn/).isVisible()
+        && await forecast.getByText(/Estimated available PTO on/).count() === 0;
+      await earned.fill('0');
+      result.explicitZeroProjects = (await forecast.locator('[aria-live="polite"]').textContent())?.trim() === '0 days';
+      await balance.fill('12');
       const input = page.getByLabel('Forecast my balance on');
       const oneMonth = page.getByRole('button', { name: '1 month', exact: true });
       const sixMonths = page.getByRole('button', { name: '6 months', exact: true });
@@ -50,7 +63,7 @@ try {
       result.changedLive = selected !== initial && await oneMonth.getAttribute('aria-pressed') === 'true';
       await page.reload({ waitUntil: 'networkidle' });
       await page.getByRole('heading', { name: 'PTO balance forecast' }).waitFor();
-      result.restoredFromURL = await page.getByLabel('Forecast my balance on').inputValue() === selected;
+      result.restoredAfterReload = await page.getByLabel('Forecast my balance on').inputValue() === selected;
       await sixMonths.focus();
       await page.keyboard.press('Enter');
       result.keyboardChangesDate = await page.getByLabel('Forecast my balance on').inputValue() !== selected;
@@ -68,9 +81,16 @@ try {
         return Boolean(targetId && document.getElementById(targetId));
       });
       result.explanationDoesNotExposeSalary = !decodeURIComponent(page.url()).includes('annualSalary');
+      await page.getByRole('button', { name: 'Save policy in this browser' }).click();
+      const revisit = await context.newPage();
+      await revisit.goto(new URL('/policy/', base).href, { waitUntil: 'networkidle' });
+      result.savedPolicyResumes = await revisit.getByLabel('Current PTO balance (days)', { exact: true }).inputValue() === '12'
+        && await revisit.getByLabel('Days earned each pay period', { exact: true }).inputValue() === '0';
+      await revisit.close();
       await page.screenshot({ path: resolve(output, `policy-forecast-${width}.png`), fullPage: true });
       result.status = errors.length === 0 && result.allPresetsVisible && result.touchTargetHeight >= 44
-        && result.changedLive && result.restoredFromURL && result.keyboardChangesDate
+        && result.blankBalanceWithholdsProjection && result.blankAccrualWithholdsProjection && result.explicitZeroProjects
+        && result.changedLive && result.restoredAfterReload && result.savedPolicyResumes && result.keyboardChangesDate
         && result.noHorizontalOverflow && result.freeformDateVisible && result.noSubmitButton
         && result.onDemandPolicyExplanation && result.explanationAccessibleTarget
         && result.explanationDoesNotExposeSalary

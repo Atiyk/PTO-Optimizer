@@ -61,7 +61,7 @@ export function PortfolioComparison({ input, minimumBreakDays, calendarIncomplet
         {!current ? <p className="mt-2 text-muted">Finding feasible plans…</p> : current.report ? (
           <>
             {current.report.portfolios.length > 0 && (
-              <ul className="m-0 mt-3 list-none space-y-2 p-0">
+              <ul className="m-0 mt-3 grid list-none items-start gap-2 p-0 xl:grid-cols-2">
                 {current.report.portfolios.map(portfolio => (
                   <li key={portfolio.objective}>
                     <details className="rounded border border-line bg-surface px-2">

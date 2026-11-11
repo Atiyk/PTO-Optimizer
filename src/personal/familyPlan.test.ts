@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { addDays, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { MAX_SCHOOL_CALENDAR_DAYS } from './schoolCalendar';
 import { MAX_FAMILY_PTO, planFamilyTime, type FamilyPlanInput } from './familyPlan';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import { createPtoRequest } from './requestLedger';
+import { planningCommitments } from './workspace';
 
 const weekdays = (start: string, end: string) => rangeISO(start, end).filter(day => mondayIndexedDow(day) < 5);
 const weekends = (start: string, end: string) => rangeISO(start, end).filter(day => mondayIndexedDow(day) >= 5);
@@ -95,6 +98,20 @@ describe('planFamilyTime per-break choice', () => {
     const result = plan({ schoolOffDays: ['2027-01-18'], parentFreeDays: parentFree, ptoBudget: 2 })!;
     expect(result.breaks[0].parentWorkdays).toEqual(['2027-01-16', '2027-01-18']);
     expect(result.plans[0]).toMatchObject({ ptoDays: ['2027-01-16', '2027-01-18'], togetherDays: 3, fullyCovered: true });
+  });
+});
+
+describe('planFamilyTime with tracked time off', () => {
+  it('spends no PTO on school days the parent already has off through tracked requests', () => {
+    const spring = weekdays('2027-03-29', '2027-04-02');
+    const committed = planningCommitments(
+      [createPtoRequest({ start: '2027-03-29', end: '2027-04-02', status: 'approved' }, { workWeek: DEFAULT_WORK_WEEK, offDays: [] }, 'spring')!],
+      WINDOW, { asOf: '2026-11-01', includesApprovedLeave: false },
+    ).unavailableDates;
+    const result = plan({ schoolOffDays: spring, parentFreeDays: [...PARENT_FREE, ...committed], ptoBudget: 3 })!;
+    expect(result.ptoUsed).toBe(0);
+    expect(result.ptoLeft).toBe(3);
+    expect(result.uncoveredDays).toEqual([]);
   });
 });
 
@@ -226,5 +243,29 @@ describe('planFamilyTime validation and performance', () => {
     expect(performance.now() - t1).toBeLessThan(500);
     expect(huge.breaks).toHaveLength(1);
     expect(huge.ptoUsed).toBe(60);
+  });
+});
+
+describe('coverage priority', () => {
+  const schoolOffDays = ['2026-11-16', '2026-11-17', '2026-11-18', '2026-12-24'];
+  const otherAdultDays = ['2026-11-17', '2026-12-24'];
+  const base = { schoolOffDays, otherAdultDays, prioritizeCoverage: true, ptoBudget: 2 };
+
+  it('uses PTO on the earliest listed closures that need coverage and skips confirmed care', () => {
+    const result = plan({ ...base, otherAdultConfirmed: true })!;
+    expect(result.plans.flatMap(item => item.ptoDays)).toEqual(['2026-11-16', '2026-11-18']);
+    expect(result.gaps.map(gap => gap.cover)).toEqual(['pto', 'other-adult', 'pto', 'other-adult']);
+    expect(result.uncoveredDays).toEqual([]);
+    expect(result.coverage).toBe('partial');
+  });
+
+  it('treats proposed availability as tentative and keeps exclusions and budgets', () => {
+    const result = plan({ ...base, otherAdultConfirmed: false })!;
+    expect(result.plans.flatMap(item => item.ptoDays)).toEqual(['2026-11-16', '2026-11-17']);
+    expect(result.uncoveredDays).toEqual(['2026-11-18', '2026-12-24']);
+    expect(result.gaps.at(-1)?.cover).toBe('other-adult-proposed');
+    const excluded = plan({ ...base, otherAdultConfirmed: false, excludedBreaks: [result.breaks[0].id] })!;
+    expect(excluded.plans.flatMap(item => item.ptoDays)).toEqual(['2026-12-24']);
+    expect(excluded.ptoLeft).toBe(1);
   });
 });

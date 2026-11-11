@@ -15,6 +15,17 @@ export type AnalyticsEvent =
   | 'expiration_alert_action_taken'
   | 'partner_share_generated'
   | 'partner_share_opened'
+  | 'partner_proposal_generated'
+  | 'family_source_applied'
+  | 'family_coverage_priority_changed'
+  | 'family_share_generated'
+  | 'family_share_opened'
+  | 'family_listed_coverage_confirmed'
+  | 'first_break_saved'
+  | 'first_break_tracked'
+  | 'first_break_exported'
+  | 'first_break_shared'
+  | 'second_meaningful_break_action'
   | 'portrait_image_exported'
   | 'Solve completed'
   | 'ICS downloaded'
@@ -42,6 +53,7 @@ declare global {
 }
 
 const pageviewDocuments = new WeakSet<Document>();
+const eventsByDocument = new WeakMap<Document, Set<AnalyticsEvent>>();
 const MAX_QUEUED_EVENTS = 100;
 
 function send(event: AnalyticsEvent | 'pageview'): boolean {
@@ -69,6 +81,38 @@ function send(event: AnalyticsEvent | 'pageview'): boolean {
 }
 
 export function track(event: AnalyticsEvent): void { send(event); }
+
+export function trackOnceInDocument(event: AnalyticsEvent): void {
+  if (typeof document === 'undefined') return;
+  const tracked = eventsByDocument.get(document) ?? new Set<AnalyticsEvent>();
+  if (tracked.has(event) || !send(event)) return;
+  tracked.add(event);
+  eventsByDocument.set(document, tracked);
+}
+
+const BREAK_MILESTONE_KEY = 'timebower.analytics.breakActions.v1';
+const firstBreakEvent = {
+  saved: 'first_break_saved',
+  tracked: 'first_break_tracked',
+  exported: 'first_break_exported',
+  shared: 'first_break_shared',
+} satisfies Record<string, AnalyticsEvent>;
+
+/** A browser-local milestone, with neither an identifier nor action data in the event. */
+export function trackBreakAction(action: keyof typeof firstBreakEvent): void {
+  try {
+    const raw: unknown = JSON.parse(window.localStorage.getItem(BREAK_MILESTONE_KEY) ?? '[]');
+    const previous = new Set(Array.isArray(raw) ? raw.filter(value =>
+      typeof value === 'string' && Object.hasOwn(firstBreakEvent, value),
+    ) : []);
+    if (previous.has(action) || !send(firstBreakEvent[action])) return;
+    previous.add(action);
+    window.localStorage.setItem(BREAK_MILESTONE_KEY, JSON.stringify([...previous]));
+    if (previous.size === 2) send('second_meaningful_break_action');
+  } catch {
+    // Blocked storage must not break or gate the product action.
+  }
+}
 
 /** StrictMode, re-renders, input edits and repeated mounts must not add pageviews. */
 export function trackPageviewOnce(): void {

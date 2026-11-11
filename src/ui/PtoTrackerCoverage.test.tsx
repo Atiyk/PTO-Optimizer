@@ -48,14 +48,18 @@ describe('tracker employer calendar coverage', () => {
     expect(screen.getByText(/outside the employer calendar loaded on this page/)).toBeTruthy();
   });
   it('keeps the saved cost when a date edit leaves coverage, then recalculates a valid edit', () => {
-    seed(); render(<Harness />);
+    seed(); render(<Harness coverage={{ ...calendar, shiftMinutes: [540, 540, 540, 540, 480, 0, 0] }} />);
     const end = screen.getByLabelText('End date for request 2027-01-01') as HTMLInputElement;
     expect(end.min).toBe('2027-01-01'); expect(end.max).toBe('2027-01-31');
     fireEvent.change(end, { target: { value: '2027-02-01' } });
     expect(saved()[0]).toMatchObject({ end: '2027-01-05', ptoDays: 2, ptoDates: ['2027-01-04', '2027-01-05'] });
     expect(screen.getByText(/The saved PTO cost is retained/)).toBeTruthy();
     fireEvent.change(end, { target: { value: '2027-01-06' } });
+    expect(screen.getByText(/these dates use 3 PTO days/)).toBeTruthy();
+    expect(saved()[0]).toMatchObject({ end: '2027-01-05', ptoDays: 2 });
+    fireEvent.click(screen.getByRole('button', { name: 'Save dates' }));
     expect(saved()[0]).toMatchObject({ end: '2027-01-06', ptoDays: 3 });
+    expect(saved()[0].ptoMinutes).toBeUndefined();
   });
   it('rejects an out-of-coverage date edit at the ledger action boundary too', () => {
     seed(); render(<Harness />);

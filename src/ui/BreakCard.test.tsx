@@ -104,6 +104,21 @@ describe('BreakCard collapse (UI density pass: collapsed by default, request too
     expect(html).not.toContain('already started');
   });
 
+  it('shows only the exact PTO dates while request tools are collapsed', () => {
+    const brk = makeBreak({
+      start: '2026-12-25', end: '2026-12-28',
+      days: ['2026-12-25', '2026-12-26', '2026-12-27', '2026-12-28'],
+      totalDaysOff: 4, ptoCost: 1, multiplier: 4,
+    });
+    const { rerender } = mountInteractive({ brk, isPtoDay: date => date === '2026-12-28' });
+    expect(container!.textContent).toContain('Dec 25 – 28, 2026');
+    expect(container!.textContent).toContain('1 working day: Mon Dec 28');
+    expect(container!.textContent).not.toContain('Fri Dec 25');
+    expect(container!.textContent).not.toContain('Copy request');
+    rerender({ requestToolsReady: false });
+    expect(container!.textContent).not.toContain('PTO dates to request');
+  });
+
   it('starts expanded when defaultExpanded is set (the first rendered card)', () => {
     const html = renderToStaticMarkup(
       <BreakCard

@@ -114,7 +114,7 @@ export function defaultPolicyURLState(): PolicyURLState {
   };
 }
 
-export function readPolicyStateFromURL(search: string, defaultCountry: string): PolicyURLState {
+export function readPolicyStateFromURL(search: string, defaultCountry: string, preserveBlank = false): PolicyURLState {
   const params = new URLSearchParams(search);
   const d = defaultPolicyURLState();
   const rawBalance = params.get('cb');
@@ -123,41 +123,51 @@ export function readPolicyStateFromURL(search: string, defaultCountry: string): 
   const validShifts = rawShifts && /^\d{1,4}(,\d{1,4}){6}$/.test(rawShifts)
     && shiftMinutes?.every(minutes => minutes >= 0 && minutes <= 1440);
   const balanceEntered = rawBalance !== null && rawBalance.trim() !== '' && Number.isFinite(Number(rawBalance));
+  const accrualKind = ACCRUAL_KIND_FROM_CODE[params.get('ak') ?? ''] ?? d.accrualKind;
+  const readNumber = (key: string, fallback: number) => {
+    const raw = params.get(key);
+    return preserveBlank && raw === '' ? NaN : num(raw, fallback);
+  };
+  const readDate = (key: string, fallback: string) => {
+    const raw = params.get(key);
+    return preserveBlank && raw === '' ? '' : date(raw, fallback);
+  };
+  const forecastDate = params.get('fd');
 
   return {
-    ...(params.get('ww') && /^[01]{7}$/.test(params.get('ww')!) ? { workWeek: [...params.get('ww')!].map(value => value === '1') as WorkWeek } : {}),
+    ...(params.get('ww') && /^[01]{7}$/.test(params.get('ww')!) && params.get('ww')!.includes('1') ? { workWeek: [...params.get('ww')!].map(value => value === '1') as WorkWeek } : {}),
     ...(params.get('sd') && /^[A-Z0-9-]{1,16}$/.test(params.get('sd')!) ? { subdivision: params.get('sd')! } : {}),
     ...(params.get('afs') && isValidISODate(params.get('afs')!) ? { altFridayStart: params.get('afs')! } : {}),
     unit: params.get('u') === '1' ? 'hours' : 'days',
-    hoursPerDay: num(params.get('hpd'), d.hoursPerDay),
-    accrualKind: ACCRUAL_KIND_FROM_CODE[params.get('ak') ?? ''] ?? d.accrualKind,
-    amount: num(params.get('am'), d.amount),
+    hoursPerDay: readNumber('hpd', d.hoursPerDay),
+    accrualKind,
+    amount: readNumber('am', preserveBlank && (accrualKind === 'per-hour-worked' || accrualKind === 'unlimited') ? NaN : d.amount),
     frequency: FREQUENCY_FROM_CODE[params.get('fq') ?? ''] ?? d.frequency,
-    payDateAnchor: date(params.get('pda'), d.payDateAnchor),
-    grantDate: date(params.get('gd'), d.grantDate),
-    hourlyRate: num(params.get('hr'), d.hourlyRate),
-    typicalWeeklyHours: num(params.get('twh'), d.typicalWeeklyHours),
+    payDateAnchor: readDate('pda', preserveBlank && accrualKind !== 'per-pay-period' ? '' : d.payDateAnchor),
+    grantDate: readDate('gd', preserveBlank && accrualKind !== 'front-loaded' ? '' : d.grantDate),
+    hourlyRate: readNumber('hr', preserveBlank && accrualKind !== 'per-hour-worked' ? NaN : d.hourlyRate),
+    typicalWeeklyHours: readNumber('twh', preserveBlank && accrualKind !== 'per-hour-worked' ? NaN : d.typicalWeeklyHours),
     expectedDaysPerYear: num(params.get('edy'), d.expectedDaysPerYear),
     planYearKind: PLAN_YEAR_FROM_CODE[params.get('py') ?? ''] ?? d.planYearKind,
-    anniversaryStart: date(params.get('as'), d.anniversaryStart),
-    customResetDate: date(params.get('crd'), d.customResetDate),
+    anniversaryStart: readDate('as', d.anniversaryStart),
+    customResetDate: readDate('crd', d.customResetDate),
     accrualCapEnabled: params.get('ace') !== '0',
-    accrualCap: num(params.get('ac'), d.accrualCap),
+    accrualCap: readNumber('ac', d.accrualCap),
     carryoverMode: CARRYOVER_FROM_CODE[params.get('cm') ?? ''] ?? d.carryoverMode,
-    carryoverCap: num(params.get('cc'), d.carryoverCap),
+    carryoverCap: readNumber('cc', d.carryoverCap),
     carryoverUseByEnabled: params.get('cue') === '1',
-    carryoverUseBy: date(params.get('cub'), d.carryoverUseBy),
+    carryoverUseBy: readDate('cub', d.carryoverUseBy),
     waitingPeriodEnabled: params.get('wpe') === '1',
-    waitingPeriodDays: num(params.get('wpd'), d.waitingPeriodDays),
-    negativeBalanceAllowance: num(params.get('nba'), d.negativeBalanceAllowance),
+    waitingPeriodDays: readNumber('wpd', d.waitingPeriodDays),
+    negativeBalanceAllowance: readNumber('nba', d.negativeBalanceAllowance),
     payoutOnLeaving: PAYOUT_FROM_CODE[params.get('pol') ?? ''] ?? d.payoutOnLeaving,
-    ...(params.has('fd') && isValidISODate(params.get('fd')!) ? { forecastDate: params.get('fd')! } : {}),
+    ...(forecastDate !== null && (isValidISODate(forecastDate) || (preserveBlank && forecastDate === '')) ? { forecastDate } : {}),
     ...(params.has('car') ? { currentCarriedBalance: num(params.get('car'), 0) } : {}),
     currentBalance: num(rawBalance, d.currentBalance),
     balanceEntered,
     ...(params.get('bap') === '1' ? { balanceIncludesApprovedLeave: true } : {}),
     ...(validShifts ? { shiftMinutes } : {}),
-    balanceAsOf: date(params.get('bao'), d.balanceAsOf),
+    balanceAsOf: readDate('bao', d.balanceAsOf),
     plannedDays: parseDateList(params.get('pd')),
     country: params.get('c') || defaultCountry,
   };
@@ -165,30 +175,31 @@ export function readPolicyStateFromURL(search: string, defaultCountry: string): 
 
 export function writePolicyStateToURL(params: URLSearchParams, state: PolicyURLState): void {
   const d = defaultPolicyURLState();
+  const writeNumber = (key: string, value: number) => params.set(key, Number.isFinite(value) ? String(value) : '');
   if (state.workWeek) params.set('ww', state.workWeek.map(value => value ? '1' : '0').join('')); else params.delete('ww');
   if (state.subdivision) params.set('sd', state.subdivision); else params.delete('sd');
   if (state.altFridayStart && isValidISODate(state.altFridayStart)) params.set('afs', state.altFridayStart); else params.delete('afs');
 
   if (state.unit === 'hours') params.set('u', '1');
   else params.delete('u');
-  if (state.hoursPerDay !== d.hoursPerDay) params.set('hpd', String(state.hoursPerDay));
+  if (state.hoursPerDay !== d.hoursPerDay) writeNumber('hpd', state.hoursPerDay);
   else params.delete('hpd');
 
   params.set('ak', ACCRUAL_KIND_CODE[state.accrualKind]);
 
   if (state.accrualKind === 'front-loaded') {
-    params.set('am', String(state.amount));
+    writeNumber('am', state.amount);
     params.set('gd', state.grantDate);
     params.delete('fq');
     params.delete('pda');
   } else if (state.accrualKind === 'per-pay-period') {
-    params.set('am', String(state.amount));
+    writeNumber('am', state.amount);
     params.set('fq', FREQUENCY_CODE[state.frequency]);
     params.set('pda', state.payDateAnchor);
     params.delete('gd');
   } else if (state.accrualKind === 'per-hour-worked') {
-    params.set('hr', String(state.hourlyRate));
-    params.set('twh', String(state.typicalWeeklyHours));
+    writeNumber('hr', state.hourlyRate);
+    writeNumber('twh', state.typicalWeeklyHours);
     params.delete('am');
     params.delete('fq');
     params.delete('pda');
@@ -216,7 +227,7 @@ export function writePolicyStateToURL(params: URLSearchParams, state: PolicyURLS
   if (state.accrualKind !== 'unlimited') {
     if (!state.accrualCapEnabled) params.set('ace', '0');
     else params.delete('ace');
-    if (state.accrualCapEnabled) params.set('ac', String(state.accrualCap));
+    if (state.accrualCapEnabled) writeNumber('ac', state.accrualCap);
     else params.delete('ac');
   } else {
     params.delete('ace');
@@ -225,9 +236,9 @@ export function writePolicyStateToURL(params: URLSearchParams, state: PolicyURLS
 
   if (state.carryoverMode !== 'capped') params.set('cm', CARRYOVER_CODE[state.carryoverMode]);
   else params.delete('cm');
-  if (state.carryoverMode === 'capped') params.set('cc', String(state.carryoverCap));
+  if (state.carryoverMode === 'capped') writeNumber('cc', state.carryoverCap);
   else params.delete('cc');
-  if (state.carryoverMode !== 'none' && state.carryoverUseByEnabled) {
+  if ((state.carryoverMode !== 'none' || (state.currentCarriedBalance ?? 0) > 0) && state.carryoverUseByEnabled) {
     params.set('cue', '1');
     params.set('cub', state.carryoverUseBy);
   } else {
@@ -237,19 +248,19 @@ export function writePolicyStateToURL(params: URLSearchParams, state: PolicyURLS
 
   if (state.waitingPeriodEnabled) {
     params.set('wpe', '1');
-    params.set('wpd', String(state.waitingPeriodDays));
+    writeNumber('wpd', state.waitingPeriodDays);
   } else {
     params.delete('wpe');
     params.delete('wpd');
   }
 
-  if (state.negativeBalanceAllowance !== 0) params.set('nba', String(state.negativeBalanceAllowance));
+  if (state.negativeBalanceAllowance !== 0) writeNumber('nba', state.negativeBalanceAllowance);
   else params.delete('nba');
 
   if (state.payoutOnLeaving !== 'not-sure') params.set('pol', PAYOUT_CODE[state.payoutOnLeaving]);
   else params.delete('pol');
 
-  if (state.forecastDate && isValidISODate(state.forecastDate)) params.set('fd', state.forecastDate);
+  if (state.forecastDate !== undefined && (state.forecastDate === '' || isValidISODate(state.forecastDate))) params.set('fd', state.forecastDate);
   else params.delete('fd');
   if (state.currentCarriedBalance) params.set('car', String(state.currentCarriedBalance));
   else params.delete('car');

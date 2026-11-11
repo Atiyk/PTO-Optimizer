@@ -1,3 +1,4 @@
+import { isPlanAddressKey } from '../ui/shareFormat';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WORK_WEEK, type WorkWeek } from '@daysoff/engine/solver/types';
 import { mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
@@ -90,7 +91,12 @@ describe('rescuePlan', () => {
     const plan = rescuePlan(risks[0], { policy: planned, country: 'US', requests: [requested], calendar, today: '2026-11-02' });
     expect(plan.daysAtRisk).toBe(5);
     for (const date of ['2026-12-14', '2026-12-15', '2026-12-16', '2026-12-21', '2026-12-22']) expect(plan.ptoDates).not.toContain(date);
-    expect(new URLSearchParams(plan.ptoHref.split('?')[1]).get('bo')).toBe('2026-12-14,2026-12-15,2026-12-16,2026-12-21,2026-12-22');
+    // Privacy (Issue 2): no reserved dates in the navigable link. Ledger dates are derived
+    // by the planner itself; manually planned days travel in the on-device hand-off.
+    const linkParams = new URLSearchParams(plan.ptoHref.split('?')[1]);
+    expect(linkParams.has('bo')).toBe(false);
+    for (const key of linkParams.keys()) expect(isPlanAddressKey(key), key).toBe(true);
+    expect(plan.privatePlan).toBe('bo=2026-12-21%2C2026-12-22');
     expect(plan.daysStillAtRisk).toBe(0);
   });
 

@@ -1,3 +1,4 @@
+import { isPlanAddressKey } from '../ui/shareFormat';
 import { describe, expect, it } from 'vitest';
 import type { TimeOffPolicy } from '../policy/model';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
@@ -21,10 +22,19 @@ describe('expiration guard and calendar reminders', () => {
   it('approved future leave reduces forfeiture while tentative leave remains separate', () => {
     const entry = createPtoRequest({ start: '2026-12-14', end: '2026-12-16', status: 'approved' }, { workWeek: DEFAULT_WORK_WEEK, offDays: [] }, 'one')!;
     expect(expirationRisks(policy, 'US', [entry], '2026-11-02')[0].daysAtStake).toBe(4);
-    const params = new URLSearchParams(expirationRisks(policy, 'US', [entry], '2026-11-02')[0].ptoHref.split('?')[1]);
-    expect(params.get('b')).toBe('4');
+    const risk = expirationRisks(policy, 'US', [entry], '2026-11-02')[0];
+    const params = new URLSearchParams(risk.ptoHref.split('?')[1]);
+    expect(risk.planningBudget).toBe(4);
+    // The planner reserves the 3 approved days itself (workspace rule), so the link adds
+    // them back once: 7 entered - 3 reserved = the 4-day plan.
+    expect(params.get('b')).toBe('7');
     expect(params.get('rv')).toBe('0');
-    expect(params.get('bo')).toBe('2026-12-14,2026-12-15,2026-12-16');
+    // Privacy (Issue 2): booked dates are not put in the navigable link. The planner
+    // derives them from the same on-device ledger; the risk keeps them as data.
+    expect(params.has('bo')).toBe(false);
+    for (const key of params.keys()) expect(isPlanAddressKey(key), key).toBe(true);
+    expect(risk.unavailableDates).toEqual(['2026-12-14', '2026-12-15', '2026-12-16']);
+    expect(risk.privatePlan).toBeUndefined();
     expect(expirationRisks(policy, 'US', [{ ...entry, status: 'requested' }], '2026-11-02')[0].daysAtStake).toBe(7);
   });
   it('uses the entered carried-day deadline inclusively, matching the policy projection', () => {

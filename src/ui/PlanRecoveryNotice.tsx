@@ -22,11 +22,10 @@ export function PlanRecoveryNotice({
     <section role="alert" aria-label="Planning needs attention" className="flex gap-3 rounded-[10px] border-2 border-ink bg-surface p-4 text-ink">
       <svg aria-hidden="true" viewBox="0 0 20 20" className="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M10 2.5 18 17H2L10 2.5Z" strokeLinejoin="round" /><path d="M10 8v4" strokeLinecap="round" /><circle cx="10" cy="14.6" r="0.9" fill="currentColor" stroke="none" /></svg>
       <div className="min-w-0">
-        <h2 className="text-[15px] font-semibold">These settings don&apos;t produce a valid plan yet.</h2>
+        <h2 className="text-[15px] font-semibold">Adjust your settings to get a plan</h2>
         <p className="mt-1 max-w-prose text-sm">{issue}</p>
         <p className="mt-1 max-w-prose text-sm text-muted">
-          Your calendar is still available. Adjust a pinned or excluded date, or review your planning settings.
-          There is no plan ready to export until the constraint is resolved.
+          Change dates on the calendar or review your planning settings.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {hasForcedDays && (

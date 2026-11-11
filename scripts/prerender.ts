@@ -43,6 +43,8 @@ import { rawHolidaysToHolidays, type Holiday } from '@daysoff/engine/data/holida
 import { getSiteUrl } from './siteUrl.ts';
 import { ENTRIES, type Entry, type ComponentKind } from './routes.ts';
 import { PRODUCT_NAME, PRODUCT_SHORT_NAME } from '../src/brand.ts';
+import { todayISO } from '../src/ui/today.ts';
+import { prerenderAppGuard } from './prerenderAppGuard.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '..');
@@ -64,19 +66,24 @@ const PRERENDERED_AT = new Date().toISOString();
  * silently - that route's SSR falls back to an empty list for this phase, exactly the
  * pre-Phase-2 behavior, not a new failure mode.
  */
-function loadStaticHolidaysForSsr(countryCode: string): Holiday[] {
+function loadStaticHolidaysForSsr(countryCode: string): { holidays: Holiday[]; sourceYears: number[] } {
   const currentYear = new Date().getUTCFullYear();
   const years = [currentYear, currentYear + 1, currentYear + 2];
-  const raw = years.flatMap((year) => {
+  const sourceYears: number[] = [];
+  const holidays = years.flatMap((year) => {
     const filePath = resolve(publicHolidaysDir, `${countryCode}-${year}.json`);
     if (!existsSync(filePath)) return [];
     try {
-      return JSON.parse(readFileSync(filePath, 'utf-8'));
+      const raw = JSON.parse(readFileSync(filePath, 'utf-8'));
+      if (!Array.isArray(raw)) return [];
+      const yearHolidays = rawHolidaysToHolidays(raw);
+      sourceYears.push(year);
+      return yearHolidays;
     } catch {
       return [];
     }
   });
-  return rawHolidaysToHolidays(raw);
+  return { holidays, sourceYears };
 }
 
 /** Decodes the small, fixed set of HTML entities this project's own <title>/<meta> tags
@@ -226,9 +233,9 @@ function installWindow(url: string, countryPreset?: string): void {
     (win as unknown as { __PTO_COUNTRY_PRESET__?: string }).__PTO_COUNTRY_PRESET__ = countryPreset;
   }
   const ssrCountry = countryPreset ?? SSR_DEFAULT_COUNTRY;
-  (win as unknown as { __PTO_PRELOADED_HOLIDAYS__?: Record<string, Holiday[]> }).__PTO_PRELOADED_HOLIDAYS__ = {
-    [ssrCountry]: loadStaticHolidaysForSsr(ssrCountry),
-  };
+  const { holidays, sourceYears } = loadStaticHolidaysForSsr(ssrCountry);
+  (win as unknown as Window).__PTO_PRELOADED_HOLIDAYS__ = { [ssrCountry]: holidays };
+  (win as unknown as Window).__PTO_PRELOADED_HOLIDAY_YEARS__ = { [ssrCountry]: sourceYears };
   (win as unknown as { __PTO_PRERENDERED_AT__?: string }).__PTO_PRERENDERED_AT__ = PRERENDERED_AT;
   // Stage 5G fix (Feature 1, PR-C): the Travel/Efficiency scores rendered blank ("—") in
   // every prerendered /pto page. Root cause: useAppState.ts deliberately computes them in a
@@ -285,6 +292,7 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
   // geolocateCountry() read them fresh on every call rather than caching at module scope.
   installWindow(url, entry.countryPreset);
 
+  const renderedDate = todayISO();
   const html = renderEntry(entry);
 
   const filePath = resolve(distDir, entry.file);
@@ -296,7 +304,9 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
   if (!original.includes(marker)) {
     throw new Error(`${entry.file}: expected marker ${JSON.stringify(marker)} not found - was it already prerendered, or did the shell HTML change?`);
   }
-  const withRoot = original.replace(marker, `<div id="root">${html}</div>`);
+  const hasDefaultPlan = entry.component === 'app' || entry.component === 'landing';
+  const content = hasDefaultPlan ? `<p data-prerendered-plan-loading role="status" class="p-6 text-ink">Loading your plan…</p><noscript><p>Enable JavaScript to open a linked plan or change these dates.</p></noscript><div data-prerendered-plan>${html}</div>` : html;
+  const withRoot = original.replace(marker, `<div id="root">${content}</div>`);
 
   const meta = extractMeta(original, url);
   const jsonLdScripts = buildJsonLd(entry, meta)
@@ -309,14 +319,21 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
   // of an empty list. Must run before the module script at the end of <body>, so <head>
   // (same injection point as the JSON-LD above) is the right place.
   const ssrCountry = entry.countryPreset ?? SSR_DEFAULT_COUNTRY;
-  const preloadedHolidays = loadStaticHolidaysForSsr(ssrCountry);
-  const preloadScript = `    <script>window.__PTO_PRELOADED_HOLIDAYS__ = ${JSON.stringify({ [ssrCountry]: preloadedHolidays })}; window.__PTO_PRERENDERED_AT__ = ${JSON.stringify(PRERENDERED_AT)};</script>`;
+  const { holidays, sourceYears } = loadStaticHolidaysForSsr(ssrCountry);
+  const preloadScript = `    <script>window.__PTO_PRELOADED_HOLIDAYS__ = ${JSON.stringify({ [ssrCountry]: holidays })}; window.__PTO_PRELOADED_HOLIDAY_YEARS__ = ${JSON.stringify({ [ssrCountry]: sourceYears })}; window.__PTO_PRERENDERED_AT__ = ${JSON.stringify(PRERENDERED_AT)};</script>`;
+  // The static planner cannot read the viewer's local plan. The home route keeps
+  // its simple query guard so its default preview does no additional startup work.
+  const guardScript = entry.component === 'app' ? prerenderAppGuard(ssrCountry, renderedDate, !entry.countryPreset)
+    : 'if(window.location.search)document.documentElement.setAttribute("data-plan-link", "");';
+  const queryGuard = hasDefaultPlan
+    ? `    <style>[data-prerendered-plan-loading],html[data-plan-link] [data-prerendered-plan]{display:none}html[data-plan-link] [data-prerendered-plan-loading]{display:block}</style>\n    <script>${guardScript}</script>\n`
+    : '';
 
   const headMarker = '</head>';
   if (!withRoot.includes(headMarker)) {
     throw new Error(`${entry.file}: no </head> found - can't inject structured data.`);
   }
-  const injected = withRoot.replace(headMarker, `${preloadScript}\n${jsonLdScripts}\n  </head>`);
+  const injected = withRoot.replace(headMarker, `${queryGuard}${preloadScript}\n${jsonLdScripts}\n  </head>`);
   writeFileSync(filePath, injected, 'utf-8');
 
   return { file: entry.file, bytesInjected: html.length };

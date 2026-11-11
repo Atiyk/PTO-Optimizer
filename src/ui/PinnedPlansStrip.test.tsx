@@ -12,15 +12,15 @@ describe('PinnedPlansStrip (UI density pass: chips only - the Pin button/hint mo
     expect(html).toBe('');
   });
 
-  it('renders a pinned summary in the "Pinned: N days → M off · K breaks" shape', () => {
+  it('names PTO days, days off, and break count in a saved scenario', () => {
     const html = renderToStaticMarkup(
       <PinnedPlansStrip summaries={[makeSummary()]} onRestore={() => {}} onRemove={() => {}} />,
     );
-    expect(html).toContain('Pinned: 15 days');
-    expect(html).toContain('32 off');
+    expect(html).toContain('15 PTO days');
+    expect(html).toContain('32 days off');
     expect(html).toContain('5 breaks');
     expect(html).not.toContain('Travel 70th');
-    expect(html).toContain('restore');
+    expect(html).toContain('Restore');
   });
 
   it('omits the travel percentile when the pinned plan had none (no valid plan at pin time)', () => {
@@ -38,7 +38,7 @@ describe('PinnedPlansStrip (UI density pass: chips only - the Pin button/hint mo
         onRemove={() => {}}
       />,
     );
-    expect(html).toContain('Pinned: 15 days');
-    expect(html).toContain('Pinned: 10 days');
+    expect(html).toContain('15 PTO days');
+    expect(html).toContain('10 PTO days');
   });
 });

@@ -3,7 +3,8 @@ import { isoToSerial } from '@daysoff/engine/solver/dateUtils';
 import { validateCurrentCarriedBalance, type TimeOffPolicy } from '../policy/model';
 import { projectBalance, type BalancePoint, type PolicyEvent } from '../policy/projection';
 import { isValidISODate } from '../ui/urlState';
-import { isScheduledRequest, requestConflicts, requestDatesForScenario, type PtoRequest } from './requestLedger';
+import { isScheduledRequest, requestConflicts, type PtoRequest } from './requestLedger';
+import { chargeableRequestDates, requestDateCharge, type BalanceBasis } from './workspace';
 
 export interface ForecastScenario {
   balance: number | null;
@@ -46,15 +47,18 @@ function validPolicy(policy: TimeOffPolicy): boolean {
 }
 
 function scenario(policy: TimeOffPolicy, through: ISODate, requests: readonly PtoRequest[], tentative: boolean): ForecastScenario {
-  const approvedAlreadyCharged = policy.balanceIncludesApprovedLeave
-    ? new Set(requestDatesForScenario(requests, policy.balanceAsOf, through)) : new Set<ISODate>();
+  // The shared workspace rule decides which request days this balance still owes.
+  const basis: BalanceBasis = { asOf: policy.balanceAsOf, includesApprovedLeave: policy.balanceIncludesApprovedLeave === true };
+  const charged = new Set(chargeableRequestDates(requests, basis, through, tentative));
+  const alreadyInBalance = new Set(requests.flatMap(request => request.ptoDates
+    .filter(date => date > policy.balanceAsOf && requestDateCharge(request, date, basis) === 'in-balance')));
   const inForecast = (date: ISODate) => isValidISODate(date) && date > policy.balanceAsOf
-    && date <= through && !approvedAlreadyCharged.has(date);
+    && date <= through && !alreadyInBalance.has(date);
   const bookedHours = new Map<ISODate, number>();
   for (const date of policy.plannedDays.filter(inForecast)) bookedHours.set(date, policy.hoursPerDay);
   for (const request of requests) {
     if (!isScheduledRequest(request, tentative)) continue;
-    for (const date of request.ptoDates.filter(inForecast)) {
+    for (const date of request.ptoDates.filter(date => charged.has(date))) {
       const minutes = request.ptoMinutes?.[date];
       const amount = minutes !== undefined && Number.isInteger(minutes) && minutes > 0 && minutes <= 1440
         ? minutes / 60 : policy.hoursPerDay;

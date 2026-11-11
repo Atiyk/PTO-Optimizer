@@ -87,6 +87,7 @@
       <div class="sections">
         <section id="local"><h2>What stays in your browser</h2>
           <p>Private planner and policy drafts stay in the current browser tab. If you save a policy or employer calendar or track a PTO request, the record is stored in your browser. The planner works without an account. These records are not automatically synchronized across devices.</p>
+          <p>Records kept in this browser&rsquo;s storage include: saved policy settings, saved employer calendars, tracked PTO requests, saved plans you pin for comparison, and the shared My PTO setting for whether your entered balance already includes approved leave. When you follow a &ldquo;Plan the days&rdquo; link from My PTO, private dates such as manually planned days are handed to the planner through this tab&rsquo;s session storage, not the link, and are removed once the planner opens.</p>
           <p>Downloaded calendar files and share images are generated on your device. We do not automatically upload them. A calendar subscription is different: your calendar app (Google, Apple or Microsoft) keeps the subscription link and asks Timebower&rsquo;s server for the latest calendar each time it refreshes.</p>
         </section>
         <section id="subscriptions"><h2>Calendar subscriptions</h2>
@@ -102,6 +103,7 @@
         </section>
         <section id="analytics"><h2>Lightweight usage analytics</h2>
           <p>We use <a href="https://vercel.com/analytics" target="_blank" rel="noopener noreferrer">Vercel Web Analytics</a> and <a href="https://plausible.io" target="_blank" rel="noopener noreferrer">Plausible</a> to understand aggregate page visits and feature interactions. The analytics integration strips query strings and URL fragments from reported page URLs and does not intentionally send PTO balances, request details or policy values as event properties.</p>
+          <p>We count first-time break actions such as saving, tracking, exporting and sharing. Your browser remembers which kinds of actions you have taken. Only the action name and public page path go to analytics. We also count when people use partner sharing or school coverage tools.</p>
           <p>Analytics providers may receive browser and device information and approximate location as part of operating their services. Timebower suppresses analytics for incoming referrer URLs containing query parameters or fragments, and uses a no-referrer policy for outgoing links.</p>
         </section>
         <section id="holidays"><h2>Where holiday information comes from</h2>

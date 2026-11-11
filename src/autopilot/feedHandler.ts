@@ -6,6 +6,7 @@
 import { buildPlanFeedICS, MAX_FEED_QUERY_LENGTH } from './feed';
 import { holidayYearsNeeded, planStateFromSearch } from './planFromSearch';
 import { isValidISODate } from '../ui/urlState';
+import { isPlanShareKey } from '../ui/shareFormat';
 
 /** Resolves to the parsed JSON for that country-year (the raw Nager-shaped array), or null
  * when there is no such file. Only called with a known country code and a year inside
@@ -98,7 +99,9 @@ export async function handleFeedRequest(request: Request, readHolidays: HolidayR
   const result = buildPlanFeedICS(query, today, (country, year) => loaded.get(`${country}-${year}`) ?? null);
   if (!result.ok) return textResponse(result.status, result.message);
 
-  const privateSchedule = explicitHolidayCoverage || ['eh', 'bo', 'od', 'ov'].some((key) => url.searchParams.has(key));
+  // Legacy subscriptions created before the public share format may still carry private
+  // or unclassified keys. Keep those responses out of shared caches (src/ui/shareFormat.ts).
+  const privateSchedule = explicitHolidayCoverage || [...url.searchParams.keys()].some((key) => !isPlanShareKey(key));
   return new Response(request.method === 'HEAD' ? null : result.ics, {
     status: 200,
     headers: {

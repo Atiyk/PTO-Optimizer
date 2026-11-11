@@ -26,6 +26,10 @@ export interface FamilyPlanInput {
   ptoBudget: number;
   /** Dates another adult (co-parent, grandparent) shared as available. Childcare cover only. */
   otherAdultDays?: readonly string[];
+  /** Proposed coverage remains unverified. Absent preserves the prior date-only input contract. */
+  otherAdultConfirmed?: boolean;
+  /** Cover listed school closures before maximizing contiguous time off. */
+  prioritizeCoverage?: boolean;
   /** Break ids (= break start date) the user switched off. */
   excludedBreaks?: readonly string[];
 }
@@ -52,7 +56,7 @@ export interface FamilyBreakPlan {
   excluded: boolean;
 }
 
-export type GapCover = 'you-off' | 'pto' | 'other-adult' | 'uncovered';
+export type GapCover = 'you-off' | 'pto' | 'other-adult' | 'other-adult-proposed' | 'uncovered';
 
 export interface FamilyPlanResult {
   breaks: SchoolBreak[];
@@ -163,7 +167,8 @@ function compareEarlier(a: string[], b: string[]): number {
  * off (school-off dates joined through Sat/Sun) containing at least one school-off weekday.
  * Allocation is a multiple-choice knapsack over non-excluded breaks (per break, the best
  * contiguous k-day PTO choice for each k), maximising total together days; ties prefer fewer
- * PTO days, then earlier PTO dates.
+ * PTO days, then earlier PTO dates. With coverage priority, PTO goes to the earliest
+ * listed school closures that still need childcare.
  */
 export function planFamilyTime(input: FamilyPlanInput): FamilyPlanResult | null {
   if (!input || typeof input !== 'object') return null;
@@ -217,6 +222,56 @@ export function planFamilyTime(input: FamilyPlanInput): FamilyPlanResult | null 
   }
   closeRun();
 
+  const confirmedAdult = input.otherAdultConfirmed !== false;
+  const finish = (plans: FamilyBreakPlan[]): FamilyPlanResult => {
+    const chosenPto = new Set(plans.flatMap(plan => plan.ptoDays));
+    const gaps: FamilyPlanResult['gaps'] = [];
+    for (const brk of breaks) {
+      for (const date of brk.schoolOffWeekdays) {
+        const cover: GapCover = parentFree.has(date) ? 'you-off' : chosenPto.has(date) ? 'pto'
+          : otherAdult.has(date) ? (confirmedAdult ? 'other-adult' : 'other-adult-proposed') : 'uncovered';
+        gaps.push({ date, cover });
+      }
+    }
+    return {
+      breaks, plans, ptoUsed: chosenPto.size, ptoLeft: ptoBudget - chosenPto.size,
+      togetherDaysTotal: plans.reduce((total, plan) => total + (plan.excluded ? 0 : plan.togetherDays), 0),
+      gaps,
+      uncoveredDays: gaps.filter(gap => gap.cover === 'uncovered' || gap.cover === 'other-adult-proposed').map(gap => gap.date),
+      coverage: 'partial',
+    };
+  };
+
+  if (input.prioritizeCoverage) {
+    let remaining = ptoBudget;
+    return finish(breaks.map((brk, index) => {
+      const excluded = excludedIds.has(brk.id);
+      const ptoDays = excluded ? [] : brk.schoolOffWeekdays.filter(date =>
+        !parentFree.has(date) && (!confirmedAdult || !otherAdult.has(date)),
+      ).slice(0, remaining);
+      remaining -= ptoDays.length;
+      const pto = new Set(ptoDays);
+      const days = breakDays[index];
+      let togetherDays = 0;
+      let togetherStart: string | null = null;
+      let togetherEnd: string | null = null;
+      let runStart = 0;
+      for (let i = 0; i < days.length; i++) {
+        if (!parentFree.has(days[i]) && !pto.has(days[i])) {
+          runStart = i + 1;
+        } else if (i - runStart + 1 > togetherDays) {
+          togetherDays = i - runStart + 1;
+          togetherStart = days[runStart];
+          togetherEnd = days[i];
+        }
+      }
+      return {
+        breakId: brk.id, ptoDays, togetherStart, togetherEnd, togetherDays, excluded,
+        fullyCovered: ptoDays.length === brk.parentWorkdays.length,
+      };
+    }));
+  }
+
   const options = breaks.map((brk, index) => {
     const days = breakDays[index];
     const positions: number[] = [];
@@ -252,8 +307,6 @@ export function planFamilyTime(input: FamilyPlanInput): FamilyPlanResult | null 
 
   const plans: FamilyBreakPlan[] = [];
   let remaining = ptoBudget;
-  let togetherDaysTotal = 0;
-  const chosenPto = new Set<string>();
   for (let b = 0; b < n; b++) {
     const { list, positions, isExcluded } = options[b];
     const days = breakDays[b];
@@ -271,8 +324,6 @@ export function planFamilyTime(input: FamilyPlanInput): FamilyPlanResult | null 
     }
     const option = chosen!;
     remaining -= option.cost;
-    for (const date of chosenDates) chosenPto.add(date);
-    if (!isExcluded) togetherDaysTotal += option.together;
     plans.push({
       breakId: breaks[b].id,
       ptoDays: chosenDates,
@@ -284,17 +335,5 @@ export function planFamilyTime(input: FamilyPlanInput): FamilyPlanResult | null 
     });
   }
 
-  const gaps: { date: string; cover: GapCover }[] = [];
-  for (const brk of breaks) {
-    for (const date of brk.schoolOffWeekdays) {
-      const cover: GapCover = parentFree.has(date) ? 'you-off' : chosenPto.has(date) ? 'pto'
-        : otherAdult.has(date) ? 'other-adult' : 'uncovered';
-      gaps.push({ date, cover });
-    }
-  }
-  return {
-    breaks, plans, ptoUsed: ptoBudget - remaining, ptoLeft: remaining, togetherDaysTotal,
-    gaps, uncoveredDays: gaps.filter(gap => gap.cover === 'uncovered').map(gap => gap.date),
-    coverage: 'partial',
-  };
+  return finish(plans);
 }

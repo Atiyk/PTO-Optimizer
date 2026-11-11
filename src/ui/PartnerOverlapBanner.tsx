@@ -5,7 +5,6 @@ interface PartnerOverlapBannerProps {
 }
 
 /** Shown once to a visitor who just arrived via a "share my days" partner-overlap link -
- * the only built-in two-person loop in the product, so their first few seconds matter.
  * Explains what they received; their partner's days are already marked on the calendar and
  * a plan is already solved beneath this banner (the app always auto-solves with defaults).
  * Neutral, not a new colour - this is information, not a warning or an error, the only two
@@ -17,8 +16,8 @@ export function PartnerOverlapBanner({ overlapDayCount, onDismiss }: PartnerOver
           <span className="font-semibold">Someone shared their days off with you.</span> Their{' '}
           {overlapDayCount} day
           {overlapDayCount === 1 ? '' : 's'} off {overlapDayCount === 1 ? 'is' : 'are'} already marked on the
-          calendar (look for the overlap dot) - set your own country and PTO days in the settings to see where your
-          time off could line up with theirs.
+          calendar with an overlap dot. Set your own country and PTO days in the settings, then{' '}
+          <a className="link-mark font-semibold" href="#partner-planner">review dates you could take off together</a>.
         </p>
         <button
           type="button"

@@ -28,8 +28,11 @@ export function isSafeAnalyticsReferrer(referrer: string): boolean {
 export function analyticsBeforeSend(event: BeforeSendEvent): BeforeSendEvent | null {
   try {
     if (typeof document !== 'undefined' && !isSafeAnalyticsReferrer(document.referrer)) return null;
+    if (event.type !== 'pageview' && event.type !== 'event') return null;
     const url = sanitizeAnalyticsUrl(event.url);
-    return url ? { ...event, url } : null;
+    // Rebuild the payload from an allowlist: a spread would forward any field a future
+    // SDK version adds (route, path, properties) without this boundary noticing.
+    return url ? { type: event.type, url } as BeforeSendEvent : null;
   } catch {
     return null;
   }

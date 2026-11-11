@@ -4,6 +4,7 @@ import { generateAlerts, type PolicyAlert } from '../policy/alerts';
 import type { CalendarReminder } from '../ui/icsExport';
 import { forecastWithRequests } from './forecast';
 import { requestDatesForScenario, type PtoRequest } from './requestLedger';
+import { chargeableRequestDates, planningCommitments, type BalanceBasis } from './workspace';
 
 export const EXPIRATION_REMINDER_LEADS = [60, 30, 7] as const;
 export type ExpirationReminderLead = typeof EXPIRATION_REMINDER_LEADS[number];
@@ -14,6 +15,12 @@ export interface ExpirationRisk extends PolicyAlert {
   expirationDate: string;
   planningBudget: number;
   canPlan: boolean;
+  /** Dates already taken in the planning window (manual planned days and booked leave).
+   * Data only: never written into `ptoHref`. */
+  unavailableDates?: readonly string[];
+  /** Private planner inputs for the on-device hand-off (src/ui/planHandoff.ts), as a
+   * query string. Absent when the planner can derive everything itself. */
+  privatePlan?: string;
 }
 
 export function expirationRisks(policy: TimeOffPolicy, country: string, requests: readonly PtoRequest[], today: string): ExpirationRisk[] {
@@ -42,16 +49,18 @@ export function expirationRisks(policy: TimeOffPolicy, country: string, requests
       if (carried && carried.date > earliest) earliest = carried.date;
     }
     const riskProjection = forecastWithRequests(policy, risk.deadline, requests)?.confirmed;
-    const futurePlanned = [...new Set([
-      ...policy.plannedDays.filter((date) => date >= start && date <= risk.deadline),
-      ...requestDatesForScenario(requests, addDays(start, -1), risk.deadline),
-    ])].sort();
+    const basis: BalanceBasis = { asOf: policy.balanceAsOf, includesApprovedLeave: policy.balanceIncludesApprovedLeave === true };
+    const manualPlanned = policy.plannedDays.filter((date) => date >= start && date <= risk.deadline);
+    // Booked days stay unavailable in the hand-off, but only days the forecast still
+    // debits are reserved: a balance that already includes approved leave is not reduced twice.
+    const futurePlanned = [...new Set([...manualPlanned, ...requestDatesForScenario(requests, addDays(start, -1), risk.deadline)])].sort();
+    const futureCharged = [...new Set([...manualPlanned, ...chargeableRequestDates(requests, basis, risk.deadline, false).filter((date) => date >= start)])];
     let bestBudget = 0;
     let planningStart = earliest;
     if (riskProjection && riskProjection.unfunded < 1e-9) {
       for (const point of riskProjection.series) {
         if (point.date < earliest || point.date > risk.deadline) continue;
-        const reserve = futurePlanned.filter((date) => date > point.date).length * perDay;
+        const reserve = futureCharged.filter((date) => date > point.date).length * perDay;
         const available = Math.min(wanted, Math.max(0, Math.floor((point.balance - reserve) / perDay + 1e-9)));
         if (available > bestBudget) { bestBudget = available; planningStart = point.date; }
         if (bestBudget >= wanted) break;
@@ -59,13 +68,25 @@ export function expirationRisks(policy: TimeOffPolicy, country: string, requests
     }
     const params = new URLSearchParams(risk.ptoHref.split('?')[1]);
     params.set('s', planningStart);
-    params.set('b', String(bestBudget));
+    // The planner reserves tracked requests from its budget with the same workspace rule
+    // (as of today). Add back exactly that reservation so the plan spends bestBudget.
+    const plannerReserve = planningCommitments(requests, { start: planningStart, end: params.get('e') ?? risk.deadline },
+      { asOf: today, includesApprovedLeave: basis.includesApprovedLeave }).reservedPtoDays;
+    params.set('b', String(bestBudget + plannerReserve));
     params.set('rv', '0');
     // The budget is already earned at planningStart under the exact pay schedule.
     // No monthly approximation or second accrual stream is needed in the optimizer.
     for (const key of ['ac', 'am', 'ex', 'xd', 'cc']) params.delete(key);
-    if (futurePlanned.length) params.set('bo', [...new Set(futurePlanned)].sort().join(','));
-    return { ...risk, planningBudget: bestBudget, canPlan: bestBudget > 0, ptoHref: `/pto?${params.toString()}` };
+    // Privacy (Issue 2): no reserved dates in the navigable link. /pto blocks tracked
+    // requests from the same on-device ledger itself; only manually planned days, which
+    // the planner cannot know, travel privately through the on-device hand-off.
+    params.delete('bo');
+    const manualHandoff = [...new Set(manualPlanned)].sort();
+    return {
+      ...risk, planningBudget: bestBudget, canPlan: bestBudget > 0, ptoHref: `/pto?${params.toString()}`,
+      unavailableDates: futurePlanned,
+      ...(manualHandoff.length ? { privatePlan: new URLSearchParams({ bo: manualHandoff.join(',') }).toString() } : {}),
+    };
   }).sort((a, b) => a.deadline.localeCompare(b.deadline) || b.daysAtStake - a.daysAtStake);
 }
 

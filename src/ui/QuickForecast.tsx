@@ -9,6 +9,7 @@ import { compactDate, compactDatesIn } from './compactDate';
 export interface QuickForecastProps {
   policy: TimeOffPolicy;
   balanceEntered?: boolean;
+  inputIssue?: string;
   requests?: readonly PtoRequest[];
   forecastDate: string;
   onForecastDateChange: (date: string) => void;
@@ -41,10 +42,12 @@ function EquationRow({ op, label, value, strong = false }: { op: string; label: 
  * balance is the marked hero figure; under it the same forecast is written out as an
  * equation (current + accrual - scheduled - expiration) so the number can be checked.
  */
-export function QuickForecast({ policy, balanceEntered = true, requests = [], forecastDate, onForecastDateChange, onForecastUsed, upcomingLoss }: QuickForecastProps) {
+export function QuickForecast({ policy, balanceEntered = true, inputIssue, requests = [], forecastDate, onForecastDateChange, onForecastUsed, upcomingLoss }: QuickForecastProps) {
   const dateId = useId();
   const [showExplanation, setShowExplanation] = useState(false);
-  const forecast = forecastWithRequests(policy, forecastDate, requests);
+  const unlimited = policy.accrual.kind === 'unlimited';
+  const missing = balanceEntered ? inputIssue : 'Enter your current PTO balance to see a forecast. Enter 0 if your balance is zero.';
+  const forecast = unlimited || !missing ? forecastWithRequests(policy, forecastDate, requests) : null;
   const unit = policy.unit;
   const confirmed = forecast?.confirmed;
   const tentative = forecast?.tentative;
@@ -75,11 +78,11 @@ export function QuickForecast({ policy, balanceEntered = true, requests = [], fo
           ))}
         </div>
       )}
-      <p className="mt-1.5 text-xs leading-5 text-muted">Shortcuts count from your balance date, {compactDate(policy.balanceAsOf)}.</p>
-      {!forecast ? (
-        <p role="status" className="mt-5 border-t border-line pt-4 text-sm text-ink">{validateCurrentCarriedBalance(policy) ?? 'Enter a valid date on or after your balance as-of date, within ten years, and valid policy amounts.'}</p>
-      ) : policy.accrual.kind === 'unlimited' ? (
+      {presets.length > 0 && <p className="mt-1.5 text-xs leading-5 text-muted">Shortcuts count from your balance date, {compactDate(policy.balanceAsOf)}.</p>}
+      {unlimited ? (
         <p className="mt-5 border-t border-line pt-4 text-base text-ink">Unlimited PTO has no banked balance to forecast. Track your planned time off and check your employer&apos;s approval rules.</p>
+      ) : !forecast ? (
+        <p role="status" className="mt-5 border-t border-line pt-4 text-sm text-ink">{missing ?? validateCurrentCarriedBalance(policy) ?? 'Enter a valid date on or after your balance as-of date, within ten years, and valid policy amounts.'}</p>
       ) : confirmed && tentative ? (
         <div className="mt-4 border-t border-line pt-3">
           <p className="text-sm text-muted">Estimated available PTO on {compactDate(forecastDate)}</p>
@@ -103,7 +106,7 @@ export function QuickForecast({ policy, balanceEntered = true, requests = [], fo
             </p>
           )}
           <dl className="mt-3 text-sm" aria-label="How the projected balance adds up">
-            <EquationRow op="" label={!balanceEntered ? 'Current balance (not entered yet)' : `Current balance on ${compactDate(policy.balanceAsOf)}`} value={`${number(policy.currentBalance)} ${unit}`} />
+            <EquationRow op="" label={`Current balance on ${compactDate(policy.balanceAsOf)}`} value={`${number(policy.currentBalance)} ${unit}`} />
             <EquationRow op="+" label="Expected accrual" value={`${signed('+', confirmed.accrued)} ${unit}`} />
             <EquationRow op="−" label="Scheduled PTO" value={`${signed('−', confirmed.scheduled)} ${unit}`} />
             <EquationRow op="−" label="Expected expiration" value={`${signed('−', confirmed.expired)} ${unit}`} />
@@ -111,7 +114,7 @@ export function QuickForecast({ policy, balanceEntered = true, requests = [], fo
           </dl>
           <p className="mt-3 text-xs leading-5 text-muted">Subject to your cap, resets and borrowing limit. {policy.balanceIncludesApprovedLeave
             ? 'Approved leave is already included in the balance you entered and is not deducted again.'
-            : 'Scheduled PTO counts approved requests and planned days in your policy.'} Days on or before {compactDate(policy.balanceAsOf)} are already in your balance.</p>
+            : 'Scheduled PTO counts approved and completed requests, plus dates entered directly in your policy.'} Days on or before {compactDate(policy.balanceAsOf)} are already in your balance.</p>
           {unit === 'days' && requests.some(request => request.ptoMinutes !== undefined) && (
             <p className="mt-2 text-xs leading-5 text-muted">This is a whole-day forecast. An hourly request counts as one day per tracked date. Select hours to forecast its recorded duration.</p>
           )}

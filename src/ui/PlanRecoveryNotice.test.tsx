@@ -14,12 +14,11 @@ function render(hasForcedDays: boolean) {
 }
 
 describe('PlanRecoveryNotice', () => {
-  it('explains that the solver cannot export a valid plan without hiding the calendar', () => {
+  it('names the issue and shows how to adjust the plan', () => {
     const html = render(true);
     expect(html).toContain('role="alert"');
     expect(html).toContain('Pinned PTO dates exceed your available budget.');
-    expect(html).toContain('Your calendar is still available.');
-    expect(html).toContain('no plan ready to export');
+    expect(html).toContain('Change dates on the calendar or review your planning settings.');
     expect(html).toContain('min-h-11');
   });
 
