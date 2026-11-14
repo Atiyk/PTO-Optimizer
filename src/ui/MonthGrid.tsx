@@ -109,8 +109,8 @@ export function MonthGrid({
 
   return (
     <div className="min-w-0">
-      <h3 className="mb-2 border-b border-line pb-1.5 text-lg font-bold leading-6 text-ink type-condensed">{monthLabel(descriptor.year, descriptor.month)}</h3>
-      <div className="mb-1 grid grid-cols-7 gap-x-1 text-center text-xs font-medium text-muted">
+      <h3 className="mb-2 border-b border-line pb-1.5 max-[400px]:px-2 text-lg font-bold leading-6 text-ink type-condensed">{monthLabel(descriptor.year, descriptor.month)}</h3>
+      <div className="mb-1 grid grid-cols-7 text-center text-xs font-medium text-muted">
         {labels.map((l) => (
           <span key={l}>{l}</span>
         ))}
@@ -134,9 +134,9 @@ export function MonthGrid({
           return (
             <div key={wIdx} className="flex flex-col gap-0.5">
               {leadingLabels.length > 0 && (
-                <div className="grid grid-cols-7 gap-x-1">
+                <div className="grid grid-cols-7">
                   {leadingLabels.map(({ seg, band }) => (
-                    <div key={`label-${seg.colStart}`} style={{ gridColumn: seg.colStart + 1 }} className="flex items-center">
+                    <div key={`label-${seg.colStart}`} style={{ gridColumn: seg.colStart + 1 }} className="flex items-center px-0.5">
                       {/* A label, not a tab stop: each day in the run says "part of break N"
                           in its own accessible name, so the badge is a picture of that. */}
                       <span
@@ -152,7 +152,12 @@ export function MonthGrid({
                   ))}
                 </div>
               )}
-              <div className="relative grid grid-cols-7 gap-x-1" style={{ gridTemplateRows: '3rem' }}>
+              {/* F09: no column gap. Each day button fills its whole column, so on a phone the
+                  touch target is the full column pitch; the visible cell inside it is inset
+                  2px a side, which draws the same 4px between days the gap used to. Bands are
+                  inset to match, so a run still starts and ends flush with its first and last
+                  day. */}
+              <div className="relative grid grid-cols-7" style={{ gridTemplateRows: '3rem' }}>
                 {/*
                   Bands sit flush within their own row's box (no negative vertical margin).
                   A previous version used a negative margin to make the band "taller", which
@@ -164,7 +169,7 @@ export function MonthGrid({
                   <div
                     key={`band-${i}`}
                     style={{ gridColumn: `${seg.colStart + 1} / ${seg.colEnd + 2}`, gridRow: '1' }}
-                    className={`border-b-[3px] border-[var(--accent)] ${COLORS.bandBg} ${seg.roundedLeft ? 'rounded-l-[8px]' : ''} ${
+                    className={`mx-0.5 border-b-[3px] border-[var(--accent)] ${COLORS.bandBg} ${seg.roundedLeft ? 'rounded-l-[8px]' : ''} ${
                       seg.roundedRight ? 'rounded-r-[8px]' : ''
                     }`}
                   />
@@ -173,7 +178,7 @@ export function MonthGrid({
                   <div
                     key={`preview-${i}`}
                     style={{ gridColumn: `${seg.colStart + 1} / ${seg.colEnd + 2}`, gridRow: '1' }}
-                    className={`${COLORS.previewBandBg} ${seg.roundedLeft ? 'rounded-l-[8px]' : ''} ${
+                    className={`mx-0.5 ${COLORS.previewBandBg} ${seg.roundedLeft ? 'rounded-l-[8px]' : ''} ${
                       seg.roundedRight ? 'rounded-r-[8px]' : ''
                     }`}
                   />

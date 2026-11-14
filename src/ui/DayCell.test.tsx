@@ -108,7 +108,11 @@ describe('DayCell category rendering', () => {
       expect(html).not.toContain(COLORS.ptoBg);
       expect(html).not.toContain(HOLIDAY_DOT);
       expect(html).not.toContain('<svg');
-      expect(html).toContain('text-slate-300'); // very muted numeral
+      // F27 (P1): its own outside-range tone (3:1+, tokens.test.ts), regular weight, no fill.
+      expect(html).toContain('text-[var(--outside-text)]');
+      expect(html).toContain('font-normal');
+      expect(html).not.toContain('text-slate-300');
+      expect(html).not.toMatch(/\bbg-/);
     }
   });
 
@@ -157,7 +161,7 @@ describe('DayCell coarse-pointer disclosure', () => {
     fireEvent.click(day, { detail: 1 });
     expect(onToggle).not.toHaveBeenCalled();
     expect(day.getAttribute('aria-expanded')).toBe('true');
-    expect(screen.getByRole('group', { name: 'Actions for July 4' })).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Actions for July 4' })).toBeTruthy();
     const action = screen.getByRole('button', { name: 'Change this day' });
     fireEvent.blur(day, { relatedTarget: action });
     expect(screen.getByRole('button', { name: 'Change this day' })).toBeTruthy();
@@ -167,7 +171,7 @@ describe('DayCell coarse-pointer disclosure', () => {
     fireEvent.click(action);
     expect(onToggle).toHaveBeenCalledTimes(1);
     expect(onToggle).toHaveBeenCalledWith('2026-07-04');
-    expect(screen.queryByRole('group', { name: 'Actions for July 4' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: 'Actions for July 4' })).toBeNull();
   });
 
   it('offers an action on holidays even without a marginal value', () => {
@@ -257,5 +261,102 @@ describe('Ink & Signal Blue calendar semantics', () => {
     const html = cell({ category: 'working', isBlackout: true, holidayName: undefined });
     expect(html).toContain('repeating-linear-gradient');
     expect(html).toContain('blackout, cannot be used for PTO');
+  });
+});
+
+/** N4: the phone day sheet is a dialog: focus moves in, stays in, and returns to the day. */
+describe('DayCell touch sheet (N4)', () => {
+  function mountSheetDay(forcedState?: 'include' | 'exclude') {
+    const onSetState = vi.fn();
+    render(
+      <DayCell
+        date="2026-07-07" dayOfMonth={7} category="working" hasOverlap={false} isAlternative={false}
+        isToday={false} inBand={false} isHighlighted={false} isBlackout={false} isOutOfRange={false}
+        marginalValue={null} holidayName={undefined} hasHover={false} onToggle={() => {}}
+        forcedState={forcedState} onSetState={onSetState}
+      />,
+    );
+    const day = screen.getByRole('button', { name: /July 7/ });
+    fireEvent.click(day, { detail: 1 });
+    return { day, onSetState, sheet: screen.getByRole('dialog', { name: 'Actions for July 7' }) };
+  }
+
+  it('opens as a named dialog the day button says it controls, and moves focus to the first option', () => {
+    const { day, sheet } = mountSheetDay();
+    expect(day.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(day.getAttribute('aria-controls')).toBe(sheet.id);
+    expect(sheet.getAttribute('aria-modal')).toBe('true');
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Take this day off' }));
+  });
+
+  it('keeps Tab inside the sheet in both directions', () => {
+    const { sheet } = mountSheetDay();
+    const buttons = [...sheet.querySelectorAll('button')];
+    const first = buttons[0];
+    const last = buttons[buttons.length - 1];
+    last.focus();
+    fireEvent.keyDown(last, { key: 'Tab' });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(last);
+  });
+
+  it('returns focus to the day on Escape and on Close', () => {
+    const { day } = mountSheetDay();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(day);
+    fireEvent.click(day, { detail: 1 });
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(day);
+  });
+
+  it('applies a choice, closes, and returns focus to the day', () => {
+    const { day, onSetState } = mountSheetDay();
+    fireEvent.click(screen.getByRole('button', { name: 'Never take this day' }));
+    expect(onSetState).toHaveBeenCalledWith('2026-07-07', 'exclude');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(day);
+  });
+
+  it('separates ruling a day out from the two keep-it choices, and keeps Close apart from all three', () => {
+    const { sheet } = mountSheetDay();
+    const group = screen.getByRole('group', { name: 'Choose for this day' });
+    const take = screen.getByRole('button', { name: 'Take this day off' });
+    const decide = screen.getByRole('button', { name: 'Let the planner decide' });
+    const never = screen.getByRole('button', { name: 'Never take this day' });
+    // Take and Let-decide share a block; Never sits in its own block below a rule.
+    expect(take.parentElement).toBe(decide.parentElement);
+    expect(never.parentElement).not.toBe(take.parentElement);
+    expect(never.parentElement!.className).toContain('border-t');
+    // Close is outside the choice group, at the top of the sheet.
+    const close = screen.getByRole('button', { name: 'Close' });
+    expect(group.contains(close)).toBe(false);
+    expect([...sheet.querySelectorAll('button')].indexOf(close as HTMLButtonElement)).toBe(0);
+    // Every option and Close are 44px targets.
+    for (const button of [take, decide, never]) expect(button.className).toContain('min-h-11');
+    expect(close.className).toContain('h-11 w-11');
+  });
+
+  it('marks the current choice as selected (pressed, soft blue, check), not as the primary action', () => {
+    mountSheetDay('exclude');
+    const never = screen.getByRole('button', { name: 'Never take this day' });
+    expect(never.getAttribute('aria-pressed')).toBe('true');
+    expect(never.className).toContain('bg-accent-soft');
+    expect(never.className).not.toMatch(/(^|\s)bg-accent(\s|$)/);
+    expect(never.querySelector('svg')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Take this day off' }).getAttribute('aria-pressed')).toBe('false');
+  });
+});
+
+/** F09: the day button is the whole grid column; the visible cell is an inset face. */
+describe('DayCell touch target (F09)', () => {
+  it('makes the button fill its column and draws the cell on an inset face', () => {
+    const html = renderCell('suggested-pto');
+    expect(html).toMatch(/<button[^>]*class="[^"]*\bw-full\b[^"]*\bh-12\b|<button[^>]*class="[^"]*\bh-12\b[^"]*\bw-full\b/);
+    expect(html).toMatch(/data-day-face=""[^>]*class="[^"]*inset-x-0\.5/);
+    // The fill lives on the face, not the button, so neighbours stay 4px apart visually.
+    expect(html).not.toMatch(/<button[^>]*class="[^"]*bg-\[var\(--pto-bg\)\]/);
   });
 });

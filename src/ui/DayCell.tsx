@@ -86,6 +86,8 @@ function formatWeekdayMonthDay(iso: string): string {
   return `${WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]}, ${formatMonthDay(iso)}`;
 }
 
+const sentenceCase = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
 function marginalValueText(mv: MarginalValue): string {
   const base = `+${mv.deltaDays} day${mv.deltaDays === 1 ? '' : 's'} off for 1 PTO day (${mv.multiplier.toFixed(1)}x)`;
   const withCaveat = mv.multiplier <= 1 ? `${base} — the suggestions above do better.` : base;
@@ -155,6 +157,34 @@ export function DayCell({
     });
     return () => cancelAnimationFrame(frame);
   }, [tooltipOpen, hasHover]);
+
+  // N4: the touch sheet is a small dialog. Focus moves to its first option when it opens (so
+  // a screen reader or keyboard user lands on the choices, not back on the day), Tab cycles
+  // inside it, and every way of closing it except tapping elsewhere returns focus to the day.
+  useEffect(() => {
+    if (!tooltipOpen || hasHover) return;
+    sheetRef.current?.querySelector<HTMLButtonElement>('[data-sheet-option]')?.focus({ preventScroll: true });
+  }, [tooltipOpen, hasHover]);
+
+  const closeSheet = () => {
+    setTooltipOpen(false);
+    dayButtonRef.current?.focus();
+  };
+
+  const trapSheetFocus = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Tab' || !sheetRef.current) return;
+    const focusables = [...sheetRef.current.querySelectorAll<HTMLButtonElement>('button:not([disabled])')];
+    if (focusables.length === 0) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   // Touch actions are a disclosure, not a hover-only tooltip. Dismiss when
   // tapping outside or pressing Escape, but preserve focus within the action panel.
@@ -258,18 +288,25 @@ export function DayCell({
     ? 'text-[var(--holiday-ink)] font-semibold'
     : inBand ? BAND_TEXT : category === 'weekend' ? TEXT_MUTED : TEXT_PRIMARY;
   const isPtoLike = category === 'suggested-pto' || category === 'pinned' || category === 'unpaid-leave';
-  const categoryClasses = isOutOfRange
-    ? 'text-slate-300'
+  // The numeral's ink and the cell's face are separate layers (see the button below).
+  const inkClasses = isOutOfRange
+    ? // F27: outside the planning range. Its own tone (3.5:1 on white, so the numeral still
+      // reads as a date) at regular weight and with no fill, so it never matches a weekday
+      // (ink on white), a weekend (muted on grey) or a holiday (teal on soft teal).
+      'text-[var(--outside-text)] font-normal'
     : isPtoLike
-      ? `${COLORS.ptoBg} border ${COLORS.ptoBorder} ${COLORS.ptoText} font-bold`
-      : `${textColor} ${!inBand && category === 'weekend' ? 'bg-surface-alt' : ''} ${!inBand && isHoliday ? 'bg-holiday-soft' : ''} ${
-          // A blackout day: neutral hatching (no brand colour), so "PTO can't go here" is a
-          // texture plus its label, never a hue alone.
-          isBlackout && !isPtoLike ? 'bg-[repeating-linear-gradient(135deg,var(--border-default)_0_2px,transparent_2px_7px)]' : ''
-        } ${
-          // A second marker pass over the run while its break is hovered or focused.
-          isHighlighted ? 'bg-mark-strong' : ''
-        }`;
+      ? `${COLORS.ptoText} font-bold`
+      : textColor;
+  const faceClasses = isPtoLike
+    ? `${COLORS.ptoBg} border ${COLORS.ptoBorder}`
+    : `${!inBand && category === 'weekend' ? 'bg-surface-alt' : ''} ${!inBand && isHoliday ? 'bg-holiday-soft' : ''} ${
+        // A blackout day: neutral hatching (no brand colour), so "PTO can't go here" is a
+        // texture plus its label, never a hue alone.
+        isBlackout ? 'bg-[repeating-linear-gradient(135deg,var(--border-default)_0_2px,transparent_2px_7px)]' : ''
+      } ${
+        // A second marker pass over the run while its break is hovered or focused.
+        isHighlighted ? 'bg-mark-strong' : ''
+      }`;
 
   // F27: a day outside the planning range is padding that keeps the month's shape, not a
   // control. It used to be a disabled <button>, which screen readers still listed among the
@@ -281,14 +318,20 @@ export function DayCell({
         <div
           id={`day-${date}`}
           data-date={date}
+          data-outside-range="true"
           aria-hidden="true"
-          className={`relative z-10 flex h-12 w-full cursor-default items-center justify-center rounded-[6px] text-sm font-medium tabular-nums ${categoryClasses}`}
+          className={`relative z-10 flex h-12 w-full cursor-default items-center justify-center text-sm tabular-nums ${inkClasses}`}
         >
           {dayOfMonth}
         </div>
       </div>
     );
   }
+
+  const sheetOption = 'flex min-h-11 w-full items-center gap-3 rounded-[6px] border px-3.5 text-left text-[15px] font-semibold transition-[background-color,border-color,transform] duration-150 ease-[var(--ease-out)] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
+  const sheetOptionState = (current: boolean) => current
+    ? 'border-accent bg-accent-soft text-accent-ink'
+    : 'border-line-strong bg-surface text-ink hover:border-ink hover:bg-surface-alt';
 
   return (
     <div
@@ -303,6 +346,9 @@ export function DayCell({
         setTooltipOpen(false);
       }}
     >
+      {/* F09: the button is the whole grid column (the grid has no gaps), so the touch target
+          is the full column pitch - 44px or more at 320px. The visible cell is the inset span
+          inside it, which keeps 4px between neighbouring states exactly as before. */}
       <button
         type="button"
         ref={dayButtonRef}
@@ -312,7 +358,6 @@ export function DayCell({
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         onMouseEnter={() => {
-          if (isOutOfRange) return;
           if (isAlternative) onHoverAlternativeStart?.();
           if (hasHover && hasTip) setTooltipOpen(true);
         }}
@@ -321,89 +366,110 @@ export function DayCell({
           if (hasHover) setTooltipOpen(false);
         }}
         onFocus={() => {
-          if (isOutOfRange) return;
           onFocusDay?.(date);
           if (isAlternative) onHoverAlternativeStart?.();
           if (hasHover && hasTip) setTooltipOpen(true);
         }}
         aria-label={ariaLabel}
+        aria-haspopup={!hasHover ? 'dialog' : undefined}
         aria-expanded={!hasHover ? tooltipOpen : undefined}
         aria-controls={!hasHover && tooltipOpen ? `tooltip-${date}` : undefined}
         aria-describedby={hasHover && tooltipOpen ? `tooltip-${date}` : undefined}
-        // Every day cell is click-to-force (pin in / rule out), not just the ones with a
-        // marginal-value tooltip - cursor-pointer plus a subtle hover outline is the only
-        // signal that's true everywhere, which is why it isn't gated on tooltipText. An
-        // out-of-range cell gets none of this: no cursor, no hover, no focus ring -
-        // `disabled` already removes it from the tab order and all hover/click handling.
-        className={`relative z-10 flex h-12 w-full items-center justify-center rounded-[6px] text-sm font-medium tabular-nums transition-colors duration-150 ${
-          isOutOfRange
-            ? 'cursor-default'
-            : `cursor-pointer hover:outline hover:outline-1 hover:outline-offset-1 hover:outline-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${COLORS.focusRing}`
-        } ${categoryClasses} ${
-          // An alternative is a suggestion about a suggestion: a 1px dashed ink outline, no fill.
-          isAlternative && !isOutOfRange ? `border border-dashed ${COLORS.altBorder}` : ''
-        } ${
-          // Today: a 2px ink ring, set off from the cell so it reads on an ink PTO block too.
-          isToday && !isOutOfRange ? 'ring-2 ring-[var(--text-primary)] ring-offset-2 ring-offset-[var(--bg-surface)]' : ''
-        } ${
-          // The hovered break: an ink outline (a separate property from the today ring, so a
-          // day that is both shows both).
-          isHighlighted && !isOutOfRange ? 'outline outline-2 outline-offset-1 outline-[var(--text-primary)]' : ''
-        }`}
+        className="group relative z-10 flex h-12 w-full cursor-pointer items-center justify-center text-sm font-medium tabular-nums focus-visible:outline-none"
       >
-        {!isOutOfRange && category === 'pinned' ? (
-          <span className="flex items-center gap-0.5">
-            {dayOfMonth}
-            <PinIcon className="h-3 w-3" />
-          </span>
-        ) : !isOutOfRange && category === 'unpaid-leave' ? (
-          <span className="flex items-center gap-0.5">
-            {dayOfMonth}
-            <UnpaidIcon className="h-3 w-3" />
-          </span>
-        ) : (
-          dayOfMonth
-        )}
-        {!isOutOfRange && category === 'public-holiday' && (
+        {/* Every day cell is click-to-force (pin in / rule out), not just the ones with a
+            marginal-value tooltip - cursor-pointer plus a subtle hover outline is the only
+            signal that's true everywhere, which is why it isn't gated on tooltipText. */}
+        <span
+          aria-hidden="true"
+          data-day-face=""
+          className={`absolute inset-y-0 inset-x-0.5 rounded-[6px] transition-colors duration-150 group-hover:outline group-hover:outline-1 group-hover:outline-offset-1 group-hover:outline-[var(--text-primary)] group-focus-visible:ring-2 group-focus-visible:ring-offset-2 ${COLORS.focusRing} group-aria-expanded:outline group-aria-expanded:outline-2 group-aria-expanded:outline-offset-1 group-aria-expanded:outline-[var(--accent)] ${faceClasses} ${
+            // An alternative is a suggestion about a suggestion: a 1px dashed outline, no fill.
+            isAlternative ? `border border-dashed ${COLORS.altBorder}` : ''
+          } ${
+            // Today: a 2px ink ring, set off from the cell so it reads on a PTO block too.
+            isToday ? 'ring-2 ring-[var(--text-primary)] ring-offset-2 ring-offset-[var(--bg-surface)]' : ''
+          } ${
+            // The hovered break: an ink outline (a separate property from the today ring, so a
+            // day that is both shows both).
+            isHighlighted ? 'outline outline-2 outline-offset-1 outline-[var(--text-primary)]' : ''
+          }`}
+        />
+        <span className={`relative flex items-center gap-0.5 ${inkClasses}`}>
+          {dayOfMonth}
+          {category === 'pinned' && <PinIcon className="h-3 w-3" />}
+          {category === 'unpaid-leave' && <UnpaidIcon className="h-3 w-3" />}
+        </span>
+        {category === 'public-holiday' && (
           <span
             aria-hidden
             className={`absolute bottom-1.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 ${holidayKind === 'company' ? 'rounded-[1px]' : 'rounded-full'} ${HOLIDAY_DOT}`}
           />
         )}
-        {!isOutOfRange && hasOverlap && (
+        {hasOverlap && (
           // A ring around the dot (not just a colour swap) so it stays visible whatever it
-          // happens to sit on - a plain dark cell in dark mode, or the now-light pto/band
-          // fills - rather than needing one colour choice that only works on some of them.
+          // happens to sit on - a plain cell or a PTO block.
           <span
             aria-label="Overlaps someone else's time off"
-            className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-ink ring-1 ring-white"
+            className="absolute right-1.5 top-1 h-1.5 w-1.5 rounded-full bg-ink ring-1 ring-white"
           />
         )}
       </button>
 
-      {tooltipOpen && (tooltipText || !hasHover) && (
+      {tooltipOpen && hasHover && tooltipText && (
+        <div
+          id={`tooltip-${date}`}
+          role="tooltip"
+          className="absolute left-1/2 top-full z-20 mt-1 w-max max-w-[15rem] -translate-x-1/2 rounded-[6px] bg-ink px-2.5 py-1.5 text-sm text-white shadow-lg"
+        >
+          <p>{tooltipText}</p>
+        </div>
+      )}
+
+      {tooltipOpen && !hasHover && (
+        // N4: a non-blocking bottom sheet that behaves like a dialog: named, focus moves in
+        // and is kept inside, Escape or Close returns to the day. Enter is a short rise from
+        // the bottom edge it is anchored to (none under reduced motion, see index.css).
         <div
           id={`tooltip-${date}`}
           ref={sheetRef}
-          role={hasHover ? 'tooltip' : 'group'}
-          aria-label={!hasHover ? `Actions for ${formatMonthDay(date)}` : undefined}
-          className={hasHover
-            ? 'absolute left-1/2 top-full z-20 mt-1 w-max max-w-[15rem] -translate-x-1/2 rounded-[6px] bg-ink px-2.5 py-1.5 text-sm text-white shadow-lg'
-            : 'fixed inset-x-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-sm rounded-[10px] border border-line bg-surface p-4 text-sm text-ink shadow-xl md:bottom-4'}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Actions for ${formatMonthDay(date)}`}
+          aria-describedby={`tooltip-${date}-state`}
+          onKeyDown={trapSheetFocus}
+          className="day-sheet fixed inset-x-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-sm rounded-[10px] border border-line bg-surface p-4 pt-3 text-sm text-ink shadow-xl md:bottom-4"
         >
-          {!hasHover && <p className="text-[15px] font-bold">{formatWeekdayMonthDay(date)}</p>}
-          {hasHover ? <p>{tooltipText}</p> : (
-            <p className="mt-0.5 text-muted">
-              <span>{stateLabel(category, isAlternative, isBlackout, isOutOfRange, holidayKind)}</span>
-              {tooltipText && <>. <span>{tooltipText}</span></>}
-            </p>
-          )}
-          {!hasHover && (
-            onSetState && !isAlternative ? (
-              <div className="mt-3 grid gap-2" role="group" aria-label="Choose for this day">
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1 pt-1">
+              <p className="text-[15px] font-bold">{formatWeekdayMonthDay(date)}</p>
+              <p id={`tooltip-${date}-state`} className="mt-0.5 text-muted">
+                <span>{sentenceCase(stateLabel(category, isAlternative, isBlackout, isOutOfRange, holidayKind))}</span>
+                {tooltipText && <>. <span>{tooltipText}</span></>}
+              </p>
+            </div>
+            {/* Close sits apart from the choices (top corner, as on every sheet), so it can
+                never be mistaken for one of them. */}
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={closeSheet}
+              className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-[6px] text-muted transition-colors duration-150 hover:bg-surface-alt hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--focus-ring)]"
+            >
+              <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
+                <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
+              </svg>
+            </button>
+          </div>
+          {onSetState && !isAlternative ? (
+            <div className="mt-3" role="group" aria-label="Choose for this day">
+              {/* The two ways of keeping a day in play come first; ruling a day out sits
+                  below a rule, so the opposite choices are never neighbours. Each glyph is
+                  the calendar's own mark for the result. The current choice is the soft blue
+                  "selected" state with a check, never the solid primary blue of an action. */}
+              <div className="grid gap-2">
                 {([
                   ['include', 'Take this day off'],
-                  ['exclude', 'Never take this day'],
                   [null, 'Let the planner decide'],
                 ] as const).map(([value, label]) => {
                   const current = (forcedState ?? null) === value;
@@ -411,62 +477,66 @@ export function DayCell({
                     <button
                       key={label}
                       type="button"
+                      data-sheet-option=""
                       aria-pressed={current}
                       onClick={() => {
                         onSetState(date, value);
-                        setTooltipOpen(false);
-                        dayButtonRef.current?.focus();
+                        closeSheet();
                       }}
-                      className={buttonClasses(current ? 'primary' : 'secondary', 'md', 'w-full justify-start!')}
+                      className={`${sheetOption} ${sheetOptionState(current)}`}
                     >
-                      {label}
+                      <span aria-hidden="true" className={`h-4 w-4 shrink-0 rounded-[4px] ${value === 'include' ? `border ${COLORS.ptoBorder} ${COLORS.ptoBg}` : 'border border-line-strong bg-surface'}`} />
+                      <span className="flex-1">{label}</span>
+                      {current && <CheckIcon />}
                     </button>
                   );
                 })}
+              </div>
+              <div className="mt-3 border-t border-line pt-3">
                 <button
                   type="button"
+                  data-sheet-option=""
+                  aria-pressed={forcedState === 'exclude'}
                   onClick={() => {
-                    setTooltipOpen(false);
-                    dayButtonRef.current?.focus();
+                    onSetState(date, 'exclude');
+                    closeSheet();
                   }}
-                  className={buttonClasses('quiet', 'md', 'w-full')}
+                  className={`${sheetOption} ${sheetOptionState(forcedState === 'exclude')}`}
                 >
-                  Close
+                  <span aria-hidden="true" className="h-4 w-4 shrink-0 rounded-[4px] border border-line-strong bg-[repeating-linear-gradient(135deg,var(--border-strong)_0_1.5px,transparent_1.5px_5px)]" />
+                  <span className="flex-1">Never take this day</span>
+                  {forcedState === 'exclude' && <CheckIcon />}
                 </button>
               </div>
-            ) : (
-              <>
-                {!isAlternative && (
-                  <p className="mt-1 text-sm text-muted">Change this date to include it, exclude it, or let the planner decide.</p>
-                )}
-                <div className="mt-3 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      primaryAction?.();
-                      setTooltipOpen(false);
-                      dayButtonRef.current?.focus();
-                    }}
-                    className={buttonClasses('primary', 'md', 'flex-1')}
-                  >
-                    {isAlternative ? 'Swap this in' : 'Change this day'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTooltipOpen(false);
-                      dayButtonRef.current?.focus();
-                    }}
-                    className={buttonClasses('secondary', 'md')}
-                  >
-                    Close
-                  </button>
-                </div>
-              </>
-            )
+            </div>
+          ) : (
+            <>
+              {!isAlternative && (
+                <p className="mt-1 text-sm text-muted">Change this date to include it, exclude it, or let the planner decide.</p>
+              )}
+              <button
+                type="button"
+                data-sheet-option=""
+                onClick={() => {
+                  primaryAction?.();
+                  closeSheet();
+                }}
+                className={buttonClasses('primary', 'md', 'mt-3 w-full')}
+              >
+                {isAlternative ? 'Swap this in' : 'Change this day'}
+              </button>
+            </>
           )}
         </div>
       )}
     </div>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3.5 8.5l3 3 6-7" />
+    </svg>
   );
 }

@@ -672,7 +672,7 @@ export function App() {
                   <span className="hidden [@media(hover:hover)]:inline">Click a day to cycle through take off, rule out, and let the planner decide. Arrow keys move between days.</span>
                   <span className="[@media(hover:hover)]:hidden">Tap a day to change its setting.</span>
                 </p>
-                <div className="mt-4 rounded-[10px] border border-line bg-surface p-3 sm:p-5">
+                <div className="mt-4 rounded-[10px] border border-line bg-surface p-3 sm:p-5 max-[400px]:-mx-4 max-[400px]:rounded-none max-[400px]:border-x-0 max-[400px]:px-1">
                   {!state.validationIssues.length && !state.planningPending ? <CalendarErrorBoundary>
                     <Calendar
                       rangeStart={state.rangeStart}

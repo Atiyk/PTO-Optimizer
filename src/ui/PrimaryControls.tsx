@@ -2,6 +2,7 @@ import { useEffect, useId } from 'react';
 import { localeForCountry } from './locale';
 import { CountrySelect } from './CountrySelect';
 import { useWholeDayDraft } from './useWholeDayDraft';
+import { NumberStepper } from './NumberStepper';
 
 interface PrimaryControlsProps {
   advanced?: boolean;
@@ -60,22 +61,27 @@ export function PrimaryControls({
 
   return (
     <>
-      {/* PTO days and country share a row when the field group has room (a phone held
-          upright at 375px and up, a tablet); they stack in the narrow desktop rail. */}
+      {/* PTO days and country share a row when the field group has room (a tablet); they
+          stack on a phone and in the narrow desktop rail. F28: PTO days is the same −/+
+          stepper as /family and /sabbatical; typing still works, and a blank field still
+          means "not entered yet", never 0. */}
       <div className="@container min-w-0">
-        <div className="grid min-w-0 grid-cols-1 gap-3.5 @min-[19rem]:grid-cols-[6.5rem_minmax(0,1fr)] @min-[19rem]:items-end">
+        <div className="grid min-w-0 grid-cols-1 gap-3.5 @min-[22rem]:grid-cols-[auto_minmax(0,1fr)] @min-[22rem]:items-end">
           <div className="flex min-w-0 flex-col gap-1.5">
             <label htmlFor={budgetId} className={LABEL_CLASS}>PTO days available</label>
-            <input id={budgetId}
-              type="number"
-              inputMode="numeric"
-              min={0}
-              step={1}
+            <NumberStepper
+              id={budgetId}
               value={budgetDraft.text}
-              aria-describedby={budgetDraft.empty ? budgetHintId : undefined}
-              onChange={(e) => budgetDraft.onChange(e.target.value)}
+              min={0}
+              describedBy={budgetDraft.empty ? budgetHintId : undefined}
+              onTextChange={budgetDraft.onChange}
               onBlur={budgetDraft.onBlur}
-              className={`${DATE_FIELD_CLASS} w-24 @min-[19rem]:w-full`}
+              onDecrement={() => onChangeBudget(Math.max(0, sliderBudget - 1))}
+              onIncrement={() => onChangeBudget(sliderBudget + 1)}
+              decrementDisabled={sliderBudget <= 0}
+              decrementLabel="One fewer PTO day"
+              incrementLabel="One more PTO day"
+              unit="days"
             />
           </div>
           <CountrySelect country={country} onChangeCountry={onChangeCountry} widthClass="w-full" />
@@ -86,7 +92,12 @@ export function PrimaryControls({
       </div>
 
       <div className="min-w-0">
-        <label htmlFor={sliderId} className={LABEL_CLASS}>Adjust PTO days</label>
+        {/* The value sits on the label row, right above the thumb's travel, so a finger on
+            the slider never hides the number it is changing. */}
+        <div className="flex items-baseline justify-between gap-2">
+          <label htmlFor={sliderId} className={LABEL_CLASS}>Adjust PTO days</label>
+          <span aria-hidden="true" className="text-base font-bold tabular-nums text-ink">{sliderBudget}</span>
+        </div>
         <input
           id={sliderId}
           type="range"

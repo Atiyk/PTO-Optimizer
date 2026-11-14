@@ -73,7 +73,7 @@ export function BreakCountSlider({
           breaks..."), so a second number up here would just duplicate it. */}
       <div className="flex items-center gap-1.5 text-[15px] font-semibold text-ink">
         How many breaks
-        <InfoHint text={BREAK_COUNT_HINT} />
+        <InfoHint text={BREAK_COUNT_HINT} label="About how many breaks" />
         {!letSolverDecide && <span className="ml-auto tabular-nums text-muted">{positionLabel(value)}</span>}
       </div>
       <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-sm text-ink">
