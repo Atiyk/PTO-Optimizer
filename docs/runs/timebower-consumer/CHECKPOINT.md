@@ -38,10 +38,12 @@ Durable state for the scheduled orchestrator. Read this first on every run; upda
 
 | Batch | Integration branch | Main PR | Critic | Production SHA | Status |
 | --- | --- | --- | --- | --- | --- |
-| P0 | `timebower/p0` | – | – | – | planning |
+| P0 | `timebower/p0` | #148 | GO on aa42812; re-review of 557d127 in progress | – | CI green on 557d127 |
 | P1 | `timebower/p1` | – | – | – | – |
 | P2 | `timebower/p2` | – | – | – | – |
 
 ## Next action
 
-Wait for A/F/B → merge into timebower/p0 → full gates → critic Q on exact SHA → PR to main → merge → verify Vercel production SHA.
+Critic verdict on 557d127 → merge #148 → verify Vercel production SHA + smoke → start P1 (F07 /policy example-first, F08 /family example, F09, F14–F16, F19, F23, F24, F28, F29, N4, N5, return-user next break).
+
+Note: the session hit a usage limit 09:05–12:30Z; the 10:58Z scheduled run was delivered late at 12:35Z.
