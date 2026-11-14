@@ -44,6 +44,14 @@ describe('SummaryMetrics', () => {
     expect(html).toContain('—');
     expect(html).not.toMatch(/\d{2,3}(th|st|nd|rd)/);
   });
+
+  it('says the travel tile shows once the plan is ready, without "solved" jargon (F24/F05)', () => {
+    const html = renderToStaticMarkup(
+      <SummaryMetrics budgetSpent={1} totalDaysOff={4} breakCountActual={1} scores={null} />,
+    );
+    expect(html).toContain('Shows once your plan is ready.');
+    expect(html).not.toMatch(/solved/i);
+  });
 });
 
 describe('SummaryMetrics motion (metrics crossfade/pulse on change rather than snapping)', () => {

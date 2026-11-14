@@ -3,6 +3,7 @@ import { act } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Landing } from './Landing';
+import { SHARE_LINK_SENTENCE } from './shareLinkCopy';
 import type { Holiday } from '@daysoff/engine/data/holidays';
 import { defaultEmployerCalendar, saveEmployerCalendar } from '../personal/employerCalendar';
 
@@ -262,5 +263,13 @@ describe('live homepage planner', () => {
     const longest = screen.getByText(/^Longest:/);
     expect(longest.textContent).not.toMatch(/—/);
     expect((longest.textContent!.match(/PTO days? for|days off for/g) ?? []).length).toBe(1);
+  });
+});
+
+describe('share-link claim (N2/F10)', () => {
+  it('uses the one shared sentence and no longer promises a link opens the plan exactly', async () => {
+    await act(async () => { render(<Landing />); });
+    expect(screen.getByText((_, el) => el?.tagName === 'P' && !!el.textContent?.includes(SHARE_LINK_SENTENCE))).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/exactly as you left it/);
   });
 });

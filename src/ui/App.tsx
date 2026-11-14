@@ -1,7 +1,7 @@
 import { HolidayCoverageNotice } from './HolidayCoverageNotice';
 import { useUncoveredHolidayYears } from './holidayCoverage';
 import { PortraitShare } from './PortraitShare';
-import { rangeISO, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
+import { addDays, rangeISO, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { PartnerPlanner } from './PartnerPlanner';
 import { readPartnerAvailability } from '../planning/partner';
 import { usePersonalWorkspace } from './usePersonalWorkspace';
@@ -18,6 +18,8 @@ import { PlusMinus } from './Chevron';
 import { pinPreviewText } from './pinPreview';
 import { planningStyleSettings } from '../planning/optimizer';
 import { formatCardDateRange, formatLong } from '@daysoff/engine/calendar/dateFormat';
+import { holidayLongWeekends, remainingHolidays } from './landingData';
+import { weightingCaption } from './weightingCaptions';
 import { RelaxedMinimumNotice } from './PlanRecoveryNotice';
 import { PlanSliders } from './PlanSliders';
 import { SubdivisionSelect } from './CountrySelect';
@@ -65,6 +67,29 @@ export function App() {
   const today = useTodayISO();
   const state = useAppState(workspace.requests, today, { includesApprovedLeave: workspace.includesApprovedLeave, schedule: workspace.schedule });
   const plannable = !state.validationIssues.length && !state.solverIssue && !state.planningPending;
+  // F05: a real 0-day balance has nothing to place. Say so, and give the free long weekends
+  // public holidays already make - the landing page's own helper and wording, so the same
+  // dates and country give the same count on both pages. Never invents leave.
+  const zeroBudget = plannable && !state.unlimitedPto && state.budget === 0;
+  const noPtoMessage = useMemo(() => {
+    if (!zeroBudget) return undefined;
+    const holidays = state.holidayEntries
+      .filter((entry) => entry.checked)
+      .map((entry) => ({ date: entry.date, nominalDate: entry.date, name: entry.name, countryCode: state.country, counties: null }));
+    const periodStart = state.rangeStart > today ? addDays(state.rangeStart, -1) : today;
+    const weekends = holidayLongWeekends(remainingHolidays(periodStart, state.rangeEnd, holidays, state.workWeek));
+    if (weekends.length === 0) return 'Public holidays don’t make any long weekends in these dates.';
+    const [next] = weekends;
+    return `Public holidays alone give you ${weekends.length} long ${weekends.length === 1 ? 'weekend' : 'weekends'} in these dates. The next is ${datedRange(next.run.start, next.run.end)}, for ${next.holiday.name}.`;
+  }, [zeroBudget, state.holidayEntries, state.country, state.rangeStart, state.rangeEnd, state.workWeek, today]);
+  // F06: while the PTO field is blank the last number stays in effect; label the plan.
+  const [budgetBlank, setBudgetBlank] = useState(false);
+  // N1: on phones the break cards start below the first screen, so name the longest one
+  // right under the result and jump to its card.
+  const longest = useMemo(() => {
+    if (!plannable || zeroBudget) return undefined;
+    return state.orderedBreaks.slice().sort((a, b) => b.brk.totalDaysOff - a.brk.totalDaysOff || b.brk.multiplier - a.brk.multiplier || a.brk.start.localeCompare(b.brk.start))[0];
+  }, [plannable, zeroBudget, state.orderedBreaks]);
   // Issue 8/17: plan years without holiday data are limited source data for the comparison.
   const uncoveredHolidayYears = useUncoveredHolidayYears(state.country, state.rangeStart, state.rangeEnd);
   const requestToolsReady = plannable && state.holidaysReady && !state.holidaysDegraded;
@@ -209,6 +234,7 @@ export function App() {
         effectiveBudget={state.effectiveBudget}
         unlimitedPto={state.unlimitedPto}
         onToggleUnlimitedPto={state.setUnlimitedPto}
+        onBudgetBlankChange={setBudgetBlank}
       />
       <p className="text-sm text-muted">This planner budgets full days. <a href="/policy" className="link-mark">Track and forecast hourly leave in My PTO</a>.</p>
       {state.hasSharedHolidaySnapshot && (
@@ -254,7 +280,7 @@ export function App() {
   const shapeSection = (
     <>
       {/* Both sliders stay on screen at every width; never behind a disclosure. */}
-      <section id="plan-shape" aria-labelledby="plan-shape-heading" className={`flex min-w-0 flex-col gap-3 ${railHoldsShape ? 'mt-5 border-t border-line pt-4' : 'scroll-mt-2 md:scroll-mt-14'}`}>
+      <section id="plan-shape" tabIndex={-1} aria-labelledby="plan-shape-heading" className={`flex min-w-0 flex-col gap-3 ${railHoldsShape ? 'mt-5 border-t border-line pt-4' : 'scroll-mt-2 md:scroll-mt-14'}`}>
         <div>
           <h2 id="plan-shape-heading" className="text-xl font-bold leading-6 text-ink type-condensed">Shape your plan</h2>
           <p className="mt-1 text-sm text-muted">The plan updates as you move the sliders.</p>
@@ -286,7 +312,7 @@ export function App() {
               change never moves the sliders without explanation. */}
           <span id="planning-style-note" className="text-sm font-normal text-muted">
             {stylePreset
-              ? `Sets What matters more to ${stylePreset.w} and How many breaks to ${sliderLabel(stylePreset.breakCount)}. Moving a slider switches to Custom.`
+              ? `Sets What matters more to “${weightingCaption(stylePreset.w).toLowerCase()}” and How many breaks to ${sliderLabel(stylePreset.breakCount)}. Moving a slider switches to Custom.`
               : 'Custom: the sliders keep your own settings.'}
           </span>
         </label>
@@ -400,7 +426,7 @@ export function App() {
   return (
     <div className="min-h-screen bg-page">
       <SiteHeader active="pto" />
-      {plannable && <CompactResultBar watch={resultRef} totalDaysOff={state.totalDaysOff} budgetSpent={state.budgetSpent} breakCountActual={state.breakCountActual} />}
+      {plannable && !zeroBudget && <CompactResultBar watch={resultRef} totalDaysOff={state.totalDaysOff} budgetSpent={state.budgetSpent} breakCountActual={state.breakCountActual} />}
 
       <main id="main-content" tabIndex={-1} className="focus:outline-none" data-plan-ready={state.holidaysReady && !state.planningPending}>
         <Container className="px-4 pb-16 pt-6 sm:px-6 lg:pb-24 lg:pt-10">
@@ -421,6 +447,8 @@ export function App() {
                 onPin={state.pinPlan}
                 pinnedCount={state.pinnedPlans.length}
                 unlimitedPto={state.unlimitedPto}
+                noPtoMessage={noPtoMessage}
+                exampleFor={budgetBlank && plannable && !zeroBudget ? state.budget : undefined}
               />
               <PinnedPlansStrip
                 summaries={state.pinnedPlans.map((p) => p.summary)}
@@ -428,7 +456,7 @@ export function App() {
                 onRemove={state.removePinnedPlan}
               />
               {state.pinMessage && <p role="status" className="text-sm text-muted">{state.pinMessage}</p>}
-              {plannable && (
+              {plannable && !zeroBudget && (
                 <SummaryMetrics
                   budgetSpent={state.budgetSpent}
                   totalDaysOff={state.totalDaysOff}
@@ -439,8 +467,15 @@ export function App() {
               )}
               {/* Thumb reach on phones: save and export sit with the result, not only at the
                   top-right corner. Each is a 44px target; a 2 x 2 grid on the narrowest screens. */}
+              {longest && (
+                <p className="text-base text-ink lg:hidden">
+                  <a href={`#break-card-${longest.index}`} className="link-mark inline-flex min-h-11 items-center font-semibold tabular-nums">
+                    Longest: {datedRange(longest.brk.start, longest.brk.end)} · {longest.brk.ptoCost} PTO {longest.brk.ptoCost === 1 ? 'day' : 'days'}
+                  </a>
+                </p>
+              )}
               <nav aria-label="On this page" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                {wide === false && plannable && (
+                {wide === false && plannable && !zeroBudget && (
                   <button type="button" onClick={state.pinPlan} disabled={!(state.canPin && requestToolsReady)} title={state.pinnedPlans.length >= 2 ? 'Remove a saved plan to make room for another.' : undefined} className={buttonClasses('secondary', 'md', 'px-3! text-sm!')}>
                     Save this plan
                   </button>
@@ -560,7 +595,7 @@ export function App() {
                       const requestDatesChanged = request && (request.ptoDates.length !== ptoDates.length
                         || request.ptoDates.some(date => !ptoDates.includes(date)));
                       return (
-                        <li key={brk.id} data-break-start={brk.start} data-break-end={brk.end} data-break-pto={brk.ptoCost} className="rounded-[10px] border border-line bg-surface">
+                        <li key={brk.id} id={`break-card-${index}`} tabIndex={-1} data-break-start={brk.start} data-break-end={brk.end} data-break-pto={brk.ptoCost} className="scroll-mt-16 rounded-[10px] border border-line bg-surface">
                           <BreakCard
                             onSave={breakReady ? () => recordBreak(brk, ptoDates, 'saved') : undefined}
                             onTrack={breakReady ? () => recordBreak(brk, ptoDates, 'tracked') : undefined}
@@ -738,4 +773,10 @@ export function App() {
       <KeyboardShortcutsHelp open={showHelp} onClose={() => setShowHelp(false)} />
     </div>
   );
+}
+
+/** "Dec 24, 2026 – Jan 10, 2027": the landing page's date form, year included. */
+function datedRange(start: string, end: string): string {
+  const range = formatCardDateRange(start, end);
+  return start.slice(0, 4) === end.slice(0, 4) ? `${range}, ${end.slice(0, 4)}` : range;
 }

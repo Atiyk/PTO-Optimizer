@@ -199,11 +199,11 @@ describe('planner result actions', () => {
     await waitFor(() => expect(new URLSearchParams(window.location.search).has('ww')).toBe(false));
   });
 
-  it('keeps save and public link controls for a settled plan with no PTO', async () => {
+  it('offers no Save for a 0-PTO plan (F05) but keeps the public link control', async () => {
     window.history.replaceState(null, '', scenario.replace('b=1', 'b=0'));
     render(<App />);
-    const save = await screen.findByRole<HTMLButtonElement>('button', { name: 'Save this plan' });
-    expect(save.disabled).toBe(false);
+    expect(await screen.findByRole('heading', { level: 1, name: 'No PTO days to spend' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Save this plan' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Save break' })).toBeNull();
   });

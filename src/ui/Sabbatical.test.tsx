@@ -17,6 +17,7 @@ vi.mock('../personal/consumerHolidays', async (original) => ({
 }));
 
 const { Sabbatical } = await import('./Sabbatical');
+const { SHARE_LINK_SENTENCE } = await import('./shareLinkCopy');
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -47,5 +48,13 @@ describe('build-date note (F17)', () => {
   it('is rendered only when the prerender stamp is present (static HTML), not on a live page', () => {
     render(<Sabbatical />);
     expect(screen.queryByText(/recomputes live/)).toBeNull();
+  });
+});
+
+describe('share-link claim (N2/F10)', () => {
+  it('uses the one sentence every page uses, not an "exact plan for anyone" promise', () => {
+    render(<Sabbatical />);
+    expect(screen.getByText(SHARE_LINK_SENTENCE)).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/exact plan for anyone/);
   });
 });

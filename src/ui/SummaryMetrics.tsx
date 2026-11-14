@@ -77,7 +77,7 @@ export function SummaryMetrics({ budgetSpent, totalDaysOff, scores, travelBasis 
           ? travelBasis === 'us'
             ? <>Relative comparison using a 7-day seasonal average of 2025 US airport checkpoint counts. Not a forecast or a fare price.</>
             : <>Generic seasonal estimate without country-specific travel observations.</>
-          : <>Appears once the plan is solved.</>}
+          : <>Shows once your plan is ready.</>}
       </Fact>
     </dl>
   );
