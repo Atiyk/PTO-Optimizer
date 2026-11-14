@@ -64,7 +64,7 @@ export function FAQ() {
         TSA checkpoint travel numbers:{' '}
         <a
           href="https://www.tsa.gov/travel/passenger-volumes"
-          className="link-mark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+          className="link-mark inline-flex min-h-11 items-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
           target="_blank"
           rel="noreferrer"
         >
