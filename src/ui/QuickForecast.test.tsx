@@ -4,6 +4,7 @@ import type { TimeOffPolicy } from '../policy/model';
 import { forecastPresets } from './forecastPresets';
 import { QuickForecast } from './QuickForecast';
 import { createPtoRequest } from '../personal/requestLedger';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 
 const policy: TimeOffPolicy = {
   unit: 'days',
@@ -91,5 +92,39 @@ describe('quick forecast date shortcuts', () => {
     expect(screen.getByText('How time is earned')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Year-end' }));
     expect(onForecastDateChange).toHaveBeenCalledWith('2026-12-31');
+  });
+});
+
+describe('balance-only answer while accrual is missing (F07)', () => {
+  const noAccrual: TimeOffPolicy = { ...policy, accrual: { kind: 'per-pay-period', amount: NaN, frequency: 'biweekly', payDateAnchor: '' } };
+  const issue = 'Enter how much PTO you earn under How you earn PTO. If you earn no more this year, enter 0.';
+  const calendar = { workWeek: DEFAULT_WORK_WEEK, offDays: [] };
+
+  it('answers from the balance and approved leave, says accrual is left out and asks for it next', () => {
+    const approved = createPtoRequest({ start: '2026-02-02', end: '2026-02-04', status: 'approved' }, calendar, 'a')!;
+    const planned = createPtoRequest({ start: '2026-02-09', end: '2026-02-09', status: 'planned' }, calendar, 'p')!;
+    render(<QuickForecast policy={noAccrual} inputIssue={issue} accrualIssue={issue} requests={[approved, planned]} forecastDate="2026-03-01" onForecastDateChange={vi.fn()} />);
+    const answer = screen.getByTestId('balance-only-forecast');
+    expect(answer.textContent).toContain('Available PTO on Mar 1, 2026, before accrual');
+    expect(answer.querySelector('[aria-live="polite"]')!.textContent).toBe('9 days');
+    expect(answer.textContent).toContain('You have 12 days now. After 3 days of approved leave, you’ll have 9 days on Mar 1, 2026.'.replace('’', "'"));
+    expect(answer.textContent).toContain('Including planned and requested leave: 8 days.');
+    expect(answer.textContent).toContain(`Accrual is not included yet. ${issue}`);
+    expect(screen.getByRole('link', { name: 'Go to How you earn PTO' }).getAttribute('href')).toBe('#how-you-earn');
+    // Not the full projection, and nothing that would explain an accrual the user never gave.
+    expect(screen.queryByText(/Estimated available PTO on/)).toBeNull();
+    expect(screen.queryByText(/Expected accrual/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Explain this forecast using my policy' })).toBeNull();
+  });
+
+  it('says plainly when no leave is tracked', () => {
+    render(<QuickForecast policy={noAccrual} inputIssue={issue} accrualIssue={issue} forecastDate="2026-03-01" onForecastDateChange={vi.fn()} />);
+    expect(screen.getByTestId('balance-only-forecast').textContent).toContain('You have 12 days now. No approved leave is tracked before Mar 1, 2026.');
+  });
+
+  it('still asks for the missing input alone when it is not about accrual', () => {
+    render(<QuickForecast policy={noAccrual} inputIssue="Enter the hours in a normal workday, up to 24." forecastDate="2026-03-01" onForecastDateChange={vi.fn()} />);
+    expect(screen.queryByTestId('balance-only-forecast')).toBeNull();
+    expect(screen.getByText('Enter the hours in a normal workday, up to 24.')).toBeTruthy();
   });
 });

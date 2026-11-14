@@ -194,7 +194,7 @@ export function ImportSources({
       setIcsError('This calendar has no all-day events, and school closures are almost always all-day. It may be a class or club schedule. Try the district’s full-year calendar, or paste or type the closure dates.');
       return;
     }
-    setPending({ source, heading: `Found ${datesToRuns(result.busyDays).length} date ranges in ${source}. Untick anything that isn't a day without school.`, candidates: icsCandidates(result.busyDays) });
+    setPending({ source, heading: `Found ${datesToRuns(result.busyDays).length} date ranges in ${source}. Uncheck anything that isn't a day without school.`, candidates: icsCandidates(result.busyDays) });
   };
 
   const handleIcsFile = async (file: File) => {

@@ -87,3 +87,21 @@ describe('blankBalanceMessage', () => {
     expect(blankBalanceMessage('2026-12-01', '2027-01-01')).not.toMatch(/ on /);
   });
 });
+
+describe('a balance alone answers right away (F07)', () => {
+  it('shows what the balance supports before any accrual input, then the full forecast once accrual is in', () => {
+    render(<Policy />);
+    fireEvent.change(screen.getByLabelText('Current PTO balance (days)'), { target: { value: '12' } });
+    const answer = screen.getByTestId('balance-only-forecast');
+    expect(answer.querySelector('[aria-live="polite"]')!.textContent).toBe('12 days');
+    expect(answer.textContent).toMatch(/You have 12 days now\./);
+    expect(answer.textContent).toMatch(/Accrual is not included yet\. Enter how much PTO you earn/);
+    expect(document.getElementById('how-you-earn')).toBeTruthy();
+    // The next input names the pay date; the answer stays.
+    fireEvent.change(screen.getByLabelText('Days earned each pay period'), { target: { value: '1' } });
+    expect(screen.getByTestId('balance-only-forecast').textContent).toMatch(/Accrual is not included yet\. Enter a known pay date/);
+    fireEvent.change(screen.getByLabelText('Days earned each pay period'), { target: { value: '0' } });
+    expect(screen.queryByTestId('balance-only-forecast')).toBeNull();
+    expect(screen.getByText(/Estimated available PTO on/)).toBeTruthy();
+  });
+});

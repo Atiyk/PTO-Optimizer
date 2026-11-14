@@ -24,7 +24,7 @@ export const ITEMS: FAQItem[] = [
   {
     question: 'Where does the travel data come from?',
     answer:
-      'In the US, from public TSA airport checkpoint counts for 2025, averaged over 7-day windows. It shows broad seasons, not single days. Other countries have no travel data, so the planner uses a generic seasonal rule. It is not a forecast or a fare price.',
+      'In the US, from public TSA airport checkpoint counts for 2025. Each day is averaged with the same weekday a week before and after, so it shows broad seasons, not single days. Other countries have no travel data, so the planner uses a generic seasonal rule. It is not a forecast or a fare price.',
   },
   {
     question: 'Why are the suggestions all near holidays?',

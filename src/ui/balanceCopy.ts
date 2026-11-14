@@ -1,3 +1,4 @@
+import type { TimeOffPolicy } from '../policy/model';
 import { compactDate } from './compactDate';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -6,4 +7,9 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 export function blankBalanceMessage(forecastDate: string, balanceAsOf: string): string {
   const when = ISO_DATE.test(forecastDate) && forecastDate >= balanceAsOf ? ` on ${compactDate(forecastDate)}` : '';
   return `Enter your current PTO balance to see how much you will have${when}, after accrual and any time off you have tracked.`;
+}
+
+/** F07: the same policy with no future accrual, which is what the balance alone supports. Nothing is invented. */
+export function withoutAccrual(policy: TimeOffPolicy): TimeOffPolicy {
+  return { ...policy, accrual: { kind: 'per-pay-period', amount: 0, frequency: 'monthly', payDateAnchor: policy.balanceAsOf } };
 }

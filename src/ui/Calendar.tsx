@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { buttonClasses } from './Button';
 import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { buildMonths, type OffRun, type WeekStart } from '@daysoff/engine/calendar/calendarMath';
@@ -176,6 +176,37 @@ export function Calendar({
         </button>
       </div>
     )}
+    </div>
+  );
+}
+
+/**
+ * Visual stability while the plan updates: the planner hides the old headline numbers and
+ * calendar until the new plan is ready, which used to collapse the page to a one-line
+ * "Updating" note and grow it back a moment later (two layout shifts of 0.23 each per input
+ * at 375px). While `holding`, this keeps the box at the last height it had when it was not
+ * holding, so the note sits in a space the size of what it replaces and nothing below moves.
+ */
+export function HoldHeightWhile({ holding, children, className }: { holding: boolean; children: ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [lastHeight, setLastHeight] = useState(0);
+  const [held, setHeld] = useState<number | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      if (!el.dataset.holding) setLastHeight(el.getBoundingClientRect().height);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  // Captured during render from the last measured height, so the very first frame of the
+  // held state already has it (an effect would let one collapsed frame paint first).
+  if (holding && held === null && lastHeight > 0) setHeld(lastHeight);
+  if (!holding && held !== null) setHeld(null);
+  return (
+    <div ref={ref} data-holding={holding ? 'true' : undefined} aria-busy={holding || undefined} className={className} style={holding && held ? { minHeight: held } : undefined}>
+      {children}
     </div>
   );
 }

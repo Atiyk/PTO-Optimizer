@@ -11,6 +11,16 @@ import type { PreparedWalletImport } from '../integration/walletImportLedgerGate
 import { Button } from './Button';
 import { compactDate } from './compactDate';
 
+/** "1 balance" / "3 balances": each saved bank of days (vacation, sick, …) is a balance. */
+export function balanceCount(n: number): string {
+  return `${n} ${n === 1 ? 'balance' : 'balances'}`;
+}
+
+/** The import review's first line, in plain words (N-P2-4: no "wallet" or "banks"). */
+export function backupSummary(added: number, matching: number): string {
+  return `This backup has ${balanceCount(added + matching)}: ${added} new, ${matching} already saved here.`;
+}
+
 export function WalletTransfer({ policy, requests, forecastDate }: {
   policy?: TimeOffPolicy;
   requests: readonly PtoRequest[];
@@ -46,10 +56,10 @@ export function WalletTransfer({ policy, requests, forecastDate }: {
     setMessage('');
     try {
       const next = file.size <= MAX_WALLET_JSON_LENGTH ? await prepareBrowserWalletImport(await file.text()) : null;
-      if (!next) setMessage('This backup or the saved wallet could not be read. Your saved banks and requests are unchanged.');
+      if (!next) setMessage('This backup file or your saved balances could not be read. Nothing saved here has changed.');
       setPreview(next);
     } catch {
-      setMessage('This backup could not be read. Your saved banks and requests are unchanged.');
+      setMessage('This backup file could not be read. Nothing saved here has changed.');
     } finally {
       setPending(false);
     }
@@ -63,20 +73,20 @@ export function WalletTransfer({ policy, requests, forecastDate }: {
     setReplaceAll(false);
     setPending(false);
     setMessage(saved
-      ? 'Wallet banks saved in this browser. Your tracked requests and active policy are unchanged.'
-      : 'The wallet or tracked requests changed, or storage is unavailable. Choose the file again for a fresh review.');
+      ? 'Balances from the backup are saved in this browser. Your tracked requests and policy are unchanged.'
+      : 'Your saved balances or tracked requests changed, or storage is unavailable. Choose the file again to review it fresh.');
   }
 
   function download() {
     const latest = readBrowserWallet();
-    if (!latest) { setMessage('The saved wallet could not be read.'); return; }
+    if (!latest) { setMessage('Your saved balances could not be read.'); return; }
     const banks = latest.banks.length ? latest.banks : policy ? [legacyVacationBank(policy)] : [];
     const content = encodeLeaveWallet({ version: 1, banks });
-    if (!content) { setMessage('Enter valid policy values or import a wallet before downloading a backup.'); return; }
+    if (!content) { setMessage('Enter valid policy values or import a backup file before downloading one.'); return; }
     const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'timebower-wallet.json';
+    link.download = 'timebower-backup.json';
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -96,7 +106,7 @@ export function WalletTransfer({ policy, requests, forecastDate }: {
       </summary>
       <div className="space-y-3 border-t border-line px-4 pb-4 pt-3 text-sm text-muted sm:px-6">
         <p>A backup file holds your saved PTO balances and policy settings, without tracked requests or notes. Use it to move them to another browser. Imported balances stay in this browser and show separately from the policy above.</p>
-        {!lockSupport && <p>Wallet imports and deletion require a browser with cross-tab storage locks. The request tracker is still available.</p>}
+        {!lockSupport && <p>Importing or removing saved balances needs a browser that supports cross-tab storage locks. The request tracker still works.</p>}
         {wallet && wallet.banks.length > 0 && (
           <ul className="space-y-2">
             {wallet.banks.map((bank) => {
@@ -111,9 +121,9 @@ export function WalletTransfer({ policy, requests, forecastDate }: {
           </ul>
         )}
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="secondary" disabled={pending || !wallet || (!policy && wallet.banks.length === 0)} onClick={download}>Download wallet backup</Button>
+          <Button variant="secondary" disabled={pending || !wallet || (!policy && wallet.banks.length === 0)} onClick={download}>Download a backup file</Button>
           <div className="min-w-0 max-w-full">
-            <label htmlFor={id} className="mb-1 block font-semibold text-ink">Review a wallet backup</label>
+            <label htmlFor={id} className="mb-1 block font-semibold text-ink">Review a backup file</label>
             <input id={id} className="max-w-full" type="file" accept=".json,application/json" disabled={pending || !lockSupport || !wallet}
               onChange={(event) => {
                 const file = event.target.files?.[0];
@@ -123,18 +133,18 @@ export function WalletTransfer({ policy, requests, forecastDate }: {
           </div>
         </div>
         {preview && (
-          <section aria-label="Wallet import review" className="space-y-2 border-t border-line pt-3">
-            <p className="text-ink">{preview.addedBankIds.length} new banks and {preview.replacedBankIds.length} matching banks in this backup.</p>
+          <section aria-label="Backup file review" className="space-y-2 border-t border-line pt-3">
+            <p className="text-ink">{backupSummary(preview.addedBankIds.length, preview.replacedBankIds.length)}</p>
             <ul className="list-disc space-y-1 pl-5">
               {preview.incoming.banks.map((bank) => <li key={bank.id} className="break-words">{bank.name}</li>)}
             </ul>
-            {preview.unresolvedRequestIds.length > 0 ? <p>Some linked requests are absent. Import this file in the browser with those requests.</p> : (
+            {preview.unresolvedRequestIds.length > 0 ? <p>This backup links to requests that aren’t in this browser. Import it in the browser that has those requests.</p> : (
               <>
-                <Button variant="secondary" disabled={pending} onClick={() => void apply('merge')}>Merge wallet banks</Button>
+                <Button variant="secondary" disabled={pending} onClick={() => void apply('merge')}>Merge with saved balances</Button>
                 {preview.removedBankIdsOnFullReplace.length > 0 && (
                   <div className="space-y-2">
-                    <label className="flex items-center gap-2"><input type="checkbox" checked={replaceAll} onChange={(event) => setReplaceAll(event.target.checked)} /> Remove {preview.removedBankIdsOnFullReplace.length} unrelated banks as well</label>
-                    <Button variant="quiet" disabled={pending || !replaceAll} onClick={() => void apply('replace-all')}>Replace all wallet banks</Button>
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={replaceAll} onChange={(event) => setReplaceAll(event.target.checked)} /> Also remove {balanceCount(preview.removedBankIdsOnFullReplace.length)} saved here that aren’t in this backup</label>
+                    <Button variant="quiet" disabled={pending || !replaceAll} onClick={() => void apply('replace-all')}>Replace all saved balances</Button>
                   </div>
                 )}
               </>
@@ -145,17 +155,17 @@ export function WalletTransfer({ policy, requests, forecastDate }: {
           <div>
             {removeRevision === wallet.revision ? (
               <div className="flex flex-wrap items-center gap-2">
-                <span>Remove the saved wallet banks and keep tracked requests?</span>
+                <span>Remove saved balances from this browser? Tracked requests stay.</span>
                 <Button variant="quiet" disabled={pending} onClick={async () => {
                   setPending(true);
                   const saved = await clearBrowserWallet(wallet.revision);
                   setPending(false);
                   setRemoveRevision(undefined);
-                  setMessage(saved ? 'Wallet banks removed from this browser.' : 'The wallet changed. Review the current banks before trying again.');
-                }}>Confirm wallet removal</Button>
+                  setMessage(saved ? 'Saved balances removed from this browser.' : 'Your saved balances changed. Review them and try again.');
+                }}>Remove saved balances</Button>
                 <Button variant="quiet" onClick={() => setRemoveRevision(undefined)}>Cancel</Button>
               </div>
-            ) : <Button variant="quiet" disabled={pending} onClick={() => setRemoveRevision(wallet.revision)}>Remove saved wallet banks</Button>}
+            ) : <Button variant="quiet" disabled={pending} onClick={() => setRemoveRevision(wallet.revision)}>Remove saved balances…</Button>}
           </div>
         )}
         {message && <p role="status">{message}</p>}

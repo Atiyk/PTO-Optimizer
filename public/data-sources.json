@@ -1,7 +1,7 @@
 {
   "$schema": "https://pto-optimizer.app/data-sources.json",
   "generated": "This file is maintained by hand and updated whenever a source changes - see lastUpdated below.",
-  "lastUpdated": "2026-10-27",
+  "lastUpdated": "2026-11-14",
   "sources": [
     {
       "id": "holidays",
@@ -10,15 +10,15 @@
       "description": "Public holiday dates and names by country and, where available, by subdivision (state/province/county).",
       "coverage": "All countries this tool supports (United States, United Kingdom, Canada, Australia, Germany, Ireland, India, and any other country selectable in the Country field). Subdivision-level detail varies by country.",
       "accessPattern": "Served with the site as a snapshot for 2026-2028 and cached in the browser. For other years the browser asks Nager.Date directly, one request per (country, year).",
-      "license": "Public domain / open data, per Nager.Date's own terms."
+      "license": "Free public API. See Nager.Date's site for its terms of use."
     },
     {
       "id": "travel-demand",
       "name": "TSA checkpoint travel numbers",
       "url": "https://www.tsa.gov/travel/passenger-volumes",
-      "description": "Daily US airport security checkpoint throughput, used as a proxy for how many people are travelling on a given date.",
-      "coverage": "United States only. Other countries use a simple seasonal estimate, not derived from travel data, labelled as an estimate.",
-      "accessPattern": "A static, pre-built index checked into the app (see scripts/build-demand-index.ts) - not fetched live.",
+      "description": "Daily US airport security checkpoint throughput, used as a rough measure of how many people travel in a given week. Built from the 2025 counts; each day is averaged with the same weekday a week before and after.",
+      "coverage": "United States only. Other countries use a simple seasonal estimate, not derived from travel data, labeled as an estimate.",
+      "accessPattern": "A static index built once and shipped with the app (see scripts/build-demand-index.ts). It is not fetched live.",
       "license": "US public domain (government work)."
     }
   ]

@@ -5,6 +5,7 @@ import { Footer } from './Footer';
 import { Container } from './Container';
 import { CountrySelect } from './CountrySelect';
 import { Button } from './Button';
+import { NumberStepper } from './NumberStepper';
 import { getPreloadedHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { getPrerenderedAt } from './prerenderedAt';
 import { geolocateCountry } from './geo';
@@ -125,8 +126,6 @@ export function Sabbatical() {
   );
 
 
-  const stepBtn = 'flex h-11 w-11 shrink-0 items-center justify-center text-lg font-semibold text-ink transition-colors duration-150 hover:bg-surface-alt disabled:opacity-40';
-  const numberInput = 'h-11 w-14 min-w-0 border-x border-line-strong bg-surface text-center text-base font-semibold text-ink [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
   const fieldLabel = 'block text-sm font-semibold text-ink';
 
   const composition = selected
@@ -205,25 +204,24 @@ export function Sabbatical() {
                     <label className={fieldLabel} htmlFor="sabbatical-length">Sabbatical length</label>
                     {/* 4B: any whole number of weeks, not a fixed list. Steppers for +/-1,
                         typing for anything else; no submit, updates live. */}
-                    <div className="mt-1.5 flex items-center gap-2">
-                      <div className="inline-flex items-stretch overflow-hidden rounded-[6px] border border-line-strong bg-surface">
-                        <button type="button" aria-label="Decrease sabbatical length by one week" disabled={lengthWeeks <= 1} onClick={() => setLengthWeeks((w) => Math.max(1, w - 1))} className={stepBtn}>&minus;</button>
-                        <input
-                          id="sabbatical-length"
-                          type="number"
-                          min={1}
-                          max={52}
-                          step={1}
-                          value={lengthWeeks}
-                          onChange={(e) => {
-                            const n = Number(e.target.value);
-                            if (Number.isFinite(n)) setLengthWeeks(Math.max(1, Math.min(52, Math.round(n))));
-                          }}
-                          className={numberInput}
-                        />
-                        <button type="button" aria-label="Increase sabbatical length by one week" disabled={lengthWeeks >= 52} onClick={() => setLengthWeeks((w) => Math.min(52, w + 1))} className={stepBtn}>+</button>
-                      </div>
-                      <span className="text-sm text-muted">week{lengthWeeks === 1 ? '' : 's'}</span>
+                    <div className="mt-1.5">
+                      <NumberStepper
+                        id="sabbatical-length"
+                        value={String(lengthWeeks)}
+                        min={1}
+                        max={52}
+                        onTextChange={(text) => {
+                          const n = Number(text);
+                          if (Number.isFinite(n)) setLengthWeeks(Math.max(1, Math.min(52, Math.round(n))));
+                        }}
+                        onDecrement={() => setLengthWeeks((w) => Math.max(1, w - 1))}
+                        onIncrement={() => setLengthWeeks((w) => Math.min(52, w + 1))}
+                        decrementDisabled={lengthWeeks <= 1}
+                        incrementDisabled={lengthWeeks >= 52}
+                        decrementLabel="Decrease sabbatical length by one week"
+                        incrementLabel="Increase sabbatical length by one week"
+                        unit={`week${lengthWeeks === 1 ? '' : 's'}`}
+                      />
                     </div>
                   </div>
                 </fieldset>
@@ -233,45 +231,51 @@ export function Sabbatical() {
                   <div className="clear-both flex flex-col gap-4 pt-1">
                     <p className="text-sm text-muted">Ordinary PTO and unpaid leave can extend the block on either side.</p>
                     <div>
-                      <label className="flex items-baseline justify-between gap-2 text-sm font-semibold text-ink" htmlFor="sabbatical-pto">
-                        PTO days to add
-                        <span className="text-base font-bold tabular-nums">{ptoToAdd}</span>
-                      </label>
-                      <input
-                        id="sabbatical-pto"
-                        type="range"
-                        min={0}
-                        max={15}
-                        step={1}
-                        value={ptoToAdd}
-                        onChange={(e) => setPtoToAdd(Number(e.target.value))}
-                        className="mt-1 h-11 w-full cursor-pointer"
-                      />
-                      <div aria-hidden="true" className="flex justify-between text-xs text-muted"><span>0</span><span>15</span></div>
+                      <label className={fieldLabel} htmlFor="sabbatical-pto">PTO days to add</label>
+                      {/* F28: the same stepper as /pto and /family. Up to 15 days, as before; a
+                          blank field reads as 0 (the URL's default), as the slider did. */}
+                      <div className="mt-1.5">
+                        <NumberStepper
+                          id="sabbatical-pto"
+                          value={String(ptoToAdd)}
+                          min={0}
+                          max={15}
+                          onTextChange={(text) => {
+                            const n = Number(text);
+                            if (Number.isFinite(n)) setPtoToAdd(Math.max(0, Math.min(15, Math.round(n))));
+                          }}
+                          onDecrement={() => setPtoToAdd((d) => Math.max(0, d - 1))}
+                          onIncrement={() => setPtoToAdd((d) => Math.min(15, d + 1))}
+                          decrementDisabled={ptoToAdd <= 0}
+                          incrementDisabled={ptoToAdd >= 15}
+                          decrementLabel="One fewer PTO day"
+                          incrementLabel="One more PTO day"
+                          unit={`day${ptoToAdd === 1 ? '' : 's'}`}
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className={fieldLabel} htmlFor="sabbatical-unpaid">Unpaid leave to add</label>
                       {/* 4C: extends the block the same way PTO does, but tracked as its own
                           budget - the tradeoff is financial, not a PTO balance. */}
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <div className="inline-flex items-stretch overflow-hidden rounded-[6px] border border-line-strong bg-surface">
-                          <button type="button" aria-label="Decrease unpaid leave by one week" disabled={unpaidWeeksToAdd <= 0} onClick={() => setUnpaidWeeksToAdd((w) => Math.max(0, w - 1))} className={stepBtn}>&minus;</button>
-                          <input
-                            id="sabbatical-unpaid"
-                            type="number"
-                            min={0}
-                            max={52}
-                            step={1}
-                            value={unpaidWeeksToAdd}
-                            onChange={(e) => {
-                              const n = Number(e.target.value);
-                              if (Number.isFinite(n)) setUnpaidWeeksToAdd(Math.max(0, Math.min(52, Math.round(n))));
-                            }}
-                            className={numberInput}
-                          />
-                          <button type="button" aria-label="Increase unpaid leave by one week" disabled={unpaidWeeksToAdd >= 52} onClick={() => setUnpaidWeeksToAdd((w) => Math.min(52, w + 1))} className={stepBtn}>+</button>
-                        </div>
-                        <span className="text-sm text-muted">week{unpaidWeeksToAdd === 1 ? '' : 's'}</span>
+                      <div className="mt-1.5">
+                        <NumberStepper
+                          id="sabbatical-unpaid"
+                          value={String(unpaidWeeksToAdd)}
+                          min={0}
+                          max={52}
+                          onTextChange={(text) => {
+                            const n = Number(text);
+                            if (Number.isFinite(n)) setUnpaidWeeksToAdd(Math.max(0, Math.min(52, Math.round(n))));
+                          }}
+                          onDecrement={() => setUnpaidWeeksToAdd((w) => Math.max(0, w - 1))}
+                          onIncrement={() => setUnpaidWeeksToAdd((w) => Math.min(52, w + 1))}
+                          decrementDisabled={unpaidWeeksToAdd <= 0}
+                          incrementDisabled={unpaidWeeksToAdd >= 52}
+                          decrementLabel="Decrease unpaid leave by one week"
+                          incrementLabel="Increase unpaid leave by one week"
+                          unit={`week${unpaidWeeksToAdd === 1 ? '' : 's'}`}
+                        />
                       </div>
                     </div>
                   </div>

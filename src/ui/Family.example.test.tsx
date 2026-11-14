@@ -23,6 +23,19 @@ beforeEach(() => { localStorage.clear(); });
 afterEach(() => { cleanup(); window.history.replaceState(null, '', '/'); });
 
 describe('Family first-visit example (F08)', () => {
+  it('labels example PTO cells as the example, not as the person\'s PTO (N-P2-5)', () => {
+    go('c=US&s=2026-11-14');
+    render(<Family />);
+    const labels = [...document.querySelectorAll('.sr-only')].map((el) => el.textContent ?? '');
+    const ptoLabels = labels.filter((label) => label.includes('PTO: a day with'));
+    expect(ptoLabels.length).toBeGreaterThan(0);
+    expect(ptoLabels.every((label) => label.includes('example PTO'))).toBe(true);
+    expect(labels.some((label) => label.includes('your PTO'))).toBe(false);
+    expect(screen.getByText('Example PTO on a school day off')).toBeTruthy();
+    expect(screen.queryByText('Your PTO on a school day off')).toBeNull();
+  });
+
+
   it('shows a live, labelled example plan on a bare US visit and keeps it out of the URL', () => {
     go('c=US&s=2026-11-14');
     render(<Family />);

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Holiday } from '@daysoff/engine/data/holidays';
 
@@ -56,5 +56,37 @@ describe('share-link claim (N2/F10)', () => {
     render(<Sabbatical />);
     expect(screen.getByText(SHARE_LINK_SENTENCE)).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/exact plan for anyone/);
+  });
+});
+
+describe('PTO days to add (F28)', () => {
+  const pto = () => new URLSearchParams(window.location.search).get('pto');
+  it('is the shared stepper, not a slider: −/+ and typing, kept in the URL, clamped to 0–15', () => {
+    render(<Sabbatical />);
+    const input = screen.getByRole<HTMLInputElement>('spinbutton', { name: 'PTO days to add' });
+    expect(input.type).toBe('number');
+    expect(document.querySelector('input[type="range"]')).toBeNull();
+    expect(input.value).toBe('5');
+    fireEvent.click(screen.getByRole('button', { name: 'One more PTO day' }));
+    expect(input.value).toBe('6');
+    expect(pto()).toBe('6');
+    fireEvent.change(input, { target: { value: '40' } });
+    expect(input.value).toBe('15');
+    expect(pto()).toBe('15');
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'One more PTO day' }).disabled).toBe(true);
+    // Blank reads as 0, as the slider's lowest value did.
+    fireEvent.change(input, { target: { value: '' } });
+    expect(input.value).toBe('0');
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'One fewer PTO day' }).disabled).toBe(true);
+  });
+
+  it('length and unpaid leave use the same stepper and keep their URL params', () => {
+    render(<Sabbatical />);
+    fireEvent.click(screen.getByRole('button', { name: 'Increase sabbatical length by one week' }));
+    expect(screen.getByRole<HTMLInputElement>('spinbutton', { name: 'Sabbatical length' }).value).toBe('5');
+    expect(new URLSearchParams(window.location.search).get('len')).toBe('5');
+    fireEvent.click(screen.getByRole('button', { name: 'Increase unpaid leave by one week' }));
+    expect(screen.getByRole<HTMLInputElement>('spinbutton', { name: 'Unpaid leave to add' }).value).toBe('1');
+    expect(new URLSearchParams(window.location.search).get('unpaid')).toBe('1');
   });
 });

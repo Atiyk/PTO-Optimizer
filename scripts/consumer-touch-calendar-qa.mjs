@@ -57,6 +57,9 @@ try {
       await day.and(page.getByRole('button', { name: /January 20, pinned by you/ })).waitFor();
       await page.locator('main[data-plan-ready="true"]').waitFor({ state: 'visible' });
       assert.equal(await day.getAttribute('aria-expanded'), 'false', 'Action should close the disclosure');
+      // N-P2-1 (WCAG 2.4.3): the calendar re-mounts while the plan updates; focus must land
+      // back on the day, never fall to <body>.
+      await page.waitForFunction(() => document.activeElement?.id === 'day-2027-01-20', null, { timeout: 5000 });
 
       await day.tap();
       await page.getByRole('dialog', { name: 'Actions for January 20' }).getByRole('button', { name: 'Close' }).tap();
@@ -70,6 +73,8 @@ try {
       assert.equal(await day.evaluate(button => button === document.activeElement), true, 'Escape should return focus to the calendar day');
       await day.press('Space');
       await day.and(page.getByRole('button', { name: /January 20, blackout/ })).waitFor();
+      await page.locator('main[data-plan-ready="true"]').waitFor({ state: 'visible' });
+      await page.waitForFunction(() => document.activeElement?.id === 'day-2027-01-20', null, { timeout: 5000 });
       assert.equal(await day.getAttribute('aria-expanded'), 'false', 'Space should change the day without reopening the touch disclosure');
       assert.deepEqual(report.runtimeErrors.filter(error => error.width === width), [], 'No uncaught browser errors');
       report.cases.push({ width, status: 'passed', touch: true, action: true, dismiss: true, keyboard: true, overflow: false });
