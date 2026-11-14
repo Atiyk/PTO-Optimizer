@@ -93,4 +93,13 @@ describe('searchable country combobox', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(input.value).toBe('United States');
   });
+
+  it('keeps the scrollable listbox out of the Tab order so Tab leaves for the next control (F04)', () => {
+    // Chromium makes an overflow:auto element with no focusable children a keyboard-focusable
+    // scroller. Without tabIndex=-1, Tab moved focus into the listbox, the input's blur closed
+    // (unmounted) it, and focus fell to <body>.
+    openPicker();
+    const list = screen.getByRole('listbox', { name: 'Country' });
+    expect(list.getAttribute('tabindex')).toBe('-1');
+  });
 });
