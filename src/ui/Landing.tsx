@@ -11,7 +11,7 @@ import { YearStrip } from './YearStrip';
 import { geolocateCountry } from './geo';
 import { todayISO } from './today';
 import { breakReason } from './breakReason';
-import { findBridges, holidayDisplayName, holidayLongWeekends, holidayRunPhrase, nextHoliday, remainingHolidays, runLength } from './landingData';
+import { bridgeLinkPhrase, bridgeSentence, findBridges, holidayDisplayName, holidayLongWeekends, holidayRunPhrase, nextHoliday, remainingHolidays } from './landingData';
 import { downloadHolidaysICS } from './icsExport';
 import { track } from './analytics';
 import { computeLandingPlan, landingHolidayHref, landingPlanHref, landingSearch, readLandingState, validLandingRange } from './landingState';
@@ -369,7 +369,7 @@ export function Landing() {
               <h2 id="landing-holidays" className="text-h1 type-display text-ink">Holidays ahead in {countryName}</h2>
               <p className="mt-2 max-w-2xl text-base text-ink">
                 {customizedHolidays ? 'Your saved employer-observed calendar for this planning range.' : 'Public holidays in your selected country and planning dates.'}
-                {next && <> Next up: <strong className="font-semibold">{next.holiday.name}</strong> on {formatLong(next.holiday.date)}.{next.bridge ? ` One PTO day can connect a ${runLength(next.bridge.combined)}-day break.` : next.runLength > 1 ? ` Already a ${next.runLength}-day break.` : ''}</>}
+                {next && <> Next up: <strong className="font-semibold">{next.holiday.name}</strong> on {formatLong(next.holiday.date)}.{next.bridge ? ` ${bridgeSentence(next.bridge)}` : next.runLength > 1 ? (next.clipped ? ` ${holidayRunPhrase(next.runLength, true)}.` : ` Already a ${next.runLength}-day break.`) : ''}</>}
               </p>
             </div>
             {holidays.length > 0 && <Button variant="secondary" onClick={() => downloadHolidaysICS(holidays)}>Download holidays (.ics)</Button>}
@@ -387,10 +387,10 @@ export function Landing() {
                 <p className="text-h2 font-bold type-condensed text-ink tabular-nums">{formatShort(entry.holiday.date)}</p>
                 <div className="min-w-0">
                   <p className="text-lg font-semibold text-ink">{entry.holiday.name}</p>
-                  <p className="text-sm text-muted">{entry.weekday}, {formatLong(entry.holiday.date)}{entry.isObserved ? ' · observed' : ''} · {entry.runLength >= 3 ? <span className="mark text-ink">{holidayRunPhrase(entry.runLength)}</span> : holidayRunPhrase(entry.runLength)}</p>
+                  <p className="text-sm text-muted">{entry.weekday}, {formatLong(entry.holiday.date)}{entry.isObserved ? ' · observed' : ''} · {entry.runLength >= 3 ? <span className="mark text-ink">{holidayRunPhrase(entry.runLength, entry.clipped)}</span> : holidayRunPhrase(entry.runLength, entry.clipped)}</p>
                 </div>
                 <a href={landingHolidayHref(state, entry.holiday.date, bridge?.bridgeDate)} className={`${LINK} col-start-2 text-sm sm:col-start-3 sm:justify-self-end`}>{bridge
-                  ? <>Connect a {runLength(bridge.combined)}-day break<span className="sr-only"> around {entry.holiday.name}</span></>
+                  ? <>{bridgeLinkPhrase(bridge)}<span className="sr-only"> around {entry.holiday.name}</span></>
                   : `Plan around ${entry.holiday.name}`}<span aria-hidden="true"> →</span></a>
               </li>;
             })}

@@ -103,7 +103,7 @@ export const PRACTICAL_GUIDES: readonly PracticalGuide[] = [
     steps: [
       'Find the required notice period and whether it counts calendar or workdays.',
       'Work backward from the first day you want off.',
-      'Check any blackout dates or team coverage requirements.',
+      'Check any blackout periods or team coverage requirements.',
       'Submit your request and track whether it is pending, approved, or denied.',
     ],
     example: {
@@ -151,8 +151,8 @@ export const PRACTICAL_GUIDES: readonly PracticalGuide[] = [
       calculation: 'Request Friday: Thursday + Friday + Saturday + Sunday = 4 consecutive calendar days off for 1 PTO day.',
       result: 'This works only if Thursday is really an employer-observed day off and Friday is a normal workday.',
     },
-    mistakes: ['Counting a public holiday that your employer does not observe.', 'Assuming a weekend is free when you work shifts.', 'Ignoring a notice period or blackout dates.'],
-    hrQuestions: ['Do we observe the Thursday holiday?', 'Are there blackout dates near that weekend?', 'How far in advance should I ask for Friday?'],
+    mistakes: ['Counting a public holiday that your employer does not observe.', 'Assuming a weekend is free when you work shifts.', 'Ignoring a notice period or blackout periods.'],
+    hrQuestions: ['Do we observe the Thursday holiday?', 'Are there blackout periods near that weekend?', 'How far in advance should I ask for Friday?'],
     action: { href: '/pto', label: 'Find my best bridge days' },
     caveat: 'The optimizer uses your selected workweek, holidays and constraints. Verify the dates with your employer.',
   },
