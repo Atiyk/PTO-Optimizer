@@ -14,6 +14,7 @@ import { EmailReminders } from './EmailReminders';
 import { ordinal } from './scoreFormat';
 import { buildPublicPlanLink, buildPublicPlanSearch, publicPlanOmissions } from './publicSharePrivacy';
 import type { ShareSnapshot } from './shareSnapshot';
+import { SHARE_LINK_SENTENCE } from './shareLinkCopy';
 
 interface ExportBarProps {
   breaks: Break[];
@@ -198,11 +199,11 @@ export function ExportBar(props: ExportBarProps) {
         )}
       </label>
       {planSearch !== undefined && (
-        <p className="text-xs text-muted">Public plan links include the scenario budget and planning controls. Employer names, blackout dates, partner availability, tracked requests and private policy settings stay in this browser. A recipient’s result may differ.</p>
+        <p className="text-xs text-muted">{SHARE_LINK_SENTENCE}</p>
       )}
       {planSearch !== undefined && observedDates !== undefined && (
         <details className="space-y-2 text-sm">
-          <summary className="cursor-pointer font-semibold text-ink">Share observed holiday dates</summary>
+          <summary className="cursor-pointer py-3 font-semibold text-ink">Share observed holiday dates</summary>
           <p className="max-w-prose text-muted">Include the dates checked in this plan’s holiday calendar. Anyone with the link can see those dates. Employer names and holiday labels stay private.{omissions?.settings ? ' Private scheduling and policy settings are still omitted, so the result may differ.' : ''}</p>
           <p className="max-w-prose break-words text-xs text-muted">{observedDates.length ? observedDates.join(', ') : 'No holidays are checked in this date range.'}</p>
           <ActionButton label="Copy link with holiday dates" onClick={() => copyPlan(observedDates)} />

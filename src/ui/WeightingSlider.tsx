@@ -1,26 +1,10 @@
 import { InfoHint } from './InfoHint';
+import { weightingCaption } from './weightingCaptions';
 
 /** UI density pass: moved off its own permanent line, into a hover/focus hint on the label -
  * still true, just no longer worth a fourth line of prose above the calendar on every load. */
 const TRAVEL_HINT =
-"Not travelling? Set this toward 0. This only weighs a rough travel estimate for your dates. In the US it's a 7-day average of 2025 airport checkpoint counts, so it shows seasons, not particular days. Other countries use a generic seasonal rule. It's not a forecast or a fare price.";
-
-// Captions for every step (0, 10, 20, ..., 100) of the weighting slider. The 0 and 100
-// wordings match the spec's own definitions verbatim; the rest fill in a legible gradient
-// between them so the midpoints don't read as a jump.
-const CAPTIONS: Record<number, string> = {
-  0: 'maximise days off, ignore travel demand',
-  10: 'almost entirely maximising days off',
-  20: 'mostly maximising days off',
-  30: 'mostly maximising days off, with a light preference for quieter weeks',
-  40: 'leaning toward days off, but weighing quieter weeks too',
-  50: 'weighing both days off and the travel estimate',
-  60: 'leaning toward quieter weeks, but weighing days off too',
-  70: 'mostly favoring quieter estimated periods, with some weight on days off',
-  80: 'mostly favoring quieter estimated periods',
-  90: 'strongly favoring quieter estimated periods',
-  100: 'prioritise quieter estimated periods',
-};
+"Not traveling? Set this toward Most days off. This only weighs a rough travel estimate for your dates. In the US it's a 7-day average of 2025 airport checkpoint counts, so it shows seasons, not particular days. Other countries use a generic seasonal rule. It's not a forecast or a fare price.";
 
 interface WeightingSliderProps {
   value: number;
@@ -30,12 +14,9 @@ interface WeightingSliderProps {
 export function WeightingSlider({ value, onChange }: WeightingSliderProps) {
   return (
     <div className="flex flex-col gap-1">
-      {/* Interaction-detail pass: the value sits in the label row itself, not only in the
-          caption below - the eye shouldn't have to travel down to see what's currently set. */}
       <div className="flex items-center gap-1.5 text-[15px] font-semibold text-ink">
         What matters more?
         <InfoHint text={TRAVEL_HINT} />
-        <span className="ml-auto tabular-nums text-muted">{value}</span>
       </div>
       <div className="flex items-center justify-between gap-3 text-xs text-muted">
         <span>Most days off</span>
@@ -49,10 +30,10 @@ export function WeightingSlider({ value, onChange }: WeightingSliderProps) {
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         aria-label="What matters more?"
-        aria-valuetext={`${value}: ${CAPTIONS[value]}`}
+        aria-valuetext={weightingCaption(value)}
         className="h-11 w-full cursor-pointer"
       />
-      <p className="-mt-1 text-sm text-muted">{CAPTIONS[value][0].toUpperCase() + CAPTIONS[value].slice(1)}</p>
+      <p className="-mt-1 text-sm text-muted">{weightingCaption(value)}</p>
     </div>
   );
 }

@@ -24,17 +24,24 @@ afterEach(() => {
 });
 
 describe('planner result actions', () => {
-  it('puts one set of request cards immediately after the result and exposes the PTO date', async () => {
+  it('puts the plan inputs, then one set of request cards, right after the result', async () => {
     render(<App />);
     const summary = screen.getByRole('region', { name: 'Your plan' });
     await waitFor(() => expect(summary.getAttribute('data-plan-result')).toBe('ready'));
 
+    // F02: the core inputs sit directly under the result, the break cards right after them.
+    const settings = screen.getByRole('complementary', { name: 'Plan settings' });
+    expect(summary.nextElementSibling).toBe(settings);
+    expect(within(settings).getByLabelText('PTO days available')).toBeTruthy();
     const requests = screen.getByRole('region', { name: 'Requesting each break' });
-    expect(summary.nextElementSibling?.contains(requests)).toBe(true);
+    expect(settings.nextElementSibling?.contains(requests)).toBe(true);
     const [card] = within(requests).getAllByRole('listitem');
     expect(card.getAttribute('data-break-pto')).toBe('1');
     expect(within(card).getByText('1 working day: Mon Jan 4')).toBeTruthy();
     expect(within(card).getByRole('button', { name: 'Track this PTO request' })).toBeTruthy();
+    // F11: the first card's request tools start collapsed like every other card.
+    expect(within(card).queryByRole('button', { name: 'Export this break (.ics)' })).toBeNull();
+    fireEvent.click(within(card).getByRole('button', { name: /Request this time off/ }));
     expect(within(card).getByRole('button', { name: 'Export this break (.ics)' })).toBeTruthy();
     expect(within(summary).getByRole('link', { name: 'Export and share' }).getAttribute('href')).toBe('#take-it-heading');
   });
@@ -73,11 +80,19 @@ describe('planner result actions', () => {
     const restored = within(cards()).getByTestId('committed-entry');
     expect(within(restored).getByText('Tracked · planned')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Track this PTO request' })).toBeNull();
-    const tracker = screen.getByRole('region', { name: 'My PTO requests' });
-    expect(within(tracker).getByRole<HTMLSelectElement>('combobox', { name: /^Status for request / }).value).toBe('planned');
-    // Approving keeps it visible with the approved label and the same reserved budget.
-    fireEvent.change(within(tracker).getByRole('combobox', { name: /^Status for request / }), { target: { value: 'approved' } });
-    expect(within(within(cards()).getByTestId('committed-entry')).getByText('Approved')).toBeTruthy();
+    // The planner links to the tracker in My PTO instead of repeating it (F20).
+    const requestsLine = screen.getByRole('region', { name: 'My PTO requests' });
+    expect(within(requestsLine).getByTestId('request-count').textContent).toBe('My PTO has 1 request from this browser.');
+    expect(within(requestsLine).getByRole('link', { name: 'Manage requests in My PTO' }).getAttribute('href')).toBe('/policy#requests');
+    expect(within(requestsLine).queryByRole('combobox')).toBeNull();
+    const stored = JSON.parse(localStorage.getItem('gapless.personal.requests.v1')!);
+    expect(stored.requests[0].status).toBe('planned');
+    // Approving it in My PTO keeps it visible with the approved label and the same reserved budget.
+    stored.requests[0].status = 'approved';
+    localStorage.setItem('gapless.personal.requests.v1', JSON.stringify(stored));
+    cleanup();
+    render(<App />);
+    await waitFor(() => expect(within(within(cards()).getByTestId('committed-entry')).getByText('Approved')).toBeTruthy());
     expect(screen.getByTestId('tracked-requests-summary').textContent).toBe('Includes 1 approved day off · 0 tentative, 1 reserved from the budget.');
   });
 
@@ -151,10 +166,9 @@ describe('planner result actions', () => {
     fireEvent.click(save);
     const requests = screen.getByRole('region', { name: 'Requesting each break' });
     await within(requests).findByText('Saved', { exact: true });
-    const tracker = screen.getByRole('region', { name: 'My PTO requests' });
-    const status = within(tracker).getByRole<HTMLSelectElement>('combobox', { name: /^Status for request / });
-    expect(status.value).toBe('considering');
-    expect(within(tracker).getAllByRole('article')).toHaveLength(1);
+    const stored = JSON.parse(localStorage.getItem('gapless.personal.requests.v1')!);
+    expect(stored.requests.map((request: { status: string }) => request.status)).toEqual(['considering']);
+    expect(screen.getByTestId('request-count').textContent).toBe('My PTO has 1 request from this browser.');
 
     first.unmount();
     render(<App />);
@@ -185,11 +199,11 @@ describe('planner result actions', () => {
     await waitFor(() => expect(new URLSearchParams(window.location.search).has('ww')).toBe(false));
   });
 
-  it('keeps save and public link controls for a settled plan with no PTO', async () => {
+  it('offers no Save for a 0-PTO plan (F05) but keeps the public link control', async () => {
     window.history.replaceState(null, '', scenario.replace('b=1', 'b=0'));
     render(<App />);
-    const save = await screen.findByRole<HTMLButtonElement>('button', { name: 'Save this plan' });
-    expect(save.disabled).toBe(false);
+    expect(await screen.findByRole('heading', { level: 1, name: 'No PTO days to spend' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Save this plan' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Save break' })).toBeNull();
   });

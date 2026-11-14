@@ -101,7 +101,7 @@ export function CountrySelect({ country, onChangeCountry, widthClass = 'w-56 max
           style={CHEVRON_BG}
         />
         {open && (
-          <ul id={listId} role="listbox" aria-labelledby={labelId} className="absolute z-20 mt-1 max-h-64 w-full min-w-56 max-w-[calc(100vw-2rem)] overflow-auto rounded-[10px] border border-line-strong bg-surface py-1 font-normal shadow-lg">
+          <ul id={listId} role="listbox" aria-labelledby={labelId} tabIndex={-1} className="absolute z-20 mt-1 max-h-64 w-full min-w-56 max-w-[calc(100vw-2rem)] overflow-auto rounded-[10px] border border-line-strong bg-surface py-1 font-normal shadow-lg">
             {matches.map((c, index) => (
               <li
                 id={`${listId}-${c.code}`}

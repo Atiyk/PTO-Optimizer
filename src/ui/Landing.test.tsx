@@ -3,6 +3,7 @@ import { act } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Landing } from './Landing';
+import { SHARE_LINK_SENTENCE } from './shareLinkCopy';
 import type { Holiday } from '@daysoff/engine/data/holidays';
 import { defaultEmployerCalendar, saveEmployerCalendar } from '../personal/employerCalendar';
 
@@ -35,7 +36,7 @@ describe('live homepage planner', () => {
     const html = renderToStaticMarkup(<Landing />);
     expect(html).toContain('Your plan: ');
     expect(html).toContain('days off');
-    expect(html).toContain('from 15 PTO days across');
+    expect(html).toMatch(/15 PTO days \+ \d+ weekend and holiday days, across/);
     expect(html).not.toContain('Calculating');
     expect(html).not.toContain('Updating your holiday calendar');
     expect((html.match(/<h1\b/g) ?? []).length).toBe(1);
@@ -65,9 +66,9 @@ describe('live homepage planner', () => {
     await act(async () => { render(<Landing />); });
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('More days off from the same PTO.');
     expect(screen.getByRole('spinbutton', { name: 'PTO days available' }).getAttribute('value')).toBe('15');
-    expect(screen.getByText(/from 15 PTO days across/)).toBeTruthy();
+    expect(screen.getByText(/^15 PTO days \+ \d+ weekend and holiday days, across/)).toBeTruthy();
     await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '5' } }); });
-    expect(screen.getByText(/from 5 PTO days across/)).toBeTruthy();
+    expect(screen.getByText(/^5 PTO days \+ \d+ weekend and holiday days, across/)).toBeTruthy();
     const link = screen.getAllByRole('link', { name: 'See the full plan →' })[0] as HTMLAnchorElement;
     expect(link.search).toContain('b=5');
     expect(link.search).toContain('pv=2');
@@ -82,10 +83,10 @@ describe('live homepage planner', () => {
     await act(async () => { fireEvent.change(field, { target: { value: '' } }); });
     expect(field.value).toBe('');
     expect(new URLSearchParams(window.location.search).get('b')).not.toBe('0');
-    expect(screen.queryByText('No PTO days allocated. You can still explore the holidays below.')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'No PTO days to spend' })).toBeNull();
     await act(async () => { fireEvent.change(field, { target: { value: '0' } }); });
     expect(field.value).toBe('0');
-    expect(screen.getByText('No PTO days allocated. You can still explore the holidays below.')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'No PTO days to spend' })).toBeTruthy();
   });
 
   it('shows a directly visible, keyboard-friendly PTO slider that stays synchronized with the number field', async () => {
@@ -97,7 +98,6 @@ describe('live homepage planner', () => {
     expect(slider.getAttribute('aria-valuetext')).toBe('7 PTO days available');
     expect(new URLSearchParams(window.location.search).get('b')).toBe('7');
     expect(screen.getByRole('heading', { name: 'Plan the breaks, then keep track of the days.' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Put your days off on the calendar.' })).toBeTruthy();
   });
 
   it('draws every break of the plan on a weekday-aligned year schedule and names each one in words', async () => {
@@ -119,8 +119,9 @@ describe('live homepage planner', () => {
   it('uses one label for the primary planner action everywhere on the page', async () => {
     await act(async () => { render(<Landing />); });
     const primary = screen.getAllByRole('link', { name: 'See the full plan →' });
-    expect(primary.length).toBe(2);
-    expect(new Set(primary.map((link) => link.getAttribute('href'))).size).toBe(1);
+    // One primary action on the page: the closing section no longer repeats it.
+    expect(primary.length).toBe(1);
+    expect(screen.queryByRole('button', { name: 'Copy this PTO plan' })).toBeNull();
   });
 
   it('leaves unmarked root queries to the historic /pto redirect', async () => {
@@ -134,7 +135,7 @@ describe('live homepage planner', () => {
   it('shows explicit empty and invalid-date states while preserving the basic controls', async () => {
     await act(async () => { render(<Landing />); });
     await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '0' } }); });
-    expect(screen.getByText(/No PTO days allocated/)).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'No PTO days to spend' })).toBeTruthy();
     await act(async () => { fireEvent.change(screen.getByLabelText('Through'), { target: { value: '2026-01-01' } }); });
     expect(screen.getByRole('alert').textContent).toContain('Choose valid start and end dates');
     expect(screen.getByLabelText('Country')).toBeTruthy();
@@ -215,8 +216,60 @@ describe('live homepage planner', () => {
   it('keeps planning available when saved preferences cannot be read', async () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('storage disabled'); });
     await act(async () => { render(<Landing />); });
-    expect(screen.getByText(/from 15 PTO days across/)).toBeTruthy();
+    expect(screen.getByText(/^15 PTO days \+/)).toBeTruthy();
     const link = screen.getAllByRole('link', { name: 'See the full plan →' })[0] as HTMLAnchorElement;
     expect(new URL(link.href).searchParams.has('eh')).toBe(false);
+  });
+
+  it('labels the 15 days and the country as a starting guess until the visitor changes either (research rec 3)', async () => {
+    await act(async () => { render(<Landing />); });
+    const guess = 'A starting guess: 15 PTO days and United States holidays. Change either to match yours.';
+    expect(screen.getByText(guess)).toBeTruthy();
+    await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '20' } }); });
+    expect(screen.queryByText(/A starting guess/)).toBeNull();
+    await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '15' } }); });
+    expect(screen.queryByText(/A starting guess/)).toBeNull();
+  });
+
+  it('does not call the country a guess when a homepage link names it', async () => {
+    window.history.replaceState(null, '', '/?home=1&c=US&b=15&s=2026-11-02&e=2027-11-01');
+    await act(async () => { render(<Landing />); });
+    expect(screen.queryByText(/A starting guess/)).toBeNull();
+  });
+
+  it('with 0 PTO days, says so and shows the long weekends public holidays already make (F05)', async () => {
+    await act(async () => { render(<Landing />); });
+    await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '0' } }); });
+    const result = screen.getByRole('heading', { name: 'No PTO days to spend' }).closest('section')!;
+    // Christmas (Fri) and New Year's Day (Fri) and Independence Day observed (Mon): three 3-day weekends.
+    expect(result.textContent).toContain('Public holidays alone give you 3 long weekends in these dates.');
+    expect(result.textContent).toContain('The next is Dec 25 – 27, 2026, for Christmas Day.');
+    expect(result.textContent).not.toMatch(/\d+ PTO days? \+/);
+    expect(screen.queryByRole('figure')).toBeNull();
+  });
+
+  it('with a blank PTO field, asks for the number instead of showing the old plan as theirs (F06)', async () => {
+    await act(async () => { render(<Landing />); });
+    await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '' } }); });
+    expect(screen.getByRole('heading', { name: 'Enter your PTO days' })).toBeTruthy();
+    expect(document.getElementById('landing-result')!.closest('section')!.textContent).not.toMatch(/\d+ days off/);
+    expect(screen.queryByText(/weekend and holiday days/)).toBeNull();
+    expect(screen.queryByRole('figure')).toBeNull();
+    expect(screen.queryByText(/A starting guess/)).toBeNull();
+  });
+
+  it('states only new information after the longest break, never the trade twice (F12)', async () => {
+    await act(async () => { render(<Landing />); });
+    const longest = screen.getByText(/^Longest:/);
+    expect(longest.textContent).not.toMatch(/—/);
+    expect((longest.textContent!.match(/PTO days? for|days off for/g) ?? []).length).toBe(1);
+  });
+});
+
+describe('share-link claim (N2/F10)', () => {
+  it('uses the one shared sentence and no longer promises a link opens the plan exactly', async () => {
+    await act(async () => { render(<Landing />); });
+    expect(screen.getByText((_, el) => el?.tagName === 'P' && !!el.textContent?.includes(SHARE_LINK_SENTENCE))).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/exactly as you left it/);
   });
 });

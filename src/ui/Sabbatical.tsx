@@ -12,7 +12,7 @@ import { todayISO } from './today';
 import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { formatCardDateRange, formatLong, formatShort, formatShortWithYear } from '@daysoff/engine/calendar/dateFormat';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
-import { bestPlacements, placementNote, type SabbaticalPlacement } from './sabbaticalData';
+import { bestPlacements, placementNote, timeAwayHolidaySentence, type SabbaticalPlacement } from './sabbaticalData';
 import { UnpaidIcon } from './DayCell';
 import { COLORS, HOLIDAY_DOT } from './colorScheme';
 import { weekStartForCountry } from './locale';
@@ -21,6 +21,7 @@ import { downloadSabbaticalICS } from './icsExport';
 import { copyCanvasImage, SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT } from './imageExport';
 import { copyText } from './requestText';
 import { SABBATICAL_FAQ_ITEMS } from './sabbaticalFaqItems';
+import { SHARE_LINK_SENTENCE } from './shareLinkCopy';
 
 /**
  * Site restructure, Phase 4: /sabbatical. A distinct experience from /pto - placing ONE
@@ -137,7 +138,6 @@ export function Sabbatical() {
         selected.ptoAfter ? `${selected.ptoAfter} PTO day${selected.ptoAfter === 1 ? '' : 's'} after` : '',
         selected.unpaidBefore ? `${selected.unpaidBefore} unpaid day${selected.unpaidBefore === 1 ? '' : 's'} before` : '',
         selected.unpaidAfter ? `${selected.unpaidAfter} unpaid day${selected.unpaidAfter === 1 ? '' : 's'} after` : '',
-        selected.holidayNames.length ? `${selected.holidayNames.length} public holiday${selected.holidayNames.length === 1 ? '' : 's'} inside` : '',
       ].filter(Boolean).join(' + ')
     : '';
 
@@ -157,6 +157,11 @@ export function Sabbatical() {
               <p className="mt-3 text-base text-muted">
                 {formatCardDateRange(selected.extendedStart, selected.extendedEnd)}: {composition}.
               </p>
+              {/* F18: holidays are counted over the same dates as the line above and named,
+                  and kept out of the "+" sum, since a holiday inside adds no days itself. */}
+              {selected.timeAwayHolidayNames.length > 0 && (
+                <p className="mt-1 text-base text-muted">{timeAwayHolidaySentence(selected)}</p>
+              )}
               {prerenderedAt && (
                 <p className="mt-1 text-xs text-muted">
                   Dates above as of {formatShort(prerenderedAt.slice(0, 10))} — this page recomputes live once it loads in your browser.
@@ -665,7 +670,7 @@ function SabbaticalExportRow({
   return (
     <section aria-labelledby="sabbatical-export-heading">
       <h2 id="sabbatical-export-heading" className="text-h2 font-bold type-condensed text-ink">Keep it</h2>
-      <p className="mt-1 text-sm text-muted">The link reproduces this exact plan for anyone you send it to.</p>
+      <p className="mt-1 text-sm text-muted">{SHARE_LINK_SENTENCE}</p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button variant="secondary" onClick={() => downloadSabbaticalICS(placement.extendedStart, placement.extendedEnd, summary, description)}>
           Add to calendar (.ics)

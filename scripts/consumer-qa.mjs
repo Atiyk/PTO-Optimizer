@@ -226,11 +226,14 @@ try {
             && await page.getByRole('heading', { name: 'Shape your plan' }).isVisible();
           if (label === 'after' && width <= 375) {
             result.mobileRequestCardsBeforeCalendar = await page.evaluate(() => {
+              // Phones read: result, the core inputs (PTO days, country, dates), the request
+              // cards, the two sliders, then the calendar, in both layout and DOM order.
               const summary = document.querySelector('main h1');
+              const inputs = document.querySelector('#plan-controls');
               const request = document.querySelector('#breaks-heading');
-              const controls = document.querySelector('#plan-controls');
+              const sliders = document.querySelector('#plan-shape');
               const calendar = document.querySelector('#complete-plan-heading');
-              const order = [summary, request, controls, calendar];
+              const order = [summary, inputs, request, sliders, calendar];
               return order.every((element, index) => element && (!index
                 || order[index - 1].getBoundingClientRect().top < element.getBoundingClientRect().top
                 && (order[index - 1].compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING)));

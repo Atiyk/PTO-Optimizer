@@ -170,13 +170,13 @@ describe('BreakCard reason (Phase 3 step 4: "why" line, computed by breakReason.
         isPtoDay={() => true}
         onHover={() => {}}
         isMostContested={false}
-        reason="Bridges Thanksgiving — 1 PTO day for 4 days off."
+        reason="Bridges Thanksgiving."
         today="2025-12-01"
         noticePeriodDays={14}
         workWeek={DEFAULT_WORK_WEEK}
       />,
     );
-    expect(html).toContain('Bridges Thanksgiving — 1 PTO day for 4 days off.');
+    expect(html).toContain('Bridges Thanksgiving.');
   });
 });
 

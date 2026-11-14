@@ -176,15 +176,8 @@ function CopyRequestDropdown({ options }: { options: CopyOption[] }) {
   );
 }
 
-/** A break at or below 1.0x gains NO extra days off beyond the PTO day(s) spent - a
- * legitimate trade at a weighting that favours quieter travel, never a bug, but it looks
- * broken with no explanation on screen. Verified empirically (not assumed) that this is a
- * budget-maximization effect independent of w, not a demand-scaling bug - see NOTES.md.
- * Still used for the multiplier badge's styling; the explanatory text itself now comes from
- * breakReason.ts (Phase 3's unified "why" line), which covers this exact case too. */
-function isLowValue(brk: Break): boolean {
-  return brk.multiplier <= 1.0;
-}
+/* A break at or below 1.0x gains no extra days off; breakReason.ts says so in the card's
+ * "why" line (see NOTES.md for why the planner can still choose one). */
 
 const travelTagLabels: Partial<Record<Break['tags'][number], string>> = {
   'Peak travel': 'Busier travel estimate',
@@ -247,7 +240,6 @@ export function BreakCard({
   // freezing a one-time snapshot.
   const [userExpanded, setUserExpanded] = useState<boolean | null>(null);
   const expanded = userExpanded ?? defaultExpanded;
-  const lowValue = isLowValue(brk);
   const dayWord = brk.totalDaysOff === 1 ? 'day' : 'days';
   const ptoWord = brk.ptoCost === 1 ? 'day' : 'days';
   const contested = isContested(brk);
@@ -284,7 +276,6 @@ export function BreakCard({
           <span>
             <span className="mark font-semibold">{brk.totalDaysOff} {dayWord} off</span> for {brk.ptoCost} PTO {ptoWord}
           </span>
-          {lowValue && <span className="text-sm text-muted">All days off come from PTO.</span>}
           {brk.tags.map((tag) => (
             <span key={tag} className="rounded-[6px] bg-surface-alt px-2 py-0.5 text-xs font-medium text-ink">
               {travelTagLabels[tag] ?? tag}

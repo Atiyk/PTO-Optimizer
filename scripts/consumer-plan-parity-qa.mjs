@@ -41,10 +41,16 @@ async function context() {
       const h1 = document.querySelector('main h1');
       if (!h1 || !h1.getClientRects().length || getComputedStyle(h1).visibility !== 'visible') return;
       const text = (h1.textContent ?? '').replace(/\s+/g, ' ').trim();
-      const summary = /^(\d+) days? off\s+from (\d+) PTO days?$/i.exec(text);
+      // The headline reads "31 days off 15 PTO days + 16 weekend and holiday days", or
+      // "N days off from N PTO days" when every day off is PTO. Both halves are recorded,
+      // and a split that does not add up is recorded as a mismatch (cost -1).
+      const split = /^(\d+) days? off\s+(\d+) PTO days? \+ (\d+) weekend and holiday days?$/i.exec(text);
+      const plain = /^(\d+) days? off\s+from (\d+) PTO days?$/i.exec(text);
+      const summary = split ?? plain;
       if (!summary) return;
+      const cost = split && Number(split[2]) + Number(split[3]) !== Number(split[1]) ? -1 : Number(summary[2]);
       const cards = [...document.querySelectorAll(breakData)].filter(el => el.getClientRects().length && getComputedStyle(el).visibility === 'visible');
-      const snapshot = { total: Number(summary[1]), cost: Number(summary[2]), breaks: cards.map(({ dataset }) => [dataset.breakStart, dataset.breakEnd, Number(dataset.breakPto)]) };
+      const snapshot = { total: Number(summary[1]), cost, breaks: cards.map(({ dataset }) => [dataset.breakStart, dataset.breakEnd, Number(dataset.breakPto)]) };
       if (JSON.stringify(snapshot) !== JSON.stringify(snapshots.at(-1))) snapshots.push(snapshot);
     };
     const observer = new MutationObserver(capture);

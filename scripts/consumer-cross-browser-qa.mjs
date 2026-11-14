@@ -71,10 +71,16 @@ for (const name of selected) {
       locale: 'en-US',
       reducedMotion: 'reduce',
     });
-    await context.route('**/*', (route) => {
+    await context.route('**/*', async (route) => {
       const url = new URL(route.request().url());
       if (url.origin === base.origin && url.pathname === '/_vercel/insights/script.js') {
         return route.fulfill({ contentType: 'application/javascript', body: '' });
+      }
+      // Vercel serves clean URLs (/pto is /pto/index.html); vite preview falls back to the
+      // homepage for slashless paths, so fetch the directory index like the deployed site.
+      if (url.origin === base.origin && route.request().resourceType() === 'document' && url.pathname === '/pto') {
+        url.pathname = '/pto/';
+        return route.fulfill({ response: await route.fetch({ url: url.href }) });
       }
       return url.origin === base.origin ? route.continue() : route.abort();
     });
@@ -108,9 +114,24 @@ for (const name of selected) {
     assert.equal(link.searchParams.get('b'), '12');
     assert.equal(link.searchParams.get('e'), '2027-10-20');
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
-    await page.getByRole('button', { name: 'Copy this PTO plan' }).click();
-    await page.getByText('Link copied.', { exact: true }).waitFor();
-    const copied = new URL(await page.evaluate(() => window.__timebowerClipboard));
+    // The homepage hands off to the planner; its public "Copy link" control is the one share
+    // path, so copy from the plan this exact link opens, in the same engine and context.
+    const planner = await context.newPage();
+    await planner.addInitScript(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: async (value) => { window.__timebowerClipboard = value; } },
+      });
+    });
+    planner.on('pageerror', (error) => result.errors.push(error.message));
+    await planner.clock.setFixedTime(new Date('2026-11-10T17:00:00Z'));
+    await planner.goto(link.href);
+    await planner.locator('main[data-plan-ready="true"]').waitFor();
+    assert.ok(await planner.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+    await planner.getByRole('button', { name: 'Copy link', exact: true }).click();
+    await planner.getByRole('button', { name: /^(?:Link copied|Copied \(calendar omitted\))$/ }).waitFor();
+    const copied = new URL(await planner.evaluate(() => window.__timebowerClipboard));
+    await planner.close();
     assert.equal(copied.searchParams.get('b'), '12');
     assert.equal(copied.searchParams.get('e'), '2027-10-20');
     assert.equal(copied.searchParams.has('eh'), false);
@@ -120,11 +141,14 @@ for (const name of selected) {
     // when no holiday dates are shared, the public holiday fingerprint. Nothing private.
     assert.equal(copied.searchParams.get('sv'), '1');
     assert.match(copied.searchParams.get('er') ?? '', /^[1-9]\d{0,2}$/);
-    // The landing preview does not compute a holiday fingerprint; when present it is valid.
+    // When present, the public holiday fingerprint is valid.
     if (copied.searchParams.has('hf')) assert.match(copied.searchParams.get('hf'), /^[0-9a-f]{8}$/);
     for (const key of ['bo', 'r', 'pp', 'od', 'cb', 'fc']) assert.equal(copied.searchParams.has(key), false, `share link must not carry ${key}`);
 
-    // Real keyboard entry into the native date control, not just a programmatic fill.
+    // Real keyboard entry into the native date control, not just a programmatic fill. Move
+    // focus off the field first (the homepage copy button used to do this), so focusing it
+    // starts at the month segment rather than the day segment the earlier Tab left it on.
+    await fullPlan.focus();
     await through.focus();
     await page.keyboard.type('09152027', { delay: 30 });
     await page.keyboard.press('Tab');

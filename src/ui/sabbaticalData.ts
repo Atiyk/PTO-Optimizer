@@ -17,8 +17,15 @@ export interface SabbaticalPlacement {
   /** The core block's own last day, before any PTO extension. */
   coreEnd: string;
   lengthDays: number;
-  /** Public holidays whose date falls inside the core block, by name (possibly empty). */
+  /** Public holidays whose date falls inside the core block, by name (possibly empty).
+   * Used for ranking and the "no window puts a holiday inside" note only - never shown next
+   * to the extended dates (see timeAwayHolidayNames). */
   holidayNames: string[];
+  /** F18: every public holiday from extendedStart to extendedEnd, by name, in date order -
+   * the holidays inside the dates the hero and card actually show. Holidays the PTO
+   * extension reaches (Christmas before a January block) count here; the core-only
+   * holidayNames used to be printed beside the extended range and undercounted. */
+  timeAwayHolidayNames: string[];
   /** Total away-days for this placement WITH the user's current PTO budget - Phase 3's
    * fix for the headline/card mismatch (K3a): ranking and display both use the same
    * number the hero shows for the selected placement, not a separate 0-PTO figure. */
@@ -209,9 +216,18 @@ function joinNames(names: string[]): string {
  * is actually said, once, at the top. */
 export function placementNote(p: SabbaticalPlacement): string {
   const clauses = [`${p.totalAwayDays} days away`];
-  if (p.holidayNames.length > 0) clauses.push(`includes ${joinNames(p.holidayNames)}`);
+  if (p.timeAwayHolidayNames.length > 0) clauses.push(`includes ${joinNames(p.timeAwayHolidayNames)}`);
   if (p.travelTag) clauses.push(p.travelTag);
   return clauses.join(' · ');
+}
+
+/** F18: the hero's holiday sentence - counted and named over the same dates the hero shows,
+ * kept out of the "4 weeks + 5 PTO days" sum because a holiday inside the time away adds
+ * no days by itself. Empty when there are none. */
+export function timeAwayHolidaySentence(p: Pick<SabbaticalPlacement, 'timeAwayHolidayNames'>): string {
+  const n = p.timeAwayHolidayNames.length;
+  if (n === 0) return '';
+  return `${n} public holiday${n === 1 ? ' falls' : 's fall'} in this time away: ${joinNames(p.timeAwayHolidayNames)}.`;
 }
 
 export interface BestPlacementsResult {
@@ -262,11 +278,19 @@ export function bestPlacements(
     const before = extended.spentDays.filter((s) => s.date < d);
     const after = extended.spentDays.filter((s) => s.date > coreEnd);
 
+    const timeAwayHolidayNames = [...new Set(
+      holidays
+        .filter((h) => h.date >= extended.start && h.date <= extended.end)
+        .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+        .map((h) => h.name),
+    )];
+
     candidates.push({
       start: d,
       coreEnd,
       lengthDays,
       holidayNames,
+      timeAwayHolidayNames,
       totalAwayDays,
       travelTag: travelTagFor(d, coreEnd, countryCode),
       extendedStart: extended.start,

@@ -11,10 +11,8 @@ import { YearStrip } from './YearStrip';
 import { geolocateCountry } from './geo';
 import { todayISO } from './today';
 import { breakReason } from './breakReason';
-import { findBridges, nextHoliday, remainingHolidays, runLength } from './landingData';
+import { findBridges, holidayLongWeekends, nextHoliday, remainingHolidays, runLength } from './landingData';
 import { downloadHolidaysICS } from './icsExport';
-import { copyText } from './requestText';
-import { buildPublicPlanLink } from './publicSharePrivacy';
 import { track } from './analytics';
 import { computeLandingPlan, landingHolidayHref, landingPlanHref, landingSearch, readLandingState, validLandingRange } from './landingState';
 import { readEmployerCalendar } from '../personal/employerCalendar';
@@ -22,7 +20,9 @@ import { landingObservedHolidays, useLandingHolidays } from './landingCalendar';
 import { weekStartForCountry } from './locale';
 import { HOLIDAY_DOT } from './colorScheme';
 import { useWholeDayDraft } from './useWholeDayDraft';
+import { daysOffSplit } from './Headline';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
+import { SHARE_LINK_SENTENCE } from './shareLinkCopy';
 
 /** A control set inside the sentence: it takes the sentence's own size and weight. */
 const INLINE_FIELD = 'h-[1.45em] min-h-11 rounded-[6px] border border-line-strong bg-surface px-[0.3em] align-baseline font-bold text-ink hover:border-ink';
@@ -30,7 +30,7 @@ const DATE_FIELD = 'h-11 min-w-0 rounded-[6px] border border-line-strong bg-surf
 const LINK = 'link-mark inline-flex min-h-11 items-center font-semibold';
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-function breakDates(brk: Break): string {
+function breakDates(brk: { start: string; end: string }): string {
   const range = formatCardDateRange(brk.start, brk.end);
   return brk.start.slice(0, 4) === brk.end.slice(0, 4) ? `${range}, ${brk.end.slice(0, 4)}` : range;
 }
@@ -151,9 +151,16 @@ export function Landing() {
   const validRange = validLandingRange(rangeStart, rangeEnd);
   const calendar = useLandingHolidays(country, rangeStart, rangeEnd, validRange);
   const engaged = useRef(false);
-  const [copyMessage, setCopyMessage] = useState('');
+  // The 15 days and the country are our guesses until the visitor sets either one, or a
+  // homepage link names the country. Read once at mount: the page rewrites its own URL.
+  const [guessing, setGuessing] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const params = new URLSearchParams(window.location.search);
+    return !(params.get('home') === '1' && params.has('c'));
+  });
   const update = (next: Partial<typeof state>) => {
     if (!engaged.current) { engaged.current = true; track('quick_plan_engaged'); }
+    if ('budget' in next || 'country' in next) setGuessing(false);
     setState((previous) => ({ ...previous, ...next }));
   };
   // Issue 15: an emptied field is "not entered yet", never a 0-day plan.
@@ -186,9 +193,14 @@ export function Landing() {
   const bridgeableDates = useMemo(() => new Set(upcoming.filter((entry) => entry.isBridgeable || entry.runLength >= 3).map((entry) => entry.holiday.date)), [upcoming]);
   const href = validRange ? landingPlanHref(state) : '/pto';
   const countryName = COUNTRIES.find((entry) => entry.code === country)?.name ?? country;
+  const budgetBlank = budgetDraft.empty;
+  const showGuess = guessing && budget === 15 && !budgetBlank;
+  // With 0 PTO days there is nothing to place, but the holidays still make long weekends.
+  const longWeekends = useMemo(() => holidayLongWeekends(upcoming), [upcoming]);
+  const zeroBudget = budget === 0 && validRange && !loading;
   const emptyMessage = !validRange ? 'Your preview will appear once the planning dates are valid.'
     : loading ? 'Updating your holiday calendar…'
-      : plan?.issue ?? (budget === 0 ? 'No PTO days allocated. You can still explore the holidays below.' : 'No qualifying break fits these dates and PTO days. Try a longer range or more available PTO.');
+      : plan?.issue ?? 'No break of 3 days or more fits these dates and PTO days. Try a longer date range or more PTO days.';
 
   return <div className="min-h-dvh bg-page">
     <SiteHeader active="landing" />
@@ -199,7 +211,8 @@ export function Landing() {
           <h1 id="landing-heading" className="max-w-[17ch] text-[clamp(2.25rem,0.95rem+5vw,4.75rem)] leading-[1.04] type-display text-ink">More days off from the same PTO.</h1>
 
           <div className="mt-6 grid min-w-0 gap-x-14 gap-y-6 sm:mt-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-            <p className="min-w-0 text-[1.375rem] leading-[1.5] font-medium text-ink sm:text-[1.75rem] lg:col-start-1 lg:row-start-1">
+            <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+            <p className="min-w-0 text-[1.375rem] leading-[1.5] font-medium text-ink sm:text-[1.75rem]">
               I have{' '}
               <input id="landing-budget" aria-label="PTO days available" type="number" inputMode="numeric" min={0} max={60} step={1}
                 className={`${INLINE_FIELD} w-[2.6em] text-center tabular-nums`} value={budgetDraft.text}
@@ -210,14 +223,24 @@ export function Landing() {
                 {COUNTRIES.map((entry) => <option key={entry.code} value={entry.code}>{entry.name}</option>)}
               </select>.
             </p>
+            {showGuess && <p className="mt-2 text-[15px] text-muted">A starting guess: 15 PTO days and {countryName} holidays. Change either to match yours.</p>}
+            </div>
 
             <section aria-labelledby="landing-result" data-plan-result={!validRange ? 'unavailable' : loading ? 'pending' : 'ready'} className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-1">
-              {bestBreak ? <>
+              {budgetBlank ? <>
+                <h2 id="landing-result" className="text-h2 font-bold type-condensed text-ink">Enter your PTO days</h2>
+                <p className="mt-2 text-base text-muted" role="status">Type how many PTO days you have, and your plan shows here.</p>
+              </> : bestBreak ? <>
                 <h2 id="landing-result" className="text-[clamp(2.75rem,1.75rem+3vw,4.5rem)] leading-none tabular-nums type-display text-ink">
                   <span className="sr-only">Your plan: </span><span className="mark">{planDaysOff} days off</span>
                 </h2>
-                <p className="mt-3 text-xl font-semibold text-ink">from {plural(used, 'PTO day')} across {plural(breakCount, 'break')}</p>
+                <p className="mt-3 text-xl font-semibold tabular-nums text-ink">{daysOffSplit(used, planDaysOff)}, across {plural(breakCount, 'break')}</p>
                 <p className="mt-2 text-base text-muted">Longest: <strong className="font-semibold text-ink"><span className="tabular-nums">{breakDates(bestBreak)}</span>, {bestBreak.totalDaysOff} days off for {plural(bestBreak.ptoCost, 'PTO day')}</strong>. {breakReason(bestBreak, (date) => holidayName.get(date))}</p>
+              </> : zeroBudget ? <>
+                <h2 id="landing-result" className="text-h2 font-bold type-condensed text-ink">No PTO days to spend</h2>
+                <p className="mt-2 text-base text-ink" role="status">{longWeekends.length > 0
+                  ? <>Public holidays alone give you {plural(longWeekends.length, 'long weekend')} in these dates. The next is <strong className="font-semibold tabular-nums">{breakDates(longWeekends[0].run)}</strong>, for {longWeekends[0].holiday.name}.</>
+                  : 'Public holidays don’t make any long weekends in these dates.'}</p>
               </> : <>
                 <h2 id="landing-result" className="text-h2 font-bold type-condensed text-ink">Your recommended break</h2>
                 <p className="mt-2 text-base text-muted" role="status">{emptyMessage}</p>
@@ -253,7 +276,7 @@ export function Landing() {
           </div>
 
           <div className="mt-8 sm:mt-10">
-            {bestBreak && plan && <PlanYear breaks={plan.result.primary} best={bestBreak} rangeStart={rangeStart} rangeEnd={rangeEnd} holidayName={holidayName} weekStart={weekStartForCountry(country)} />}
+            {bestBreak && plan && !budgetBlank && <PlanYear breaks={plan.result.primary} best={bestBreak} rangeStart={rangeStart} rangeEnd={rangeEnd} holidayName={holidayName} weekStart={weekStartForCountry(country)} />}
             <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-8 gap-y-1">
               <p className="max-w-3xl text-sm text-muted">Preview assumes a Monday–Friday workweek. {customizedHolidays ? 'Your saved employer holiday calendar is applied' : 'National public holidays are assumed to be observed by your employer'}{employer.custom.length > 0 ? ', including additional company days off' : ''}. Calendar days off include weekends, observed holidays, and PTO days.</p>
               <a href={`${href}#planning-assumptions`} className={`${LINK} text-sm`}>Customize workweek and employer holidays →</a>
@@ -318,54 +341,29 @@ export function Landing() {
         </section>
       </Container>
 
-      {/* How it works: a field one tone down, a plain statement, three facts. */}
-      <section aria-labelledby="landing-how" className="mt-20 bg-surface-alt lg:mt-28">
-        <Container className="grid gap-x-16 gap-y-10 px-4 py-14 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:py-20">
+      {/* How it works: a plain statement, then two facts with their sources. It is the last
+          section, so it sits on the page itself rather than a band that would stop short of
+          the footer. */}
+      <section aria-labelledby="landing-how" className="mt-20 lg:mt-28">
+        <Container className="grid gap-x-16 gap-y-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <div className="min-w-0">
             <h2 id="landing-how" className="max-w-[12ch] text-display-sm type-display text-ink">Same inputs, same plan.</h2>
-            <p className="mt-4 max-w-sm text-lg text-ink">A shared link carries the scenario you choose to share. Private employer settings and tracked requests stay in your browser.</p>
+            <p className="mt-4 max-w-sm text-lg text-ink">The planner checks every date in your range against your workweek, public holidays and PTO days. The same inputs always give the same plan.</p>
           </div>
           <div className="grid min-w-0 gap-x-10 gap-y-8 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <h3 className="text-h2 font-bold type-condensed text-ink">Real calendar, clear calculations.</h3>
-              <p className="mt-2 max-w-2xl text-base text-ink">Our deterministic planner searches your dates, workweek, holidays, and PTO budget. Identical inputs produce the same plan.</p>
-            </div>
             <div>
-              <h3 className="text-h2 font-bold type-condensed text-ink">Your employer sets the rules.</h3>
-              <p className="mt-2 text-base text-ink">Public holiday data comes from Nager.Date. We assume those days are observed; adjust them in the planner. Forecasts estimate the policy you enter.</p>
+              <h3 className="text-h2 font-bold type-condensed text-ink">Where the holidays come from.</h3>
+              <p className="mt-2 text-base text-ink">Public holiday data comes from Nager.Date. We assume your employer observes those days; you can change that in the planner. Balance forecasts are estimates from the policy you enter.</p>
               <a className={LINK} href="/data-sources">About the data →</a>
             </div>
             <div>
-              <h3 className="text-h2 font-bold type-condensed text-ink">Personal planning stays personal.</h3>
-              <p className="mt-2 text-base text-ink">Employer preferences and request notes save in this browser. Planning links contain the settings you choose to share, so review them before sharing.</p>
+              <h3 className="text-h2 font-bold type-condensed text-ink">What stays in your browser.</h3>
+              <p className="mt-2 text-base text-ink">Employer settings and request notes save in this browser only. {SHARE_LINK_SENTENCE}</p>
               <a className={LINK} href="/privacy.html">Privacy details →</a>
             </div>
           </div>
         </Container>
       </section>
-
-      {/* The close: the visitor's own numbers, and the way into the full planner. */}
-      <Container className="px-4 pt-20 sm:px-6 lg:pt-24">
-        <section aria-labelledby="landing-close" className="grid items-end gap-x-16 gap-y-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-          <div className="min-w-0">
-            <h2 id="landing-close" className="max-w-[14ch] text-display-sm type-display text-ink">Put your days off on the calendar.</h2>
-            <p className="mt-4 max-w-xl text-lg text-ink">{bestBreak
-              ? <>This preview plans {used} of your {budget} PTO days across {plural(breakCount, 'break')}. The full planner lets you pin days, compare alternatives, and export the plan.</>
-              : 'Start with a plan. Make it yours.'}</p>
-          </div>
-          <div className="flex min-w-0 flex-col items-start gap-3">
-            <Button href={href}>See the full plan →</Button>
-            <div className="flex flex-wrap items-center gap-x-3">
-              <Button variant="quiet" onClick={async () => {
-                const url = new URL(href, window.location.origin);
-                const copied = await copyText(buildPublicPlanLink(url.href, url.search).url);
-                setCopyMessage(copied ? (customizedHolidays ? 'Public plan copied. Your employer holiday settings stay in this browser.' : 'Link copied.') : 'Could not copy the public plan link.');
-              }}>Copy this PTO plan</Button>
-              {copyMessage && <span role="status" className="text-sm text-muted">{copyMessage}</span>}
-            </div>
-          </div>
-        </section>
-      </Container>
     </main>
     <Footer />
   </div>;

@@ -236,3 +236,13 @@ export function remainingHolidays(
   }
   return result;
 }
+
+/**
+ * F05: the long weekends public holidays make on their own - one entry per distinct off run
+ * of 3+ days that contains a holiday. Shared by the landing page's 0-PTO state and /pto's,
+ * so the same dates and country give the same count on both.
+ */
+export function holidayLongWeekends(upcoming: RemainingHoliday[]): RemainingHoliday[] {
+  const seen = new Set<string>();
+  return upcoming.filter((entry) => entry.runLength >= 3 && !seen.has(entry.run.start) && seen.add(entry.run.start));
+}

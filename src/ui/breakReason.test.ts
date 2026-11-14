@@ -19,23 +19,23 @@ const noHoliday = () => undefined;
 describe('breakReason', () => {
   it('names the holiday when the break bridges one, over any other branch', () => {
     const holidayNameFor = (iso: string) => (iso === '2026-11-26' ? 'Thanksgiving' : undefined);
-    expect(breakReason(BASE, holidayNameFor)).toBe('Bridges Thanksgiving — 1 PTO day for 4 days off.');
+    expect(breakReason(BASE, holidayNameFor)).toBe('Bridges Thanksgiving.');
   });
 
-  it('pluralizes PTO day(s) and day(s) off correctly', () => {
+  it('names only the holiday, without restating the trade the card already shows', () => {
     const brk: Break = { ...BASE, ptoCost: 2, totalDaysOff: 1 };
     const holidayNameFor = () => 'New Year’s Day';
-    expect(breakReason(brk, holidayNameFor)).toBe('Bridges New Year’s Day — 2 PTO days for 1 day off.');
+    expect(breakReason(brk, holidayNameFor)).toBe('Bridges New Year’s Day.');
   });
 
-  it('describes a quieter historical comparison and keeps the exact PTO trade', () => {
+  it('describes a quieter historical comparison without restating the trade', () => {
     const brk: Break = { ...BASE, tags: ['Low travel demand'], meanDemand: 0.7 };
-    expect(breakReason(brk, noHoliday)).toBe('1 PTO day for 4 days off — quieter in the historical travel comparison.');
+    expect(breakReason(brk, noHoliday)).toBe('These dates look quieter in the historical travel comparison.');
   });
 
-  it('describes a busier historical comparison and keeps the exact PTO trade', () => {
+  it('describes a busier historical comparison without restating the trade', () => {
     const brk: Break = { ...BASE, tags: ['Peak travel'], meanDemand: 1.4 };
-    expect(breakReason(brk, noHoliday)).toBe('1 PTO day for 4 days off — busier in the historical travel comparison.');
+    expect(breakReason(brk, noHoliday)).toBe('These dates look busier in the historical travel comparison.');
   });
 
   it('does not invent percentages when demand metadata is invalid or contradicts its tag', () => {
@@ -48,38 +48,38 @@ describe('breakReason', () => {
     ];
     for (const { tag, meanDemand } of cases) {
       const explanation = breakReason({ ...BASE, tags: [tag], meanDemand }, noHoliday);
-      expect(explanation).toBe('Efficient swap — 1 PTO day for 4 days off (4.00x).');
+      expect(explanation).toBe('Joins your PTO to days you already have off.');
       expect(explanation).not.toMatch(/NaN|Infinity|%/);
     }
   });
 
   it('flags estimated demand data explicitly rather than presenting it as measured', () => {
     const brk: Break = { ...BASE, tags: ['Estimated'] };
-    expect(breakReason(brk, noHoliday)).toBe('1 PTO day for 4 days off — travel demand here is an estimate for this country.');
+    expect(breakReason(brk, noHoliday)).toBe('Travel demand for these dates is an estimate for this country.');
   });
 
   it('does not present estimated low-demand or peak-demand data as observed', () => {
     for (const demandTag of ['Low travel demand', 'Peak travel'] as const) {
       const brk: Break = { ...BASE, tags: [demandTag, 'Estimated'], meanDemand: demandTag === 'Low travel demand' ? 0.7 : 1.4 };
       const explanation = breakReason(brk, noHoliday);
-      expect(explanation).toBe('1 PTO day for 4 days off — travel demand here is an estimate for this country.');
+      expect(explanation).toBe('Travel demand for these dates is an estimate for this country.');
       expect(explanation).not.toMatch(/quiet travel week|busier travel week|% less|% above/i);
     }
   });
 
-  it('falls back to the plain multiplier swap when nothing else applies', () => {
-    expect(breakReason(BASE, noHoliday)).toBe('Efficient swap — 1 PTO day for 4 days off (4.00x).');
+  it('falls back to the days already off when nothing else applies', () => {
+    expect(breakReason(BASE, noHoliday)).toBe('Joins your PTO to days you already have off.');
   });
 
   it('never fabricates a reason for a low-value (1.0x or worse) break - matches the existing lowValueExplanation copy', () => {
     const lowValue: Break = { ...BASE, multiplier: 1, totalDaysOff: 1, ptoCost: 1, tags: ['Low travel demand'], meanDemand: 0.7 };
-    expect(breakReason(lowValue, noHoliday)).toBe('No extra days off — 1 PTO day for 1 day off; these dates look quieter in the historical comparison.');
+    expect(breakReason(lowValue, noHoliday)).toBe('No extra days off from weekends or holidays. These dates look quieter in the historical travel comparison.');
 
     expect(breakReason(lowValue, noHoliday)).not.toMatch(/chosen|optimized|budget|unspent/i);
 
     const lowValueNoTag: Break = { ...BASE, multiplier: 1, totalDaysOff: 1, ptoCost: 1, tags: [] };
     expect(breakReason(lowValueNoTag, noHoliday)).toBe(
-      'No extra days off — 1 PTO day for 1 day off.',
+      'No extra days off from weekends or holidays.',
     );
   });
 
@@ -92,7 +92,7 @@ describe('breakReason', () => {
         tags: ['Low travel demand'],
         meanDemand,
       };
-      expect(breakReason(lowValue, noHoliday)).toBe('No extra days off — 1 PTO day for 1 day off.');
+      expect(breakReason(lowValue, noHoliday)).toBe('No extra days off from weekends or holidays.');
     }
   });
 
@@ -106,7 +106,7 @@ describe('breakReason', () => {
         tags: [demandTag, 'Estimated'],
       };
       const explanation = breakReason(lowValue, noHoliday);
-      expect(explanation).toBe('No extra days off — 1 PTO day for 1 day off; travel demand here is an estimate for this country.');
+      expect(explanation).toBe('No extra days off from weekends or holidays. Travel demand for these dates is an estimate for this country.');
       expect(explanation).not.toMatch(/lower travel demand is tagged|quiet travel week|busier travel week/i);
     }
   });
@@ -114,7 +114,7 @@ describe('breakReason', () => {
   it('does not invent an optimization motive when a low-value break has no travel tag', () => {
     const lowValue: Break = { ...BASE, multiplier: 0.5, ptoCost: 2, totalDaysOff: 1, tags: [] };
     const explanation = breakReason(lowValue, noHoliday);
-    expect(explanation).toBe('No extra days off — 2 PTO days for 1 day off.');
+    expect(explanation).toBe('No extra days off from weekends or holidays.');
     expect(explanation).not.toMatch(/budget|unspent|optimized/i);
   });
 
@@ -125,5 +125,23 @@ describe('breakReason', () => {
     const holidayNameFor = () => 'Thanksgiving';
     expect(breakReason(lowValue, holidayNameFor)).not.toContain('Bridges');
     expect(breakReason(lowValue, holidayNameFor)).not.toContain('Busier');
+  });
+});
+
+describe('breakReason repetition (F12)', () => {
+  it('never restates the PTO trade or ratio that the card and headline already show', () => {
+    const variants: Break[] = [
+      BASE,
+      { ...BASE, tags: ['Estimated'] },
+      { ...BASE, tags: ['Low travel demand'], meanDemand: 0.7 },
+      { ...BASE, tags: ['Peak travel'], meanDemand: 1.4 },
+      { ...BASE, multiplier: 1, totalDaysOff: 1 },
+    ];
+    for (const brk of variants) {
+      for (const holidayNameFor of [noHoliday, () => 'Christmas Day']) {
+        const reason = breakReason(brk, holidayNameFor);
+        expect(reason).not.toMatch(/PTO days? for \d|\d+(\.\d+)?x|—/);
+      }
+    }
   });
 });

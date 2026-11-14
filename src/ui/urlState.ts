@@ -176,6 +176,16 @@ export interface FullURLDefaults {
   country: string;
 }
 
+/** The reserve a fresh visit starts with: the same as the homepage preview (rv=0). */
+export const FRESH_VISIT_RESERVE_DAYS = 0;
+const LEGACY_PLAN_KEYS = ['objective', 'shape', 'minBreakLength', 'maxBreakLength'];
+
+/** True when the query carries any planning param, current or legacy. Unrelated keys such
+ * as utm_* do not make a visit a "link with a plan". */
+export function hasPlanningParams(params: URLSearchParams): boolean {
+  return [...params.keys()].some((key) => Object.hasOwn(PLAN_URL_KEYS, key) || LEGACY_PLAN_KEYS.includes(key));
+}
+
 /** Reads everything the solver (and the few UI-only settings) needs from the URL, falling
  * back to `defaults` field-by-field for anything missing or malformed. Never throws. */
 export function readFullStateFromURL(search: string, defaults: FullURLDefaults): FullURLState {
@@ -243,7 +253,11 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
 
   const rvRaw = params.get('rv');
   const rvParsed = rvRaw !== null ? Number(rvRaw) : NaN;
-  const reserveDays = Number.isFinite(rvParsed) && rvParsed >= 0 ? rvParsed : 3;
+  // A visit with no planning params at all (bare /pto, /uk) starts from the homepage
+  // preview's defaults, which keep nothing in reserve. Any link that carries a planning
+  // param keeps its old meaning: a missing rv there still means 3, because the writer
+  // below omits rv when the reserve is 3.
+  const reserveDays = Number.isFinite(rvParsed) && rvParsed >= 0 ? rvParsed : hasPlanningParams(params) ? 3 : FRESH_VISIT_RESERVE_DAYS;
   const unlimitedPto = params.get('up') === '1';
 
   const npRaw = params.get('np');

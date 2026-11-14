@@ -258,3 +258,21 @@ describe('untrusted legacy link bounds', () => {
     expect(readSliderStateFromURL('?objective=toString')).toEqual({ w: 30, breakCount: 0 });
   });
 });
+
+describe('reserve default (F01: one default everywhere)', () => {
+  const defaults = { rangeStart: '2026-11-02', rangeEnd: '2027-11-01', budget: 15, country: 'US' };
+  it('keeps nothing in reserve on a visit with no planning params, like the homepage preview', () => {
+    expect(readFullStateFromURL('', defaults).reserveDays).toBe(0);
+    expect(readFullStateFromURL('?utm_source=newsletter', defaults).reserveDays).toBe(0);
+  });
+  it('keeps the old meaning of a missing rv on any link with planning params', () => {
+    expect(readFullStateFromURL('?b=15', defaults).reserveDays).toBe(3);
+    expect(readFullStateFromURL('?c=GB', defaults).reserveDays).toBe(3);
+    expect(readFullStateFromURL('?objective=most-days-off', defaults).reserveDays).toBe(3);
+    expect(readFullStateFromURL('?c=US&b=15&s=2026-11-02&e=2027-11-01&w=30&count=3', defaults).reserveDays).toBe(3);
+  });
+  it('reads an explicit rv as given', () => {
+    expect(readFullStateFromURL('?rv=0&b=15', defaults).reserveDays).toBe(0);
+    expect(readFullStateFromURL('?rv=5', defaults).reserveDays).toBe(5);
+  });
+});
