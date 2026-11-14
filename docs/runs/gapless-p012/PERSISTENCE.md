@@ -26,6 +26,11 @@ Readers ignore unknown fields, so older code still reads new records. Records wi
 them too. The employer calendar keeps its compact `1.[...]` format and is identified by
 content hash.
 
+Ledger requests may carry two optional fields, `noticePeriodDays` (integer 0–365) and
+`noticeUnit` (`working` or `calendar`), recorded when a request is saved from the planner.
+They need no version bump. Older readers ignore them, and an invalid value is dropped
+on read without dropping the request. Without them, the "Submit by" date uses 14 days.
+
 ## Rules (`guardedWrite`)
 
 1. **Stale-write detection.** A write names the revision it was based on. If the stored
