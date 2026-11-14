@@ -31,8 +31,8 @@ try {
         result.status = 'captured';
         continue;
       }
-      await page.goto(new URL('/policy/?c=US&cb=12&bao=2027-01-01&ak=fl&am=0&gd=2027-01-01&cm=a&ace=0', base).href, { waitUntil: 'networkidle' });
-      await page.getByRole('heading', { name: 'What might my unused vacation be worth?' }).waitFor();
+      await page.goto(new URL('/policy/?c=US&cb=12&bao=2027-01-01&ak=fl&am=0&gd=2027-01-01&cm=a&ace=0#departure-payout', base).href, { waitUntil: 'networkidle' });
+      await page.getByRole('heading', { name: 'What might my unused PTO be worth if I leave?' }).waitFor();
       const hourly = page.getByLabel('Hourly pay (gross)');
       const work = page.getByLabel('Work jurisdiction (where you work)');
       const employer = page.getByLabel('Employer payout assumption');

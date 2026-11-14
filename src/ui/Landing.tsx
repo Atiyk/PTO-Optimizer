@@ -11,7 +11,7 @@ import { YearStrip } from './YearStrip';
 import { geolocateCountry } from './geo';
 import { todayISO } from './today';
 import { breakReason } from './breakReason';
-import { findBridges, holidayLongWeekends, nextHoliday, remainingHolidays, runLength } from './landingData';
+import { findBridges, holidayDisplayName, holidayLongWeekends, holidayRunPhrase, nextHoliday, remainingHolidays, runLength } from './landingData';
 import { downloadHolidaysICS } from './icsExport';
 import { track } from './analytics';
 import { computeLandingPlan, landingHolidayHref, landingPlanHref, landingSearch, readLandingState, validLandingRange } from './landingState';
@@ -23,6 +23,10 @@ import { useWholeDayDraft } from './useWholeDayDraft';
 import { daysOffSplit } from './Headline';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import { SHARE_LINK_SENTENCE } from './shareLinkCopy';
+import { readRequestLedger } from '../personal/requestLedger';
+import { usePinnedPlans } from './pinnedPlanStore';
+import { nextReturnItem, type ReturnItem } from './returnVisit';
+import { handOffOnClick } from './planHandoff';
 
 /** A control set inside the sentence: it takes the sentence's own size and weight. */
 const INLINE_FIELD = 'h-[1.45em] min-h-11 rounded-[6px] border border-line-strong bg-surface px-[0.3em] align-baseline font-bold text-ink hover:border-ink';
@@ -124,6 +128,28 @@ function PlanYear({ breaks, best, rangeStart, rangeEnd, holidayName, weekStart }
   </figure>;
 }
 
+/** The holidays list starts with this many rows; the rest sit behind one disclosure. */
+const HOLIDAYS_SHOWN = 3;
+
+/** Research rec 10: one compact row for a returning visitor, from what this browser saved. */
+function WelcomeBack({ item, today }: { item: ReturnItem; today: string }) {
+  const body = item.kind === 'request' ? <>
+    <p className="font-semibold text-ink">Welcome back. Next up: <span className="tabular-nums">{breakDates(item.request)}</span></p>
+    <p className="text-muted">{item.status} · {plural(item.request.ptoDays, 'PTO day')}{item.requestBy
+      ? item.requestBy < today ? <> · <strong className="font-semibold text-ink">Request now</strong>, the 14-day notice window opened {formatShort(item.requestBy)}</> : <> · Request by <strong className="font-semibold text-ink">{formatShort(item.requestBy)}</strong> for 14 days&apos; notice</>
+      : ''}</p>
+  </> : <>
+    <p className="font-semibold text-ink">Welcome back. Your saved plan: {item.plan.summary.totalDaysOff} days off for {plural(item.plan.summary.budgetSpent, 'PTO day')}</p>
+    <p className="text-muted tabular-nums">{plural(item.plan.summary.breakCountActual, 'break')} between {breakDates({ start: item.plan.rangeStart, end: item.plan.rangeEnd })}</p>
+  </>;
+  return <section aria-label="Welcome back" data-testid="welcome-back" className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-[10px] border border-line bg-surface px-4 py-2 text-[15px] leading-6">
+    <div className="min-w-0 py-1">{body}</div>
+    {item.kind === 'request'
+      ? <a href="/policy#requests" className={LINK}>Open in My PTO →</a>
+      : <a href={item.href} onClick={handOffOnClick(item.href, item.privateSearch)} className={LINK}>Open saved plan →</a>}
+  </section>;
+}
+
 /** One live engine calculation drives the preview and full-plan handoff. */
 function ToolGroup({ title, rows }: { title: string; rows: { href: string; title: string; body: string }[] }) {
   return <div className="min-w-0">
@@ -144,6 +170,10 @@ function ToolGroup({ title, rows }: { title: string; rows: { href: string; title
 
 export function Landing() {
   const today = todayISO();
+  const [allHolidays, setAllHolidays] = useState(false);
+  const { pinnedPlans } = usePinnedPlans();
+  // Read once: the landing page only shows what this browser already saved.
+  const [savedRequests] = useState(() => typeof window === 'undefined' ? [] : readRequestLedger().requests);
   const [state, setState] = useState(() => readLandingState(typeof window === 'undefined' ? '' : window.location.search, today, geolocateCountry()));
   const { country, budget, rangeStart, rangeEnd } = state;
   const employer = useMemo(() => readEmployerCalendar(country), [country]);
@@ -168,9 +198,9 @@ export function Landing() {
 
   useEffect(() => {
     if (!validRange) return;
-    const query = landingSearch(state);
+    const query = landingSearch(state, budgetDraft.empty);
     if (window.location.search !== query) window.history.replaceState(null, '', `/${query}${window.location.hash}`);
-  }, [state, validRange]);
+  }, [state, validRange, budgetDraft.empty]);
   useEffect(() => {
     const onPopState = () => setState(readLandingState(window.location.search, today, geolocateCountry()));
     window.addEventListener('popstate', onPopState);
@@ -178,7 +208,10 @@ export function Landing() {
   }, [today]);
 
   const { loading } = calendar;
-  const holidays = useMemo(() => landingObservedHolidays(calendar.holidays, employer, rangeStart, rangeEnd), [calendar.holidays, employer, rangeStart, rangeEnd]);
+  // Local holiday names (US "Labor Day", UK "Boxing Day"), applied to each name a date carries.
+  const holidays = useMemo(() => landingObservedHolidays(calendar.holidays, employer, rangeStart, rangeEnd)
+    .map((holiday) => ({ ...holiday, name: holiday.name.split(' / ').map((name) => holidayDisplayName(name, country)).join(' / ') })),
+  [calendar.holidays, employer, rangeStart, rangeEnd, country]);
   const holidaySet = useMemo(() => new Set(holidays.map((holiday) => holiday.date)), [holidays]);
   const holidayName = useMemo(() => new Map(holidays.map((holiday) => [holiday.date, holiday.name])), [holidays]);
   const plan = useMemo(() => validRange && !loading ? computeLandingPlan(state, holidays) : null, [state, validRange, loading, holidays]);
@@ -191,9 +224,12 @@ export function Landing() {
   const next = useMemo(() => validRange ? nextHoliday(periodStart, rangeEnd, holidays) : undefined, [validRange, periodStart, rangeEnd, holidays]);
   const bridges = useMemo(() => validRange ? findBridges(periodStart, rangeEnd, holidaySet) : [], [validRange, periodStart, rangeEnd, holidaySet]);
   const bridgeableDates = useMemo(() => new Set(upcoming.filter((entry) => entry.isBridgeable || entry.runLength >= 3).map((entry) => entry.holiday.date)), [upcoming]);
-  const href = validRange ? landingPlanHref(state) : '/pto';
-  const countryName = COUNTRIES.find((entry) => entry.code === country)?.name ?? country;
   const budgetBlank = budgetDraft.empty;
+  // R2: a blank field has no number to carry, so the planner opens on its own defaults.
+  const href = validRange ? landingPlanHref(state, undefined, budgetBlank) : '/pto';
+  const returnItem = useMemo(() => nextReturnItem(savedRequests, pinnedPlans, today, holidays.map((holiday) => holiday.date)), [savedRequests, pinnedPlans, today, holidays]);
+  const shownHolidays = allHolidays ? upcoming : upcoming.slice(0, HOLIDAYS_SHOWN);
+  const countryName = COUNTRIES.find((entry) => entry.code === country)?.name ?? country;
   const showGuess = guessing && budget === 15 && !budgetBlank;
   // With 0 PTO days there is nothing to place, but the holidays still make long weekends.
   const longWeekends = useMemo(() => holidayLongWeekends(upcoming), [upcoming]);
@@ -206,11 +242,11 @@ export function Landing() {
     <SiteHeader active="landing" />
     <main id="main-content" tabIndex={-1}>
       {/* First screen: what this is, the sentence that drives it, the answer, the schedule. */}
-      <Container className="px-4 pt-7 sm:px-6 sm:pt-12 lg:pt-14">
+      <Container className="px-4 pt-5 sm:px-6 sm:pt-12 lg:pt-14">
         <section aria-labelledby="landing-heading">
-          <h1 id="landing-heading" className="max-w-[17ch] text-[clamp(2.25rem,0.95rem+5vw,4.75rem)] leading-[1.04] type-display text-ink">More days off from the same PTO.</h1>
+          <h1 id="landing-heading" className="max-w-[17ch] text-[clamp(2rem,0.95rem+5vw,4.75rem)] leading-[1.04] type-display text-ink">More days off from the same PTO.</h1>
 
-          <div className="mt-6 grid min-w-0 gap-x-14 gap-y-6 sm:mt-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+          <div className="mt-4 grid min-w-0 gap-x-14 gap-y-4 sm:mt-10 sm:gap-y-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
             <div className="min-w-0 lg:col-start-1 lg:row-start-1">
             <p className="min-w-0 text-[1.375rem] leading-[1.5] font-medium text-ink sm:text-[1.75rem]">
               I have{' '}
@@ -223,19 +259,20 @@ export function Landing() {
                 {COUNTRIES.map((entry) => <option key={entry.code} value={entry.code}>{entry.name}</option>)}
               </select>.
             </p>
-            {showGuess && <p className="mt-2 text-[15px] text-muted">A starting guess: 15 PTO days and {countryName} holidays. Change either to match yours.</p>}
+            {showGuess && <p className="mt-1.5 text-sm text-muted sm:mt-2 sm:text-[15px]">A starting guess: 15 PTO days and {countryName} holidays. Change either to match yours.</p>}
             </div>
 
-            <section aria-labelledby="landing-result" data-plan-result={!validRange ? 'unavailable' : loading ? 'pending' : 'ready'} className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-1">
+            <section aria-labelledby="landing-result" data-plan-result={!validRange ? 'unavailable' : loading ? 'pending' : 'ready'} className="flex min-w-0 flex-col lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-1">
+              {returnItem && <WelcomeBack item={returnItem} today={today} />}
               {budgetBlank ? <>
                 <h2 id="landing-result" className="text-h2 font-bold type-condensed text-ink">Enter your PTO days</h2>
                 <p className="mt-2 text-base text-muted" role="status">Type how many PTO days you have, and your plan shows here.</p>
               </> : bestBreak ? <>
-                <h2 id="landing-result" className="text-[clamp(2.75rem,1.75rem+3vw,4.5rem)] leading-none tabular-nums type-display text-ink">
+                <h2 id="landing-result" className="text-[clamp(2.5rem,1.75rem+3vw,4.5rem)] leading-none tabular-nums type-display text-ink">
                   <span className="sr-only">Your plan: </span><span className="mark">{planDaysOff} days off</span>
                 </h2>
-                <p className="mt-3 text-xl font-semibold tabular-nums text-ink">{daysOffSplit(used, planDaysOff)}, across {plural(breakCount, 'break')}</p>
-                <p className="mt-2 text-base text-muted">Longest: <strong className="font-semibold text-ink"><span className="tabular-nums">{breakDates(bestBreak)}</span>, {bestBreak.totalDaysOff} days off for {plural(bestBreak.ptoCost, 'PTO day')}</strong>. {breakReason(bestBreak, (date) => holidayName.get(date))}</p>
+                <p className="mt-2 text-xl font-semibold tabular-nums text-ink sm:mt-3">{daysOffSplit(used, planDaysOff)}, across {plural(breakCount, 'break')}</p>
+                <p className="order-1 mt-3 text-base text-muted sm:order-none sm:mt-2">Longest: <strong className="font-semibold text-ink"><span className="tabular-nums">{breakDates(bestBreak)}</span>, {bestBreak.totalDaysOff} days off for {plural(bestBreak.ptoCost, 'PTO day')}</strong>. {breakReason(bestBreak, (date) => holidayName.get(date))}</p>
               </> : zeroBudget ? <>
                 <h2 id="landing-result" className="text-h2 font-bold type-condensed text-ink">No PTO days to spend</h2>
                 <p className="mt-2 text-base text-ink" role="status">{longWeekends.length > 0
@@ -245,11 +282,13 @@ export function Landing() {
                 <h2 id="landing-result" className="text-h2 font-bold type-condensed text-ink">Your recommended break</h2>
                 <p className="mt-2 text-base text-muted" role="status">{emptyMessage}</p>
               </>}
-              <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-1">
-                <Button href={href}>See the full plan →</Button>
-                <span className="text-sm text-muted">Free, no account needed.</span>
+              {/* F21: on phones the action sits right under the answer, so it clears the tab bar
+                  on a 320x568 screen; the longest-break detail follows it. */}
+              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 sm:mt-5">
+                <Button href={href}>{budgetBlank ? 'Open the planner →' : 'See the full plan →'}</Button>
+                <span className="text-sm text-muted">{budgetBlank ? 'It starts at 15 PTO days. Change them there.' : 'Free, no account needed.'}</span>
               </div>
-              <p className="mt-4 text-[15px] text-muted">
+              <p className="order-2 mt-4 text-[15px] text-muted sm:order-none">
                 Planning around <a className="link-mark font-semibold" href={`/family?c=${encodeURIComponent(country)}`}>school breaks</a> or <a className="link-mark font-semibold" href={`/sabbatical?c=${encodeURIComponent(country)}`}>a sabbatical</a>?
               </p>
             </section>
@@ -278,7 +317,7 @@ export function Landing() {
           <div className="mt-8 sm:mt-10">
             {bestBreak && plan && !budgetBlank && <PlanYear breaks={plan.result.primary} best={bestBreak} rangeStart={rangeStart} rangeEnd={rangeEnd} holidayName={holidayName} weekStart={weekStartForCountry(country)} />}
             <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-8 gap-y-1">
-              <p className="max-w-3xl text-sm text-muted">Preview assumes a Monday–Friday workweek. {customizedHolidays ? 'Your saved employer holiday calendar is applied' : 'National public holidays are assumed to be observed by your employer'}{employer.custom.length > 0 ? ', including additional company days off' : ''}. Calendar days off include weekends, observed holidays, and PTO days.</p>
+              <p className="max-w-3xl text-sm text-muted">Preview assumes a Monday–Friday workweek. {customizedHolidays ? 'Your saved employer holiday calendar is applied' : 'National public holidays are assumed to be observed by your employer'}{employer.custom.length > 0 ? ', including additional company days off' : ''}. Days off include weekends, holidays and PTO days.</p>
               <a href={`${href}#planning-assumptions`} className={`${LINK} text-sm`}>Customize workweek and employer holidays →</a>
             </div>
             {calendar.degraded && <p className="mt-2 text-sm font-semibold text-ink" role="status">Some holiday data is unavailable. This preview may miss public holidays.</p>}
@@ -325,19 +364,26 @@ export function Landing() {
             <p className="mt-2 text-sm text-muted">Tall marked ticks are holidays that already make a long weekend or sit one PTO day from one. Shaded stretches run eight days or more without a holiday.</p>
           </div>}
 
-          {upcoming.length > 0 ? <ol aria-label={`All ${upcoming.length} upcoming holidays`} className="mt-6 list-none p-0">
-            {upcoming.map((entry) => {
+          {upcoming.length > 0 ? <><ol id="landing-holiday-list" aria-label={allHolidays || upcoming.length <= HOLIDAYS_SHOWN ? `All ${upcoming.length} upcoming holidays` : `Next ${HOLIDAYS_SHOWN} of ${upcoming.length} upcoming holidays`} className="mt-6 list-none p-0">
+            {shownHolidays.map((entry) => {
               const bridge = budget > 0 ? bridges.find((candidate) => candidate.combined.start === entry.run.start || candidate.combined.end === entry.run.end) : undefined;
               return <li key={entry.holiday.date} className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-baseline gap-x-4 rounded-[6px] px-3 py-3 odd:bg-surface sm:px-5 sm:grid-cols-[7rem_minmax(0,1fr)_auto] sm:gap-x-8">
                 <p className="text-h2 font-bold type-condensed text-ink tabular-nums">{formatShort(entry.holiday.date)}</p>
                 <div className="min-w-0">
                   <p className="text-lg font-semibold text-ink">{entry.holiday.name}</p>
-                  <p className="text-sm text-muted">{entry.weekday}, {formatLong(entry.holiday.date)}{entry.isObserved ? ' · observed' : ''} · {entry.runLength >= 3 ? <span className="mark text-ink">{entry.runLength} calendar days off</span> : `${plural(entry.runLength, 'calendar day')} off`} before PTO</p>
+                  <p className="text-sm text-muted">{entry.weekday}, {formatLong(entry.holiday.date)}{entry.isObserved ? ' · observed' : ''} · {entry.runLength >= 3 ? <span className="mark text-ink">{holidayRunPhrase(entry.runLength)}</span> : holidayRunPhrase(entry.runLength)}</p>
                 </div>
-                <a href={landingHolidayHref(state, entry.holiday.date, bridge?.bridgeDate)} className={`${LINK} col-start-2 text-sm sm:col-start-3 sm:justify-self-end`}>{bridge ? `Connect a ${runLength(bridge.combined)}-day break` : 'View this holiday in the planner'} →</a>
+                <a href={landingHolidayHref(state, entry.holiday.date, bridge?.bridgeDate)} className={`${LINK} col-start-2 text-sm sm:col-start-3 sm:justify-self-end`}>{bridge
+                  ? <>Connect a {runLength(bridge.combined)}-day break<span className="sr-only"> around {entry.holiday.name}</span></>
+                  : `Plan around ${entry.holiday.name}`}<span aria-hidden="true"> →</span></a>
               </li>;
             })}
-          </ol> : <p className="mt-8 rounded-[10px] bg-surface p-5 text-base text-muted">{loading ? 'Updating public holidays…' : calendar.degraded ? 'Holiday data could not be loaded. You can still use the planner with your own holiday dates.' : 'No upcoming observed holidays in this range. The planner can still help you make more of your weekends.'}</p>}
+          </ol>
+          {upcoming.length > HOLIDAYS_SHOWN && <button type="button" aria-expanded={allHolidays} aria-controls="landing-holiday-list"
+            className="mt-2 inline-flex min-h-11 items-center px-3 text-sm font-semibold text-ink underline decoration-1 underline-offset-[0.22em] hover:decoration-2 sm:px-5"
+            onClick={() => setAllHolidays((open) => !open)}>
+            {allHolidays ? `Show the next ${HOLIDAYS_SHOWN} only` : `Show all ${upcoming.length} holidays`}
+          </button>}</> : <p className="mt-8 rounded-[10px] bg-surface p-5 text-base text-muted">{loading ? 'Updating public holidays…' : calendar.degraded ? 'Holiday data could not be loaded. You can still use the planner with your own holiday dates.' : 'No upcoming observed holidays in this range. The planner can still help you make more of your weekends.'}</p>}
         </section>
       </Container>
 

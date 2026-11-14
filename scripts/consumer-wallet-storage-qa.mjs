@@ -33,7 +33,7 @@ try {
   const importer = await context.newPage();
   await Promise.all([tracker.goto(new URL('/policy/', base).href), importer.goto(new URL('/policy/', base).href)]);
   assert.equal(await importer.evaluate(() => typeof navigator.locks?.request), 'function');
-  await importer.getByText('Wallet backups and imports', { exact: true }).click();
+  await importer.getByText('Back up or move your saved data', { exact: true }).click();
   const input = importer.getByLabel('Review a wallet backup');
   const merge = importer.getByRole('button', { name: 'Merge wallet banks' });
   await importer.waitForFunction(() => {

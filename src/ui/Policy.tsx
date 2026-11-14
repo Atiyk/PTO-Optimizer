@@ -79,7 +79,7 @@ function missingForecastInput(policy: TimeOffPolicy, validWorkdayHours: boolean)
   if (!isValidISODate(policy.balanceAsOf)) return 'Enter the date of your current PTO balance.';
   const { accrual, carryover } = policy;
   if ((accrual.kind === 'front-loaded' || accrual.kind === 'per-pay-period') && !Number.isFinite(accrual.amount)) {
-    return 'Enter how much PTO you earn. Enter 0 if you do not earn more PTO.';
+    return 'Enter how much PTO you earn under How you earn PTO. If you earn no more this year, enter 0.';
   }
   if (accrual.kind === 'front-loaded' && !isValidISODate(accrual.grantDate)) return 'Enter the date your annual PTO is granted.';
   if (accrual.kind === 'per-pay-period' && !isValidISODate(accrual.payDateAnchor)) return 'Enter a known pay date to forecast future accrual.';
@@ -284,7 +284,6 @@ export function Policy() {
   const forecastInputIssue = missingForecastInput(policy, !needsWorkdayHours || validWorkdayHours);
   const canProjectBalance = useMemo(() => !needsBalance && !forecastInputIssue && accrualKind !== 'unlimited'
     && forecastWithRequests(policy, balanceAsOf) !== null, [needsBalance, forecastInputIssue, accrualKind, policy, balanceAsOf]);
-  const forecastFirst = canProjectBalance || accrualKind === 'unlimited';
   const projection = useMemo(() => canProjectBalance
     ? forecastWithRequests(policy, addMonthsClamped(balanceAsOf, HORIZON_MONTHS), ledger.requests)
     : null, [canProjectBalance, policy, balanceAsOf, ledger.requests]);
@@ -330,6 +329,19 @@ export function Policy() {
     </div>
   );
 
+  // The one input that turns this page into an answer. It sits inside the forecast card, so
+  // the number appears right under it as soon as there is one.
+  const balanceFields = (
+    <div className="mt-4 grid gap-x-4 gap-y-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,12rem)]">
+      <div className="flex min-w-0 flex-col gap-1">
+        <Field label={`Current PTO balance (${unit})`}><input type="number" inputMode="decimal" step="any" value={enteredBalance ?? ''} aria-describedby="current-balance-hint" onChange={event => editBalance(event.target.value)} className={`${inputClass} h-12 text-lg font-semibold tabular-nums`} /></Field>
+        <p id="current-balance-hint" className="text-xs leading-5 text-muted">From your payslip or HR portal. If you have none left, enter 0.</p>
+      </div>
+      <Field label="Balance as-of date"><input type="date" value={balanceAsOf} onChange={event => setBalanceAsOf(event.target.value)} className={inputClass} /></Field>
+      {(!needsWorkdayHours || validWorkdayHours) && <div className="min-w-0 sm:col-span-2"><BalanceFromImage unit={unit} hoursPerDay={policyHoursPerDay} today={visitDate} onUse={(balance, asOf) => { setEnteredBalance(balance); if (asOf) setBalanceAsOf(asOf); }} /></div>}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-page">
       <SiteHeader active="policy" />
@@ -337,50 +349,50 @@ export function Policy() {
         <Container className="px-4 pb-12 pt-6 sm:px-6 lg:pt-10">
           <h1 className="max-w-3xl text-h1 type-display text-ink">How much PTO will I have, and what am I about to lose?</h1>
           <p className="mt-3 max-w-2xl text-base text-muted">
-            Enter your balance and how you earn PTO. The forecast and the expiry check update as you type; the rest of your policy lives in Advanced options.
+            Enter your balance and the forecast updates as you type. Then set how you earn PTO. Plan years, caps and payout rules are under Advanced policy options.
           </p>
-          <aside aria-label="Saved plans" className="mt-2 flex flex-wrap items-baseline gap-x-3 text-sm text-muted">
-            <p>{pinnedPlans.length} saved {pinnedPlans.length === 1 ? 'plan' : 'plans'} in this browser.</p>
-            <a href="/pto#saved-plans" className="link-mark inline-flex min-h-11 items-center font-semibold">View saved plans</a>
-          </aside>
+          {pinnedPlans.length > 0 && (
+            <aside aria-label="Saved plans" className="mt-2 flex flex-wrap items-baseline gap-x-3 text-sm text-muted">
+              <p>{pinnedPlans.length} saved {pinnedPlans.length === 1 ? 'plan' : 'plans'} in this browser.</p>
+              <a href="/pto#saved-plans" className="link-mark inline-flex min-h-11 items-center font-semibold">View saved plans</a>
+            </aside>
+          )}
 
-          {/* On phones, incomplete policy inputs stay ahead of the forecast. */}
-          {/* Inputs left, the answer right (sticky on desktop). Below lg the answer column
-              dissolves (display: contents) so its two parts can be ordered answer, inputs,
-              risk: the number first, then what drives it, then what could be lost. */}
-          <div id="balance" className="mt-6 flex scroll-mt-24 flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,27rem)]">
-            <div className={`${forecastFirst ? 'order-2' : 'order-1'} flex min-w-0 flex-col gap-6 lg:order-none lg:col-start-1 lg:row-start-1`}>
-              <section aria-label="Quick balance forecast" className="min-w-0 rounded-[10px] border border-line bg-surface p-4 sm:p-6">
-                <h2 className="text-h2 font-bold type-condensed text-ink">Your balance and how you earn it</h2>
-                <p className="mt-1 text-sm text-muted">Use your real balance and employer rules. Full carryover at reset is assumed until you choose another rule.</p>
-                <div className="mt-5 grid gap-x-4 gap-y-4 sm:grid-cols-2">
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <Field label={`Current PTO balance (${unit})`}><input type="number" step="any" value={enteredBalance ?? ''} aria-describedby="current-balance-hint" onChange={event => editBalance(event.target.value)} className={inputClass} /></Field>
-                    <p id="current-balance-hint" className="text-xs leading-5 text-muted">From your payslip or HR portal. Enter 0 if your balance is zero.</p>
-                  </div>
-                  <Field label="Balance as-of date"><input type="date" value={balanceAsOf} onChange={event => setBalanceAsOf(event.target.value)} className={inputClass} /></Field>
-                  {(!needsWorkdayHours || validWorkdayHours) && <BalanceFromImage unit={unit} hoursPerDay={policyHoursPerDay} today={visitDate} onUse={(balance, asOf) => { setEnteredBalance(balance); if (asOf) setBalanceAsOf(asOf); }} />}
-                  <Field label="How PTO accrues"><select value={accrualKind} onChange={event => setAccrualKind(event.target.value as AccrualMethod['kind'])} className={selectClass}><option value="front-loaded">Granted all at once</option><option value="per-pay-period">Each pay period</option><option value="per-hour-worked">For each hour worked</option><option value="unlimited">Unlimited PTO</option></select></Field>
-                  <Field label="Balance unit"><select value={unit} onChange={event => setUnit(event.target.value as 'days' | 'hours')} className={selectClass}><option value="days">Days</option><option value="hours">Hours</option></select></Field>
-                  {(accrualKind === 'per-pay-period' || accrualKind === 'front-loaded') && <Field label={`${unit === 'hours' ? 'Hours' : 'Days'} earned each ${accrualKind === 'front-loaded' ? 'grant' : 'pay period'}`}><input type="number" min={0} step="any" value={displayNumber(amount)} onChange={event => setAmount(inputNumber(event.target.value))} className={inputClass} /></Field>}
-                  {accrualKind === 'per-pay-period' && <><Field label="Pay frequency"><select value={frequency} onChange={event => setFrequency(event.target.value as typeof frequency)} className={selectClass}><option value="weekly">Weekly</option><option value="biweekly">Every two weeks</option><option value="semi-monthly">Twice a month</option><option value="monthly">Monthly</option></select></Field><Field label="Known pay date"><input type="date" value={payDateAnchor} onChange={event => setPayDateAnchor(event.target.value)} className={inputClass} /></Field></>}
-                  {accrualKind === 'front-loaded' && <Field label="Annual grant date"><input type="date" value={grantDate} onChange={event => setGrantDate(event.target.value)} className={inputClass} /></Field>}
-                  {accrualKind === 'per-hour-worked' && <><Field label="Hours earned per hour worked"><input type="number" min={0} step="any" value={displayNumber(hourlyRate)} onChange={event => setHourlyRate(inputNumber(event.target.value))} className={inputClass} /></Field><Field label="Typical hours worked each week"><input type="number" min={0} step="any" value={displayNumber(typicalWeeklyHours)} onChange={event => setTypicalWeeklyHours(inputNumber(event.target.value))} className={inputClass} /></Field></>}
-                  {(unit === 'hours' || accrualKind === 'per-hour-worked') && <Field label="Hours per working day for conversion"><input type="number" min={0.25} step="any" value={displayNumber(hoursPerDay)} onChange={event => setHoursPerDay(inputNumber(event.target.value))} className={inputClass} /></Field>}
-                  {accrualKind !== 'unlimited' && <Field label="Expiry and carryover"><select value={carryoverMode} onChange={event => setCarryoverMode(event.target.value as CarryoverRule['mode'])} className={selectClass}><option value="all">Full carryover at reset</option><option value="none">Use it or lose it at reset</option><option value="capped">Limited carryover at reset</option></select></Field>}
-                  {accrualKind !== 'unlimited' && carryoverMode !== 'all' && <Field label="Reset date (new plan year begins)"><input type="date" value={planYearKind === 'calendar' ? `${Number(balanceAsOf.slice(0, 4)) + 1}-01-01` : planYearKind === 'anniversary' ? anniversaryStart : customResetDate} onChange={event => { setPlanYearKind('custom'); setCustomResetDate(event.target.value); }} className={inputClass} /></Field>}
-                  {accrualKind !== 'unlimited' && carryoverMode === 'capped' && <Field label={`Carryover limit (${unit})`}><input type="number" min={0} step="any" value={displayNumber(carryoverCap)} onChange={event => setCarryoverCap(inputNumber(event.target.value))} className={inputClass} /></Field>}
-                </div>
-                {saveButtons}
-                <p className="text-xs leading-5 text-muted">Save here to resume on another visit from this browser. Your balance and policy stay off the page URL.</p>
-                {saveFeedback?.search === privatePolicySearch && <p role="status" className="mt-1 text-sm text-muted">{saveFeedback.message}</p>}
-                {storageNotice && <p role="status" data-testid="policy-storage-notice" className="mt-2 border-l-2 border-ink pl-3 text-sm text-ink">{storageNotice}</p>}
-              </section>
+          {/* Result first: the balance input and its forecast are one card, then what drives
+              the number. On desktop the drivers sit beside the answer. */}
+          <section id="balance" aria-label="Quick balance forecast" className="mt-6 flex scroll-mt-24 flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,28rem)]">
+            <div className="min-w-0">
+              <QuickForecast policy={policy} balanceEntered={!needsBalance} inputIssue={forecastInputIssue} requests={ledger.requests} upcomingLoss={upcomingLoss} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')}>
+                {balanceFields}
+              </QuickForecast>
+            </div>
+            <section aria-labelledby="policy-earn-heading" className="min-w-0 rounded-[10px] border border-line bg-surface p-4 sm:p-6">
+              <h2 id="policy-earn-heading" className="text-lg font-bold type-condensed text-ink">How you earn PTO</h2>
+              <p className="mt-1 text-sm text-muted">Use your employer&apos;s rules. Until you pick another option, all unused PTO carries over at reset.</p>
+              <div className="mt-4 grid gap-x-4 gap-y-4 sm:grid-cols-2 lg:grid-cols-1">
+                <Field label="How PTO accrues"><select value={accrualKind} onChange={event => setAccrualKind(event.target.value as AccrualMethod['kind'])} className={selectClass}><option value="front-loaded">Granted all at once</option><option value="per-pay-period">Each pay period</option><option value="per-hour-worked">For each hour worked</option><option value="unlimited">Unlimited PTO</option></select></Field>
+                {(accrualKind === 'per-pay-period' || accrualKind === 'front-loaded') && <Field label={`${unit === 'hours' ? 'Hours' : 'Days'} earned each ${accrualKind === 'front-loaded' ? 'grant' : 'pay period'}`}><input type="number" min={0} step="any" value={displayNumber(amount)} onChange={event => setAmount(inputNumber(event.target.value))} className={inputClass} /></Field>}
+                {accrualKind === 'per-pay-period' && <><Field label="Pay frequency"><select value={frequency} onChange={event => setFrequency(event.target.value as typeof frequency)} className={selectClass}><option value="weekly">Weekly</option><option value="biweekly">Every two weeks</option><option value="semi-monthly">Twice a month</option><option value="monthly">Monthly</option></select></Field><Field label="Known pay date"><input type="date" value={payDateAnchor} onChange={event => setPayDateAnchor(event.target.value)} className={inputClass} /></Field></>}
+                {accrualKind === 'front-loaded' && <Field label="Annual grant date"><input type="date" value={grantDate} onChange={event => setGrantDate(event.target.value)} className={inputClass} /></Field>}
+                {accrualKind === 'per-hour-worked' && <><Field label="Hours earned per hour worked"><input type="number" min={0} step="any" value={displayNumber(hourlyRate)} onChange={event => setHourlyRate(inputNumber(event.target.value))} className={inputClass} /></Field><Field label="Typical hours worked each week"><input type="number" min={0} step="any" value={displayNumber(typicalWeeklyHours)} onChange={event => setTypicalWeeklyHours(inputNumber(event.target.value))} className={inputClass} /></Field></>}
+                <Field label="Balance unit"><select value={unit} onChange={event => setUnit(event.target.value as 'days' | 'hours')} className={selectClass}><option value="days">Days</option><option value="hours">Hours</option></select></Field>
+                {(unit === 'hours' || accrualKind === 'per-hour-worked') && <Field label="Hours per working day for conversion"><input type="number" min={0.25} step="any" value={displayNumber(hoursPerDay)} onChange={event => setHoursPerDay(inputNumber(event.target.value))} className={inputClass} /></Field>}
+                {accrualKind !== 'unlimited' && <Field label="Expiry and carryover"><select value={carryoverMode} onChange={event => setCarryoverMode(event.target.value as CarryoverRule['mode'])} className={selectClass}><option value="all">Full carryover at reset</option><option value="none">Unused PTO is forfeited at reset</option><option value="capped">Limited carryover at reset</option></select></Field>}
+                {accrualKind !== 'unlimited' && carryoverMode !== 'all' && <Field label="Reset date (new plan year begins)"><input type="date" value={planYearKind === 'calendar' ? `${Number(balanceAsOf.slice(0, 4)) + 1}-01-01` : planYearKind === 'anniversary' ? anniversaryStart : customResetDate} onChange={event => { setPlanYearKind('custom'); setCustomResetDate(event.target.value); }} className={inputClass} /></Field>}
+                {accrualKind !== 'unlimited' && carryoverMode === 'capped' && <Field label={`Carryover limit (${unit})`}><input type="number" min={0} step="any" value={displayNumber(carryoverCap)} onChange={event => setCarryoverCap(inputNumber(event.target.value))} className={inputClass} /></Field>}
+              </div>
+              {saveButtons}
+              <p className="text-xs leading-5 text-muted">Save here to pick up where you left off on your next visit in this browser. Your balance and policy never go into the page address.</p>
+              {saveFeedback?.search === privatePolicySearch && <p role="status" className="mt-1 text-sm text-muted">{saveFeedback.message}</p>}
+              {storageNotice && <p role="status" data-testid="policy-storage-notice" className="mt-2 border-l-2 border-ink pl-3 text-sm text-ink">{storageNotice}</p>}
+            </section>
+          </section>
 
+          <div className="mt-6 flex flex-col gap-6">
               <details className="group min-w-0 rounded-[10px] border border-line bg-surface">
                 <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
                   <span>
-                    <span className="block text-lg font-bold type-condensed text-ink">Advanced policy options and explanation</span>
+                    <span className="block text-lg font-bold type-condensed text-ink">Advanced policy options</span>
                     <span className="block text-sm text-muted">Plan year, caps, carryover deadlines, waiting period, borrowing, payout, planned days, questions for HR.</span>
                   </span>
                   <span aria-hidden="true" className="shrink-0 text-xl leading-none text-ink group-open:rotate-45 motion-safe:transition-transform">+</span>
@@ -507,7 +519,7 @@ export function Policy() {
                     )}
                     <Field label="Carryover" termId="carryover">
                       <select value={carryoverMode} onChange={(e) => setCarryoverMode(e.target.value as CarryoverRule['mode'])} className={selectClass}>
-                        <option value="none">None (use-it-or-lose-it)</option>
+                        <option value="none">None (unused PTO is forfeited)</option>
                         <option value="capped">Up to a limit</option>
                         <option value="all">Everything carries over</option>
                       </select>
@@ -691,26 +703,17 @@ export function Policy() {
                   </div>
                 </div>
               </details>
-            </div>
 
-            <div className="contents lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:flex lg:flex-col lg:gap-4">
-              <div className={`${forecastFirst ? 'order-1' : 'order-2'} min-w-0 lg:order-none`}>
-                <QuickForecast policy={policy} balanceEntered={!needsBalance} inputIssue={forecastInputIssue} requests={ledger.requests} upcomingLoss={upcomingLoss} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')} />
+            {/* What could be lost appears once there is a policy to check; until then the
+                forecast card says what it needs. */}
+            {canProjectBalance && (
+              <div id="expiration" className="min-w-0 scroll-mt-24">
+                <ExpirationGuard policy={policy} country={country} requests={ledger.requests} today={visitDate} holidayCalendar={trackerCalendar} subdivision={trackerSubdivision} watchSearch={privatePolicySearch} onAlertViewed={() => track('expiration_alert_viewed')} onAlertAction={() => track('expiration_alert_action_taken')} />
               </div>
-              <div id="expiration" className="order-3 min-w-0 scroll-mt-24 lg:order-none">
-                {canProjectBalance ? (
-                  <ExpirationGuard policy={policy} country={country} requests={ledger.requests} today={visitDate} holidayCalendar={trackerCalendar} subdivision={trackerSubdivision} watchSearch={privatePolicySearch} onAlertViewed={() => track('expiration_alert_viewed')} onAlertAction={() => track('expiration_alert_action_taken')} />
-                ) : (
-                  <section className="min-w-0 rounded-[10px] border border-line bg-surface p-4 sm:p-6">
-                    <h2 className="text-lg font-bold type-condensed text-ink">PTO expiration guard</h2>
-                    <p className="mt-2 text-sm text-muted">{accrualKind === 'unlimited' ? 'Unlimited PTO has no banked balance to expire.' : 'Enter your balance and policy above to check expiration risk.'}</p>
-                  </section>
-                )}
-              </div>
-            </div>
-            <div id="requests" className="order-4 mt-6 min-w-0 scroll-mt-24 lg:order-none lg:col-start-1 lg:row-start-2 lg:mt-4">
+            )}
+
+            <div id="requests" className="min-w-0 scroll-mt-24">
               <PtoTracker today={visitDate} ledger={ledger} calendar={pricedRequestCalendar} calendarReady={!trackerCalendar.loading && !trackerCalendar.degraded} calendarNotice={trackerCalendar.loading ? 'Loading your employer calendar…' : trackerCalendar.degraded ? 'Holiday data or a calendar input is unavailable. Check the calendar settings before adding or changing request dates.' : undefined} forecastSummary={selectedForecast?.confirmed.balance === null || selectedForecast?.confirmed.balance === undefined ? undefined : `Projected balance on ${compactDate(forecastDate)} is ${new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(selectedForecast.confirmed.balance)} ${unit}.`} onTrackingStarted={() => track('request_tracking_started')} onStatusChanged={() => track('request_status_updated')} />
-              <WalletTransfer policy={canProjectBalance ? policy : undefined} requests={ledger.requests} forecastDate={forecastDate} />
               {workWeekNotice && <p role="status" className="mt-3 rounded-[10px] bg-surface-alt p-4 text-sm text-ink">{workWeekNotice}</p>}
               <details className="group mt-3 rounded-[10px] border border-line bg-surface">
                 <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 font-semibold text-ink sm:px-6 [&::-webkit-details-marker]:hidden">
@@ -757,10 +760,11 @@ export function Policy() {
                 </div>
               </details>
             </div>
-          </div>
 
-          <div className="mt-12 border-t border-line pt-8 lg:mt-16 lg:pt-10">
-            <DeparturePayoutEstimator policy={policy} policyReady={canProjectBalance} requests={ledger.requests} />
+            <div className="flex min-w-0 flex-col gap-3">
+              <DeparturePayoutEstimator policy={policy} policyReady={canProjectBalance} requests={ledger.requests} collapsible />
+              <WalletTransfer policy={canProjectBalance ? policy : undefined} requests={ledger.requests} forecastDate={forecastDate} />
+            </div>
           </div>
         </Container>
       </main>

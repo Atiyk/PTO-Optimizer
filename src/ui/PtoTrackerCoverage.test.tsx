@@ -7,7 +7,7 @@ import { useRequestLedger } from './useRequestLedger';
 
 const calendar: RequestCalendar = { workWeek: DEFAULT_WORK_WEEK, offDays: ['2027-01-01'], rangeStart: '2027-01-01', rangeEnd: '2027-01-31' };
 const saved = () => parseRequestLedger(window.localStorage.getItem(REQUEST_STORAGE_KEY));
-const addInputs = () => within(screen.getByText('Track another date range').closest('details')!);
+const addInputs = () => within(screen.getByText(/^Track (?:a|another) date range$/).closest('details')!);
 
 beforeEach(() => window.localStorage.clear());
 afterEach(() => { cleanup(); window.localStorage.clear(); });
