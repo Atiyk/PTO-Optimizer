@@ -208,6 +208,18 @@ try {
           result.homeMainValueAndActVisible = await page.getByRole('heading', { name: /^Holidays ahead/ }).isVisible()
             && await page.getByRole('link', { name: /See the full plan/ }).first().isVisible();
           await page.screenshot({ path: resolve(outputDirectory, `home-controls-${width}.png`), fullPage: true });
+          // N-P1-1: a cleared PTO field stays blank when focus leaves it, and the call to
+          // action keeps its place and a link with no PTO number, so a tap after clearing lands.
+          const cta = () => page.locator('[data-plan-result] a', { hasText: /Open the planner|See the full plan/ });
+          await numberInput.fill('');
+          const blankBox = await cta().boundingBox();
+          await numberInput.evaluate((element) => element.blur());
+          const blurredBox = await cta().boundingBox();
+          const blankHref = new URL(await cta().getAttribute('href'), page.url());
+          result.homeBlankFieldStaysBlank = await numberInput.inputValue() === ''
+            && /Open the planner/.test(await cta().textContent() ?? '') && !blankHref.searchParams.has('b')
+            && Boolean(blankBox && blurredBox && Math.abs(blankBox.y - blurredBox.y) < 1);
+          await numberInput.fill(selected);
         }
         if (route.name === 'pto') {
           // The two live planning sliders must be directly visible without opening
@@ -303,7 +315,7 @@ try {
           || result.homeCountryNotCramped === false || result.homeCountryGridSingleColumn === false || result.homeCountryAccessibleName === false
           || result.homeSliderVisible === false || result.homeDatesDirectlyVisible === false
           || result.homeSliderKeyboardAndNumberSync === false || result.homeSliderURLParity === false
-          || result.homeMainValueAndActVisible === false || result.mainLandmarkTargeted === false
+          || result.homeMainValueAndActVisible === false || result.homeBlankFieldStaysBlank === false || result.mainLandmarkTargeted === false
           || result.keyboardSkipAvailable === false || result.skipFocusOrNavigation === false
           || result.planExplanationVisible === false || result.planExplanationExpanded === false
           || result.planExplanationConsistent === false || result.planExplanationOverflow === true ? 'failed' : 'passed';

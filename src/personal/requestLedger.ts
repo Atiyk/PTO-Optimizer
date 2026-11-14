@@ -1,4 +1,5 @@
 import type { ISODate, WorkWeek } from '@daysoff/engine/solver/types';
+import type { NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
 import { addDays, isoToSerial, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { isValidISODate } from '../ui/urlState';
 import { guardedWrite, recordRevision, stampRecord, type GuardedWriteResult } from './storageRecord';
@@ -44,11 +45,32 @@ export interface PtoRequest {
   partialShiftMinutes?: number;
   status: RequestStatus;
   note: string;
+  /** N-P1-2: the notice period the user planned with, when the request came from the
+   * planner. Absent on older requests and on requests added in My PTO; readers fall back
+   * to the 14-day default. Older readers ignore it. */
+  noticePeriodDays?: number;
+  noticeUnit?: NoticeUnit;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface RequestInput {
+/** The notice period a request was planned with, if it carries a valid one. */
+export interface RequestNotice { noticePeriodDays?: number; noticeUnit?: NoticeUnit }
+
+export const MAX_NOTICE_PERIOD_DAYS = 365;
+const validNoticeDays = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_NOTICE_PERIOD_DAYS;
+
+/** Only a valid notice period is kept; the unit is stored only alongside a period. */
+function noticeFields(notice: RequestNotice): RequestNotice {
+  if (!validNoticeDays(notice.noticePeriodDays)) return {};
+  return {
+    noticePeriodDays: notice.noticePeriodDays,
+    ...(notice.noticeUnit === 'working' || notice.noticeUnit === 'calendar' ? { noticeUnit: notice.noticeUnit } : {}),
+  };
+}
+
+export interface RequestInput extends RequestNotice {
   start: ISODate;
   end: ISODate;
   status?: RequestStatus;
@@ -57,7 +79,7 @@ export interface RequestInput {
   note?: string;
 }
 
-export interface SavedBreakInput {
+export interface SavedBreakInput extends RequestNotice {
   start: ISODate;
   end: ISODate;
   ptoDates: readonly ISODate[];
@@ -137,7 +159,7 @@ export function createPtoRequest(input: RequestInput, calendar: RequestCalendar,
     ...(input.partialMinutes !== undefined ? { partialMinutes: input.partialMinutes } : {}),
     ...(input.partialMinutes !== undefined && validMinutes(calendar.shiftMinutes?.[mondayIndexedDow(input.start)])
       ? { partialShiftMinutes: calendar.shiftMinutes![mondayIndexedDow(input.start)] } : {}),
-    status, note: (input.note ?? '').slice(0, 1000), createdAt: now, updatedAt: now,
+    status, note: (input.note ?? '').slice(0, 1000), ...noticeFields(input), createdAt: now, updatedAt: now,
   };
 }
 
@@ -149,7 +171,7 @@ export function createSavedBreakRequest(input: SavedBreakInput, calendar: Reques
   if (ptoDates.length !== input.ptoDates.length || !ptoDates.every(date => workDates.has(date))) return null;
   return {
     id, start: input.start, end: input.end, ptoDates, ptoDays: ptoDates.length,
-    status: 'considering', note: '', createdAt: now, updatedAt: now,
+    status: 'considering', note: '', ...noticeFields(input), createdAt: now, updatedAt: now,
   };
 }
 
@@ -202,6 +224,7 @@ export function parseLedgerRecord(raw: string | null): { requests: PtoRequest[];
         ...(minutes === undefined ? {} : { ptoMinutes: Object.fromEntries(ptoDates.map(date => [date, minutes[date]])) }),
         ...(item.partialMinutes === undefined ? {} : { partialMinutes: item.partialMinutes }),
         ...(item.partialShiftMinutes === undefined ? {} : { partialShiftMinutes: item.partialShiftMinutes }),
+        ...noticeFields(item),
         createdAt: item.createdAt, updatedAt: item.updatedAt,
       });
       seen.add(item.id);
