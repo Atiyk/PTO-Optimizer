@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extendSabbatical, bestPlacements, placementNote, paddedCalendarRange, type SabbaticalPlacement } from './sabbaticalData';
+import { extendSabbatical, bestPlacements, placementNote, paddedCalendarRange, timeAwayHolidaySentence, type SabbaticalPlacement } from './sabbaticalData';
 import { addDays } from '@daysoff/engine/solver/dateUtils';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import type { Holiday } from '@daysoff/engine/data/holidays';
@@ -70,6 +70,7 @@ describe('placementNote (3A)', () => {
     coreEnd: '2027-01-17',
     lengthDays: 28,
     holidayNames: [],
+    timeAwayHolidayNames: [],
     totalAwayDays: 41,
     travelTag: null,
     extendedStart: '2026-12-19',
@@ -87,12 +88,12 @@ describe('placementNote (3A)', () => {
   });
 
   it('adds an "includes ..." clause only when holidays actually fall inside', () => {
-    const withHolidays = { ...base, holidayNames: ['Christmas Day', "New Year's Day"] };
+    const withHolidays = { ...base, timeAwayHolidayNames: ['Christmas Day', "New Year's Day"] };
     expect(placementNote(withHolidays)).toBe("41 days away · includes Christmas Day and New Year's Day");
   });
 
   it('adds the travel tag clause when present', () => {
-    const peak = { ...base, holidayNames: ['Christmas Day'], travelTag: 'peak travel' as const };
+    const peak = { ...base, timeAwayHolidayNames: ['Christmas Day'], travelTag: 'peak travel' as const };
     expect(placementNote(peak)).toBe('41 days away · includes Christmas Day · peak travel');
   });
 });
@@ -168,5 +169,38 @@ describe('paddedCalendarRange (3D: every month the trip touches, plus one either
     const { start, end } = paddedCalendarRange('2026-12-15', '2026-12-20');
     expect(start).toBe('2026-11-01');
     expect(end).toBe('2027-01-31');
+  });
+});
+
+describe('holidays in the time away (F18)', () => {
+  // The baseline /sabbatical/ default: US, eligible 2026-11-14, 4 weeks, 5 PTO days. The top
+  // placement starts Jan 4, 2027 and the PTO pulls the time away back to Dec 24, 2026, so the
+  // dates shown (Dec 24 - Jan 31) contain Christmas, New Year's Day and MLK Day. The hero used
+  // to say "+ 1 public holiday inside" and the card "includes Martin Luther King, Jr. Day",
+  // because both counted only the 28-day core block.
+  const holidays = [
+    holiday('2026-11-26', 'Thanksgiving Day'),
+    holiday('2026-12-25', 'Christmas Day'),
+    holiday('2027-01-01', "New Year's Day"),
+    holiday('2027-01-18', 'Martin Luther King, Jr. Day'),
+  ];
+  const eligibleFrom = '2026-11-14';
+  const { placements } = bestPlacements(eligibleFrom, addDays(eligibleFrom, 364), 4, 5, 0, holidays, 'US', DEFAULT_WORK_WEEK, eligibleFrom);
+  const jan = placements.find((p) => p.start === '2027-01-04')!;
+
+  it('names every public holiday between the first and last day away, in date order', () => {
+    expect(jan.extendedStart).toBe('2026-12-24');
+    expect(jan.extendedEnd).toBe('2027-01-31');
+    expect(jan.timeAwayHolidayNames).toEqual(['Christmas Day', "New Year's Day", 'Martin Luther King, Jr. Day']);
+  });
+
+  it('the card names the same holidays as the dates it shows', () => {
+    expect(placementNote(jan)).toContain("includes Christmas Day, New Year's Day, and Martin Luther King, Jr. Day");
+  });
+
+  it('the summary counts and names them in one sentence, with singular grammar for one', () => {
+    expect(timeAwayHolidaySentence(jan)).toBe("3 public holidays fall in this time away: Christmas Day, New Year's Day, and Martin Luther King, Jr. Day.");
+    expect(timeAwayHolidaySentence({ ...jan, timeAwayHolidayNames: ['Memorial Day'] })).toBe('1 public holiday falls in this time away: Memorial Day.');
+    expect(timeAwayHolidaySentence({ ...jan, timeAwayHolidayNames: [] })).toBe('');
   });
 });

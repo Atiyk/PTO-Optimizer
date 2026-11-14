@@ -12,7 +12,7 @@ import { todayISO } from './today';
 import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
 import { formatCardDateRange, formatLong, formatShort, formatShortWithYear } from '@daysoff/engine/calendar/dateFormat';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
-import { bestPlacements, placementNote, type SabbaticalPlacement } from './sabbaticalData';
+import { bestPlacements, placementNote, timeAwayHolidaySentence, type SabbaticalPlacement } from './sabbaticalData';
 import { UnpaidIcon } from './DayCell';
 import { COLORS, HOLIDAY_DOT } from './colorScheme';
 import { weekStartForCountry } from './locale';
@@ -137,7 +137,6 @@ export function Sabbatical() {
         selected.ptoAfter ? `${selected.ptoAfter} PTO day${selected.ptoAfter === 1 ? '' : 's'} after` : '',
         selected.unpaidBefore ? `${selected.unpaidBefore} unpaid day${selected.unpaidBefore === 1 ? '' : 's'} before` : '',
         selected.unpaidAfter ? `${selected.unpaidAfter} unpaid day${selected.unpaidAfter === 1 ? '' : 's'} after` : '',
-        selected.holidayNames.length ? `${selected.holidayNames.length} public holiday${selected.holidayNames.length === 1 ? '' : 's'} inside` : '',
       ].filter(Boolean).join(' + ')
     : '';
 
@@ -157,6 +156,11 @@ export function Sabbatical() {
               <p className="mt-3 text-base text-muted">
                 {formatCardDateRange(selected.extendedStart, selected.extendedEnd)}: {composition}.
               </p>
+              {/* F18: holidays are counted over the same dates as the line above and named,
+                  and kept out of the "+" sum, since a holiday inside adds no days itself. */}
+              {selected.timeAwayHolidayNames.length > 0 && (
+                <p className="mt-1 text-base text-muted">{timeAwayHolidaySentence(selected)}</p>
+              )}
               {prerenderedAt && (
                 <p className="mt-1 text-xs text-muted">
                   Dates above as of {formatShort(prerenderedAt.slice(0, 10))} — this page recomputes live once it loads in your browser.
