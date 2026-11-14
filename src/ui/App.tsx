@@ -444,7 +444,7 @@ export function App() {
                 budget={state.budget}
                 reserveDays={state.reserveDays}
                 trackedReservedDays={state.reservedPtoDays}
-                canPin={state.canPin && requestToolsReady}
+                canPin={state.canPin && requestToolsReady && !budgetBlank}
                 pending={state.planningPending}
                 unavailable={!plannable && !state.planningPending}
                 onPin={state.pinPlan}
@@ -478,7 +478,7 @@ export function App() {
                 </p>
               )}
               <nav aria-label="On this page" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                {wide === false && plannable && !zeroBudget && (
+                {wide === false && plannable && !zeroBudget && !budgetBlank && (
                   <button type="button" onClick={state.pinPlan} disabled={!(state.canPin && requestToolsReady)} title={state.pinnedPlans.length >= 2 ? 'Remove a saved plan to make room for another.' : undefined} className={buttonClasses('secondary', 'md', 'px-3! text-sm!')}>
                     Save this plan
                   </button>

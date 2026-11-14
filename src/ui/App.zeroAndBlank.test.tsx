@@ -53,6 +53,8 @@ describe('/pto with the PTO field blank (F06)', () => {
     expect(within(summary).queryByText(/Example for 15 PTO days/)).toBeNull();
     fireEvent.change(screen.getByLabelText('PTO days available'), { target: { value: '' } });
     expect(within(summary).getByText('Example for 15 PTO days. Enter yours to see your plan.')).toBeTruthy();
+    // R2: an example plan is not the user's own, so it can't be saved.
+    for (const save of screen.queryAllByRole<HTMLButtonElement>('button', { name: 'Save this plan' })) expect(save.disabled).toBe(true);
     fireEvent.change(screen.getByLabelText('PTO days available'), { target: { value: '12' } });
     expect(within(summary).queryByText(/Example for/)).toBeNull();
   });
