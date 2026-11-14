@@ -311,7 +311,7 @@ describe('returning visitors (research rec 10)', () => {
     ]);
     await act(async () => { render(<Landing />); });
     const row = screen.getByRole('region', { name: 'Welcome back' });
-    expect(row.textContent).toContain('Next on your list: Dec 21 – 23, 2026');
+    expect(row.textContent).toContain('Next up: Dec 21 – 23, 2026');
     expect(row.textContent).toContain('Planned · 3 PTO days');
     // 14 calendar days before Monday Dec 21 is Monday Dec 7.
     expect(row.textContent).toContain('Request by Dec 7');

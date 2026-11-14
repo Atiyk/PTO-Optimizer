@@ -11,7 +11,7 @@ import { YearStrip } from './YearStrip';
 import { geolocateCountry } from './geo';
 import { todayISO } from './today';
 import { breakReason } from './breakReason';
-import { findBridges, holidayLongWeekends, nextHoliday, remainingHolidays, runLength } from './landingData';
+import { findBridges, holidayDisplayName, holidayLongWeekends, holidayRunPhrase, nextHoliday, remainingHolidays, runLength } from './landingData';
 import { downloadHolidaysICS } from './icsExport';
 import { track } from './analytics';
 import { computeLandingPlan, landingHolidayHref, landingPlanHref, landingSearch, readLandingState, validLandingRange } from './landingState';
@@ -134,7 +134,7 @@ const HOLIDAYS_SHOWN = 3;
 /** Research rec 10: one compact row for a returning visitor, from what this browser saved. */
 function WelcomeBack({ item, today }: { item: ReturnItem; today: string }) {
   const body = item.kind === 'request' ? <>
-    <p className="font-semibold text-ink">Welcome back. Next on your list: <span className="tabular-nums">{breakDates(item.request)}</span></p>
+    <p className="font-semibold text-ink">Welcome back. Next up: <span className="tabular-nums">{breakDates(item.request)}</span></p>
     <p className="text-muted">{item.status} · {plural(item.request.ptoDays, 'PTO day')}{item.requestBy
       ? item.requestBy < today ? <> · <strong className="font-semibold text-ink">Request now</strong>, the 14-day notice window opened {formatShort(item.requestBy)}</> : <> · Request by <strong className="font-semibold text-ink">{formatShort(item.requestBy)}</strong> for 14 days&apos; notice</>
       : ''}</p>
@@ -142,7 +142,7 @@ function WelcomeBack({ item, today }: { item: ReturnItem; today: string }) {
     <p className="font-semibold text-ink">Welcome back. Your saved plan: {item.plan.summary.totalDaysOff} days off for {plural(item.plan.summary.budgetSpent, 'PTO day')}</p>
     <p className="text-muted tabular-nums">{plural(item.plan.summary.breakCountActual, 'break')} between {breakDates({ start: item.plan.rangeStart, end: item.plan.rangeEnd })}</p>
   </>;
-  return <section aria-label="Welcome back" data-testid="welcome-back" className="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-[10px] border border-line bg-surface px-4 py-2 text-[15px] leading-6">
+  return <section aria-label="Welcome back" data-testid="welcome-back" className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-[10px] border border-line bg-surface px-4 py-2 text-[15px] leading-6">
     <div className="min-w-0 py-1">{body}</div>
     {item.kind === 'request'
       ? <a href="/policy#requests" className={LINK}>Open in My PTO →</a>
@@ -208,7 +208,10 @@ export function Landing() {
   }, [today]);
 
   const { loading } = calendar;
-  const holidays = useMemo(() => landingObservedHolidays(calendar.holidays, employer, rangeStart, rangeEnd), [calendar.holidays, employer, rangeStart, rangeEnd]);
+  // Local holiday names (US "Labor Day", UK "Boxing Day"), applied to each name a date carries.
+  const holidays = useMemo(() => landingObservedHolidays(calendar.holidays, employer, rangeStart, rangeEnd)
+    .map((holiday) => ({ ...holiday, name: holiday.name.split(' / ').map((name) => holidayDisplayName(name, country)).join(' / ') })),
+  [calendar.holidays, employer, rangeStart, rangeEnd, country]);
   const holidaySet = useMemo(() => new Set(holidays.map((holiday) => holiday.date)), [holidays]);
   const holidayName = useMemo(() => new Map(holidays.map((holiday) => [holiday.date, holiday.name])), [holidays]);
   const plan = useMemo(() => validRange && !loading ? computeLandingPlan(state, holidays) : null, [state, validRange, loading, holidays]);
@@ -314,7 +317,7 @@ export function Landing() {
           <div className="mt-8 sm:mt-10">
             {bestBreak && plan && !budgetBlank && <PlanYear breaks={plan.result.primary} best={bestBreak} rangeStart={rangeStart} rangeEnd={rangeEnd} holidayName={holidayName} weekStart={weekStartForCountry(country)} />}
             <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-8 gap-y-1">
-              <p className="max-w-3xl text-sm text-muted">Preview assumes a Monday–Friday workweek. {customizedHolidays ? 'Your saved employer holiday calendar is applied' : 'National public holidays are assumed to be observed by your employer'}{employer.custom.length > 0 ? ', including additional company days off' : ''}. Calendar days off include weekends, observed holidays, and PTO days.</p>
+              <p className="max-w-3xl text-sm text-muted">Preview assumes a Monday–Friday workweek. {customizedHolidays ? 'Your saved employer holiday calendar is applied' : 'National public holidays are assumed to be observed by your employer'}{employer.custom.length > 0 ? ', including additional company days off' : ''}. Days off include weekends, holidays and PTO days.</p>
               <a href={`${href}#planning-assumptions`} className={`${LINK} text-sm`}>Customize workweek and employer holidays →</a>
             </div>
             {calendar.degraded && <p className="mt-2 text-sm font-semibold text-ink" role="status">Some holiday data is unavailable. This preview may miss public holidays.</p>}
@@ -368,7 +371,7 @@ export function Landing() {
                 <p className="text-h2 font-bold type-condensed text-ink tabular-nums">{formatShort(entry.holiday.date)}</p>
                 <div className="min-w-0">
                   <p className="text-lg font-semibold text-ink">{entry.holiday.name}</p>
-                  <p className="text-sm text-muted">{entry.weekday}, {formatLong(entry.holiday.date)}{entry.isObserved ? ' · observed' : ''} · {entry.runLength >= 3 ? <span className="mark text-ink">{entry.runLength} calendar days off</span> : `${plural(entry.runLength, 'calendar day')} off`} before PTO</p>
+                  <p className="text-sm text-muted">{entry.weekday}, {formatLong(entry.holiday.date)}{entry.isObserved ? ' · observed' : ''} · {entry.runLength >= 3 ? <span className="mark text-ink">{holidayRunPhrase(entry.runLength)}</span> : holidayRunPhrase(entry.runLength)}</p>
                 </div>
                 <a href={landingHolidayHref(state, entry.holiday.date, bridge?.bridgeDate)} className={`${LINK} col-start-2 text-sm sm:col-start-3 sm:justify-self-end`}>{bridge
                   ? <>Connect a {runLength(bridge.combined)}-day break<span className="sr-only"> around {entry.holiday.name}</span></>
