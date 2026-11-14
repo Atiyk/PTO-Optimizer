@@ -85,7 +85,9 @@ describe('planStateFromSearch', () => {
     expect(state.rangeEnd).toBe(defaultPlanRangeEnd(TODAY));
     expect(state.country).toBe('US');
     expect(state.noticePeriodDays).toBe(14);
-    expect(state.reserveDays).toBe(3);
+    // A bare link starts like the homepage preview (F01): nothing kept in reserve.
+    expect(state.reserveDays).toBe(0);
+    expect(planStateFromSearch('?b=15', TODAY).reserveDays).toBe(3);
   });
 
   it('reads the notice period from the link', () => {

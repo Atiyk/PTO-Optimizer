@@ -14,7 +14,7 @@ import { activeCountryPreset } from '@daysoff/engine/data/countryPresets';
 import { computeQualifyingRuns, type WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import { weekStartForCountry } from './locale';
 import { isoToSerial, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
-import { readBrowserPlanSearch, readBrowserFullState, writeBrowserPlanStateToURL, writeFullStateToURL, readOverlapPayloadFromURL, buildOverlapShareURL, type FullURLState, type WriteStateInput } from './urlState';
+import { FRESH_VISIT_RESERVE_DAYS, readBrowserPlanSearch, readBrowserFullState, writeBrowserPlanStateToURL, writeFullStateToURL, readOverlapPayloadFromURL, buildOverlapShareURL, type FullURLState, type WriteStateInput } from './urlState';
 import type { DayCategory, ForcedState } from './types';
 import { classifyDay } from './dayCategory';
 import { alternativeForDate as alternativeForDateImpl } from './alternativeForDate';
@@ -162,7 +162,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
         ruledOutDays: [],
         altFridayEnabled: false,
         altFridayStart: undefined,
-        reserveDays: 3,
+        reserveDays: FRESH_VISIT_RESERVE_DAYS,
         unlimitedPto: false,
         noticePeriodDays: 14,
         noticeUnit: 'calendar' as const,
@@ -220,7 +220,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   // balance. Defaults to 3, not 0: the whole point is that committing everything is the
   // thing people refuse to do, so a deliberate non-zero default is what actually changes
   // behavior, not a feature nobody opts into.
-  const [reserveDays, setReserveDays] = useState(initial.reserveDays ?? 3);
+  const [reserveDays, setReserveDays] = useState(initial.reserveDays ?? FRESH_VISIT_RESERVE_DAYS);
   // Phase 3.2: unlimited-PTO workers still self-cap (66% at 15 days or fewer) because the
   // expectation is unclear, not because they prefer fewer days - so flipping this on seeds
   // a concrete number rather than leaving the field at whatever it was. The field stays

@@ -6,7 +6,7 @@ import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { createPtoRequest } from '../personal/requestLedger';
 import { readEmployerCalendar } from '../personal/employerCalendar';
 import { landingObservedHolidays, useLandingHolidays } from './landingCalendar';
-import { computeLandingPlan, landingHolidayHref, landingPlanHref } from './landingState';
+import { computeLandingPlan, landingHolidayHref, landingPlanHref, readLandingState } from './landingState';
 import { buildPublicPlanLink } from './publicSharePrivacy';
 import { useAppState } from './useAppState';
 import { formatManagerEmailDetailed, formatWorkingDaysList } from './requestText';
@@ -70,6 +70,37 @@ describe('landing preview and planner result', () => {
     window.history.replaceState(null, '', share.pathname + share.search);
     const recipient = renderHook(() => useAppState());
     expect(recipient.result.current.breaks).toEqual(expected.primary);
+  });
+
+  it('starts a bare /pto visit from the same defaults and plan as the homepage preview (F01)', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 2, 12));
+    try {
+      window.__PTO_PRELOADED_HOLIDAY_YEARS__ = { US: years };
+      const landing = readLandingState('', '2026-11-02', 'US');
+      const preview = viewPreview().result.current!;
+      expect(landing).toEqual(scenario);
+      window.history.replaceState(null, '', '/pto');
+      const planner = renderHook(() => useAppState());
+      const state = planner.result.current;
+      expect(state.reserveDays).toBe(0);
+      expect(state.budget).toBe(landing.budget);
+      expect(state.rangeStart).toBe(landing.rangeStart);
+      expect(state.rangeEnd).toBe(landing.rangeEnd);
+      expect(state.breaks).toEqual(preview.primary);
+      expect(state.budgetSpent).toBe(15);
+      expect(totalDays(state.breaks)).toBe(31);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('still reserves 3 days for an old link that has planning params but no rv', () => {
+    window.__PTO_PRELOADED_HOLIDAY_YEARS__ = { US: years };
+    window.history.replaceState(null, '', '/pto?c=US&b=15&s=2026-11-02&e=2027-11-01');
+    const planner = renderHook(() => useAppState());
+    expect(planner.result.current.reserveDays).toBe(3);
+    expect(planner.result.current.budgetSpent).toBeLessThanOrEqual(12);
   });
 
   it('holds both views until slow holiday data covers the complete selected range', async () => {
