@@ -4,7 +4,8 @@
  * holiday lookup lives in src/autopilot so it is unit tested with the app.
  */
 import { rawHolidaysToHolidays, type Holiday } from '@daysoff/engine/data/holidays';
-import { handleFeedRequest, type HolidayReader } from '../src/autopilot/feedHandler';
+import { FEED_CACHE_CONTROL, handleFeedRequest, type HolidayReader } from '../src/autopilot/feedHandler';
+import { buildWatchFeedV2ICS, isWatchFeedV2 } from '../src/autopilot/feedV2';
 import { buildWatchFeedICS, watchFeedHolidayYears } from '../src/autopilot/watchFeed';
 import { loadHolidayFile } from './holidayData';
 import { utcDateISO } from '../src/ui/today';
@@ -33,6 +34,17 @@ export async function handleWatch(request: Request, now: Date = new Date()): Pro
   const query = url.search.replace(/^\?/, '');
   // No viewer timezone reaches this endpoint: UTC calendar date, documented in today.ts.
   const today = utcDateISO(now);
+  if (isWatchFeedV2(url.searchParams)) {
+    // Format 2 holds only reminder and suggested dates (no balance or policy), so nothing
+    // is forecast here and a shared cache may keep the response.
+    const v2 = buildWatchFeedV2ICS(query, today);
+    if (!v2.ok) return text(v2.status, v2.message);
+    return new Response(request.method === 'HEAD' ? null : v2.ics, {
+      status: 200,
+      headers: { 'content-type': 'text/calendar; charset=utf-8', 'cache-control': FEED_CACHE_CONTROL, 'content-disposition': 'inline; filename="timebower-pto-expiry-watch.ics"', 'x-content-type-options': 'nosniff' },
+    });
+  }
+  // Format 1 (compat): the policy link itself, recomputed against today on every fetch.
   const country = url.searchParams.get('c') ?? '';
   const loaded = new Map<string, Holiday[]>();
   if (COUNTRY.test(country) && query.length <= 4096) {
@@ -45,6 +57,6 @@ export async function handleWatch(request: Request, now: Date = new Date()): Pro
   if (!result.ok) return text(result.status, result.message);
   return new Response(request.method === 'HEAD' ? null : result.ics, {
     status: 200,
-    headers: { 'content-type': 'text/calendar; charset=utf-8', 'cache-control': 'private, no-store', 'content-disposition': 'inline; filename="gapless-pto-expiry-watch.ics"', 'x-content-type-options': 'nosniff' },
+    headers: { 'content-type': 'text/calendar; charset=utf-8', 'cache-control': 'private, no-store', 'content-disposition': 'inline; filename="timebower-pto-expiry-watch.ics"', 'x-content-type-options': 'nosniff' },
   });
 }

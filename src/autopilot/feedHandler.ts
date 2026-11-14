@@ -4,6 +4,7 @@
  * free of Node APIs.
  */
 import { buildPlanFeedICS, MAX_FEED_QUERY_LENGTH } from './feed';
+import { buildPlanFeedV2ICS, isPlanFeedV2, planFeedV2StateSearch } from './feedV2';
 import { holidayYearsNeeded, planStateFromSearch } from './planFromSearch';
 import { isValidISODate } from '../ui/urlState';
 import { isPlanShareKey } from '../ui/shareFormat';
@@ -75,7 +76,10 @@ export async function handleFeedRequest(request: Request, readHolidays: HolidayR
     return textResponse(400, 'This plan link is too long for a calendar feed. Download the .ics file instead.');
   }
   const today = utcToday(now);
+  if (isPlanFeedV2(url.searchParams)) return handlePlanFeedV2(request, query, url.searchParams, readHolidays, today);
 
+  // Format 1 (compat): links made before the private format carry the plan's inputs and
+  // are re-solved on every fetch. They keep working exactly as before.
   // Load the country-years this plan needs before solving. A missing snapshot is not
   // equivalent to a valid snapshot containing no holidays.
   const state = planStateFromSearch(query, today);
@@ -109,7 +113,51 @@ export async function handleFeedRequest(request: Request, readHolidays: HolidayR
     headers: {
       'content-type': 'text/calendar; charset=utf-8',
       'cache-control': privateSchedule ? 'private, no-store' : FEED_CACHE_CONTROL,
-      'content-disposition': 'inline; filename="gapless-pto-plan.ics"',
+      'content-disposition': 'inline; filename="timebower-pto-plan.ics"',
+      'x-content-type-options': 'nosniff',
+    },
+  });
+}
+
+/** Loads the holiday files a plan range needs. Null when any is missing or malformed. */
+async function loadPlanHolidays(country: string, rangeStart: string, rangeEnd: string, readHolidays: HolidayReader): Promise<Map<string, unknown> | null> {
+  const loaded = new Map<string, unknown>();
+  const years = holidayYearsNeeded(country, rangeStart, rangeEnd);
+  await Promise.all(years.map(async (year) => {
+    try {
+      loaded.set(`${country}-${year}`, await readHolidays(country, year));
+    } catch {
+      loaded.set(`${country}-${year}`, null);
+    }
+  }));
+  if (years.length === 0 || years.some((year) => !validHolidaySnapshot(loaded.get(`${country}-${year}`), country))) return null;
+  return loaded;
+}
+
+/**
+ * Format 2 (src/autopilot/feedV2.ts): the link carries the chosen dates, not balances, so
+ * nothing is solved here. Without opt-in holiday dates the response holds only public data
+ * plus the dates themselves, so a shared cache may keep it.
+ */
+async function handlePlanFeedV2(request: Request, query: string, params: URLSearchParams, readHolidays: HolidayReader, today: string): Promise<Response> {
+  const state = planStateFromSearch(planFeedV2StateSearch(params), today);
+  const explicitHolidayCoverage = Array.isArray(state.sharedObservedHolidays);
+  let loaded = new Map<string, unknown>();
+  if (!explicitHolidayCoverage && isValidISODate(state.rangeStart) && isValidISODate(state.rangeEnd)) {
+    const files = await loadPlanHolidays(state.country, state.rangeStart, state.rangeEnd, readHolidays);
+    if (!files) {
+      return textResponse(422, 'This country and date range lack complete holiday data for a calendar feed. Choose a covered range, or download an .ics file after checking the holidays in the planner.');
+    }
+    loaded = files;
+  }
+  const result = buildPlanFeedV2ICS(query, today, (country, year) => loaded.get(`${country}-${year}`) ?? null);
+  if (!result.ok) return textResponse(result.status, result.message);
+  return new Response(request.method === 'HEAD' ? null : result.ics, {
+    status: 200,
+    headers: {
+      'content-type': 'text/calendar; charset=utf-8',
+      'cache-control': explicitHolidayCoverage ? 'private, no-store' : FEED_CACHE_CONTROL,
+      'content-disposition': 'inline; filename="timebower-pto-plan.ics"',
       'x-content-type-options': 'nosniff',
     },
   });

@@ -11,6 +11,7 @@ import { carryoverSnapshot } from '../personal/carryoverSnapshot';
 import { Button } from './Button';
 import { SubscribeFeed } from './SubscribeFeed';
 import { EmailReminders } from './EmailReminders';
+import { buildWatchFeedV2Search, watchFeedV2Reminders } from '../autopilot/feedV2';
 
 import { downloadReminderICS } from './icsExport';
 import { compactDate, compactDatesIn } from './compactDate';
@@ -137,6 +138,14 @@ function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalen
   [calendarLoading, risks, policy, country, requests, calendarWorkWeek, calendarOffDays, calendarStart, calendarEnd, subdivision, effectiveToday]);
   const calendarState = calendarLoading ? 'loading' : calendarDegraded ? 'degraded' : 'ready';
   const reminders = useMemo(() => expirationReminders(visible, prefs.leads, effectiveToday, rescueSuggestions(plans)), [visible, prefs.leads, effectiveToday, plans]);
+  // The watch subscription carries these dates only (format 2, feedV2.ts): every lead for
+  // every risk, as the old policy-link feed did, but no balance or policy setting.
+  const watchFeedSearch = useMemo(() => watchSearch === undefined || calendarLoading ? undefined
+    : buildWatchFeedV2Search(
+      watchFeedV2Reminders(expirationReminders(risks, EXPIRATION_REMINDER_LEADS, effectiveToday), risks),
+      [...plans.values()].map((plan) => ({ riskId: plan.riskId, deadline: plan.deadline, dates: plan.ptoDates.filter((date) => date >= effectiveToday) })),
+      effectiveToday,
+    ), [watchSearch, calendarLoading, risks, plans, effectiveToday]);
   const [showReset, setShowReset] = useState(false);
   // Lazy: no extra reset projection until a user asks to inspect their next reset.
   const reset = useMemo(() => showReset ? carryoverSnapshot(policy, requests) : null, [showReset, policy, requests]);
@@ -260,20 +269,20 @@ function Guard({ policy, country, requests = EMPTY_REQUESTS, today, holidayCalen
         <div className="mt-4">
           {acceptedWatchSearch !== watchSearch ? (
             <>
-              <p className="text-sm text-muted">Online reminders send the balance and policy you entered to the reminder service. Anyone with a calendar subscription link can read those details. You can download reminders above and keep your details on this device.</p>
+              <p className="text-sm text-muted">A calendar subscription link holds today&apos;s reminder dates and suggested days, not your balance or policy. Anyone with the link can see those dates. You can download reminders above instead.</p>
               <Button variant="secondary" className="mt-2" onClick={() => setAcceptedWatchSearch(watchSearch)}>Show online reminder options</Button>
             </>
           ) : (
             <>
-              <SubscribeFeed
-                planSearch={watchSearch}
+              {watchFeedSearch !== undefined && <SubscribeFeed
+                planSearch={watchFeedSearch}
                 path="/api/watch"
                 idPrefix={`${id}-watch`}
                 calendarName={WATCH_CALENDAR_NAME}
                 heading="Get these reminders in your calendar"
-                description="Subscribe once to get the 60, 30 and 7-day reminders and suggested days to use expiring PTO, recalculated from today's date when your calendar refreshes."
-                caveat="Requests tracked on this device aren't included. After editing your policy, subscribe again. Anyone with the link can see the policy details in it."
-              />
+                description="Subscribe to get the 60, 30 and 7-day reminders and suggested days to use expiring PTO. It shows the dates as of today; subscribe again after changes."
+                caveat="The link holds these dates only, not your balance or policy. It does not change when you edit your policy or balance. Anyone with the link can see the dates."
+              />}
               <div className="mt-4"><EmailReminders kind="policy" search={watchSearch} /></div>
             </>
           )}

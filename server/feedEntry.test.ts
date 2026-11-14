@@ -38,3 +38,29 @@ describe('server feed entry', () => {
     expect((await handleWatch(new Request(`https://x.test/api/watch?${POLICY}&pad=${'a'.repeat(5000)}`), NOW)).status).toBe(414);
   });
 });
+
+describe('server feed entry: private format 2', () => {
+  const WATCH_V2 = 'wv=2&r=f20270101-60.20261102.20261231_f20270101-7.20261225.20261231&d=f20270101.20261231.20261228.20261229&fc=2026-11-01';
+
+  it('serves a dates-only watch feed from a shared cache, with no balance in the link or calendar', async () => {
+    const res = await handleWatch(new Request(`https://x.test/api/watch?${WATCH_V2}`), NOW);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('public, max-age=0, s-maxage=21600, stale-while-revalidate=86400');
+    const ics = (await res.text()).replace(/\r\n /g, '');
+    expect(ics).toContain('UID:expiration-forfeit-2027-01-01-7@pto-optimizer.app');
+    expect(ics).not.toContain('UID:expiration-forfeit-2027-01-01-60@'); // its date has passed
+    expect(ics).toContain('UID:rescue-forfeit-2027-01-01-20261228@pto-optimizer.app');
+    expect(ics).not.toMatch(/lose \d/);
+    expect((await handleWatch(new Request('https://x.test/api/watch?wv=2&r=bad'), NOW)).status).toBe(400);
+  });
+
+  it('serves a dates-only plan feed with holidays from disk and the same PTO UIDs', async () => {
+    const res = await handleFeed(new Request('https://x.test/api/feed?fv=2&c=US&s=2026-11-04&e=2027-12-31&k=20261121-20261129-001110000&fc=2026-11-04'));
+    expect(res.status).toBe(200);
+    const ics = await res.text();
+    expect(ics).toContain('Thanksgiving');
+    expect(ics).toContain('UID:pto-20261123@pto-optimizer.app');
+    expect(ics).toContain('UID:pto-20261125@pto-optimizer.app');
+    expect(ics).not.toContain('UID:pto-20261126@');
+  });
+});

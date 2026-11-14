@@ -33,6 +33,10 @@ export type AnalyticsEvent =
   | 'URL shared'
   | 'Overlap link opened'
   | 'returned_with_saved_url'
+  // A visit that arrived through a public plan share link (sv=1) the app wrote. Name only.
+  | 'shared_link_opened'
+  // The person took a calendar-subscription action (opened a calendar app link or copied it).
+  | 'feed_subscribed'
   | 'team_days_used'
   // Feature 1 Stage 4E - event names only, plus the sanitized public route.
   // Listed on the privacy page (public/privacy.html) alongside the rest.
@@ -112,6 +116,22 @@ export function trackBreakAction(action: keyof typeof firstBreakEvent): void {
   } catch {
     // Blocked storage must not break or gate the product action.
   }
+}
+
+/** True for a /pto query string written by "Copy plan link" (public share format,
+ * src/ui/shareFormat.ts): it carries the version marker `sv=1`. Reads nothing else. */
+export function isShareLinkArrival(search: string): boolean {
+  try {
+    return new URLSearchParams(search).get('sv') === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Fires 'shared_link_opened' once per document for a share-link arrival. No properties:
+ * never the balance, dates, employer data or the link itself. */
+export function trackSharedLinkOpened(search: string): void {
+  if (isShareLinkArrival(search)) trackOnceInDocument('shared_link_opened');
 }
 
 /** StrictMode, re-renders, input edits and repeated mounts must not add pageviews. */

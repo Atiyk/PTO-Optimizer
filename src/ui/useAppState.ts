@@ -18,7 +18,7 @@ import { FRESH_VISIT_RESERVE_DAYS, readBrowserPlanSearch, readBrowserFullState, 
 import type { DayCategory, ForcedState } from './types';
 import { classifyDay } from './dayCategory';
 import { alternativeForDate as alternativeForDateImpl } from './alternativeForDate';
-import { track } from './analytics';
+import { track, trackSharedLinkOpened } from './analytics';
 import { validateInputs, isSupportedPlanningRange } from './validation';
 import { defaultRangeEnd, defaultPlanRangeEnd, holidayEntriesFor, stateHolidayCandidatesFor, altFridayOffDatesFor, effectiveOffDaysFor, mustIncludeDaysFor, effectiveBlackoutsFor, effectiveBudgetFor, policyAccrualFieldsFor, buildSolveInput, isSuggestedPtoDay, type HolidayEntry } from '../autopilot/planFromSearch';
 import { todayISO } from './today';
@@ -187,8 +187,12 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     const params = new URLSearchParams(window.location.search);
     return params.has('s') && params.has('b');
   }, []);
+  // Same raw arrival string, read once before the URL sync rewrites it (share-only keys
+  // such as sv are not kept in the address bar).
+  const arrivalSearch = useMemo(() => (typeof window === 'undefined' ? '' : window.location.search), []);
   useEffect(() => {
     if (arrivedWithSavedUrl) track('returned_with_saved_url');
+    trackSharedLinkOpened(arrivalSearch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
