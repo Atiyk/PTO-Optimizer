@@ -351,6 +351,26 @@ try {
     assert.equal(await main.getByRole('button', { name: /^(?:Generate|Submit)/i }).count(), 0);
     const trackButton = main.getByRole('region', { name: 'Requesting each break', exact: true }).getByRole('button', { name: 'Track this PTO request', exact: true }).first();
     await trackButton.click();
+    // The planner confirms on the card and counts the request; the tracker itself lives in
+    // My PTO (one place to edit requests), reached from the planner's request line.
+    const cards = main.getByRole('region', { name: 'Requesting each break', exact: true });
+    const requestLine = main.getByRole('region', { name: 'My PTO requests', exact: true });
+    await cards.getByTestId('committed-entry').waitFor({ state: 'visible' });
+    assert.equal(await cards.getByTestId('committed-entry').count(), 1);
+    assert.match(await cards.getByTestId('committed-entry').innerText(), /Tracked/);
+    assert.equal(await requestLine.getByTestId('request-count').innerText(), 'My PTO has 1 request from this browser.');
+    // The card recognizes the saved request on return and never offers a duplicate.
+    assert.equal(await trackButton.count(), 0, 'A tracked break must confirm in place instead of offering Track again.');
+    await main.reload({ waitUntil: 'domcontentloaded' });
+    await waitForPlanner(main);
+    await eventually(async () => {
+      assert.equal(await cards.getByTestId('committed-entry').count(), 1);
+      assert.equal(await requestLine.getByTestId('request-count').innerText(), 'My PTO has 1 request from this browser.');
+      assert.equal(await trackButton.count(), 0);
+    }, 'A reload should restore the same request and keep its card marked as tracked.');
+    assert.equal(await main.getByRole('link', { name: 'Forecast my balance and check expiration', exact: true }).getAttribute('href'), '/policy#balance');
+    await requestLine.getByRole('link', { name: 'Manage requests in My PTO', exact: true }).click();
+    await main.getByRole('heading', { level: 1, name: 'How much PTO will I have, and what am I about to lose?', exact: true }).waitFor();
     const tracker = main.getByRole('region', { name: 'My PTO requests', exact: true });
     await tracker.getByRole('article').waitFor({ state: 'visible' });
     assert.equal(await tracker.getByRole('article').count(), 1);
@@ -363,21 +383,11 @@ try {
     }).length;
     assert.ok(trackedCost > 0 && trackedCost <= 3);
     assert.match(await row.innerText(), new RegExp(`${trackedCost} PTO days?`));
-    // The card recognizes the saved request on return and never offers a duplicate.
-    assert.equal(await trackButton.count(), 0, 'A tracked break must confirm in place instead of offering Track again.');
-    await main.reload({ waitUntil: 'domcontentloaded' });
-    await waitForPlanner(main);
-    await eventually(async () => {
-      assert.equal(await tracker.getByRole('article').count(), 1);
-      assert.equal(await trackButton.count(), 0);
-    }, 'A reload should restore the same request and keep its card marked as tracked.');
     await row.getByRole('combobox', { name: `Status for request ${trackedStart}`, exact: true }).selectOption('requested');
     await row.locator('summary').filter({ hasText: 'Personal note' }).click();
     await row.getByLabel(`Personal note for request ${trackedStart}`, { exact: true }).fill(privateNote);
     assert.ok(!main.url().includes(privateNote));
     await noOverflow(main); await screenshot(main, '01-requested-375.png');
-    await main.getByRole('link', { name: 'Forecast my balance and check expiration', exact: true }).click();
-    await main.getByRole('heading', { level: 1, name: 'How much PTO will I have, and what am I about to lose?', exact: true }).waitFor();
     const quick = main.getByRole('region', { name: 'Quick balance forecast', exact: true });
     await quick.getByLabel('Current PTO balance (days)', { exact: true }).fill('20');
     await quick.getByLabel('Balance as-of date', { exact: true }).fill('2027-01-01');

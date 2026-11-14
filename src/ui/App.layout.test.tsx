@@ -103,3 +103,15 @@ describe('planner request tracker link (F20)', () => {
     expect(within(line).queryByRole('button')).toBeNull();
   });
 });
+
+describe('phone calendar keeps the months the person changed (F11)', () => {
+  it('keeps a month with a day they cannot take off in view, and collapses an untouched one', async () => {
+    setViewport(375);
+    window.history.replaceState(null, '', `${scenario}&bo=2027-03-10`);
+    await renderReady();
+    await waitFor(() => expect(document.getElementById('day-2027-03-10')).toBeTruthy());
+    expect(document.getElementById('day-2027-03-10')!.closest('[data-collapsed-month="true"]')).toBeNull();
+    expect(screen.getByRole('button', { name: /Show all \d+ months/ })).toBeTruthy();
+  });
+});
+

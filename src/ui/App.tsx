@@ -166,13 +166,15 @@ export function App() {
   }, [holidayFocusDate]);
 
   // On a phone the calendar opens on the months that matter: a break, a tracked request, a
-  // day the person pinned or ruled out, or the holiday they came to plan around.
+  // day the person pinned, ruled out or blacked out, or the holiday they came to plan around.
   const narrowKeepDates = useMemo(() => [
     ...state.breaks.flatMap(brk => brk.days),
     ...state.committedEntries.flatMap(entry => rangeISO(entry.start, entry.end)),
     ...Object.keys(state.forced),
+    // Days the person can't take off (typed or imported from a calendar file) stay in view.
+    ...(state.solveInput.blackouts ?? []),
     ...(holidayFocusDate ? [holidayFocusDate] : []),
-  ], [state.breaks, state.committedEntries, state.forced, holidayFocusDate]);
+  ], [state.breaks, state.committedEntries, state.forced, state.solveInput.blackouts, holidayFocusDate]);
 
   const previewRun = state.hoveredAlternative
     ? { start: state.hoveredAlternative.start, end: state.hoveredAlternative.end }
