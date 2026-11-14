@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { headlineText, Headline, balanceLine } from './Headline';
+import { headlineText, Headline, balanceLine, daysOffSplit } from './Headline';
 
 describe('headlineText (Phase 3.1: reserve days read as deliberate, never as unspent budget)', () => {
   it('leads with "N of M days planned · R kept in reserve" when a reserve is set', () => {
@@ -43,9 +43,9 @@ describe('Headline render', () => {
     expect(html.match(/<h1\b/g)).toHaveLength(1);
     expect(html).toContain('aria-live="polite"');
     expect(html).toContain('<span class="mark">26 days off</span>');
-    expect(html).toMatch(/from 12 PTO days/);
-    // The figure comes before what it costs.
-    expect(html.indexOf('26 days off')).toBeLessThan(html.indexOf('from 12 PTO days'));
+    expect(html).toContain('12 PTO days + 14 weekend and holiday days');
+    // The figure comes before how it splits.
+    expect(html.indexOf('26 days off')).toBeLessThan(html.indexOf('12 PTO days + 14'));
   });
 
   it('states the break count and the reserve as a deliberate choice, never as unspent budget', () => {
@@ -116,5 +116,18 @@ describe('balanceLine', () => {
     const html = renderToStaticMarkup(<Headline budgetSpent={2} totalDaysOff={4} breakCountActual={1} scores={null} budget={12} reserveDays={3} trackedReservedDays={7} canPin={false} onPin={() => {}} pinnedCount={0} />);
     expect(html).toContain('7 reserved for tracked requests');
     expect(html).not.toContain('not placed');
+  });
+});
+
+describe('daysOffSplit (honest arithmetic under the total)', () => {
+  it('splits calendar days off into PTO days and days already off, adding up to the total', () => {
+    expect(daysOffSplit(15, 31)).toBe('15 PTO days + 16 weekend and holiday days');
+    expect(daysOffSplit(1, 4)).toBe('1 PTO day + 3 weekend and holiday days');
+    expect(daysOffSplit(3, 4)).toBe('3 PTO days + 1 weekend and holiday day');
+    expect(daysOffSplit(10, 18, 'target')).toBe('10 target days + 8 weekend and holiday days');
+  });
+  it('makes no split claim when PTO bought nothing extra or nothing was placed', () => {
+    expect(daysOffSplit(5, 5)).toBe('from 5 PTO days');
+    expect(daysOffSplit(0, 0)).toBe('from 0 PTO days');
   });
 });

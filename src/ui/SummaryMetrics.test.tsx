@@ -12,10 +12,10 @@ describe('SummaryMetrics', () => {
     const html = renderToStaticMarkup(
       <SummaryMetrics budgetSpent={12} totalDaysOff={27} breakCountActual={3} scores={scores} />,
     );
-    // The multiplier is the same number (27 / 12 = 2.25), stated in words too.
+    // The multiplier (27 / 12 = 2.25) says what it means without restating the headline (F12).
     expect(html).toContain('2.25×');
-    expect(html).toContain('27 days off for 12 PTO days');
-    expect(html).toContain('Each PTO day buys 2.25 days off');
+    expect(html).toContain('Calendar days off for each PTO day spent.');
+    expect(html).not.toContain('27 days off for 12 PTO days');
     // Display only broad context and its source, even when the engine returns an internal percentile.
     expect(html).not.toContain('Efficiency percentile');
     expect(html).toContain('Travel estimate');
@@ -31,9 +31,8 @@ describe('SummaryMetrics', () => {
     const html = renderToStaticMarkup(
       <SummaryMetrics budgetSpent={12} totalDaysOff={33} breakCountActual={9} scores={scores} />,
     );
-    expect(html).toContain('12');
-    expect(html).toContain('33');
-    expect(html).toContain('in 9 breaks');
+    expect(html).toContain('2.75×');
+    expect(html).not.toContain('in 9 breaks');
     expect(html).not.toContain('78th');
     expect(html).not.toContain('91st');
   });

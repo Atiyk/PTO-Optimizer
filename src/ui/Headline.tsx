@@ -39,6 +39,18 @@ export function headlineText(budgetSpent: number, budget: number, reserveDays: n
   return `${budgetSpent} PTO ${spentWord} → ${totalDaysOff} ${offWord} off`;
 }
 
+/**
+ * The honest arithmetic under the total: "15 PTO days + 16 weekend and holiday days". The
+ * total counts calendar days off, so whatever the PTO did not pay for is days the person is
+ * already off. Falls back to "from N PTO days" when there is nothing to split.
+ */
+export function daysOffSplit(ptoDays: number, totalDaysOff: number, unit: 'PTO' | 'target' = 'PTO'): string {
+  const ptoWord = ptoDays === 1 ? 'day' : 'days';
+  const free = totalDaysOff - ptoDays;
+  if (ptoDays <= 0 || free <= 0) return `from ${ptoDays} ${unit} ${ptoWord}`;
+  return `${ptoDays} ${unit} ${ptoWord} + ${free} weekend and holiday ${free === 1 ? 'day' : 'days'}`;
+}
+
 /** The supporting line under the figure: break count, then how the balance was used. */
 export function balanceLine(budgetSpent: number, budget: number, reserveDays: number, breakCountActual: number, unlimitedPto = false, trackedReservedDays = 0): string {
   const breaks = `${breakCountActual} ${breakCountActual === 1 ? 'break' : 'breaks'}`;
@@ -57,7 +69,7 @@ export function balanceLine(budgetSpent: number, budget: number, reserveDays: nu
 
 /**
  * The answer, put first: the plan's result as a marked figure ("27 days off") with what it
- * costs beside it ("from 12 PTO days"). This is the page's single h1 and sits inside a polite
+ * splits into beside it ("12 PTO days + 15 weekend and holiday days"). This is the page's single h1 and sits inside a polite
  * live region, so a screen reader hears the new result as the sliders move.
  */
 export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, reserveDays, canPin, onPin, pinnedCount, pending, unavailable, unlimitedPto = false, trackedReservedDays = 0 }: HeadlineProps) {
@@ -69,7 +81,6 @@ export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, 
   }
   const saveTitle = pinnedCount >= 2 ? 'Remove a saved plan to make room for another.' : undefined;
   const offWord = totalDaysOff === 1 ? 'day' : 'days';
-  const spentWord = budgetSpent === 1 ? 'day' : 'days';
   return (
     <div className="min-w-0">
       <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-x-6">
@@ -78,7 +89,7 @@ export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, 
             <span className="mark">{totalDaysOff} {offWord} off</span>
           </span>{' '}
           <span className="mt-2 block text-h2 font-bold tabular-nums type-condensed">
-            from {budgetSpent} {unlimitedPto ? 'target' : 'PTO'} {spentWord}
+            {daysOffSplit(budgetSpent, totalDaysOff, unlimitedPto ? 'target' : 'PTO')}
           </span>
         </h1>
         <Button variant="secondary" size="md" onClick={onPin} disabled={!canPin} title={saveTitle} className="mt-1 shrink-0 px-3! text-sm!">

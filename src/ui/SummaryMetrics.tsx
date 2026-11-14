@@ -5,6 +5,7 @@ import { intensityBand } from './scoreFormat';
 interface SummaryMetricsProps {
   budgetSpent: number;
   totalDaysOff: number;
+  /** Kept for API stability: the headline states the break count. */
   breakCountActual: number;
   scores: Scores | null;
   /** 'us': scored on 2025 US airport checkpoint counts. 'estimate': a seasonal rule of thumb. */
@@ -57,20 +58,19 @@ function trimDecimal(n: number): string {
  * Keep the exact PTO arithmetic separate from broad travel model context.
  * The internal travel percentile only selects an ordinal band for US history.
  */
-export function SummaryMetrics({ budgetSpent, totalDaysOff, breakCountActual, scores, travelBasis = 'estimate' }: SummaryMetricsProps) {
+export function SummaryMetrics({ budgetSpent, totalDaysOff, scores, travelBasis = 'estimate' }: SummaryMetricsProps) {
   const ratio = budgetSpent > 0 ? trimDecimal(totalDaysOff / budgetSpent) : null;
-  const offWord = totalDaysOff === 1 ? 'day' : 'days';
-  const ptoWord = budgetSpent === 1 ? 'day' : 'days';
-  const breakWord = breakCountActual === 1 ? 'break' : 'breaks';
   const travelFigure = scores
     ? travelBasis === 'us' ? ['Busier', 'Typical', 'Quieter'][intensityBand(scores.travel.percentile)] : 'Seasonal'
     : '—';
   return (
     <dl className="m-0 grid grid-cols-2 gap-x-4 border-t border-line pt-4 sm:gap-x-8">
       <Fact figure={ratio ? `${ratio}×` : '—'} label="Days off per PTO day" short="days off per PTO day">
+        {/* The headline already states the total and its split; this line only says what the
+            ratio means, so the same numbers are not read out a third time. */}
         {ratio
-          ? <>{totalDaysOff} {offWord} off for {budgetSpent} PTO {ptoWord} in {breakCountActual} {breakWord}. Each PTO day buys {ratio} days off, weekends and holidays included.</>
-          : <>No PTO placed yet, so there is no return to show.</>}
+          ? <>Calendar days off for each PTO day spent.</>
+          : <>No PTO placed yet, so there is no ratio to show.</>}
       </Fact>
       <Fact figure={travelFigure} label="Travel estimate" short="travel estimate">
         {scores
