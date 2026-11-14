@@ -45,6 +45,11 @@ try {
       await balance.fill('0');
       result.blankAccrualWithholdsProjection = await forecast.getByText(/Enter how much PTO you earn/).isVisible()
         && await forecast.getByText(/Estimated available PTO on/).count() === 0;
+      // F07: the balance alone already answers, labeled as excluding accrual, with no accrual row.
+      result.balanceOnlyAnswers = await forecast.getByText(/before accrual$/).isVisible()
+        && (await forecast.locator('[aria-live="polite"]').textContent())?.trim() === '0 days'
+        && await forecast.getByText(/Accrual is not included yet\./).isVisible()
+        && await forecast.getByText(/Expected accrual/).count() === 0;
       await earned.fill('0');
       result.explicitZeroProjects = (await forecast.locator('[aria-live="polite"]').textContent())?.trim() === '0 days';
       await balance.fill('12');
@@ -89,7 +94,7 @@ try {
       await revisit.close();
       await page.screenshot({ path: resolve(output, `policy-forecast-${width}.png`), fullPage: true });
       result.status = errors.length === 0 && result.allPresetsVisible && result.touchTargetHeight >= 44
-        && result.blankBalanceWithholdsProjection && result.blankAccrualWithholdsProjection && result.explicitZeroProjects
+        && result.blankBalanceWithholdsProjection && result.blankAccrualWithholdsProjection && result.balanceOnlyAnswers && result.explicitZeroProjects
         && result.changedLive && result.restoredAfterReload && result.savedPolicyResumes && result.keyboardChangesDate
         && result.noHorizontalOverflow && result.freeformDateVisible && result.noSubmitButton
         && result.onDemandPolicyExplanation && result.explanationAccessibleTarget

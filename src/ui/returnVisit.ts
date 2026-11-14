@@ -1,6 +1,7 @@
-import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import { DEFAULT_WORK_WEEK, type ISODate, type WorkWeek } from '@daysoff/engine/solver/types';
+import type { NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
 import { DEFAULT_NOTICE_PERIOD_DAYS, submitByDate } from '../personal/outOfOffice';
-import type { PtoRequest, RequestStatus } from '../personal/requestLedger';
+import { validRequestRange, type PtoRequest, type RequestStatus } from '../personal/requestLedger';
 import type { PlanSnapshot } from './useAppState';
 import { partitionPlanParams } from './shareFormat';
 import { writeFullStateToURL } from './urlState';
@@ -10,14 +11,34 @@ import { writeFullStateToURL } from './urlState';
  * Reads only what the planner and My PTO already stored; adds no storage and sends nothing.
  */
 export type ReturnItem =
-  | { kind: 'request'; request: PtoRequest; requestBy?: string; status: string }
+  | { kind: 'request'; request: PtoRequest; submitBy?: SubmitBy; status: string }
   | { kind: 'plan'; plan: PlanSnapshot; href: string; privateSearch: string };
 
 const OPEN_STATUSES: Partial<Record<RequestStatus, string>> = {
   considering: 'Considering', planned: 'Planned', requested: 'Requested', approved: 'Approved',
 };
-/** Not asked for yet: a request-by date still helps. */
-const NOT_YET_REQUESTED: readonly RequestStatus[] = ['considering', 'planned'];
+export interface SubmitBy {
+  /** null when this work schedule has no working day to count back from. */
+  date: ISODate | null;
+  noticePeriodDays: number;
+  noticeUnit: NoticeUnit;
+}
+
+/**
+ * N-P1-2: the one "Submit by" rule shared by the My PTO tracker and the homepage welcome
+ * row. Only a Planned request that has not started gets a date. The notice period is, in
+ * order: the page's own setting when it has one (the planner on /pto), the notice period
+ * the request was planned with, then the 14-day default.
+ */
+export function requestSubmitBy(
+  request: PtoRequest, today: ISODate, calendar: { workWeek: WorkWeek; offDays: readonly ISODate[] },
+  pageNotice?: { noticePeriodDays: number; noticeUnit?: NoticeUnit },
+): SubmitBy | null {
+  if (request.status !== 'planned' || request.start < today || !validRequestRange(request.start, request.end)) return null;
+  const noticePeriodDays = pageNotice?.noticePeriodDays ?? request.noticePeriodDays ?? DEFAULT_NOTICE_PERIOD_DAYS;
+  const noticeUnit = (pageNotice ? pageNotice.noticeUnit : request.noticeUnit) ?? 'calendar';
+  return { date: submitByDate(request.start, noticePeriodDays, calendar.workWeek, calendar.offDays, noticeUnit), noticePeriodDays, noticeUnit };
+}
 
 /** The saved plan's own planner link: public keys in the address, private ones handed over on this device. */
 export function savedPlanLink(plan: PlanSnapshot): { href: string; privateSearch: string } {
@@ -34,12 +55,8 @@ export function nextReturnItem(
     .filter((entry) => entry.end >= today && OPEN_STATUSES[entry.status] !== undefined)
     .sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end))[0];
   if (request) {
-    const firstPtoDay = request.ptoDates.find((date) => date >= today);
-    // Same default notice as the My PTO tracker (14 calendar days before the first day away).
-    const requestBy = NOT_YET_REQUESTED.includes(request.status) && firstPtoDay
-      ? submitByDate(firstPtoDay, DEFAULT_NOTICE_PERIOD_DAYS, DEFAULT_WORK_WEEK, offDays) ?? undefined
-      : undefined;
-    return { kind: 'request', request, status: OPEN_STATUSES[request.status]!, requestBy };
+    const submitBy = requestSubmitBy(request, today, { workWeek: DEFAULT_WORK_WEEK, offDays }) ?? undefined;
+    return { kind: 'request', request, status: OPEN_STATUSES[request.status]!, submitBy };
   }
   const plan = plans.filter((entry) => entry.rangeEnd >= today && entry.summary.totalDaysOff > 0)
     .sort((a, b) => a.rangeStart.localeCompare(b.rangeStart))[0];

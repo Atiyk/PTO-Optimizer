@@ -27,6 +27,7 @@ import { readRequestLedger } from '../personal/requestLedger';
 import { usePinnedPlans } from './pinnedPlanStore';
 import { nextReturnItem, type ReturnItem } from './returnVisit';
 import { handOffOnClick } from './planHandoff';
+import { noticePhrase } from '@daysoff/engine/calendar/requestDeadline';
 
 /** A control set inside the sentence: it takes the sentence's own size and weight. */
 const INLINE_FIELD = 'h-[1.45em] min-h-11 rounded-[6px] border border-line-strong bg-surface px-[0.3em] align-baseline font-bold text-ink hover:border-ink';
@@ -131,18 +132,27 @@ function PlanYear({ breaks, best, rangeStart, rangeEnd, holidayName, weekStart }
 /** The holidays list starts with this many rows; the rest sit behind one disclosure. */
 const HOLIDAYS_SHOWN = 3;
 
-/** Research rec 10: one compact row for a returning visitor, from what this browser saved. */
+/**
+ * Research rec 10: one compact row for a returning visitor, from what this browser saved.
+ * N-P2-3: on phones it follows the call to action, so the action stays above the tab bar.
+ * N-P1-2: the submit-by date uses the tracker's rule and wording, with the notice period
+ * the break was planned with when it was saved from the planner.
+ */
 function WelcomeBack({ item, today }: { item: ReturnItem; today: string }) {
+  const submitBy = item.kind === 'request' ? item.submitBy : undefined;
+  const notice = submitBy ? `${noticePhrase(submitBy.noticePeriodDays, submitBy.noticeUnit)} notice` : '';
   const body = item.kind === 'request' ? <>
     <p className="font-semibold text-ink">Welcome back. Next up: <span className="tabular-nums">{breakDates(item.request)}</span></p>
-    <p className="text-muted">{item.status} · {plural(item.request.ptoDays, 'PTO day')}{item.requestBy
-      ? item.requestBy < today ? <> · <strong className="font-semibold text-ink">Request now</strong>, the 14-day notice window opened {formatShort(item.requestBy)}</> : <> · Request by <strong className="font-semibold text-ink">{formatShort(item.requestBy)}</strong> for 14 days&apos; notice</>
+    <p className="text-muted">{item.status} · {plural(item.request.ptoDays, 'PTO day')}{submitBy?.date
+      ? submitBy.date < today
+        ? <> · <strong className="font-semibold text-ink">Submit now</strong>: the {notice} window opened {formatShort(submitBy.date)}</>
+        : <> · <strong className="font-semibold text-ink">Submit by {formatShort(submitBy.date)}</strong> · {notice}</>
       : ''}</p>
   </> : <>
     <p className="font-semibold text-ink">Welcome back. Your saved plan: {item.plan.summary.totalDaysOff} days off for {plural(item.plan.summary.budgetSpent, 'PTO day')}</p>
     <p className="text-muted tabular-nums">{plural(item.plan.summary.breakCountActual, 'break')} between {breakDates({ start: item.plan.rangeStart, end: item.plan.rangeEnd })}</p>
   </>;
-  return <section aria-label="Welcome back" data-testid="welcome-back" className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-[10px] border border-line bg-surface px-4 py-2 text-[15px] leading-6">
+  return <section aria-label="Welcome back" data-testid="welcome-back" className="order-1 mt-4 flex flex-wrap items-center justify-between gap-x-4 rounded-[10px] border border-line bg-surface px-4 py-1.5 text-[15px] leading-6 sm:order-none sm:mt-0 sm:mb-4 sm:py-2">
     <div className="min-w-0 py-1">{body}</div>
     {item.kind === 'request'
       ? <a href="/policy#requests" className={LINK}>Open in My PTO →</a>
@@ -194,7 +204,9 @@ export function Landing() {
     setState((previous) => ({ ...previous, ...next }));
   };
   // Issue 15: an emptied field is "not entered yet", never a 0-day plan.
-  const budgetDraft = useWholeDayDraft(state.budget, (n) => update({ budget: Math.max(0, Math.min(60, Math.round(n))) }));
+  // N-P1-1: blank stays blank on blur, so the answer and the call to action hold still
+  // while a tap or a Tab leaves the field.
+  const budgetDraft = useWholeDayDraft(state.budget, (n) => update({ budget: Math.max(0, Math.min(60, Math.round(n))) }), { keepBlankOnBlur: true });
 
   useEffect(() => {
     if (!validRange) return;
@@ -264,6 +276,9 @@ export function Landing() {
 
             <section aria-labelledby="landing-result" data-plan-result={!validRange ? 'unavailable' : loading ? 'pending' : 'ready'} className="flex min-w-0 flex-col lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-1">
               {returnItem && <WelcomeBack item={returnItem} today={today} />}
+              {/* N-P1-1: the blank state reserves the plan's height, so the call to action
+                  stays where it was when the field empties. */}
+              <div className={budgetBlank ? 'min-h-[9.375rem] sm:min-h-[9.5rem] lg:min-h-[11.75rem]' : undefined}>
               {budgetBlank ? <>
                 <h2 id="landing-result" className="text-h2 font-bold type-condensed text-ink">Enter your PTO days</h2>
                 <p className="mt-2 text-base text-muted" role="status">Type how many PTO days you have, and your plan shows here.</p>
@@ -272,7 +287,6 @@ export function Landing() {
                   <span className="sr-only">Your plan: </span><span className="mark">{planDaysOff} days off</span>
                 </h2>
                 <p className="mt-2 text-xl font-semibold tabular-nums text-ink sm:mt-3">{daysOffSplit(used, planDaysOff)}, across {plural(breakCount, 'break')}</p>
-                <p className="order-1 mt-3 text-base text-muted sm:order-none sm:mt-2">Longest: <strong className="font-semibold text-ink"><span className="tabular-nums">{breakDates(bestBreak)}</span>, {bestBreak.totalDaysOff} days off for {plural(bestBreak.ptoCost, 'PTO day')}</strong>. {breakReason(bestBreak, (date) => holidayName.get(date))}</p>
               </> : zeroBudget ? <>
                 <h2 id="landing-result" className="text-h2 font-bold type-condensed text-ink">No PTO days to spend</h2>
                 <p className="mt-2 text-base text-ink" role="status">{longWeekends.length > 0
@@ -282,13 +296,15 @@ export function Landing() {
                 <h2 id="landing-result" className="text-h2 font-bold type-condensed text-ink">Your recommended break</h2>
                 <p className="mt-2 text-base text-muted" role="status">{emptyMessage}</p>
               </>}
+              </div>
+              {!budgetBlank && bestBreak && <p className="order-2 mt-3 text-base text-muted sm:order-none sm:mt-2">Longest: <strong className="font-semibold text-ink"><span className="tabular-nums">{breakDates(bestBreak)}</span>, {bestBreak.totalDaysOff} days off for {plural(bestBreak.ptoCost, 'PTO day')}</strong>. {breakReason(bestBreak, (date) => holidayName.get(date))}</p>}
               {/* F21: on phones the action sits right under the answer, so it clears the tab bar
-                  on a 320x568 screen; the longest-break detail follows it. */}
+                  on a 320x568 screen; the welcome row and the longest-break detail follow it. */}
               <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 sm:mt-5">
                 <Button href={href}>{budgetBlank ? 'Open the planner →' : 'See the full plan →'}</Button>
                 <span className="text-sm text-muted">{budgetBlank ? 'It starts at 15 PTO days. Change them there.' : 'Free, no account needed.'}</span>
               </div>
-              <p className="order-2 mt-4 text-[15px] text-muted sm:order-none">
+              <p className="order-3 mt-4 text-[15px] text-muted sm:order-none">
                 Planning around <a className="link-mark font-semibold" href={`/family?c=${encodeURIComponent(country)}`}>school breaks</a> or <a className="link-mark font-semibold" href={`/sabbatical?c=${encodeURIComponent(country)}`}>a sabbatical</a>?
               </p>
             </section>

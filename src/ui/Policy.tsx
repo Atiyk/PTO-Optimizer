@@ -20,6 +20,7 @@ import { expirationRisks } from '../personal/expiration';
 import { compactDate, compactDatesIn } from './compactDate';
 import { initialPolicyPreferences, readBrowserPolicyDraft, keepPrivatePolicyDraft, writePolicyPreferences, deletePolicyPreferences, policyStorageNotice, rememberLoadedPolicy, POLICY_STORAGE_KEY, type PolicySaveResult } from '../personal/policyPreferences';
 import { QuickForecast } from './QuickForecast';
+import { withoutAccrual } from './balanceCopy';
 import { BalanceFromImage } from './BalanceFromImage';
 import { useRequestLedger } from './useRequestLedger';
 import { WalletTransfer } from './WalletTransfer';
@@ -75,9 +76,9 @@ const checkRow = 'flex min-h-11 items-center gap-2 text-sm text-ink';
 const inputNumber = (value: string) => value === '' ? NaN : Number(value);
 const displayNumber = (value: number) => Number.isFinite(value) ? value : '';
 
-function missingForecastInput(policy: TimeOffPolicy, validWorkdayHours: boolean): string | undefined {
-  if (!isValidISODate(policy.balanceAsOf)) return 'Enter the date of your current PTO balance.';
-  const { accrual, carryover } = policy;
+/** F07: the inputs that only affect future accrual. Without them the balance alone still answers. */
+function missingAccrualInput(policy: TimeOffPolicy): string | undefined {
+  const { accrual } = policy;
   if ((accrual.kind === 'front-loaded' || accrual.kind === 'per-pay-period') && !Number.isFinite(accrual.amount)) {
     return 'Enter how much PTO you earn under How you earn PTO. If you earn no more this year, enter 0.';
   }
@@ -86,6 +87,13 @@ function missingForecastInput(policy: TimeOffPolicy, validWorkdayHours: boolean)
   if (accrual.kind === 'per-hour-worked' && (!Number.isFinite(accrual.rate) || !Number.isFinite(accrual.typicalWeeklyHours))) {
     return 'Enter your PTO accrual rate and typical weekly hours.';
   }
+}
+
+function missingForecastInput(policy: TimeOffPolicy, validWorkdayHours: boolean): string | undefined {
+  if (!isValidISODate(policy.balanceAsOf)) return 'Enter the date of your current PTO balance.';
+  const accrualIssue = missingAccrualInput(policy);
+  if (accrualIssue) return accrualIssue;
+  const { carryover } = policy;
   if (!validWorkdayHours) return 'Enter the hours in a normal workday, up to 24.';
   if (carryover.useByDate !== undefined && !isValidISODate(carryover.useByDate)) return 'Enter the use-by date for carried PTO.';
 }
@@ -282,6 +290,9 @@ export function Policy() {
   useEffect(() => publishBalanceBasis(balanceIncludesApprovedLeave), [balanceIncludesApprovedLeave]);
 
   const forecastInputIssue = missingForecastInput(policy, !needsWorkdayHours || validWorkdayHours);
+  // F07: when only accrual is missing, the forecast answers from the balance alone and asks for it next.
+  const accrualOnlyIssue = forecastInputIssue !== undefined && forecastInputIssue === missingAccrualInput(policy)
+    && missingForecastInput(withoutAccrual(policy), !needsWorkdayHours || validWorkdayHours) === undefined ? forecastInputIssue : undefined;
   const canProjectBalance = useMemo(() => !needsBalance && !forecastInputIssue && accrualKind !== 'unlimited'
     && forecastWithRequests(policy, balanceAsOf) !== null, [needsBalance, forecastInputIssue, accrualKind, policy, balanceAsOf]);
   const projection = useMemo(() => canProjectBalance
@@ -362,11 +373,11 @@ export function Policy() {
               the number. On desktop the drivers sit beside the answer. */}
           <section id="balance" aria-label="Quick balance forecast" className="mt-6 flex scroll-mt-24 flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,28rem)]">
             <div className="min-w-0">
-              <QuickForecast policy={policy} balanceEntered={!needsBalance} inputIssue={forecastInputIssue} requests={ledger.requests} upcomingLoss={upcomingLoss} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')}>
+              <QuickForecast policy={policy} balanceEntered={!needsBalance} inputIssue={forecastInputIssue} accrualIssue={accrualOnlyIssue} requests={ledger.requests} upcomingLoss={upcomingLoss} forecastDate={forecastDate} onForecastDateChange={setForecastDate} onForecastUsed={() => track('balance_forecast_used')}>
                 {balanceFields}
               </QuickForecast>
             </div>
-            <section aria-labelledby="policy-earn-heading" className="min-w-0 rounded-[10px] border border-line bg-surface p-4 sm:p-6">
+            <section id="how-you-earn" aria-labelledby="policy-earn-heading" className="min-w-0 scroll-mt-24 rounded-[10px] border border-line bg-surface p-4 sm:p-6">
               <h2 id="policy-earn-heading" className="text-lg font-bold type-condensed text-ink">How you earn PTO</h2>
               <p className="mt-1 text-sm text-muted">Use your employer&apos;s rules. Until you pick another option, all unused PTO carries over at reset.</p>
               <div className="mt-4 grid gap-x-4 gap-y-4 sm:grid-cols-2 lg:grid-cols-1">

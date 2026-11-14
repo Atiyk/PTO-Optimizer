@@ -5,7 +5,7 @@ import { explainConnectedPolicy } from '../personal/policyExplanation';
 import type { PtoRequest } from '../personal/requestLedger';
 import { forecastPresets } from './forecastPresets';
 import { compactDate, compactDatesIn } from './compactDate';
-import { blankBalanceMessage } from './balanceCopy';
+import { blankBalanceMessage, withoutAccrual } from './balanceCopy';
 
 export interface QuickForecastProps {
   policy: TimeOffPolicy;
@@ -20,6 +20,9 @@ export interface QuickForecastProps {
   upcomingLoss?: { text: string; deadline: string; expirationDate: string };
   /** The balance input, placed first in the card so the answer appears right under it. */
   children?: ReactNode;
+  /** F07: set when the only missing inputs are about accrual. The card then answers from
+   * the balance and tracked leave alone, says accrual is not in it, and asks for it next. */
+  accrualIssue?: string;
 }
 
 const number = (value: number) => new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(value);
@@ -41,17 +44,56 @@ function EquationRow({ op, label, value, strong = false }: { op: string; label: 
 }
 
 /**
+ * F07: the answer from the balance alone. Tracked leave and the carryover rule still apply;
+ * accrual is left out and the card says so, with the one input that would add it.
+ */
+function BalanceOnly({ policy, forecast, forecastDate, accrualIssue }: { policy: TimeOffPolicy; forecast: NonNullable<ReturnType<typeof forecastWithRequests>>; forecastDate: string; accrualIssue: string }) {
+  const { confirmed, tentative } = forecast;
+  const unit = policy.unit;
+  const balance = confirmed.balance ?? 0;
+  const amount = (value: number) => `${number(value)} ${unit === 'days' && value === 1 ? 'day' : unit === 'hours' && value === 1 ? 'hour' : unit}`;
+  return (
+    <div className="mt-4 border-t border-line pt-3" data-testid="balance-only-forecast">
+      <p className="text-sm text-muted">Available PTO on {compactDate(forecastDate)}, before accrual</p>
+      <p className="mt-1 flex items-baseline gap-2 text-ink" aria-live="polite">
+        <span className="mark text-display-sm type-display tabular-nums">{number(balance)}</span>{' '}
+        <span className="text-lg font-semibold">{unit}</span>
+      </p>
+      <p className="mt-2 text-base text-ink">
+        You have {amount(policy.currentBalance)} now.{' '}
+        {confirmed.scheduled > 0
+          ? <>After {amount(confirmed.scheduled)} of approved leave, you&apos;ll have {amount(balance)} on {compactDate(forecastDate)}.</>
+          : <>No approved leave is tracked before {compactDate(forecastDate)}.</>}
+        {confirmed.expired > 0 && <> {amount(confirmed.expired)} {confirmed.expired === 1 ? "expires" : "expire"} under your carryover rule by then.</>}
+      </p>
+      {tentative.scheduled > confirmed.scheduled && (
+        <p className="mt-2 text-sm text-ink">Including planned and requested leave: <strong>{amount(tentative.balance ?? 0)}</strong>.</p>
+      )}
+      {confirmed.unfunded > 0.000001 && (
+        <p role="status" className="mt-2 text-sm text-ink">Your approved leave is {amount(confirmed.unfunded)} more than this balance covers, before accrual.</p>
+      )}
+      <div role="status" className="mt-4 rounded-[10px] bg-surface-alt p-3 text-sm text-ink">
+        <p><strong className="font-semibold">Accrual is not included yet.</strong> {accrualIssue}</p>
+        <a href="#how-you-earn" className="link-mark mt-1 inline-flex min-h-11 items-center font-semibold">Go to How you earn PTO</a>
+      </div>
+    </div>
+  );
+}
+
+/**
  * The answer panel of /policy: "how much PTO will I have on this date?". The projected
  * balance is the marked hero figure; under it the same forecast is written out as an
  * equation (current + accrual - scheduled - expiration) so the number can be checked.
  */
-export function QuickForecast({ policy, balanceEntered = true, inputIssue, requests = [], forecastDate, onForecastDateChange, onForecastUsed, upcomingLoss, children }: QuickForecastProps) {
+export function QuickForecast({ policy, balanceEntered = true, inputIssue, accrualIssue, requests = [], forecastDate, onForecastDateChange, onForecastUsed, upcomingLoss, children }: QuickForecastProps) {
   const dateId = useId();
   const [showExplanation, setShowExplanation] = useState(false);
   const unlimited = policy.accrual.kind === 'unlimited';
   // Blank is "not entered yet", never 0: say what the answer will be instead of showing one.
   const missing = balanceEntered ? inputIssue : blankBalanceMessage(forecastDate, policy.balanceAsOf);
   const forecast = unlimited || !missing ? forecastWithRequests(policy, forecastDate, requests) : null;
+  const balanceOnly = !unlimited && balanceEntered && missing !== undefined && missing === accrualIssue
+    ? forecastWithRequests(withoutAccrual(policy), forecastDate, requests) : null;
   const unit = policy.unit;
   const confirmed = forecast?.confirmed;
   const tentative = forecast?.tentative;
@@ -86,6 +128,8 @@ export function QuickForecast({ policy, balanceEntered = true, inputIssue, reque
       {presets.length > 0 && <p className="mt-1.5 text-xs leading-5 text-muted">Shortcuts count from your balance date, {compactDate(policy.balanceAsOf)}.</p>}
       {unlimited ? (
         <p className="mt-5 border-t border-line pt-4 text-base text-ink">Unlimited PTO has no banked balance to forecast. Track your planned time off and check your employer&apos;s approval rules.</p>
+      ) : !forecast && balanceOnly ? (
+        <BalanceOnly policy={policy} forecast={balanceOnly} forecastDate={forecastDate} accrualIssue={accrualIssue!} />
       ) : !forecast ? (
         <p role="status" className="mt-5 border-t border-line pt-4 text-sm text-ink">{missing ?? validateCurrentCarriedBalance(policy) ?? 'Enter a valid date on or after your balance as-of date, within ten years, and valid policy amounts.'}</p>
       ) : confirmed && tentative ? (

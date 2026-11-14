@@ -313,8 +313,8 @@ describe('returning visitors (research rec 10)', () => {
     const row = screen.getByRole('region', { name: 'Welcome back' });
     expect(row.textContent).toContain('Next up: Dec 21 – 23, 2026');
     expect(row.textContent).toContain('Planned · 3 PTO days');
-    // 14 calendar days before Monday Dec 21 is Monday Dec 7.
-    expect(row.textContent).toContain('Request by Dec 7');
+    // 14 calendar days before Monday Dec 21 is Monday Dec 7. N-P1-2: the tracker's wording.
+    expect(row.textContent).toContain('Submit by Dec 7 · 14-day notice');
     const links = row.querySelectorAll('a');
     expect(links).toHaveLength(1);
     expect(links[0].getAttribute('href')).toBe('/policy#requests');
@@ -357,6 +357,83 @@ describe('blank PTO field (R2)', () => {
     expect(new URLSearchParams(window.location.search).has('b')).toBe(false);
     await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '9' } }); });
     expect(new URL((screen.getByRole('link', { name: 'See the full plan →' }) as HTMLAnchorElement).href).searchParams.get('b')).toBe('9');
+  });
+});
+
+describe('blank PTO field keeps still on blur (N-P1-1)', () => {
+  it('stays blank when focus leaves, so the call to action keeps its label, link and place', async () => {
+    await act(async () => { render(<Landing />); });
+    const field = screen.getByRole('spinbutton') as HTMLInputElement;
+    await act(async () => { field.focus(); fireEvent.change(field, { target: { value: '' } }); });
+    const cta = screen.getByRole('link', { name: 'Open the planner →' }) as HTMLAnchorElement;
+    const hrefBefore = cta.href;
+    // A tap or a Tab blurs the field before the link receives the click or the focus.
+    await act(async () => { fireEvent.blur(field); field.blur(); });
+    expect(field.value).toBe('');
+    expect(screen.getByRole('heading', { name: 'Enter your PTO days' })).toBeTruthy();
+    // The very same element, unchanged: nothing re-rendered it into another place.
+    expect(screen.getByRole('link', { name: 'Open the planner →' })).toBe(cta);
+    expect(cta.href).toBe(hrefBefore);
+    expect(new URL(cta.href).searchParams.has('b')).toBe(false);
+    expect(new URLSearchParams(window.location.search).has('b')).toBe(false);
+    expect(screen.queryByRole('link', { name: 'See the full plan →' })).toBeNull();
+    // Keyboard: Tab from the field reaches the same blank-state link.
+    await act(async () => { cta.focus(); });
+    expect(document.activeElement).toBe(cta);
+    expect(new URL((document.activeElement as HTMLAnchorElement).href).searchParams.has('b')).toBe(false);
+  });
+
+  it('keeps the blank answer the same height as the plan it replaces', async () => {
+    await act(async () => { render(<Landing />); });
+    await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '' } }); });
+    const answer = document.getElementById('landing-result')!.parentElement!;
+    expect(answer.className).toMatch(/min-h-\[/);
+    expect(screen.queryByText(/^Longest:/)).toBeNull();
+  });
+
+  it('leaves blank once a number or the slider sets one', async () => {
+    await act(async () => { render(<Landing />); });
+    const field = screen.getByRole('spinbutton') as HTMLInputElement;
+    await act(async () => { fireEvent.change(field, { target: { value: '' } }); fireEvent.blur(field); });
+    await act(async () => { fireEvent.change(screen.getByRole('slider'), { target: { value: '8' } }); });
+    expect(field.value).toBe('8');
+    expect(new URL((screen.getByRole('link', { name: 'See the full plan →' }) as HTMLAnchorElement).href).searchParams.get('b')).toBe('8');
+  });
+});
+
+describe('welcome row notice period (N-P1-2)', () => {
+  it('uses the notice period the break was planned with, in the tracker\'s wording', async () => {
+    const planned = createPtoRequest({ start: '2026-12-21', end: '2026-12-23', status: 'planned', noticePeriodDays: 30 }, REQUEST_CALENDAR, 'np30')!;
+    writeRequestLedger([planned]);
+    await act(async () => { render(<Landing />); });
+    const row = screen.getByRole('region', { name: 'Welcome back' });
+    // 30 calendar days before Monday Dec 21 is Saturday Nov 21, moved back to Friday Nov 20.
+    expect(row.textContent).toContain('Submit by Nov 20 · 30-day notice');
+    expect(row.textContent).not.toMatch(/14-day/);
+  });
+
+  it('says to submit now once the notice window has opened', async () => {
+    writeRequestLedger([createPtoRequest({ start: '2026-11-09', end: '2026-11-10', status: 'planned', noticePeriodDays: 10, noticeUnit: 'working' }, REQUEST_CALENDAR, 'soon')!]);
+    await act(async () => { render(<Landing />); });
+    expect(screen.getByRole('region', { name: 'Welcome back' }).textContent).toMatch(/Submit now: the 10-working-day notice window opened Oct 26/);
+  });
+
+  it('shows no date for a break still being considered, as the tracker does', async () => {
+    writeRequestLedger([request('2026-12-21', '2026-12-23', 'considering', 'maybe')]);
+    await act(async () => { render(<Landing />); });
+    const row = screen.getByRole('region', { name: 'Welcome back' });
+    expect(row.textContent).toContain('Considering · 3 PTO days');
+    expect(row.textContent).not.toMatch(/Submit|Request by/);
+  });
+
+  it('follows the call to action on phones and leads the answer from sm up (N-P2-3)', async () => {
+    writeRequestLedger([request('2026-12-21', '2026-12-23', 'planned', 'next')]);
+    await act(async () => { render(<Landing />); });
+    const row = screen.getByRole('region', { name: 'Welcome back' });
+    expect(row.className).toMatch(/(^| )order-1( |$)/);
+    expect(row.className).toMatch(/sm:order-none/);
+    const longest = screen.getByText(/^Longest:/);
+    expect(longest.className).toMatch(/(^| )order-2( |$)/);
   });
 });
 

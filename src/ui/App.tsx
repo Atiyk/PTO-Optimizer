@@ -121,7 +121,8 @@ export function App() {
     if (!requestToolsReady || ptoDates.length !== brk.ptoCost) {
       return { ok: false, message: 'Wait for your calendar to update, then try again.' };
     }
-    const range = { start: brk.start, end: brk.end };
+    // N-P1-2: the request keeps the notice period it was planned with, for My PTO and the homepage.
+    const range = { start: brk.start, end: brk.end, noticePeriodDays: state.noticePeriodDays, noticeUnit: state.noticeUnit };
     const recorded = action === 'saved'
       ? ledger.saveBreak({ ...range, ptoDates }, requestCalendar)
       : ledger.addRequest(range, requestCalendar);
