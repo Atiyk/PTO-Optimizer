@@ -27,8 +27,8 @@ try {
       await page.goto(new URL('/policy/', base).href, { waitUntil: 'networkidle', timeout: 30000 });
       await page.getByRole('heading', { name: 'PTO balance forecast' }).waitFor();
       result.allThreeVisible = await page.getByRole('heading', { name: 'PTO expiration guard' }).isVisible()
-        && await page.getByRole('heading', { name: 'What might my unused vacation be worth?' }).isVisible();
-      await page.goto(new URL('/policy/?c=US&cb=12&bao=2027-01-01&ak=fl&am=0&gd=2027-01-01&cm=a&ace=0', base).href, { waitUntil: 'networkidle' });
+        && await page.getByRole('heading', { name: 'What might my unused PTO be worth if I leave?' }).isVisible();
+      await page.goto(new URL('/policy/?c=US&cb=12&bao=2027-01-01&ak=fl&am=0&gd=2027-01-01&cm=a&ace=0#departure-payout', base).href, { waitUntil: 'networkidle' });
       const forecastDate = page.getByLabel('Forecast my balance on');
       const beforeDate = await forecastDate.inputValue();
       // Initial forecast can already be 3 months ahead. Use a 1-month shortcut to test a real change.

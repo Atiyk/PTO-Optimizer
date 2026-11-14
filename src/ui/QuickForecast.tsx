@@ -5,6 +5,7 @@ import { explainConnectedPolicy } from '../personal/policyExplanation';
 import type { PtoRequest } from '../personal/requestLedger';
 import { forecastPresets } from './forecastPresets';
 import { compactDate, compactDatesIn } from './compactDate';
+import { blankBalanceMessage } from './balanceCopy';
 
 export interface QuickForecastProps {
   policy: TimeOffPolicy;
@@ -17,6 +18,8 @@ export interface QuickForecastProps {
   /** The soonest loss the policy causes (from the same expiration check as the guard), so
    * the answer can say it beside the figure instead of only further down the page. */
   upcomingLoss?: { text: string; deadline: string; expirationDate: string };
+  /** The balance input, placed first in the card so the answer appears right under it. */
+  children?: ReactNode;
 }
 
 const number = (value: number) => new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(value);
@@ -42,11 +45,12 @@ function EquationRow({ op, label, value, strong = false }: { op: string; label: 
  * balance is the marked hero figure; under it the same forecast is written out as an
  * equation (current + accrual - scheduled - expiration) so the number can be checked.
  */
-export function QuickForecast({ policy, balanceEntered = true, inputIssue, requests = [], forecastDate, onForecastDateChange, onForecastUsed, upcomingLoss }: QuickForecastProps) {
+export function QuickForecast({ policy, balanceEntered = true, inputIssue, requests = [], forecastDate, onForecastDateChange, onForecastUsed, upcomingLoss, children }: QuickForecastProps) {
   const dateId = useId();
   const [showExplanation, setShowExplanation] = useState(false);
   const unlimited = policy.accrual.kind === 'unlimited';
-  const missing = balanceEntered ? inputIssue : 'Enter your current PTO balance to see a forecast. Enter 0 if your balance is zero.';
+  // Blank is "not entered yet", never 0: say what the answer will be instead of showing one.
+  const missing = balanceEntered ? inputIssue : blankBalanceMessage(forecastDate, policy.balanceAsOf);
   const forecast = unlimited || !missing ? forecastWithRequests(policy, forecastDate, requests) : null;
   const unit = policy.unit;
   const confirmed = forecast?.confirmed;
@@ -57,7 +61,8 @@ export function QuickForecast({ policy, balanceEntered = true, inputIssue, reque
   return (
     <section aria-labelledby={`${dateId}-heading`} className="min-w-0 rounded-[10px] border border-ink bg-surface p-4 sm:p-6">
       <h2 id={`${dateId}-heading`} className="text-h2 font-bold type-condensed text-ink">PTO balance forecast</h2>
-      <label htmlFor={dateId} className="mt-3 block text-sm font-semibold text-ink">Forecast my balance on</label>
+      {children}
+      <label htmlFor={dateId} className={`${children ? 'mt-5 border-t border-line pt-4' : 'mt-3'} block text-sm font-semibold text-ink`}>Forecast my balance on</label>
       <input
         id={dateId} type="date" min={policy.balanceAsOf} value={forecastDate}
         className="mt-1.5 h-11 w-full min-w-0 rounded-[6px] border border-line-strong bg-surface px-3 text-base text-ink"

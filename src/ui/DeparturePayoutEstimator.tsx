@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import type { TimeOffPolicy } from '../policy/model';
 import type { PtoRequest } from '../personal/requestLedger';
 import { estimateDeparturePayout, type CompanyPayoutRule } from '../personal/payoutEstimate';
@@ -19,9 +19,18 @@ const units = (value: number) => new Intl.NumberFormat('en', { maximumFractionDi
  * No pay, jurisdiction, balance or request input is written to URLs or analytics here.
  */
 export function DeparturePayoutEstimator({
-  policy, requests = [], policyReady = true,
-}: { policy: TimeOffPolicy; requests?: readonly PtoRequest[]; policyReady?: boolean }) {
+  policy, requests = [], policyReady = true, collapsible = false,
+}: { policy: TimeOffPolicy; requests?: readonly PtoRequest[]; policyReady?: boolean; collapsible?: boolean }) {
   const id = useId();
+  // On My PTO the estimator starts closed; a link to #departure-payout still opens it.
+  const [open, setOpen] = useState(!collapsible);
+  useEffect(() => {
+    if (!collapsible) return;
+    const openFromHash = () => { if (window.location.hash === '#departure-payout') setOpen(true); };
+    openFromHash();
+    window.addEventListener('hashchange', openFromHash);
+    return () => window.removeEventListener('hashchange', openFromHash);
+  }, [collapsible]);
   const [departureDateOverride, setDepartureDate] = useState<string>();
   const departureDate = departureDateOverride ?? policy.balanceAsOf;
   const [workJurisdiction, setWorkJurisdiction] = useState('');
@@ -47,13 +56,10 @@ export function DeparturePayoutEstimator({
   }) : null;
   const line = result?.lines[0];
 
-  return (
-    <section id="departure-payout" aria-labelledby={id + '-heading'} className="scroll-mt-24">
-      <h2 id={id + '-heading'} className="text-h2 font-bold type-condensed text-ink">What might my unused vacation be worth?</h2>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-        If you left on a given date: a <strong className="text-ink">gross employer-policy scenario</strong> from the balance and accrual above,
-        not a legal entitlement or take-home pay. Employment-law coverage is not yet verified for any jurisdiction.
-      </p>
+  const heading = 'What might my unused PTO be worth if I leave?';
+  const intro = 'A gross, before-tax figure under your employer\'s payout rule, using the balance and accrual above.';
+  const body = (
+    <>
       <div className="mt-5 grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div className="min-w-0">
           <div className="grid min-w-0 gap-4 sm:grid-cols-2">
@@ -98,7 +104,7 @@ export function DeparturePayoutEstimator({
               Employer payout assumption
               <select className={selectCls} value={companyRule} onChange={e => setCompanyRule(e.target.value as EmployerRule)}>
                 <option value="unknown">I do not know yet</option>
-                <option value="pays-all">Pays all unused vacation</option>
+                <option value="pays-all">Pays all unused PTO</option>
                 <option value="pays-up-to">Pays up to a cap</option>
                 <option value="pays-none">Says it pays none</option>
               </select>
@@ -114,16 +120,16 @@ export function DeparturePayoutEstimator({
           <label className="mt-4 flex min-h-11 items-center gap-3 text-sm text-ink">
             <input type="checkbox" checked={includeTrackedVacation} className="h-5 w-5 shrink-0"
               onChange={e => setIncludeTrackedVacation(e.target.checked)} />
-            Count my tracked PTO requests as vacation (only if they really are vacation)
+            Count my tracked requests in this estimate (only if they all came from this PTO balance)
           </label>
           <p className="text-xs leading-5 text-muted">
-            Your request tracker does not classify leave types. Without this, only the planned dates in your policy affect the estimate.
+            The request tracker doesn't record leave types, such as sick leave. Without this, only the planned days in your policy affect the estimate.
           </p>
         </div>
         <div className="min-w-0 self-start border-t-2 border-ink pt-4 lg:border-l lg:border-t-0 lg:border-line lg:pl-6 lg:pt-0">
           {!policyReady ? (
             <p role="status" className="text-sm text-ink">
-              {policy.accrual.kind === 'unlimited' ? 'Unlimited vacation has no banked cash balance to estimate.'
+              {policy.accrual.kind === 'unlimited' ? 'Unlimited PTO has no banked balance to pay out.'
                 : <>Enter your <a href="#balance" className="link-mark font-semibold">PTO balance and policy</a> to estimate a payout.</>}
             </p>
           ) : !complete ? (
@@ -140,7 +146,7 @@ export function DeparturePayoutEstimator({
               {result.totalCompanyGrossCents === null ? (
                 <p role="status" className="mt-1 text-lg font-semibold text-ink">
                   {line.status === 'unsupported-unlimited'
-                    ? 'Unlimited vacation has no banked cash balance to estimate.'
+                    ? 'Unlimited PTO has no banked balance to pay out.'
                     : 'Payout amount unknown until you confirm the employer rule.'}
                 </p>
               ) : (
@@ -149,25 +155,55 @@ export function DeparturePayoutEstimator({
                 </p>
               )}
               <dl className="mt-4 divide-y divide-line border-t border-line text-sm">
-                <div className="flex justify-between gap-3 py-1.5"><dt className="text-muted">Projected unused vacation</dt><dd className="text-right font-semibold text-ink">{line.status === 'unsupported-unlimited' ? 'Not banked' : units(line.unusedUnits) + ' ' + line.unit}</dd></div>
+                <div className="flex justify-between gap-3 py-1.5"><dt className="text-muted">Projected unused PTO</dt><dd className="text-right font-semibold text-ink">{line.status === 'unsupported-unlimited' ? 'Not banked' : units(line.unusedUnits) + ' ' + line.unit}</dd></div>
                 <div className="flex justify-between gap-3 py-1.5"><dt className="text-muted">Earned by departure</dt><dd className="text-right font-semibold text-ink">{units(line.forecast.accrued)} {line.unit}</dd></div>
                 <div className="flex justify-between gap-3 py-1.5"><dt className="text-muted">Scheduled time off</dt><dd className="text-right font-semibold text-ink">{units(line.forecast.scheduled)} {line.unit}</dd></div>
                 <div className="flex justify-between gap-3 py-1.5"><dt className="text-muted">Eligible under this assumption</dt><dd className="text-right font-semibold text-ink">{line.payableUnits === null ? 'Unknown' : units(line.payableUnits) + ' ' + line.unit}</dd></div>
               </dl>
               <p className="mt-3 text-xs leading-5 text-muted">
-                Payable vacation hours times your hourly rate (or annual salary divided by annual hours). Accrual, approved leave and resets use the same forecast. Not a tax or payroll estimate.
+                Payable PTO hours times your hourly rate (or annual salary divided by annual hours). Accrual, approved leave and resets use the same forecast. Not a tax or payroll estimate.
               </p>
             </>
           )}
         </div>
       </div>
       <div className="mt-5 max-w-3xl space-y-2 border-t border-line pt-4 text-sm leading-6 text-muted">
-        <p><strong className="text-ink">Employment law is not verified here.</strong> A company’s stated rule may differ from mandatory rights. We do not calculate legal entitlement or resolve that difference.</p>
-        <p><strong className="text-ink">Confirm with HR:</strong> Is unused vacation paid at departure, which leave categories qualify, is there a cap, and what are the final accrual and pay-period rules?</p>
+        <p><strong className="text-ink">Employment law is not verified here.</strong> Your employer's stated rule may differ from what the law requires where you work. This is not a legal entitlement or take-home pay, and we do not calculate either.</p>
+        <p><strong className="text-ink">Confirm with HR:</strong> Is unused PTO paid when you leave, which leave types count, is there a cap, and what are the final accrual and pay-period rules?</p>
         <a href="/glossary/payout" className="link-mark inline-flex min-h-11 items-center font-semibold">
           Read the guide to unused PTO at departure
         </a>
       </div>
+    </>
+  );
+
+  if (!collapsible) {
+    return (
+      <section id="departure-payout" aria-labelledby={id + '-heading'} className="scroll-mt-24">
+        <h2 id={id + '-heading'} className="text-h2 font-bold type-condensed text-ink">{heading}</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{intro}</p>
+        {body}
+      </section>
+    );
+  }
+  return (
+    <section id="departure-payout" aria-labelledby={id + '-heading'} className="scroll-mt-24">
+      <details open={open} onToggle={(event) => setOpen(event.currentTarget.open)} className="group min-w-0 rounded-[10px] border border-line bg-surface">
+        <Summary>
+          <h2 id={id + '-heading'} className="block text-lg font-bold type-condensed text-ink">{heading}</h2>
+          <span className="block text-sm text-muted">{intro}</span>
+        </Summary>
+        <div className="border-t border-line px-4 pb-5 sm:px-6">{body}</div>
+      </details>
     </section>
+  );
+}
+
+function Summary({ children }: { children: ReactNode }) {
+  return (
+    <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
+      <span className="min-w-0">{children}</span>
+      <span aria-hidden="true" className="shrink-0 text-xl leading-none text-ink group-open:rotate-45 motion-safe:transition-transform">+</span>
+    </summary>
   );
 }
