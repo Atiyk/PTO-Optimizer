@@ -38,12 +38,12 @@ Durable state for the scheduled orchestrator. Read this first on every run; upda
 
 | Batch | Integration branch | Main PR | Critic | Production SHA | Status |
 | --- | --- | --- | --- | --- | --- |
-| P0 | `timebower/p0` | #148 | GO on aa42812; re-review of 557d127 in progress | – | CI green on 557d127 |
-| P1 | `timebower/p1` | – | – | – | – |
+| P0 | `timebower/p0` | #148 | GO on 557d127 (after GO on aa42812 + follow-ups) | e521a85 (Vercel production deployment: success) | RELEASED 2026-11-14 ~12:45Z |
+| P1 | `timebower/p1` (from e521a85) | – | – | – | building: A wt-activation (My PTO, return users, R2, F23/F21), G wt-family (F08, partner), C wt-bugs (copy F14/15/16/24/29, R1/R3), D wt-planner (F09, N4, N5, F27, F28) |
 | P2 | `timebower/p2` | – | – | – | – |
 
 ## Next action
 
-Critic verdict on 557d127 → merge #148 → verify Vercel production SHA + smoke → start P1 (F07 /policy example-first, F08 /family example, F09, F14–F16, F19, F23, F24, F28, F29, N4, N5, return-user next break).
+Collect P1 workers → integrate on timebower/p1 → gates + CI → critic GO on exact SHA → merge → production verify. Then P2.
 
-Note: the session hit a usage limit 09:05–12:30Z; the 10:58Z scheduled run was delivered late at 12:35Z.
+Note: usage limit hit 09:05–12:30Z; the 10:58Z scheduled run was delivered late at 12:35Z.
