@@ -3,7 +3,7 @@ import { useWholeDayDraft } from './useWholeDayDraft';
 import { initialPolicyPreferences } from '../personal/policyPreferences';
 import { buildSchoolCalendar } from '../personal/schoolCalendar';
 import { familyParentFreeDays, MAX_FAMILY_PTO, planFamilyTime, type FamilyPlanResult, type SchoolBreak, type FamilyBreakPlan } from '../personal/familyPlan';
-import { findDistrictPreset, presetLabels, presetOffDays } from '../content/schoolDistricts';
+import { findDistrictPreset, presetLabels, presetOffDays, SCHOOL_DISTRICT_PRESETS } from '../content/schoolDistricts';
 import type { PartnerAvailability } from '../planning/partner';
 import { addDays, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { formatCardDateRange, formatLong, formatShort, formatShortWithYear } from '@daysoff/engine/calendar/dateFormat';
@@ -22,6 +22,7 @@ import { downloadFamilyPtoICS } from './icsExport';
 import { buildFamilyShareURL, encodeDateRanges, MAX_FAMILY_DATES_PARAM, readFamilyBrowserState, writeFamilyBrowserState } from './familyUrlState';
 import { FamilyCalendar, FamilyLegend, type FamilyDayState } from './FamilyCalendar';
 import { DistrictPicker, ImportSources } from './FamilySources';
+import { openFamilySource } from './familySourceFocus';
 import { FamilyShare } from './FamilyShare';
 import { FAMILY_FAQ_ITEMS } from './familyFaqItems';
 import { useRequestCalendar } from './useRequestCalendar';
@@ -33,6 +34,28 @@ import { track } from './analytics';
 const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * F08: a first visit (US, no district, no added dates, nothing shared) plans live against
+ * this sourced preset so /family shows a result like every other planner. It is labelled as
+ * an example wherever results appear, and nothing about it is written to the URL: the
+ * example is a pure function of "no school calendar yet", so a bare or shared link with
+ * the same public inputs reproduces exactly what the sender saw.
+ */
+const FAMILY_EXAMPLE_DISTRICT_ID = 'fairfax-fcps-2026-27';
+const DISTRICT_SEARCH_ID = 'family-district-search';
+const PTO_INPUT_ID = 'family-pto';
+const START_INPUT_ID = 'family-from';
+const schoolYearLabel = (y: string) => y.replace('-', '–');
+/** Every preset is a US district; other countries lead with pasted or typed dates. */
+const PRESET_COUNTRY = 'US';
+
+function focusField(id: string) {
+  const el = typeof document === 'undefined' ? null : document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView?.({ block: 'center' });
+  el.focus({ preventScroll: true });
+}
 
 /**
  * /family: plan PTO around school breaks. Modelled on /sabbatical - its own route, the same
@@ -114,7 +137,13 @@ export function Family() {
     window.history.replaceState({ ...previous, familyDraft: draft }, '', `${url.pathname}${url.search}${url.hash}`);
   }, [country, start, ptoBudget, prioritizeCoverage, districtId, customOffDays, excludedBreaks, ask, today, initial.availability]);
 
-  const preset = districtId ? findDistrictPreset(districtId) : undefined;
+  const presetsApply = country === PRESET_COUNTRY;
+  const examplePreset = useMemo(() => findDistrictPreset(FAMILY_EXAMPLE_DISTRICT_ID), []);
+  // Only when there is no school calendar of the person's own, and nothing shared or asked
+  // that the example could be confused with.
+  const exampleCandidate = presetsApply && !!examplePreset && !districtId && customOffDays.length === 0 &&
+    !ask && !received.availability && !received.invalid && !initial.invalid.includes('sd');
+  const preset = districtId ? findDistrictPreset(districtId) : exampleCandidate ? examplePreset : undefined;
   const schoolYearStart = preset
     ? Number(preset.schoolYear.slice(0, 4))
     : Number(start.slice(5, 7)) >= 7 ? Number(start.slice(0, 4)) : Number(start.slice(0, 4)) - 1;
@@ -129,9 +158,9 @@ export function Family() {
     const district = new Set(presetDates);
     const added = new Set(customOffDays);
     return new Map(schoolOffDays.map(date => [date, preset && district.has(date)
-      ? (added.has(date) ? `${preset.shortName} and added dates` : preset.shortName)
+      ? (added.has(date) ? `${preset.shortName} and added dates` : exampleCandidate ? `Example: ${preset.shortName}` : preset.shortName)
       : 'Added or shared dates']));
-  }, [preset, presetDates, customOffDays, schoolOffDays]);
+  }, [preset, presetDates, customOffDays, schoolOffDays, exampleCandidate]);
   const schoolLabels = useMemo(() => (preset ? presetLabels(preset) : {}), [preset]);
 
   // Whole days of tracked approved and tentative leave are already off (workspace rule), so
@@ -158,10 +187,17 @@ export function Family() {
   const calendarReady = !workCalendarLoading && !workCalendarDegraded;
   const hasSchoolDates = schoolOffDays.length > 0;
   const hasBreaks = !!plan && plan.breaks.length > 0;
+  // An example with no breaks in this window is not shown at all: the empty state teaches instead.
+  const isExample = exampleCandidate && hasBreaks;
+  const hasOwnSchoolDates = hasSchoolDates && !exampleCandidate;
+  const exampleTag = isExample ? ' (example)' : '';
   const sdTooLong = skippedParams.includes('sd') || encodeDateRanges(customOffDays).length > MAX_FAMILY_DATES_PARAM;
   const unknownDistrict = !!districtId && !preset;
 
+  // Breaks switched off while looking at the example must not carry into the person's own plan.
+  const leaveExample = () => { if (exampleCandidate) setExcludedBreaks([]); };
   const addCustom = (dates: string[]) => {
+    leaveExample();
     if (dates.some(date => !customOffDays.includes(date))) track('family_source_applied');
     setCustomOffDays(cur => [...new Set([...cur, ...dates])].sort());
   };
@@ -187,6 +223,19 @@ export function Family() {
     setBudgetMessage('');
   };
   const budgetDraft = useWholeDayDraft(ptoBudget, setBudget);
+
+  const districtPicker = (
+    <DistrictPicker
+      inputId={DISTRICT_SEARCH_ID}
+      exampleDistrictId={isExample ? FAMILY_EXAMPLE_DISTRICT_ID : undefined}
+      districtId={districtId}
+      onChange={next => {
+        if (next && next !== districtId) track('family_source_applied');
+        if (next) leaveExample();
+        setDistrictId(next);
+      }}
+    />
+  );
 
   return (
     <div className="min-h-screen bg-page">
@@ -216,7 +265,17 @@ export function Family() {
           )}
 
           <header className="max-w-4xl">
-            {plan && hasBreaks ? (
+            {plan && isExample && preset ? (
+              <ExampleSummary
+                plan={plan}
+                district={preset.district}
+                schoolYear={preset.schoolYear}
+                ptoBudget={ptoBudget}
+                prioritizeCoverage={prioritizeCoverage}
+                onPickDistrict={() => focusField(DISTRICT_SEARCH_ID)}
+                onAddDates={() => openFamilySource('family-source-paste')}
+              />
+            ) : plan && hasBreaks ? (
               <>
                 {prioritizeCoverage ? (
                   <>
@@ -255,14 +314,16 @@ export function Family() {
               <>
                 <h1 className="text-h1 type-display text-ink">Line up your PTO with school breaks</h1>
                 <p className="mt-3 max-w-2xl text-base text-muted">
-                  {hasSchoolDates
+                  {hasOwnSchoolDates
                     ? `None of the school dates you added fall between ${formatLong(start)} and ${formatLong(end)}. Move the start date or add dates for this school year.`
-                    : 'Pick your school district or add your school’s days off. This shows which breaks to take off for the most days with your kids, and which school days off still need cover.'}
+                    : presetsApply
+                      ? 'Pick your school district or add your school’s days off. This shows which breaks to take off for the most days with your kids, and which school days off still need cover.'
+                      : 'Paste or type your school’s days off. This shows which breaks to take off for the most days with your kids, and which school days off still need cover.'}
                 </p>
               </>
             )}
             {prerenderedAt && plan && (
-              <p className="mt-1 text-xs text-muted">Dates as of {formatShort(prerenderedAt.slice(0, 10))}; this page recomputes live once it loads.</p>
+              <p className="mt-1 text-xs text-muted">Dates as of {formatShort(prerenderedAt.slice(0, 10))}. They update once the page loads.</p>
             )}
           </header>
 
@@ -275,9 +336,9 @@ export function Family() {
                   <div className="mt-3 flex flex-col gap-4 sm:grid sm:grid-cols-3 lg:flex">
                     <CountrySelect country={country} onChangeCountry={next => { setCountry(next); setBudgetMessage(''); }} widthClass="w-full" />
                     <div className="min-w-0">
-                      <label className="block text-sm font-semibold text-ink" htmlFor="family-from">Plan from</label>
+                      <label className="block text-sm font-semibold text-ink" htmlFor={START_INPUT_ID}>Plan from</label>
                       <input
-                        id="family-from"
+                        id={START_INPUT_ID}
                         type="date"
                         value={start}
                         onChange={(e) => e.target.value && setStart(e.target.value)}
@@ -286,11 +347,11 @@ export function Family() {
                       <p className="mt-1 text-xs text-muted">Through {formatShortWithYear(end)}</p>
                     </div>
                     <div className="min-w-0">
-                      <label className="block text-sm font-semibold text-ink" htmlFor="family-pto">PTO for school breaks</label>
+                      <label className="block text-sm font-semibold text-ink" htmlFor={PTO_INPUT_ID}>PTO for school breaks</label>
                       <div className="mt-1.5 flex items-center gap-2">
                         <div className="inline-flex items-stretch overflow-hidden rounded-[6px] border border-line-strong bg-surface">
                           <button type="button" aria-label="One fewer PTO day" disabled={ptoBudget <= 0} onClick={() => setBudget(ptoBudget - 1)} className={stepBtn}>&minus;</button>
-                          <input id="family-pto" type="number" min={0} max={MAX_FAMILY_PTO} step={1} value={budgetDraft.text} aria-describedby={budgetDraft.empty ? 'family-pto-hint' : undefined} onChange={(e) => budgetDraft.onChange(e.target.value)} onBlur={budgetDraft.onBlur} className={numberInput} />
+                          <input id={PTO_INPUT_ID} type="number" min={0} max={MAX_FAMILY_PTO} step={1} value={budgetDraft.text} aria-describedby={budgetDraft.empty ? 'family-pto-hint' : undefined} onChange={(e) => budgetDraft.onChange(e.target.value)} onBlur={budgetDraft.onBlur} className={numberInput} />
                           <button type="button" aria-label="One more PTO day" disabled={ptoBudget >= MAX_FAMILY_PTO} onClick={() => setBudget(ptoBudget + 1)} className={stepBtn}>+</button>
                         </div>
                         <span className="text-sm text-muted">days</span>
@@ -332,13 +393,15 @@ export function Family() {
                 <fieldset className="min-w-0 border-t border-line pt-5">
                   <legend className="float-left w-full text-base font-bold type-condensed text-ink">School calendar</legend>
                   <div className="clear-both flex flex-col gap-4 pt-3">
-                    <DistrictPicker districtId={districtId} onChange={next => {
-                      if (next && next !== districtId) track('family_source_applied');
-                      setDistrictId(next);
-                    }} />
+                    {presetsApply ? districtPicker : (
+                      <p className="text-sm text-ink">
+                        District presets cover {SCHOOL_DISTRICT_PRESETS.length} large US school districts only. Paste your school&apos;s calendar text or type the days off.
+                      </p>
+                    )}
                     <div>
-                      <p className="text-sm font-semibold text-ink">Add or correct dates</p>
+                      <p className="text-sm font-semibold text-ink">{presetsApply ? 'Add or correct dates' : 'Add your school’s dates'}</p>
                       <ImportSources
+                        lead={presetsApply ? 'file' : 'text'}
                         schoolYearStart={schoolYearStart}
                         customDates={customOffDays}
                         onAddDates={addCustom}
@@ -362,6 +425,18 @@ export function Family() {
                         </p>
                       )}
                     </div>
+                    {!presetsApply && (
+                      <details id="family-us-presets" className="group border-b border-line" open={districtId ? true : undefined}>
+                        <summary className={`flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 py-2 [&::-webkit-details-marker]:hidden ${FOCUS}`}>
+                          <span className="text-[15px] font-semibold text-ink">US district presets</span>
+                          <span aria-hidden="true" className="relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border border-ink group-open:bg-ink">
+                            <span className="absolute h-[1.5px] w-2.5 bg-ink group-open:bg-white" />
+                            <span className="absolute h-2.5 w-[1.5px] bg-ink group-open:hidden" />
+                          </span>
+                        </summary>
+                        <div className="pb-4">{districtPicker}</div>
+                      </details>
+                    )}
                   </div>
                 </fieldset>
               </div>
@@ -379,11 +454,15 @@ export function Family() {
               )}
 
               {!hasBreaks ? (
-                <EmptyResults hasSchoolDates={hasSchoolDates} />
+                <EmptyResults
+                  hasOwnSchoolDates={hasOwnSchoolDates}
+                  presetsApply={presetsApply}
+                  ownDateSpan={hasOwnSchoolDates ? [schoolOffDays[0], schoolOffDays[schoolOffDays.length - 1]] : undefined}
+                />
               ) : (
                 <>
                   <section aria-labelledby="family-breaks-heading">
-                    <h2 id="family-breaks-heading" className="text-h2 font-bold type-condensed text-ink">School breaks</h2>
+                    <h2 id="family-breaks-heading" className="text-h2 font-bold type-condensed text-ink">School breaks{exampleTag}</h2>
                     <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold text-ink">
                       <input type="checkbox" checked={prioritizeCoverage} onChange={event => {
                         setPrioritizeCoverage(event.target.checked);
@@ -394,9 +473,16 @@ export function Family() {
                     <p className="text-xs text-muted">{prioritizeCoverage
                       ? 'Use PTO for the earliest listed closures that still need care. Confirmed cover from another adult frees up your PTO.'
                       : 'Use PTO for longer stretches of time with your kids.'}</p>
-                    <p className="mt-1 text-sm text-muted">
-                      {plural(plan.ptoUsed, 'PTO day')} used, {plan.ptoLeft} left of {ptoBudget}. Switch a break off to make its PTO available for other breaks.
-                    </p>
+                    {ptoBudget === 0 ? (
+                      <div role="status" className="mt-2 rounded-[10px] bg-surface-alt p-3 text-sm text-ink">
+                        <p>PTO for school breaks is 0, so this plan only counts days you&apos;re already off. Add the PTO days you can spend to see which breaks are worth taking.</p>
+                        <Button variant="quiet" size="sm" className="-ml-2.5 mt-1 min-h-11" onClick={() => focusField(PTO_INPUT_ID)}>Change PTO days</Button>
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-sm text-muted">
+                        {plural(plan.ptoUsed, 'PTO day')} used, {plan.ptoLeft} left of {ptoBudget}. Switch a break off to make its PTO available for other breaks.
+                      </p>
+                    )}
                     <ul className="mt-4 flex flex-col gap-2">
                       {plan.breaks.map((brk, i) => (
                         <BreakRow key={brk.id} brk={brk} plan={plan.plans[i]} onToggle={(include) => toggleBreak(brk.id, include)} />
@@ -412,21 +498,31 @@ export function Family() {
                     holidayNames={holidayNames}
                     schoolLabels={schoolLabels}
                     otherAdultStatus={received.availability?.status}
+                    headingSuffix={exampleTag}
                   />
 
-                  <UncoveredSection plan={plan} schoolSources={schoolSources} calendarReady={calendarReady} />
+                  <UncoveredSection plan={plan} schoolSources={schoolSources} calendarReady={calendarReady} isExample={isExample} />
 
                   <section aria-labelledby="family-export-heading">
                     <h2 id="family-export-heading" className="text-h2 font-bold type-condensed text-ink">Keep it</h2>
-                    <ExportRow plan={plan} calendarReady={calendarReady} publicPlanLink={publicPlanLink} />
+                    {isExample ? (
+                      <>
+                        <p className="mt-1 max-w-2xl text-sm text-muted">
+                          The calendar file and share links are for your own plan, so they aren&apos;t offered for this example. Pick your district or add your school&apos;s dates first.
+                        </p>
+                        <Button className="mt-3" variant="secondary" onClick={() => focusField(DISTRICT_SEARCH_ID)}>Pick your district</Button>
+                      </>
+                    ) : <ExportRow plan={plan} calendarReady={calendarReady} publicPlanLink={publicPlanLink} />}
                   </section>
 
-                  <FamilyShare
-                    schoolDates={schoolOffDays}
-                    availableDays={calendarReady ? plan.gaps.filter((g) => g.cover === 'you-off' || g.cover === 'pto').map((g) => g.date) : []}
-                    freeDays={calendarReady ? plan.gaps.filter((g) => g.cover === 'you-off').map((g) => g.date) : []}
-                    buildLink={shareLink}
-                  />
+                  {!isExample && (
+                    <FamilyShare
+                      schoolDates={schoolOffDays}
+                      availableDays={calendarReady ? plan.gaps.filter((g) => g.cover === 'you-off' || g.cover === 'pto').map((g) => g.date) : []}
+                      freeDays={calendarReady ? plan.gaps.filter((g) => g.cover === 'you-off').map((g) => g.date) : []}
+                      buildLink={shareLink}
+                    />
+                  )}
                 </>
               )}
 
@@ -444,17 +540,75 @@ export function Family() {
   );
 }
 
-function EmptyResults({ hasSchoolDates }: { hasSchoolDates: boolean }) {
+function EmptyResults({ hasOwnSchoolDates, presetsApply, ownDateSpan }: {
+  hasOwnSchoolDates: boolean;
+  presetsApply: boolean;
+  /** First and last school day off the person added, when none fall in the window. */
+  ownDateSpan?: [string, string];
+}) {
+  if (hasOwnSchoolDates && ownDateSpan) {
+    return (
+      <section aria-labelledby="family-empty-heading" className="rounded-[10px] bg-surface-alt p-5 sm:p-6">
+        <h2 id="family-empty-heading" className="text-h2 font-bold type-condensed text-ink">No school breaks in this window</h2>
+        <p className="mt-3 max-w-2xl text-base text-ink">
+          Your school dates run from {formatShortWithYear(ownDateSpan[0])} to {formatShortWithYear(ownDateSpan[1])}. Set &ldquo;Plan from&rdquo; to a date in that school year, or add dates for the year you&apos;re planning.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button variant="primary" onClick={() => focusField(START_INPUT_ID)}>Change the start date</Button>
+          <Button variant="secondary" onClick={() => openFamilySource('family-source-type')}>Add more dates</Button>
+        </div>
+      </section>
+    );
+  }
   return (
     <section aria-labelledby="family-empty-heading" className="rounded-[10px] bg-surface-alt p-5 sm:p-6">
-      <h2 id="family-empty-heading" className="text-h2 font-bold type-condensed text-ink">{hasSchoolDates ? 'No school breaks in this window' : 'Start with the school calendar'}</h2>
-      <ul className="mt-3 flex max-w-2xl list-disc flex-col gap-1.5 pl-5 text-base text-ink">
-        <li>Choose a district preset, if yours is listed.</li>
-        <li>Or add the dates: upload the school&apos;s calendar file, take a photo of the printed calendar, paste the text, or type them.</li>
-        <li>Or ask a co-parent to add them and send the link back.</li>
-      </ul>
-      <p className="mt-3 text-sm text-muted">School dates stay in this tab unless you choose to share them. Imported files stay on your device.</p>
+      <h2 id="family-empty-heading" className="text-h2 font-bold type-condensed text-ink">Start with the school calendar</h2>
+      <p className="mt-3 max-w-2xl text-base text-ink">
+        {presetsApply
+          ? 'Your plan appears here as soon as there are school days off to plan around. Pick your district if it’s one of the presets, or add the dates from the school’s calendar.'
+          : 'Your plan appears here as soon as there are school days off to plan around. Paste the school’s calendar text or type the dates.'}
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {presetsApply && <Button variant="primary" onClick={() => focusField(DISTRICT_SEARCH_ID)}>Pick your district</Button>}
+        <Button variant={presetsApply ? 'secondary' : 'primary'} onClick={() => openFamilySource('family-source-paste')}>Paste calendar text</Button>
+        <Button variant="secondary" onClick={() => openFamilySource('family-source-type')}>Type dates</Button>
+      </div>
+      <p className="mt-4 text-sm text-muted">You can also upload the school&apos;s calendar file, use a photo of a printed calendar, or ask a co-parent to add the dates. School dates stay in this tab unless you choose to share them. Imported files stay on your device.</p>
     </section>
+  );
+}
+
+function ExampleSummary({ plan, district, schoolYear, ptoBudget, prioritizeCoverage, onPickDistrict, onAddDates }: {
+  plan: FamilyPlanResult;
+  district: string;
+  schoolYear: string;
+  ptoBudget: number;
+  prioritizeCoverage: boolean;
+  onPickDistrict: () => void;
+  onAddDates: () => void;
+}) {
+  return (
+    <>
+      <h1 className="text-h1 type-display text-ink">Line up your PTO with school breaks</h1>
+      <p className="mt-3 max-w-2xl text-base text-muted">See which breaks to take off for the most days with your kids, and which school days off still need cover.</p>
+      <section aria-labelledby="family-example-heading" className="mt-5 max-w-2xl rounded-[10px] border border-dashed border-line-strong bg-surface p-4 sm:p-5">
+        <h2 id="family-example-heading" className="text-sm font-semibold text-ink">Example: {district} {schoolYearLabel(schoolYear)}</h2>
+        <p className="mt-1.5 text-xl font-bold text-ink type-condensed sm:text-2xl">
+          {prioritizeCoverage
+            ? (plan.uncoveredDays.length > 0
+              ? <><span className="mark">{plural(plan.uncoveredDays.length, 'school closure')}</span> still {plan.uncoveredDays.length === 1 ? 'needs' : 'need'} care.</>
+              : <><span className="mark">No gaps</span> in the example closures.</>)
+            : <><span className="mark">{plural(plan.togetherDaysTotal, 'day')} with the kids</span>{' '}{plan.ptoUsed > 0 ? <>for {plural(plan.ptoUsed, 'PTO day')}.</> : <>without using PTO.</>}</>}
+        </p>
+        <p className="mt-1.5 text-sm text-muted">
+          This isn&apos;t your calendar yet. It uses this district&apos;s published closures and {plural(ptoBudget, 'PTO day')}, and updates as you change the controls. Pick your district or add your own dates.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button variant="primary" onClick={onPickDistrict}>Pick your district</Button>
+          <Button variant="secondary" onClick={onAddDates}>Add your own dates</Button>
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -505,8 +659,9 @@ function monthsOf(breaks: readonly SchoolBreak[]): string[] {
 }
 
 function CalendarSection({
-  plan, weekStart, today, parentFreeSet, holidayNames, schoolLabels, otherAdultStatus,
+  plan, weekStart, today, parentFreeSet, holidayNames, schoolLabels, otherAdultStatus, headingSuffix = '',
 }: {
+  headingSuffix?: string;
   plan: FamilyPlanResult;
   weekStart: 0 | 1;
   today: string;
@@ -535,7 +690,7 @@ function CalendarSection({
 
   return (
     <section aria-labelledby="family-calendar-heading">
-      <h2 id="family-calendar-heading" className="text-h2 font-bold type-condensed text-ink">On the calendar</h2>
+      <h2 id="family-calendar-heading" className="text-h2 font-bold type-condensed text-ink">On the calendar{headingSuffix}</h2>
       <FamilyLegend otherAdultStatus={otherAdultStatus} />
       <FamilyCalendar
         months={months}
@@ -549,14 +704,15 @@ function CalendarSection({
   );
 }
 
-function UncoveredSection({ plan, schoolSources, calendarReady }: {
+function UncoveredSection({ plan, schoolSources, calendarReady, isExample = false }: {
+  isExample?: boolean;
   plan: FamilyPlanResult;
   schoolSources: ReadonlyMap<string, string>;
   calendarReady: boolean;
 }) {
   const uncovered = new Set(plan.uncoveredDays);
   const tentative = new Set(plan.gaps.filter(g => g.cover === 'other-adult-proposed').map(g => g.date));
-  const reviewKey = calendarReady && plan.gaps.length && !uncovered.size ? plan.gaps.map(g => `${g.date}:${g.cover}`).join(',') : null;
+  const reviewKey = !isExample && calendarReady && plan.gaps.length && !uncovered.size ? plan.gaps.map(g => `${g.date}:${g.cover}`).join(',') : null;
   const [confirmedReview, setConfirmedReview] = useState<string | null>(null);
   if (confirmedReview !== null && confirmedReview !== reviewKey) setConfirmedReview(null);
   const groups = plan.breaks
@@ -566,7 +722,7 @@ function UncoveredSection({ plan, schoolSources, calendarReady }: {
 
   return (
     <section aria-labelledby="family-uncovered-heading">
-      <h2 id="family-uncovered-heading" className="scroll-mt-24 text-h2 font-bold type-condensed text-ink">Uncovered school days</h2>
+      <h2 id="family-uncovered-heading" className="scroll-mt-24 text-h2 font-bold type-condensed text-ink">Uncovered school days{isExample ? ' (example)' : ''}</h2>
       <p className="mt-1 max-w-2xl text-sm text-muted">
         These listed school closures still need confirmed care. Coverage is partial and uses only the closure dates in your plan.
       </p>

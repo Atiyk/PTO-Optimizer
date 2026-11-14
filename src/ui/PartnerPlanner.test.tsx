@@ -47,10 +47,10 @@ describe('partner planner controls', () => {
     const input = { rangeStart: '2027-01-01', rangeEnd: '2027-12-31', offDays: ['2027-07-05'], budget: 2 };
     const original = JSON.stringify(input);
     render(<PartnerPlanner breaks={[brk]} freeDays={[]} input={input} />);
-    expect(screen.getByText(/Choose one of these alternatives/)).toBeTruthy();
+    expect(screen.getByText(/Pick one option/)).toBeTruthy();
     expect(screen.getByText(/Timebower does not contact either employer/)).toBeTruthy();
     expect(JSON.stringify(input)).toBe(original);
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Prioritize days off together.' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Show options for time off together.' }));
     expect(new URLSearchParams(window.location.search).get('jp')).toBe('0');
     expect(new URLSearchParams(window.location.search).has('pp')).toBe(true);
   });
@@ -76,10 +76,10 @@ describe('partner planner controls', () => {
   it('clears a return proposal when recipient settings make its dates infeasible', () => {
     window.history.replaceState(null, '', buildPartnerShareURL(window.location.origin, '/pto', { days: brk.days, freeDays: null, status: 'proposed' }));
     const { rerender } = render(<PartnerPlanner breaks={[]} freeDays={[]} input={input} />);
-    fireEvent.click(screen.getAllByRole('button', { name: 'Review return proposal' })[0]);
-    expect(screen.getByRole('button', { name: 'Copy return proposal' })).toBeTruthy();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Propose these dates' })[0]);
+    expect(screen.getByRole('button', { name: 'Copy proposal link' })).toBeTruthy();
     rerender(<PartnerPlanner breaks={[]} freeDays={[]} input={{ ...input, blackouts: brk.days }} />);
-    expect(screen.queryByRole('button', { name: 'Copy return proposal' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Copy proposal link' })).toBeNull();
     expect(screen.getByText(/Your plan changed/)).toBeTruthy();
   });
 
@@ -87,17 +87,29 @@ describe('partner planner controls', () => {
     const days = [...brk.days, ...otherBreak.days];
     window.history.replaceState(null, '', buildPartnerShareURL(window.location.origin, '/pto', { days, freeDays: null, status: 'proposed' }));
     render(<PartnerPlanner breaks={[otherBreak]} freeDays={['2027-07-03', '2027-07-05', '2027-09-04']} input={input} />);
-    expect(screen.getAllByText('PTO cost undisclosed').length).toBeGreaterThan(0);
-    fireEvent.click(screen.getAllByRole('button', { name: 'Review return proposal' })[0]);
+    expect(screen.getAllByText('PTO not shared').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Propose these dates' })[0]);
     expect(copied).toHaveLength(0);
-    expect(screen.getByText('Preview shared dates')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Copy return proposal' }));
+    expect(screen.getByText('What your partner will see')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Copy proposal link' }));
     await waitFor(() => expect(copied).toHaveLength(1));
     const proposal = readPartnerAvailability(new URL(copied[0]).search).availability!;
     expect(proposal.days.length).toBeGreaterThanOrEqual(3);
     expect(proposal.days.every(date => days.includes(date))).toBe(true);
     expect(proposal.status).toBe('proposed');
     expect(proposal.freeDays).toBeNull();
+  });
+
+  it('tells a first-time sender what to do next and exactly what the partner will see', async () => {
+    render(<PartnerPlanner breaks={[brk]} freeDays={[]} input={input} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Plan with someone' }));
+    expect(screen.getByRole('group', { name: 'Dates you could take off' })).toBeTruthy();
+    expect(screen.getByText('Tick at least one set of dates to make a link.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Jul 3 - Jul 11, 2027' }));
+    expect(screen.getByText('What your partner will see')).toBeTruthy();
+    expect(screen.getByText(/Anyone with the link sees only these dates/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Copy partner link' }));
+    expect(await screen.findByText('Partner link copied with 9 proposed dates. Send it to your partner in any message.')).toBeTruthy();
   });
 
 });

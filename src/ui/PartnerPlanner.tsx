@@ -1,6 +1,9 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { Break, SolveInput } from '@daysoff/engine/solver/types';
 import { formatDateRange } from '@daysoff/engine/calendar/dateFormat';
+
+/** Native checkboxes render at 13px; give the visible box a 20px size inside a 44px row. */
+const CHECK = 'h-5 w-5 shrink-0';
 import { buildPartnerShareURL, findJointOpportunities, readPartnerAvailability, type PartnerAvailability } from '../planning/partner';
 import { copyText } from './requestText';
 import { downloadICS } from './icsExport';
@@ -71,7 +74,7 @@ export function PartnerPlanner({ breaks, freeDays, input, minimumBreakLength = 3
   if (proposalDays && !opportunities.some(({ break: brk }) => brk.start === proposalDays[0] && brk.end === proposalDays.at(-1))) {
     setProposalDays(null);
     setDiscloseFree(false);
-    setMessage('Your plan changed. Review another return proposal before copying a link.');
+    setMessage('Your plan changed, so those dates no longer fit. Pick another option to propose.');
   }
   const chosenBreaks = useMemo(() => breaks.filter(brk => selected.includes(brk.id)), [breaks, selected]);
   const selectedDays = useMemo(
@@ -106,19 +109,21 @@ export function PartnerPlanner({ breaks, freeDays, input, minimumBreakLength = 3
       </button></h2>
       {!open && <p className="pb-2 text-sm text-muted">Find dates you can both take off, without sharing your balance.</p>}
       {open && <div id={id} className="mt-2 space-y-5 pb-3">
-        <p className="max-w-2xl text-sm text-muted">Choose which dates to share. Your partner uses their own country, work schedule, employer holidays, and PTO budget in the controls above.</p>
+        <p className="max-w-2xl text-sm text-muted">{received.availability
+          ? 'Below are the dates your partner shared, checked against your own country, work schedule, employer holidays and PTO from the controls above.'
+          : 'Pick dates you could take off and copy a link for your partner. When they open it, Timebower checks those dates against their own country, work schedule and PTO and shows the options that work for both of you.'}</p>
         {received.invalid && <p role="alert" className="rounded-[10px] border border-ink p-3 text-sm text-ink">This shared availability link is invalid or too large. Ask for a new link with fewer dates.</p>}
         {received.availability && <div className="border-t border-line pt-4">
           <h3 className="font-semibold text-ink">Possible dates together</h3>
-          <p className="mt-1 text-sm text-muted">Your partner shared {received.availability.days.length} dates as {received.availability.status} availability. Dates outside that selection are undisclosed.</p>
+          <p className="mt-1 text-sm text-muted">Your partner shared {received.availability.days.length} dates they {received.availability.status === 'confirmed' ? 'have confirmed they can take off' : 'could take off (not yet confirmed)'}. They didn&apos;t share anything about other dates.</p>
           <p className="mt-1 text-sm text-muted">Proposed dates may still need employer approval. Timebower does not contact either employer.</p>
           <div className="mt-3"><ShareDatePreview title="See dates they shared" dates={received.availability.days} status={received.availability.status} freeDays={received.availability.freeDays} /></div>
           <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-medium text-ink">
-            <input type="checkbox" checked={prioritize} onChange={event => setPrioritize(event.target.checked)} />
-            Prioritize days off together.
+            <input type="checkbox" className={CHECK} checked={prioritize} onChange={event => setPrioritize(event.target.checked)} />
+            Show options for time off together.
           </label>
           {prioritize && <>
-            <p className="mt-2 text-sm text-muted">Choose one of these alternatives. Each fits your own budget and rules; overlapping options cannot all be booked together.</p>
+            <p className="mt-2 text-sm text-muted">Pick one option. Each fits your own PTO and rules. Options that overlap canPick one option. Each fits your own PTO and rules, but they overlap, so you can book only one.apos;t both be booked.</p>
             {!opportunities.length && <p role="status" className="mt-3 text-sm text-ink">No shared break of at least {Math.max(3, minimumBreakLength)} days fits your disclosed dates and PTO rules. Adjust your own dates or constraints, or share different availability.</p>}
             <div className="mt-4 grid gap-3 lg:grid-cols-3">
               {opportunities.map(opportunity => <article key={opportunity.kind} className="min-w-0 rounded-[10px] border border-line bg-surface p-4">
@@ -127,50 +132,54 @@ export function PartnerPlanner({ breaks, freeDays, input, minimumBreakLength = 3
                 <p className="mt-1 text-lg font-bold text-ink type-condensed"><span className="mark">{opportunity.break.totalDaysOff} days together</span></p>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                   <div><span className="block text-muted">You</span><span className="font-semibold text-ink">{opportunity.yourPtoDays.length} PTO {opportunity.yourPtoDays.length === 1 ? 'day' : 'days'}</span></div>
-                  <div><span className="block text-muted">Partner</span><span className="font-semibold text-ink">{opportunity.partnerPtoCost === null ? 'PTO cost undisclosed' : `${opportunity.partnerPtoCost} PTO ${opportunity.partnerPtoCost === 1 ? 'day' : 'days'}`}</span></div>
+                  <div><span className="block text-muted">Partner</span><span className="font-semibold text-ink">{opportunity.partnerPtoCost === null ? 'PTO not shared' : `${opportunity.partnerPtoCost} PTO ${opportunity.partnerPtoCost === 1 ? 'day' : 'days'}`}</span></div>
                 </div>
                 {opportunity.partnerPtoCost !== null && <p className="mt-3 text-xs leading-relaxed text-muted">{opportunity.bothFree} already off together · {opportunity.onlyYouNeedPto} need only your PTO · {opportunity.onlyPartnerNeedsPto} need only your partner’s PTO · {opportunity.bothNeedPto} need PTO from both.</p>}
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Button variant="secondary" size="sm" onClick={() => {
+                  <Button variant="secondary" size="sm" className="min-h-11" onClick={() => {
                     try {
                       const pto = new Set(opportunity.yourPtoDays);
                       downloadICS([opportunity.break], day => pto.has(day));
                       setMessage('Your PTO calendar file downloaded.');
                       track('ICS downloaded');
                     } catch { setMessage('Could not download the calendar file. Please try again.'); }
-                  }}>Export my PTO</Button>
-                  <Button variant="quiet" size="sm" onClick={() => reviewProposal(opportunity.break.days)}>Review return proposal</Button>
+                  }}>Add my PTO to calendar</Button>
+                  <Button variant="quiet" size="sm" className="min-h-11" onClick={() => reviewProposal(opportunity.break.days)}>Propose these dates</Button>
                 </div>
               </article>)}
             </div>
           </>}
         </div>}
         <fieldset ref={draftRef} tabIndex={-1} className="min-w-0 scroll-mt-24">
-          <legend className="text-sm font-semibold text-ink">{proposalDays ? 'Review return proposal' : 'Choose dates to share'}</legend>
+          <legend className="text-base font-semibold text-ink">{proposalDays ? 'Send these dates back' : received.availability ? 'Or share your own dates' : 'Dates you could take off'}</legend>
           {proposalDays ? (
-            <p className="mt-2 text-sm text-ink">Propose {formatDateRange(proposalDays[0], proposalDays[proposalDays.length - 1])}. Your partner can review these dates with their own calendar.</p>
+            <p className="mt-2 text-sm text-ink">You&apos;re proposing {formatDateRange(proposalDays[0], proposalDays[proposalDays.length - 1])}. Your partner opens the link and checks these dates against their own calendar.</p>
           ) : <>
-            {breaks.length === 0 && <p className="mt-2 text-sm text-muted">Add PTO to your plan, or share dates you already have off.</p>}
+            {breaks.length === 0 && <p className="mt-2 text-sm text-muted">Your plan has no breaks yet. Add PTO days in the controls above, or share dates you already have off.</p>}
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
               {breaks.map(brk => <label key={brk.id} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-[6px] border border-line px-3 py-2 text-sm text-ink hover:border-line-strong">
-                <input type="checkbox" checked={selected.includes(brk.id)} onChange={event => {
+                <input type="checkbox" className={CHECK} checked={selected.includes(brk.id)} onChange={event => {
                   const checked = event.target.checked;
                   setSelected(current => checked ? [...new Set([...current, brk.id])] : current.filter(value => value !== brk.id));
                 }} />
                 {formatDateRange(brk.start, brk.end)}
               </label>)}
             </div>
-            <label className="mt-2 flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" checked={includeFree} onChange={event => setIncludeFree(event.target.checked)} />Also share other dates I already have off.</label>
+            <label className="mt-2 flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" className={CHECK} checked={includeFree} onChange={event => setIncludeFree(event.target.checked)} />Also share other dates I already have off.</label>
           </>}
-          <label className="flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" checked={discloseFree} disabled={!selectedDays.length} onChange={event => setDiscloseFree(event.target.checked)} />Show which of these dates I already have off.</label>
-          {!proposalDays && <label className="flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" checked={confirmed} disabled={!selectedDays.length} onChange={event => setConfirmedSelection(event.target.checked ? selectionKey : null)} />I have confirmed the availability I am sharing.</label>}
-          <p className="mt-1 text-sm text-muted">Anyone with the link can see these dates and whether you propose or confirm them. Your balance, employer and private notes stay in your plan.</p>
-          {selectedDays.length > 0 && <div className="mt-3"><ShareDatePreview expanded dates={share.days} status={share.status} freeDays={share.freeDays} /></div>}
+          <p className="mt-3 text-sm font-semibold text-ink">Optional</p>
+          <label className="flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" className={CHECK} checked={discloseFree} disabled={!selectedDays.length} onChange={event => setDiscloseFree(event.target.checked)} />Show which of these dates I already have off.</label>
+          {!proposalDays && <label className="flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" className={CHECK} checked={confirmed} disabled={!selectedDays.length} onChange={event => setConfirmedSelection(event.target.checked ? selectionKey : null)} />I have confirmed the availability I am sharing.</label>}
+          {!proposalDays && <p className="mt-1 text-sm text-muted">Leave &ldquo;confirmed&rdquo; unticked and your partner sees these as proposed dates.</p>}
+          {selectedDays.length > 0
+            ? <div className="mt-3"><ShareDatePreview expanded title="What your partner will see" dates={share.days} status={share.status} freeDays={share.freeDays} /></div>
+            : <p className="mt-3 text-sm text-ink">Tick at least one set of dates to make a link.</p>}
+          <p className="mt-2 text-sm text-muted">Anyone with the link sees only these dates and whether they&apos;re proposed or confirmed. Your balance, employer and private notes stay in your plan.</p>
           <Button className="mt-3" variant="secondary" disabled={!selectedDays.length} onClick={async () => {
             try {
               const link = buildPartnerShareURL(window.location.origin, window.location.pathname, share);
               const ok = await copyText(link);
-              setMessage(ok ? `${proposalDays ? 'Return proposal' : 'Partner link'} copied with ${selectedDays.length} ${share.status} dates.` : 'Could not copy the link. Please try again.');
+              setMessage(ok ? `${proposalDays ? 'Proposal link' : 'Partner link'} copied with ${selectedDays.length} ${share.status} ${selectedDays.length === 1 ? 'date' : 'dates'}. Send it to your partner in any message.` : 'Could not copy the link. Please try again.');
               if (ok) {
                 track(proposalDays ? 'partner_proposal_generated' : 'partner_share_generated');
                 if (!proposalDays && !includeFree && selectedBreakId && selected.length === 1 && selected[0] === selectedBreakId) {
@@ -178,7 +187,7 @@ export function PartnerPlanner({ breaks, freeDays, input, minimumBreakLength = 3
                 }
               }
             } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not create the link.'); }
-          }}>{proposalDays ? 'Copy return proposal' : 'Copy partner link'}</Button>
+          }}>{proposalDays ? 'Copy proposal link' : 'Copy partner link'}</Button>
           {proposalDays && <Button className="ml-2 mt-3" variant="quiet" onClick={() => {
             setProposalDays(null);
             setDiscloseFree(false);

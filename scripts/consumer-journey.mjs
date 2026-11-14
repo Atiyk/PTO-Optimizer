@@ -628,8 +628,8 @@ try {
     const card = joint.getByRole('article').first();
     const ownCost = numberIn(await card.getByText('You', { exact: true }).locator('..').innerText());
     assert.ok(ownCost <= 1, 'Joint opportunity must respect recipient PTO budget.');
-    await card.getByRole('button', { name: 'Review return proposal', exact: true }).click();
-    await joint.getByRole('button', { name: 'Copy return proposal', exact: true }).click();
+    await card.getByRole('button', { name: 'Propose these dates', exact: true }).click();
+    await joint.getByRole('button', { name: 'Copy proposal link', exact: true }).click();
     const jointDays = disclosedDays(await clipboardText(recipient));
     assert.ok(jointDays.every((date) => shared.includes(date)), 'A joint opportunity cannot invent undisclosed availability.');
     assert.equal(await recipient.getByText(privateNote, { exact: true }).count(), 0);
