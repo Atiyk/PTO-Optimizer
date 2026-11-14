@@ -92,7 +92,7 @@ export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, 
             {daysOffSplit(budgetSpent, totalDaysOff, unlimitedPto ? 'target' : 'PTO')}
           </span>
         </h1>
-        <Button variant="secondary" size="md" onClick={onPin} disabled={!canPin} title={saveTitle} className="mt-1 shrink-0 px-3! text-sm!">
+        <Button variant="secondary" size="md" onClick={onPin} disabled={!canPin} title={saveTitle} className="mt-1 shrink-0 px-3! text-sm! max-lg:hidden">
           Save this plan
         </Button>
       </div>
