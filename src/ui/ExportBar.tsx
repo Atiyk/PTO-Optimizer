@@ -202,7 +202,7 @@ export function ExportBar(props: ExportBarProps) {
       )}
       {planSearch !== undefined && observedDates !== undefined && (
         <details className="space-y-2 text-sm">
-          <summary className="cursor-pointer font-semibold text-ink">Share observed holiday dates</summary>
+          <summary className="cursor-pointer py-3 font-semibold text-ink">Share observed holiday dates</summary>
           <p className="max-w-prose text-muted">Include the dates checked in this plan’s holiday calendar. Anyone with the link can see those dates. Employer names and holiday labels stay private.{omissions?.settings ? ' Private scheduling and policy settings are still omitted, so the result may differ.' : ''}</p>
           <p className="max-w-prose break-words text-xs text-muted">{observedDates.length ? observedDates.join(', ') : 'No holidays are checked in this date range.'}</p>
           <ActionButton label="Copy link with holiday dates" onClick={() => copyPlan(observedDates)} />
