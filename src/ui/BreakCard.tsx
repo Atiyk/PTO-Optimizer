@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useId, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { FEWER_FLYERS_LABEL, fewerFlyersThanUsual } from '../planning/travelEvidence';
 import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
 import { formatWorkingDaysList, formatManagerEmailShort, formatManagerEmailDetailed, copyText } from './requestText';
 import { formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
@@ -181,7 +182,8 @@ function CopyRequestDropdown({ options }: { options: CopyOption[] }) {
 
 const travelTagLabels: Partial<Record<Break['tags'][number], string>> = {
   'Peak travel': 'Busier travel estimate',
-  'Low travel demand': 'Quieter travel estimate',
+  // Shown only when fewerFlyersThanUsual agrees (>= 15% below the 2025 yearly mean).
+  'Low travel demand': FEWER_FLYERS_LABEL,
   Estimated: 'Seasonal estimate',
 };
 
@@ -276,7 +278,7 @@ export function BreakCard({
           <span>
             <span className="mark font-semibold">{brk.totalDaysOff} {dayWord} off</span> for {brk.ptoCost} PTO {ptoWord}
           </span>
-          {brk.tags.map((tag) => (
+          {brk.tags.filter((tag) => tag !== 'Low travel demand' || fewerFlyersThanUsual(brk.start, brk.end)).map((tag) => (
             <span key={tag} className="rounded-[6px] bg-surface-alt px-2 py-0.5 text-xs font-medium text-ink">
               {travelTagLabels[tag] ?? tag}
             </span>
