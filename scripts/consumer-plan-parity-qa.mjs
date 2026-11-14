@@ -94,7 +94,7 @@ try {
   await assertPlanner(page, expected, 'slow homepage handoff');
   await page.screenshot({ path: resolve(directory, '02-planner-375.png') });
   const href = page.url();
-  await page.getByRole('button', { name: 'Copy link', exact: true }).click();
+  await page.getByRole('button', { name: 'Copy plan link', exact: true }).click();
   await page.getByRole('button', { name: /^(?:Link copied|Copied \(calendar omitted\))$/ }).waitFor();
   const publicHref = await page.evaluate(() => navigator.clipboard.readText());
   assert.equal(new URL(publicHref).searchParams.get('sv'), '1');

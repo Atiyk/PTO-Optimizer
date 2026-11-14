@@ -14,32 +14,32 @@ export const ITEMS: FAQItem[] = [
   {
     question: 'How does it choose which days to take?',
     answer:
-      "Holidays and weekends are fixed; the tool finds runs of consecutive days off that a small number of PTO days can bridge, then compares non-overlapping combinations within your budget to find a good set of breaks.",
+      "Weekends and public holidays are fixed days off. The planner finds workdays where a few PTO days join them into longer breaks, then picks the set of breaks that fits your PTO and your two slider settings.",
   },
   {
     question: 'What do the two sliders do?',
     answer:
-      'The first weighs total days off and a rough travel estimate when choosing dates. The second sets how many separate breaks you want, from one long stretch to as many as the calendar allows.',
+      'What matters more weighs total days off against a rough travel estimate. How many breaks sets how many separate breaks you get, from one long break to as many as the calendar allows.',
   },
   {
     question: 'Where does the travel data come from?',
     answer:
-      'The US estimate averages public TSA checkpoint counts from 2025 over each 7-day window, so it reflects broad seasons, not particular weekdays or next year’s traffic. Other countries use a generic seasonal rule without local observations. Neither is a forecast, and neither says anything about fares or prices. Your PTO days and days off are exact; only the travel estimate is approximate.',
+      'In the US, from public TSA airport checkpoint counts for 2025, averaged over 7-day windows. It shows broad seasons, not single days. Other countries have no travel data, so the planner uses a generic seasonal rule. It is not a forecast or a fare price.',
   },
   {
     question: 'Why are the suggestions all near holidays?',
     answer:
-      'A holiday or regular day off can stretch a break without using extra PTO. The travel slider lets you give more weight to dates that look quieter in the model.',
+      'A holiday next to a weekend makes a break longer without using PTO, so breaks there cost the least. To favor quieter travel weeks instead, move What matters more to the right.',
   },
   {
-    question: 'My company’s holidays are different.',
+    question: 'What if my company’s holidays are different?',
     answer:
-      'The holiday list is editable. Public holidays are not the same as company holidays, and many employers do not observe all of them.',
+      'Edit the holiday list under More options in the planner. Uncheck public holidays you work, and add your company’s own days off. Many employers don’t observe every public holiday.',
   },
   {
     question: 'Will I get the same result if I come back?',
     answer:
-      "Yes, as long as the link includes its dates and the holiday data hasn't been updated since. That is why a shared link reproduces what the sender saw.",
+      "Yes. The same link gives the same plan unless the public holiday data has changed since. Employer holidays and other private settings stay in your browser, so a plan that used them can differ for someone else.",
   },
 ];
 

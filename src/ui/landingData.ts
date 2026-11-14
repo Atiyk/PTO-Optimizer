@@ -246,3 +246,32 @@ export function holidayLongWeekends(upcoming: RemainingHoliday[]): RemainingHoli
   const seen = new Set<string>();
   return upcoming.filter((entry) => entry.runLength >= 3 && !seen.has(entry.run.start) && seen.add(entry.run.start));
 }
+
+/**
+ * F14: Nager.Date's English `name` uses one spelling for every country, so the US list read
+ * "Labour Day" and the UK's "St. Stephen's Day" for Boxing Day. Each entry renames a holiday
+ * to the name people in that country use; the data files stay untouched.
+ */
+const LOCAL_HOLIDAY_NAMES: Record<string, Record<string, string>> = {
+  US: { 'Labour Day': 'Labor Day' },
+  GB: { "St. Stephen's Day": 'Boxing Day' },
+  CA: { "St. Stephen's Day": 'Boxing Day' },
+  AU: { "St. Stephen's Day": 'Boxing Day' },
+};
+
+/** The holiday's name as people in `country` usually write it. */
+export function holidayDisplayName(name: string, country: string): string {
+  return LOCAL_HOLIDAY_NAMES[country]?.[name] ?? name;
+}
+
+/**
+ * F14: what a holiday already gives before any PTO, in plain words: "Already a 3-day
+ * weekend" rather than "3 calendar days off before PTO". `runLength` is the number of days
+ * off in a row, weekends included, around the holiday (Monday to Friday work week).
+ */
+export function holidayRunPhrase(runLength: number): string {
+  if (runLength <= 1) return 'A single day off';
+  if (runLength === 2) return '2 days off in a row';
+  if (runLength <= 4) return `Already a ${runLength}-day weekend`;
+  return `Already ${runLength} days off in a row`;
+}

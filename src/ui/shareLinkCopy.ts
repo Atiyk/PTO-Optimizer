@@ -5,4 +5,4 @@
  * /sabbatical (Keep it).
  */
 export const SHARE_LINK_SENTENCE =
-  'A plan link carries your planning settings; employer holidays, blackout dates, tracked requests and partner availability stay in this browser, so a plan that uses them can differ for the person you send it to.';
+  'A plan link carries your planning settings. Employer holidays, blackout dates, tracked requests and partner availability stay in this browser, so the plan can differ for whoever opens it.';
