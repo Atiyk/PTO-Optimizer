@@ -37,7 +37,7 @@ describe('departure payout scenario UI', () => {
     expect(screen.getByText('$700.00')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Employer payout assumption'), { target: { value: 'pays-none' } });
     expect(screen.getByText('$0.00')).toBeTruthy();
-    expect(screen.getByText(/We do not calculate legal entitlement/)).toBeTruthy();
+    expect(screen.getByText(/not a legal entitlement or take-home pay, and we do not calculate either/)).toBeTruthy();
   });
 
   it('uses annual pay conversion and never transmits salary into a link', () => {
@@ -56,7 +56,7 @@ describe('departure payout scenario UI', () => {
     render(<DeparturePayoutEstimator policy={{ ...policy, accrual: { kind: 'unlimited', expectedDaysPerYear: 20 } }} />);
     fill();
     fireEvent.change(screen.getByLabelText('Employer payout assumption'), { target: { value: 'pays-all' } });
-    expect(screen.getByText(/Unlimited vacation has no banked cash balance/)).toBeTruthy();
+    expect(screen.getByText(/Unlimited PTO has no banked balance to pay out/)).toBeTruthy();
     expect(screen.queryByText('$2,000.00')).toBeNull();
   });
 });

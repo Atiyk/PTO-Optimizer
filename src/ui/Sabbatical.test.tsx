@@ -40,14 +40,14 @@ describe('sabbatical summary (F18)', () => {
     const summary = within(hero).getByText(/Dec 24, 2026 – Jan 31, 2027/);
     expect(summary.textContent).toContain('4 weeks of sabbatical + 5 PTO days before.');
     expect(summary.textContent).not.toMatch(/holiday inside/);
-    expect(within(hero).getByText("3 public holidays fall in this time away: Christmas Day, New Year's Day, and Martin Luther King, Jr. Day.")).toBeTruthy();
+    expect(within(hero).getByText("Includes 3 public holidays: Christmas Day, New Year's Day, and Martin Luther King, Jr. Day.")).toBeTruthy();
   });
 });
 
 describe('build-date note (F17)', () => {
   it('is rendered only when the prerender stamp is present (static HTML), not on a live page', () => {
     render(<Sabbatical />);
-    expect(screen.queryByText(/recomputes live/)).toBeNull();
+    expect(screen.queryByText(/They update once the page loads/)).toBeNull();
   });
 });
 

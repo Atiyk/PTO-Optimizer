@@ -114,7 +114,7 @@ for (const name of selected) {
     assert.equal(link.searchParams.get('b'), '12');
     assert.equal(link.searchParams.get('e'), '2027-10-20');
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
-    // The homepage hands off to the planner; its public "Copy link" control is the one share
+    // The homepage hands off to the planner; its public "Copy plan link" control is the one share
     // path, so copy from the plan this exact link opens, in the same engine and context.
     const planner = await context.newPage();
     await planner.addInitScript(() => {
@@ -128,7 +128,7 @@ for (const name of selected) {
     await planner.goto(link.href);
     await planner.locator('main[data-plan-ready="true"]').waitFor();
     assert.ok(await planner.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
-    await planner.getByRole('button', { name: 'Copy link', exact: true }).click();
+    await planner.getByRole('button', { name: 'Copy plan link', exact: true }).click();
     await planner.getByRole('button', { name: /^(?:Link copied|Copied \(calendar omitted\))$/ }).waitFor();
     const copied = new URL(await planner.evaluate(() => window.__timebowerClipboard));
     await planner.close();
@@ -354,7 +354,7 @@ async function checkTouch(browser, name, result) {
     await day.waitFor({ state: 'visible' });
     await day.tap();
     if (!hover) {
-      const panel = page.getByRole('group', { name: 'Actions for January 20' });
+      const panel = page.getByRole('dialog', { name: 'Actions for January 20' });
       await panel.waitFor({ state: 'visible' });
       assert.equal(await day.getAttribute('aria-expanded'), 'true', 'a tap discloses the actions without changing the day');
       const bounds = await panel.boundingBox();

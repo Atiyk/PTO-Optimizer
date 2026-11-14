@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { Landing } from './Landing';
 import { SHARE_LINK_SENTENCE } from './shareLinkCopy';
 import type { Holiday } from '@daysoff/engine/data/holidays';
 import { defaultEmployerCalendar, saveEmployerCalendar } from '../personal/employerCalendar';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import { createPtoRequest, writeRequestLedger, type PtoRequest } from '../personal/requestLedger';
+import { PINNED_PLANS_STORAGE_KEY } from './pinnedPlanStore';
 
 const calendar = vi.hoisted(() => [
   { date: '2026-12-25', nominalDate: '2026-12-25', name: 'Christmas Day', countryCode: 'US', counties: null },
@@ -157,7 +160,12 @@ describe('live homepage planner', () => {
     await act(async () => { render(<Landing />); });
     const list = screen.getByRole('list', { name: /upcoming holidays/ });
     expect(list.querySelectorAll('li').length).toBe(3);
-    expect(screen.getAllByRole('link', { name: /View this holiday in the planner|Plan around this holiday|Connect a \d+-day break/ }).length).toBe(3);
+    const links = within(list).getAllByRole('link', { name: /^(?:Plan around .+|Connect a \d+-day break around .+)$/ });
+    expect(links.length).toBe(3);
+    // F23: each link names its holiday, so a list of links never reads as identical entries.
+    expect(new Set(links.map((link) => link.textContent)).size).toBe(3);
+    expect(links.some((link) => /Christmas Day/.test(link.textContent ?? ''))).toBe(true);
+    expect(screen.queryByRole('button', { name: /^Show all/ })).toBeNull();
     expect(screen.getByRole('button', { name: 'Download holidays (.ics)' })).toBeTruthy();
   });
 
@@ -271,5 +279,105 @@ describe('share-link claim (N2/F10)', () => {
     await act(async () => { render(<Landing />); });
     expect(screen.getByText((_, el) => el?.tagName === 'P' && !!el.textContent?.includes(SHARE_LINK_SENTENCE))).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/exactly as you left it/);
+  });
+});
+
+const REQUEST_CALENDAR = { workWeek: DEFAULT_WORK_WEEK, offDays: [], rangeStart: '2026-01-01', rangeEnd: '2028-12-31' };
+const request = (start: string, end: string, status: PtoRequest['status'], id: string) => createPtoRequest({ start, end, status }, REQUEST_CALENDAR, id)!;
+const SAVED_PLAN = {
+  country: 'US', planningVersion: 2, planningStyle: 'balanced', minimumBreakDays: 3,
+  employerCalendar: { version: 1, country: 'US', excluded: [], custom: [{ date: '2027-05-17', name: 'Private closure' }] },
+  rangeStart: '2027-01-01', rangeEnd: '2027-12-31', budget: 10, w: 30,
+  letSolverDecide: false, manualBreakCount: 3, weekStartOverride: 'auto', accrualEnabled: false,
+  accrualPerMonth: 1.25, expiryEnabled: false, expiryDate: '', carryoverCap: 0,
+  overlapDays: [], blackouts: [], workWeek: DEFAULT_WORK_WEEK, forced: {}, altFridayEnabled: false, altFridayStart: '',
+  reserveDays: 0, applyTrackedRequests: false, reserveApprovedPto: false, unlimitedPto: false, noticePeriodDays: 14,
+  peakCapEnabled: false, peakCapStart: '', peakCapEnd: '', peakCapMaxDays: 5,
+  summary: { budgetSpent: 10, totalDaysOff: 26, breakCountActual: 3, travelPercentile: null },
+};
+
+describe('returning visitors (research rec 10)', () => {
+  it('shows nothing new to a first-time visitor', async () => {
+    await act(async () => { render(<Landing />); });
+    expect(screen.queryByRole('region', { name: 'Welcome back' })).toBeNull();
+    expect(screen.queryByText(/Welcome back/)).toBeNull();
+  });
+
+  it('names the next tracked break, its request-by date and one way to open it', async () => {
+    writeRequestLedger([
+      request('2027-03-15', '2027-03-19', 'approved', 'later'),
+      request('2026-12-21', '2026-12-23', 'planned', 'next'),
+      request('2026-11-20', '2026-11-20', 'canceled', 'dropped'),
+    ]);
+    await act(async () => { render(<Landing />); });
+    const row = screen.getByRole('region', { name: 'Welcome back' });
+    expect(row.textContent).toContain('Next up: Dec 21 – 23, 2026');
+    expect(row.textContent).toContain('Planned · 3 PTO days');
+    // 14 calendar days before Monday Dec 21 is Monday Dec 7.
+    expect(row.textContent).toContain('Request by Dec 7');
+    const links = row.querySelectorAll('a');
+    expect(links).toHaveLength(1);
+    expect(links[0].getAttribute('href')).toBe('/policy#requests');
+    // It sits at the top of the result area, before the answer.
+    const result = document.querySelector('[data-plan-result]')!;
+    expect(result.firstElementChild).toBe(row);
+  });
+
+  it('opens a saved plan from its own planner link, keeping private settings off the address', async () => {
+    localStorage.setItem(PINNED_PLANS_STORAGE_KEY, JSON.stringify({ version: 1, plans: [{ id: 'one', snapshot: SAVED_PLAN }] }));
+    await act(async () => { render(<Landing />); });
+    const row = screen.getByRole('region', { name: 'Welcome back' });
+    expect(row.textContent).toContain('Your saved plan: 26 days off for 10 PTO days');
+    const link = screen.getByRole('link', { name: 'Open saved plan →' }) as HTMLAnchorElement;
+    const url = new URL(link.href);
+    expect(url.pathname).toBe('/pto');
+    expect(url.searchParams.get('b')).toBe('10');
+    expect(url.searchParams.get('s')).toBe('2027-01-01');
+    expect(url.searchParams.get('e')).toBe('2027-12-31');
+    expect(link.href).not.toContain('Private');
+    expect(url.searchParams.has('eh')).toBe(false);
+  });
+
+  it('ignores finished and past requests', async () => {
+    writeRequestLedger([request('2026-10-01', '2026-10-02', 'approved', 'past'), request('2026-12-01', '2026-12-01', 'rejected', 'no')]);
+    await act(async () => { render(<Landing />); });
+    expect(screen.queryByRole('region', { name: 'Welcome back' })).toBeNull();
+  });
+});
+
+describe('blank PTO field (R2)', () => {
+  it('does not carry the cleared number into the planner link or the address', async () => {
+    await act(async () => { render(<Landing />); });
+    await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '' } }); });
+    const cta = screen.getByRole('link', { name: 'Open the planner →' }) as HTMLAnchorElement;
+    expect(new URL(cta.href).searchParams.has('b')).toBe(false);
+    expect(new URL(cta.href).searchParams.get('c')).toBe('US');
+    expect(screen.queryByRole('link', { name: 'See the full plan →' })).toBeNull();
+    expect(screen.getByText('It starts at 15 PTO days. Change them there.')).toBeTruthy();
+    expect(new URLSearchParams(window.location.search).has('b')).toBe(false);
+    await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '9' } }); });
+    expect(new URL((screen.getByRole('link', { name: 'See the full plan →' }) as HTMLAnchorElement).href).searchParams.get('b')).toBe('9');
+  });
+});
+
+describe('holidays ahead (F23)', () => {
+  it('shows the next three and puts the rest behind one disclosure', async () => {
+    const extra = [
+      { date: '2027-05-31', nominalDate: '2027-05-31', name: 'Memorial Day', countryCode: 'US', counties: null },
+      { date: '2027-09-06', nominalDate: '2027-09-06', name: 'Labor Day', countryCode: 'US', counties: null },
+    ] satisfies Holiday[];
+    calendar.push(...extra);
+    try {
+      await act(async () => { render(<Landing />); });
+      expect(screen.getByRole('list', { name: 'Next 3 of 5 upcoming holidays' }).querySelectorAll('li')).toHaveLength(3);
+      const more = screen.getByRole('button', { name: 'Show all 5 holidays' });
+      expect(more.getAttribute('aria-expanded')).toBe('false');
+      await act(async () => { fireEvent.click(more); });
+      expect(screen.getByRole('list', { name: 'All 5 upcoming holidays' }).querySelectorAll('li')).toHaveLength(5);
+      expect(screen.getByRole('button', { name: 'Show the next 3 only' }).getAttribute('aria-expanded')).toBe('true');
+      expect(screen.getByRole('button', { name: 'Download holidays (.ics)' })).toBeTruthy();
+    } finally {
+      calendar.splice(3);
+    }
   });
 });

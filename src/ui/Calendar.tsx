@@ -127,6 +127,8 @@ export function Calendar({
     // Months flow by the width the calendar actually has (a container query), not the
     // viewport: beside the planner's control rail it gets about 850px at 1440, full width on
     // a tablet, and the sabbatical page's own column elsewhere.
+    // F09: below 400px the planner's calendar card runs edge to edge (App.tsx) so seven
+    // columns get the whole screen width; month titles and the toggle keep their own inset.
     <div className="@container">
     <div id={listId} className="grid grid-cols-1 gap-x-8 gap-y-6 @min-[36rem]:grid-cols-2">
       {months.map((m) => {
@@ -167,7 +169,7 @@ export function Calendar({
       })}
     </div>
     {collapsible && (
-      <div className="mt-5 flex flex-col items-start gap-1 md:hidden">
+      <div className="mt-5 flex flex-col items-start gap-1 max-[400px]:px-2 md:hidden">
         {!showAll && <p className="text-sm text-muted">Showing {months.length - hiddenCount} of {months.length} months: the ones with a break, a day you set, or today.</p>}
         <button type="button" aria-expanded={showAll} aria-controls={listId} onClick={() => setShowAll(!showAll)} className={buttonClasses('secondary', 'md', 'w-full justify-center')}>
           {showAll ? 'Show fewer months' : `Show all ${months.length} months`}

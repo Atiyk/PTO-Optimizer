@@ -82,7 +82,7 @@ export function WalletTransfer({ policy, requests, forecastDate }: {
   }
 
   return (
-    <details className="mt-3 min-w-0 rounded-[10px] border border-line bg-surface" onToggle={(event) => {
+    <details className="group min-w-0 rounded-[10px] border border-line bg-surface" onToggle={(event) => {
       const next = event.currentTarget.open;
       setOpen(next);
       if (next) {
@@ -90,9 +90,12 @@ export function WalletTransfer({ policy, requests, forecastDate }: {
         setLockSupport(canLockWalletLedger());
       }
     }}>
-      <summary className="flex min-h-11 cursor-pointer items-center px-4 py-2 font-semibold text-ink sm:px-6">Wallet backups and imports</summary>
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 font-semibold text-ink sm:px-6 [&::-webkit-details-marker]:hidden">
+        <span>Back up or move your saved data</span>
+        <span aria-hidden="true" className="shrink-0 text-xl leading-none group-open:rotate-45 motion-safe:transition-transform">+</span>
+      </summary>
       <div className="space-y-3 border-t border-line px-4 pb-4 pt-3 text-sm text-muted sm:px-6">
-        <p>Backups contain wallet-bank settings only. Imported banks stay in this browser, with their balances shown separately from the policy above.</p>
+        <p>A backup file holds your saved PTO balances and policy settings, without tracked requests or notes. Use it to move them to another browser. Imported balances stay in this browser and show separately from the policy above.</p>
         {!lockSupport && <p>Wallet imports and deletion require a browser with cross-tab storage locks. The request tracker is still available.</p>}
         {wallet && wallet.banks.length > 0 && (
           <ul className="space-y-2">

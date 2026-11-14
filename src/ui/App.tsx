@@ -19,7 +19,7 @@ import { pinPreviewText } from './pinPreview';
 import { planningStyleSettings } from '../planning/optimizer';
 import { formatCardDateRange, formatLong } from '@daysoff/engine/calendar/dateFormat';
 import { holidayLongWeekends, remainingHolidays } from './landingData';
-import { weightingCaption } from './weightingCaptions';
+import { weightingShort } from './weightingCaptions';
 import { RelaxedMinimumNotice } from './PlanRecoveryNotice';
 import { PlanSliders } from './PlanSliders';
 import { SubdivisionSelect } from './CountrySelect';
@@ -215,7 +215,8 @@ export function App() {
   const fieldLabel = 'text-sm font-semibold text-ink';
   const selectClass = 'select-ink w-full min-w-0 text-[15px] font-normal';
   const stylePreset = planningStyleSettings(state.planningStyle);
-  const sliderLabel = (count: number) => count >= 7 ? 'as many breaks as possible' : count === 1 ? '1 break (all in one)' : `${count} breaks`;
+  const sliderLabel = (count: number) => count >= 7 ? 'as many breaks as possible' : count === 1 ? '1 long break' : `${count} breaks`;
+  const styleName = { balanced: 'Balanced', 'long-breaks': 'Long breaks', 'more-breaks': 'More breaks', custom: 'Custom' }[state.planningStyle];
 
   const inputsSection = (
     <section aria-labelledby="plan-inputs-heading" className="flex min-w-0 flex-col gap-3.5">
@@ -238,10 +239,10 @@ export function App() {
         onToggleUnlimitedPto={state.setUnlimitedPto}
         onBudgetBlankChange={setBudgetBlank}
       />
-      <p className="text-sm text-muted">This planner budgets full days. <a href="/policy" className="link-mark">Track and forecast hourly leave in My PTO</a>.</p>
+      <p className="text-sm text-muted">This planner works in whole days. <a href="/policy" className="link-mark">Track and forecast hourly leave in My PTO</a>.</p>
       {state.hasSharedHolidaySnapshot && (
         <p className="text-sm text-muted">
-          This plan uses the observed holiday dates its sender selected. Switch to your calendar to edit or save the plan.{' '}
+          This plan uses the holiday dates the sender chose. To edit or save it, switch to your own calendar.{' '}
           <button type="button" className="link-mark min-h-11" onClick={state.restoreMyEmployerCalendar}>Use my saved calendar</button>
         </p>
       )}
@@ -259,7 +260,7 @@ export function App() {
               {state.reservedPtoDays > 0 && !state.unlimitedPto ? `, ${state.reservedPtoDays} reserved from the budget` : ''}.
             </p>
           )}
-          {state.applyTrackedRequests && <p>Tracked approved, planned and requested time off is excluded from new breaks on this device.</p>}
+          {state.applyTrackedRequests && <p>New breaks avoid the time off you’ve tracked in this browser, whether approved, requested or planned.</p>}
           {state.applyTrackedRequests && state.hasHourlyBookings && (
             <p data-testid="tracked-hourly-note">
               {workspace.schedule
@@ -314,8 +315,8 @@ export function App() {
               change never moves the sliders without explanation. */}
           <span id="planning-style-note" className="text-sm font-normal text-muted">
             {stylePreset
-              ? `Sets What matters more to “${weightingCaption(stylePreset.w).toLowerCase()}” and How many breaks to ${sliderLabel(stylePreset.breakCount)}. Moving a slider switches to Custom.`
-              : 'Custom: the sliders keep your own settings.'}
+              ? `${styleName}: ${weightingShort(stylePreset.w)}, ${sliderLabel(stylePreset.breakCount)}. Moving a slider switches to Custom.`
+              : 'Custom: the sliders keep your settings.'}
           </span>
         </label>
       </section>
@@ -443,7 +444,7 @@ export function App() {
                 budget={state.budget}
                 reserveDays={state.reserveDays}
                 trackedReservedDays={state.reservedPtoDays}
-                canPin={state.canPin && requestToolsReady}
+                canPin={state.canPin && requestToolsReady && !budgetBlank}
                 pending={state.planningPending}
                 unavailable={!plannable && !state.planningPending}
                 onPin={state.pinPlan}
@@ -472,12 +473,12 @@ export function App() {
               {longest && (
                 <p className="text-base text-ink lg:hidden">
                   <a href={`#break-card-${longest.index}`} className="link-mark inline-flex min-h-11 items-center font-semibold tabular-nums">
-                    Longest: {datedRange(longest.brk.start, longest.brk.end)} · {longest.brk.ptoCost} PTO {longest.brk.ptoCost === 1 ? 'day' : 'days'}
+                    Longest: {datedRange(longest.brk.start, longest.brk.end)} · {longest.brk.totalDaysOff} days off for {longest.brk.ptoCost} PTO {longest.brk.ptoCost === 1 ? 'day' : 'days'}
                   </a>
                 </p>
               )}
               <nav aria-label="On this page" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                {wide === false && plannable && !zeroBudget && (
+                {wide === false && plannable && !zeroBudget && !budgetBlank && (
                   <button type="button" onClick={state.pinPlan} disabled={!(state.canPin && requestToolsReady)} title={state.pinnedPlans.length >= 2 ? 'Remove a saved plan to make room for another.' : undefined} className={buttonClasses('secondary', 'md', 'px-3! text-sm!')}>
                     Save this plan
                   </button>
@@ -510,7 +511,7 @@ export function App() {
                   <p className="font-semibold">Planning around {state.holidayNameFor(holidayFocusDate) ?? 'this holiday'}</p>
                   <p>{formatLong(holidayFocusDate)}</p>
                   {holidayFocusRun && holidayFocusRun.length > 1 && (
-                    <p className="mt-1">{holidayFocusRun.length} calendar days off · {formatCardDateRange(holidayFocusRun.start, holidayFocusRun.end)}</p>
+                    <p className="mt-1">{holidayFocusRun.length} days off in a row · {formatCardDateRange(holidayFocusRun.start, holidayFocusRun.end)}</p>
                   )}
                   {!state.planningPending && !state.validationIssues.length && <a className="link-mark inline-flex min-h-11 items-center" href={`#day-${holidayFocusDate}`}>Find this date on the calendar</a>}
                 </div>
@@ -671,7 +672,7 @@ export function App() {
                   <span className="hidden [@media(hover:hover)]:inline">Click a day to cycle through take off, rule out, and let the planner decide. Arrow keys move between days.</span>
                   <span className="[@media(hover:hover)]:hidden">Tap a day to change its setting.</span>
                 </p>
-                <div className="mt-4 rounded-[10px] border border-line bg-surface p-3 sm:p-5">
+                <div className="mt-4 rounded-[10px] border border-line bg-surface p-3 sm:p-5 max-[400px]:-mx-4 max-[400px]:rounded-none max-[400px]:border-x-0 max-[400px]:px-1">
                   {!state.validationIssues.length && !state.planningPending ? <CalendarErrorBoundary>
                     <Calendar
                       rangeStart={state.rangeStart}

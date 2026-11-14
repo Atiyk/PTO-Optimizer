@@ -53,6 +53,8 @@ describe('/pto with the PTO field blank (F06)', () => {
     expect(within(summary).queryByText(/Example for 15 PTO days/)).toBeNull();
     fireEvent.change(screen.getByLabelText('PTO days available'), { target: { value: '' } });
     expect(within(summary).getByText('Example for 15 PTO days. Enter yours to see your plan.')).toBeTruthy();
+    // R2: an example plan is not the user's own, so it can't be saved.
+    for (const save of screen.queryAllByRole<HTMLButtonElement>('button', { name: 'Save this plan' })) expect(save.disabled).toBe(true);
     fireEvent.change(screen.getByLabelText('PTO days available'), { target: { value: '12' } });
     expect(within(summary).queryByText(/Example for/)).toBeNull();
   });
@@ -70,7 +72,8 @@ describe('/pto first screen (N1, N3, N2, F13)', () => {
     const start = target.getAttribute('data-break-start');
     const totals = [...document.querySelectorAll('li[data-break-start]')].map((li) => li.getAttribute('data-break-start'));
     expect(totals).toContain(start);
-    expect(link.textContent).toMatch(/^Longest: .+ · \d+ PTO days?$/);
+    // R3: the line carries the days off, not only the PTO cost.
+    expect(link.textContent).toMatch(/^Longest: .+ · \d+ days off for \d+ PTO days?$/);
   });
 
   it('gives the Adjust plan target a focus landing spot', async () => {
@@ -93,7 +96,9 @@ describe('/pto first screen (N1, N3, N2, F13)', () => {
     render(<App />);
     await ready();
     fireEvent.change(screen.getByLabelText('Planning style'), { target: { value: 'balanced' } });
-    const helper = screen.getByText(/^Sets What matters more to/);
-    expect(helper.textContent).not.toMatch(/What matters more to \d/);
+    // R1: one short line naming the style, what it favors and the break count.
+    const helper = screen.getByText(/^Balanced: /);
+    expect(helper.textContent).toBe('Balanced: mostly days off, 3 breaks. Moving a slider switches to Custom.');
+    expect(helper.textContent!.split(/\s+/).length).toBeLessThanOrEqual(12);
   });
 });

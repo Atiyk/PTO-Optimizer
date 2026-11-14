@@ -49,24 +49,29 @@ export function readLandingState(search: string, today: string, country: string)
   };
 }
 
-export function landingSearch(state: LandingState): string {
+/** A blank PTO field has no number to record, so `b` is left out rather than kept at the last value. */
+export function landingSearch(state: LandingState, budgetBlank = false): string {
   const params = new URLSearchParams({
     home: '1', c: state.country, b: String(state.budget), s: state.rangeStart, e: state.rangeEnd,
   });
+  if (budgetBlank) params.delete('b');
   return `?${params}`;
 }
 
-export function landingPlanHref(state: LandingState, pinnedDate?: string): string {
+/** R2: with a blank PTO field the link omits `b`, so the planner opens on its own starting
+ * plan instead of carrying a number the visitor cleared. */
+export function landingPlanHref(state: LandingState, pinnedDate?: string, budgetBlank = false): string {
   const params = new URLSearchParams({
     c: state.country, b: String(state.budget), s: state.rangeStart, e: state.rangeEnd,
     rv: '0', pv: String(PREVIEW_VERSION), ps: PREVIEW_STYLE, mb: String(PREVIEW_MINIMUM), lp: '1',
   });
+  if (budgetBlank) params.delete('b');
   const preset = planningStyleSettings(PREVIEW_STYLE);
   if (preset) {
     params.set('w', String(preset.w));
     params.set('count', String(preset.breakCount));
   }
-  if (state.budget > 0 && pinnedDate && dateInLandingRange(state, pinnedDate)) params.set('p', pinnedDate);
+  if (!budgetBlank && state.budget > 0 && pinnedDate && dateInLandingRange(state, pinnedDate)) params.set('p', pinnedDate);
   return `/pto?${params}`;
 }
 

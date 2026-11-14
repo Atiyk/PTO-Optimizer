@@ -64,3 +64,12 @@ describe('Legend', () => {
     expect(full).toContain('repeating-linear-gradient'); // hatching, not a hue
   });
 });
+
+describe('Legend outside-range entry (F27)', () => {
+  it('is hidden by default and shows the outside-range numeral tone when asked', () => {
+    expect(renderToStaticMarkup(<Legend />)).not.toContain('Outside your dates');
+    const html = renderToStaticMarkup(<Legend showOutside />);
+    expect(html).toContain('Outside your dates');
+    expect(html).toContain('text-[var(--outside-text)]');
+  });
+});

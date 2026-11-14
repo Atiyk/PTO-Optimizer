@@ -47,13 +47,13 @@ export function buildPortraitText(data: PortraitPlanData, includeBalance = false
   return {
     title: sameYear ? `My ${year} time-off plan` : 'My time-off plan',
     range: formatDateRange(data.rangeStart, data.rangeEnd),
-    summary: `${pto} PTO days → ${days} calendar days off`,
+    summary: `${pto} PTO days → ${days} days off`,
     breaks: data.breaks.slice(0, PORTRAIT_MAX_BREAKS).map(brk => ({
       dates: formatDateRange(brk.start, brk.end),
-      metrics: `${brk.totalDaysOff} calendar days off · ${brk.ptoCost} PTO ${brk.ptoCost === 1 ? 'day' : 'days'}`,
+      metrics: `${brk.totalDaysOff} days off · ${brk.ptoCost} PTO ${brk.ptoCost === 1 ? 'day' : 'days'}`,
       holidays: (data.holidayNamesOf?.(brk) ?? []).length
         ? `Includes: ${[...new Set(data.holidayNamesOf?.(brk))].join(', ')}`
-        : 'Weekends and observed holidays included where applicable.',
+        : 'No holidays in this break.',
     })),
     overflow: data.breaks.length > PORTRAIT_MAX_BREAKS
       ? `Plan summary · ${data.breaks.length - PORTRAIT_MAX_BREAKS} additional ${data.breaks.length - PORTRAIT_MAX_BREAKS === 1 ? 'break' : 'breaks'} in the full plan`
@@ -128,7 +128,7 @@ export function drawPortraitImage(ctx: CanvasRenderingContext2D, data: PortraitP
   ctx.fillText(summary, 64, 330);
   ctx.fillStyle = colors.muted;
   ctx.font = '400 21px Archivo Variable, system-ui, sans-serif';
-  ctx.fillText('Calendar days off include weekends, observed holidays, and PTO.', 64, 367);
+  ctx.fillText('Days off include weekends, holidays and PTO days.', 64, 367);
 
   text.breaks.forEach((brk, index) => {
     const y = 402 + index * 224;

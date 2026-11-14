@@ -24,14 +24,14 @@ describe('actual Copy link action protects private employer details', () => {
       noticePeriodDays={14} onPlanWithPartner={() => {}} planSearch={search}
       observedHolidayDates={['2027-12-27', '2027-07-05']}
     />);
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy link' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy plan link' })); });
     expect(writeText).toHaveBeenCalledTimes(1);
     const copied = String(writeText.mock.calls[0][0]);
     const copiedURL = new URL(copied);
     expect(copiedURL.searchParams.get('b')).toBe('12');
     expect(copied).not.toMatch(/PRIVATE_|[?&](eh|bo|od|ho)=|#/);
     expect(screen.getByRole('button', { name: /Copied \(calendar omitted\)/i })).toBeTruthy();
-    fireEvent.click(screen.getByText('Share observed holiday dates', { selector: 'summary' }));
+    fireEvent.click(screen.getByText('Send your holiday dates with the link', { selector: 'summary' }));
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy link with holiday dates' })); });
     expect(writeText).toHaveBeenCalledTimes(2);
     const optedIn = String(writeText.mock.calls[1][0]);
@@ -53,7 +53,7 @@ describe('actual Copy link action protects private employer details', () => {
       budgetSpent={0} totalDaysOff={0} travelPercentile={null} efficiencyPercentile={null}
       noticePeriodDays={21} onPlanWithPartner={() => {}} planSearch={search}
     />);
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy link' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy plan link' })); });
     const copied = new URL(String(writeText.mock.calls[0][0]));
     const allowed = new Set<string>(PLAN_SHARE_KEYS);
     expect([...copied.searchParams.keys()].filter(key => !allowed.has(key))).toEqual([]);

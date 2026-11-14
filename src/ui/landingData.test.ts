@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   isOffDay,
+  holidayDisplayName,
+  holidayRunPhrase,
   nextDayOff,
   nextHoliday,
   daysOffRemainingThisYear,
@@ -168,5 +170,26 @@ describe('findDrySpells (K4, used directly by YearStrip)', () => {
       { start: '2026-11-05', end: '2026-11-24' },
       { start: '2026-11-26', end: '2026-11-30' },
     ]);
+  });
+});
+
+describe('holidayDisplayName (F14)', () => {
+  it('uses the spelling people in each country use', () => {
+    expect(holidayDisplayName('Labour Day', 'US')).toBe('Labor Day');
+    expect(holidayDisplayName('Labour Day', 'CA')).toBe('Labour Day');
+    expect(holidayDisplayName("St. Stephen's Day", 'GB')).toBe('Boxing Day');
+    expect(holidayDisplayName("St. Stephen's Day", 'IE')).toBe("St. Stephen's Day");
+    expect(holidayDisplayName('Memorial Day', 'US')).toBe('Memorial Day');
+  });
+});
+
+describe('holidayRunPhrase (F14)', () => {
+  it('says what the holiday already gives in plain words, without "before PTO"', () => {
+    expect(holidayRunPhrase(1)).toBe('A single day off');
+    expect(holidayRunPhrase(2)).toBe('2 days off in a row');
+    expect(holidayRunPhrase(3)).toBe('Already a 3-day weekend');
+    expect(holidayRunPhrase(4)).toBe('Already a 4-day weekend');
+    expect(holidayRunPhrase(9)).toBe('Already 9 days off in a row');
+    for (const n of [1, 2, 3, 4, 9]) expect(holidayRunPhrase(n)).not.toMatch(/PTO|calendar/);
   });
 });

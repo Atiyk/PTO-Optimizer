@@ -3,12 +3,26 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { Policy } from './Policy';
 import { readBrowserWorkdaySchedule } from './usePersonalWorkspace';
 import { initialPolicyPreferences, readBrowserPolicyDraft, savePolicyPreferences } from '../personal/policyPreferences';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import { PINNED_PLANS_STORAGE_KEY } from './pinnedPlanStore';
+
+const SAVED_PLAN = {
+  country: 'US', planningVersion: 2, planningStyle: 'balanced', minimumBreakDays: 3,
+  employerCalendar: { version: 1, country: 'US', excluded: [], custom: [] },
+  rangeStart: '2027-01-01', rangeEnd: '2027-12-31', budget: 10, w: 30,
+  letSolverDecide: false, manualBreakCount: 3, weekStartOverride: 'auto', accrualEnabled: false,
+  accrualPerMonth: 1.25, expiryEnabled: false, expiryDate: '', carryoverCap: 0,
+  overlapDays: [], blackouts: [], workWeek: DEFAULT_WORK_WEEK, forced: {}, altFridayEnabled: false, altFridayStart: '',
+  reserveDays: 0, applyTrackedRequests: false, reserveApprovedPto: false, unlimitedPto: false, noticePeriodDays: 14,
+  peakCapEnabled: false, peakCapStart: '', peakCapEnd: '', peakCapMaxDays: 5,
+  summary: { budgetSpent: 10, totalDaysOff: 26, breakCountActual: 3, travelPercentile: null },
+};
 
 const INITIAL_SEARCH = '?c=US&cb=10&bao=2027-01-01&ak=pp&am=1&fq=m&pda=2027-01-15&cm=a&ace=0&fd=2027-03-15';
 const quickInputs = () => within(screen.getByRole('region', { name: 'Quick balance forecast' }));
 const forecastOutput = () => within(screen.getByRole('region', { name: 'PTO balance forecast' }));
 const expectForecast = (text: string) => expect(forecastOutput().getByText((_content, node) => node?.getAttribute('aria-live') === 'polite' && node.textContent === text)).toBeTruthy();
-const advanced = () => screen.getByText('Advanced policy options and explanation').closest('details')!;
+const advanced = () => screen.getByText('Advanced policy options').closest('details')!;
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -75,7 +89,7 @@ describe('quick policy forecast in the real consumer page', () => {
     expect(options.getByLabelText('Can your balance go negative?')).toBeTruthy();
     expect(options.getByLabelText('Already-carried PTO included in your balance (days)')).toBeTruthy();
     expect(options.getByLabelText("If you leave, is unused PTO paid out?")).toBeTruthy();
-    fireEvent.click(screen.getByText('Advanced policy options and explanation'));
+    fireEvent.click(screen.getByText('Advanced policy options'));
     expect(advanced().open).toBe(true);
     fireEvent.change(options.getByLabelText('Can your balance go negative?'), { target: { value: '2' } });
     expect(window.location.search).toBe('?c=US');
@@ -83,9 +97,15 @@ describe('quick policy forecast in the real consumer page', () => {
   });
 
   it('offers the same-browser saved-plan return path without including private inputs', () => {
+    const empty = render(<Policy />);
+    // F07: no "0 saved plans" line when there are none.
+    expect(screen.queryByRole('complementary', { name: 'Saved plans' })).toBeNull();
+    expect(screen.queryByText(/saved plans? in this browser/)).toBeNull();
+    empty.unmount();
+    window.localStorage.setItem(PINNED_PLANS_STORAGE_KEY, JSON.stringify({ version: 1, plans: [{ id: 'one', snapshot: SAVED_PLAN }] }));
     render(<Policy />);
     const savedPlans = within(screen.getByRole('complementary', { name: 'Saved plans' }));
-    expect(savedPlans.getByText('0 saved plans in this browser.')).toBeTruthy();
+    expect(savedPlans.getByText('1 saved plan in this browser.')).toBeTruthy();
     expect(savedPlans.getByRole('link', { name: 'View saved plans' }).getAttribute('href')).toBe('/pto#saved-plans');
   });
 
@@ -155,7 +175,7 @@ describe('quick policy forecast in the real consumer page', () => {
     expect(input.value).toBe('0');
     expectForecast('3 days');
     fireEvent.change(input, { target: { value: '' } });
-    expect(forecastOutput().getByText(/Enter your current PTO balance to see a forecast/)).toBeTruthy();
+    expect(forecastOutput().getByText('Enter your current PTO balance to see how much you will have on Mar 15, 2030, after accrual and any time off you have tracked.')).toBeTruthy();
     expect(forecastOutput().queryByText(/Estimated available PTO/)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Review next policy reset' })).toBeNull();
     expect(screen.getByRole('link', { name: 'PTO balance and policy' }).getAttribute('href')).toBe('#balance');

@@ -204,7 +204,7 @@ describe('planner result actions', () => {
     render(<App />);
     expect(await screen.findByRole('heading', { level: 1, name: 'No PTO days to spend' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Save this plan' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Copy plan link' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Save break' })).toBeNull();
   });
 });

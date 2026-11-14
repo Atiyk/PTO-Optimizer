@@ -38,8 +38,8 @@ describe('portrait share image', () => {
   it('uses plan costs, date range and employer holiday assumptions', () => {
     const text = buildPortraitText(data);
     expect(text.title).toBe('My 2027 time-off plan');
-    expect(text.summary).toBe('4 PTO days → 9 calendar days off');
-    expect(text.breaks[0]).toEqual({ dates: 'Jul 3 - Jul 11, 2027', metrics: '9 calendar days off · 4 PTO days', holidays: 'Includes: Independence Day' });
+    expect(text.summary).toBe('4 PTO days → 9 days off');
+    expect(text.breaks[0]).toEqual({ dates: 'Jul 3 - Jul 11, 2027', metrics: '9 days off · 4 PTO days', holidays: 'Includes: Independence Day' });
     expect(text.assumption).toContain('customized employer-observed');
     expect(buildPortraitText({ ...data, holidayAssumption: 'company' }).assumption).toContain('additional company days');
     expect(buildPortraitText({ ...data, holidayAssumption: 'public' }).assumption).toContain('public holidays');
@@ -49,7 +49,7 @@ describe('portrait share image', () => {
     const text = buildPortraitText({ ...data, breaks: Array.from({ length: 5 }, () => data.breaks[0]) });
     expect(text.breaks).toHaveLength(3);
     expect(text.overflow).toBe('Plan summary · 2 additional breaks in the full plan');
-    expect(text.summary).toBe('20 PTO days → 45 calendar days off');
+    expect(text.summary).toBe('20 PTO days → 45 days off');
   });
 
   it('uses years on cross-year dates and never hides overflow behind canvas bounds', () => {

@@ -309,7 +309,7 @@ try {
     // F05: a real 0-day balance has nothing to save; the page says so and stays shareable.
     await page.getByRole('heading', { level: 1, name: 'No PTO days to spend', exact: true }).waitFor();
     assert.equal(await page.getByRole('button', { name: 'Save this plan', exact: true }).count(), 0, 'A zero-budget plan offers no Save.');
-    assert.equal(await page.getByRole('button', { name: 'Copy link', exact: true }).isEnabled(), true, 'A valid zero-budget scenario remains shareable.');
+    assert.equal(await page.getByRole('button', { name: 'Copy plan link', exact: true }).isEnabled(), true, 'A valid zero-budget scenario remains shareable.');
     await noOverflow(page);
     await screenshot(page, '06-pinned-recovery-after-320.png');
     await page.close();
@@ -437,7 +437,7 @@ try {
     await waitForPlanner(recipient);
     await eventually(async () => assert.doesNotMatch(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Saved exclusions should survive a fresh URL');
     const sender = await open(await mobileContext(), holidayPath);
-    await sender.getByRole('button', { name: 'Copy link', exact: true }).click();
+    await sender.getByRole('button', { name: 'Copy plan link', exact: true }).click();
     const sharedDefault = await clipboardText(sender);
     assert.equal(new URL(sharedDefault).searchParams.has('eh'), false, 'Copied public plans must not expose employer calendar overrides.');
     await recipient.goto(sharedDefault, { waitUntil: 'domcontentloaded' });
@@ -497,7 +497,7 @@ try {
     assert.equal(await subscriptions.getByRole('link', { name: /Outlook/ }).count(), 0, 'No pre-consent Outlook URL may contain private names.');
     assert.equal(await subscriptions.getByRole('link', { name: /Apple Calendar/ }).count(), 0, 'No pre-consent webcal URL may contain private names.');
     assert.equal(await subscriptions.getByLabel(/Or paste this link into any calendar app/).count(), 0, 'No private feed URL may be selectable before consent.');
-    await page.getByRole('button', { name: 'Copy link', exact: true }).click();
+    await page.getByRole('button', { name: 'Copy plan link', exact: true }).click();
     const shared = await clipboardText(page);
     const sharedParams = new URL(shared).searchParams;
     assert.equal(sharedParams.get('sv'), '1');
@@ -508,7 +508,7 @@ try {
     await moreOptions(recipient);
     assert.equal(await holidaySection(recipient).getByRole('checkbox', { name: /PRIVATE_EMPLOYER_POLICY_TITLE/ }).count(), 0,
       'Shared public URL must not restore the sender private title on the recipient.');
-    await page.locator('summary').filter({ hasText: 'Share observed holiday dates' }).click();
+    await page.locator('summary').filter({ hasText: 'Send your holiday dates with the link' }).click();
     await page.getByRole('button', { name: 'Copy link with holiday dates' }).click();
     const optedIn = await clipboardText(page);
     const optedInParams = new URL(optedIn).searchParams;
@@ -518,7 +518,7 @@ try {
     await waitForPlanner(recipient);
     await eventually(async () => assert.match(await recipient.locator('#day-2027-12-30').getAttribute('aria-label'), /Shared observed holiday/i),
       'The recipient should reproduce the selected observed date without its original label');
-    await subscriptions.getByRole('button', { name: /Include observed holiday dates/ }).click();
+    await subscriptions.getByRole('button', { name: /Use my holiday dates/ }).click();
     const google = new URL(await subscriptions.getByRole('link', { name: /Google Calendar/ }).getAttribute('href'));
     const cid = google.searchParams.get('cid');
     const googleQuery = new URL(cid.replace(/^webcal:/, 'https:')).searchParams;
@@ -628,8 +628,8 @@ try {
     const card = joint.getByRole('article').first();
     const ownCost = numberIn(await card.getByText('You', { exact: true }).locator('..').innerText());
     assert.ok(ownCost <= 1, 'Joint opportunity must respect recipient PTO budget.');
-    await card.getByRole('button', { name: 'Review return proposal', exact: true }).click();
-    await joint.getByRole('button', { name: 'Copy return proposal', exact: true }).click();
+    await card.getByRole('button', { name: 'Propose these dates', exact: true }).click();
+    await joint.getByRole('button', { name: 'Copy proposal link', exact: true }).click();
     const jointDays = disclosedDays(await clipboardText(recipient));
     assert.ok(jointDays.every((date) => shared.includes(date)), 'A joint opportunity cannot invent undisclosed availability.');
     assert.equal(await recipient.getByText(privateNote, { exact: true }).count(), 0);

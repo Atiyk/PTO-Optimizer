@@ -37,10 +37,17 @@ try {
       assert.equal(await page.evaluate(() => matchMedia('(hover: hover)').matches), false, 'Browser must simulate a touch-only device');
       const day = page.locator('#day-2027-01-20');
       await day.waitFor({ state: 'visible' });
+      // F09: every in-range day is a 44px-wide (or wider) touch target, measured in the DOM.
+      const narrowest = await page.evaluate(() => Math.min(...[...document.querySelectorAll('button[data-date]')]
+        .filter((el) => el.getClientRects().length).map((el) => el.getBoundingClientRect().width)));
+      assert.ok(narrowest >= 44, `Calendar day targets must be at least 44px wide (narrowest ${narrowest}px)`);
+      assert.ok((await day.boundingBox()).height >= 44, 'Calendar day targets must be at least 44px tall');
       await day.tap();
-      const panel = page.getByRole('group', { name: 'Actions for January 20' });
+      const panel = page.getByRole('dialog', { name: 'Actions for January 20' });
       await panel.waitFor({ state: 'visible' });
       assert.equal(await day.getAttribute('aria-expanded'), 'true', 'Tap must disclose the action without changing the day');
+      // N4: the sheet is a dialog that takes focus to its first option.
+      assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Take this day off', 'Opening the sheet must move focus to its first option');
       const bounds = await panel.boundingBox();
       assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= width + 1, 'Touch action panel must fit inside the viewport');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, 'Calendar must not overflow horizontally');
@@ -52,7 +59,7 @@ try {
       assert.equal(await day.getAttribute('aria-expanded'), 'false', 'Action should close the disclosure');
 
       await day.tap();
-      await page.getByRole('group', { name: 'Actions for January 20' }).getByRole('button', { name: 'Close' }).tap();
+      await page.getByRole('dialog', { name: 'Actions for January 20' }).getByRole('button', { name: 'Close' }).tap();
       assert.equal(await day.getAttribute('aria-expanded'), 'false', 'Close should dismiss without action');
       await day.tap();
       await panel.waitFor({ state: 'visible' });

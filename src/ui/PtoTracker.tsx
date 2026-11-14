@@ -168,21 +168,32 @@ export function PtoTracker({ ledger, calendar, calendarReady = true, calendarNot
     { label: 'Cancelled', count: ledger.requests.filter((r) => r.status === 'canceled').length },
   ];
   const conflicts = requestConflicts(ledger.requests);
+  // With nothing tracked, six zero counters and an empty list say nothing: one sentence and
+  // the one action (track dates) take their place. The full tracker returns with the first request.
+  const empty = ledger.requests.length === 0;
+  const hints = <>
+    {coverageHint && <p className="mt-3 text-sm leading-6 text-muted">{compactDatesIn(coverageHint)}</p>}
+    {calendarNotice && <p className="mt-2 text-sm leading-6 text-muted">{compactDatesIn(calendarNotice)}</p>}
+  </>;
   return (
     <section id="my-pto-requests" aria-labelledby={`${id}-heading`} className="min-w-0 rounded-[10px] border border-line bg-surface p-5 sm:p-6">
       <h2 id={`${id}-heading`} className="text-h2 font-bold text-ink type-condensed">My PTO requests</h2>
-      <p className="mt-1 text-sm leading-6 text-muted">Save breaks you’re considering and record what your employer approves. Update each status yourself as your plans change.</p>
-      {coverageHint && <p className="mt-3 text-sm leading-6 text-muted">{compactDatesIn(coverageHint)}</p>}
-      {calendarNotice && <p className="mt-2 text-sm leading-6 text-muted">{compactDatesIn(calendarNotice)}</p>}
+      {empty
+        ? <p data-testid="tracker-empty" className="mt-1 text-sm leading-6 text-muted">Nothing tracked in this browser yet. Save a break from <a className="link-mark font-semibold" href="/pto">the planner</a>, or add dates you have already asked for.</p>
+        : <p className="mt-1 text-sm leading-6 text-muted">Save breaks you’re considering and record what your employer approves. Update each status yourself as your plans change.</p>}
+      {!empty && hints}
       {!calendarReady && <p role="status" className="mt-3 border-l-2 border-ink pl-3 text-sm text-ink">Holiday data is loading or unavailable. New requests and date edits are paused until the calendar is ready. You can still update statuses and notes or delete requests.</p>}
-      <dl className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
-        {counts.map(({ label, count }) => <div key={label}><dt className="text-xs text-muted">{label}</dt><dd className="mt-1 text-[1.75rem] leading-8 tabular-nums text-ink type-display">{count}</dd></div>)}
-      </dl>
-      {forecastSummary && <p className="mt-4 text-sm text-muted">{forecastSummary}</p>}
-      {remainingPto !== undefined && <p className="mt-4 text-sm text-muted">Unallocated PTO in the current optimizer plan: <strong className="text-ink">{remainingPto} days</strong>. Check the balance forecast for approved and tentative requests.</p>}
-      <ApprovalAssistant ledger={ledger} calendar={calendar} today={effectiveToday} onStatusChanged={onStatusChanged} />
-      <details className="mt-5 border-y border-line">
-        <summary className="flex min-h-11 cursor-pointer items-center font-semibold text-ink">Track another date range</summary>
+      {!empty && <>
+        <dl className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
+          {counts.map(({ label, count }) => <div key={label}><dt className="text-xs text-muted">{label}</dt><dd className="mt-1 text-[1.75rem] leading-8 tabular-nums text-ink type-display">{count}</dd></div>)}
+        </dl>
+        {forecastSummary && <p className="mt-4 text-sm text-muted">{forecastSummary}</p>}
+        {remainingPto !== undefined && <p className="mt-4 text-sm text-muted">Unallocated PTO in the current optimizer plan: <strong className="text-ink">{remainingPto} days</strong>. Check the balance forecast for approved and tentative requests.</p>}
+        <ApprovalAssistant ledger={ledger} calendar={calendar} today={effectiveToday} onStatusChanged={onStatusChanged} />
+      </>}
+      <details className={`${empty ? 'mt-3' : 'mt-5'} border-y border-line`}>
+        <summary className="flex min-h-11 cursor-pointer items-center font-semibold text-ink">{empty ? 'Track a date range' : 'Track another date range'}</summary>
+        {empty && hints}
         <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="min-w-0 text-sm text-muted">Start date<input className={`${fieldClass} mt-1`} type="date" value={start} min={calendar.rangeStart} max={calendar.rangeEnd} disabled={!calendarReady} onChange={(event) => setStart(event.target.value)} /></label>
           <label className="min-w-0 text-sm text-muted">End date<input className={`${fieldClass} mt-1`} type="date" value={end} min={calendar.rangeStart} max={calendar.rangeEnd} disabled={!calendarReady} onChange={(event) => setEnd(event.target.value)} /></label>
@@ -210,7 +221,7 @@ export function PtoTracker({ ledger, calendar, calendarReady = true, calendarNot
       {ledger.storageNotice && <p role="status" data-testid="ledger-storage-notice" className="mt-4 border-l-2 border-ink pl-3 text-sm text-ink">{ledger.storageNotice}</p>}
       {!ledger.storageAvailable && !ledger.storageNotice && <p role="status" className="mt-4 border-l-2 border-ink pl-3 text-sm text-ink">Browser storage is unavailable. Your tracker works for this visit, but changes may disappear when you leave.</p>}
       {conflicts.length > 0 && <p className="mt-4 flex gap-2 border-l-2 border-ink pl-3 text-sm text-ink">Some request dates overlap. They are flagged here and deducted only once in the balance forecast. Review the dates before requesting leave.</p>}
-      <div className="mt-5 flex items-center justify-between gap-3">
+      {!empty && <><div className="mt-5 flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-ink">{showPast ? 'All tracked requests' : 'Upcoming requests'}</p>
         <label className="flex min-h-11 items-center gap-2 text-sm text-muted"><input type="checkbox" checked={showPast} onChange={(event) => setShowPast(event.target.checked)} />Include past requests</label>
       </div>
@@ -218,7 +229,7 @@ export function PtoTracker({ ledger, calendar, calendarReady = true, calendarNot
         {visible.length === 0 ? <p className="text-sm leading-6 text-muted">No {showPast ? '' : 'upcoming '}time off saved. Save a recommended break from the planner or add dates above.</p>
           : visible.map((request) => <RequestRow key={`${request.id}:${request.start}:${request.end}`} request={request} ledger={ledger} calendar={calendar} calendarReady={calendarReady} onStatusChanged={onStatusChanged} noticePeriodDays={noticePeriodDays} noticeUnit={noticeUnit} today={effectiveToday} />)}
       </div>
-      <p className="mt-4 text-xs leading-5 text-muted">Saved in this browser. Notes and statuses stay private. You can review the updated PTO cost before saving date edits.</p>
+      <p className="mt-4 text-xs leading-5 text-muted">Saved in this browser. Notes and statuses stay private. You can review the updated PTO cost before saving date edits.</p></>}
     </section>
   );
 }
