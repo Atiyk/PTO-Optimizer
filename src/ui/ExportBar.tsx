@@ -135,7 +135,7 @@ export function ExportBar(props: ExportBarProps) {
       <div className="flex flex-wrap items-center gap-2">
         <ActionButton
           id="shortcut-download-ics"
-          label="Add to calendar (.ics)"
+          label="Download calendar file (.ics)"
           variant="primary"
           onClick={async () => {
             const reminderOptions = {
@@ -148,7 +148,7 @@ export function ExportBar(props: ExportBarProps) {
           }}
         />
         <ActionButton
-          label="Copy as image"
+          label="Copy plan as image"
           onClick={async () => {
             const months = buildShareImageMonths(props.rangeStart, props.rangeEnd, props.weekStart, props.categoryOf);
             const ptoWord = props.budgetSpent === 1 ? 'day' : 'days';
@@ -177,7 +177,7 @@ export function ExportBar(props: ExportBarProps) {
         />
         <ActionButton
           id="shortcut-copy-link"
-          label="Copy link"
+          label="Copy plan link"
           onClick={() => copyPlan()}
         />
         <button type="button" onClick={props.onPlanWithPartner} className={buttonClasses('secondary', 'md')}>
@@ -203,8 +203,10 @@ export function ExportBar(props: ExportBarProps) {
       )}
       {planSearch !== undefined && observedDates !== undefined && (
         <details className="space-y-2 text-sm">
-          <summary className="cursor-pointer py-3 font-semibold text-ink">Share observed holiday dates</summary>
-          <p className="max-w-prose text-muted">Include the dates checked in this plan’s holiday calendar. Anyone with the link can see those dates. Employer names and holiday labels stay private.{omissions?.settings ? ' Private scheduling and policy settings are still omitted, so the result may differ.' : ''}</p>
+          <summary className="min-h-11 cursor-pointer py-3 font-semibold text-ink">Send your holiday dates with the link</summary>
+          <p className="max-w-prose text-muted">Copy plan link uses public holidays. This link also carries the holiday dates checked in your plan, listed below.</p>
+          <p className="max-w-prose text-muted">Anyone with the link can see those dates. Holiday and employer names stay private.</p>
+          {omissions?.settings && <p className="max-w-prose text-muted">Your scheduling and policy settings still stay in this browser, so their plan can differ.</p>}
           <p className="max-w-prose break-words text-xs text-muted">{observedDates.length ? observedDates.join(', ') : 'No holidays are checked in this date range.'}</p>
           <ActionButton label="Copy link with holiday dates" onClick={() => copyPlan(observedDates)} />
         </details>

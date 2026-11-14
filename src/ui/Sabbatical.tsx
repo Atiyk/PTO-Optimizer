@@ -151,8 +151,8 @@ export function Sabbatical() {
           {selected ? (
             <header className="max-w-4xl">
               <h1 className="text-h1 type-display text-ink">
-                Take it from {formatLong(selected.start)} and you&apos;re away for{' '}
-                <span className="mark">{selected.totalAwayDays} consecutive days</span>.
+                Start on {formatLong(selected.start)} and get{' '}
+                <span className="mark">{selected.totalAwayDays} days off in a row</span>.
               </h1>
               <p className="mt-3 text-base text-muted">
                 {formatCardDateRange(selected.extendedStart, selected.extendedEnd)}: {composition}.
@@ -164,7 +164,7 @@ export function Sabbatical() {
               )}
               {prerenderedAt && (
                 <p className="mt-1 text-xs text-muted">
-                  Dates above as of {formatShort(prerenderedAt.slice(0, 10))} — this page recomputes live once it loads in your browser.
+                  Dates as of {formatShort(prerenderedAt.slice(0, 10))}. They update once the page loads.
                 </p>
               )}
             </header>
@@ -297,7 +297,7 @@ export function Sabbatical() {
               {selected && (
                 <section aria-labelledby="marginal-heading">
                   <h2 id="marginal-heading" className="text-h2 font-bold type-condensed text-ink">What each added day buys</h2>
-                  <p className="mt-1 max-w-2xl text-sm text-muted">Days away gained by each PTO or unpaid day you add, in the order they are spent. Bars past the first few often shrink: that is where adding more stops paying.</p>
+                  <p className="mt-1 max-w-2xl text-sm text-muted">Days off gained by each PTO or unpaid day you add, in the order they are spent. Where the bars shrink, extra days buy less.</p>
                   <MarginalBars marginal={selected.marginal} currentDaysUsed={ptoToAdd + unpaidWeeksToAdd * 7} />
                   <p className="mt-3 max-w-2xl text-base text-ink">{marginalReturnText(selected.marginal)}</p>
                 </section>
@@ -390,7 +390,7 @@ function PlacementList({
                 <span aria-hidden="true" className="h-3 min-w-0 flex-1 bg-surface-alt">
                   <span className={`block h-full ${isSelected ? 'bg-accent' : 'bg-[var(--mark-strong)]'}`} style={{ width: `${(p.totalAwayDays / max) * 100}%` }} />
                 </span>
-                <span className="shrink-0 text-base font-bold tabular-nums text-ink">{p.totalAwayDays} days away</span>
+                <span className="shrink-0 text-base font-bold tabular-nums text-ink">{p.totalAwayDays} days off</span>
               </span>
               {extras && <span className="mt-1 block text-sm text-muted">{extras}</span>}
             </span>
@@ -402,9 +402,9 @@ function PlacementList({
 }
 
 function marginalReturnText(marginal: { daysUsed: number; awayDays: number }[]): string {
-  if (marginal.length <= 1) return 'Adding days here would extend the trip - try the sliders above.';
+  if (marginal.length <= 1) return 'Add PTO or unpaid days above to see what each one adds.';
   const first = marginal[0];
-  // Collapse into "Days 1-3 add 7 days away. Days 4-5 add 2. Beyond that, nothing." style text.
+  // Collapse into "Days 1-3 add 7 days off. Days 4-5 add 2. Beyond that, nothing." style text.
   const grouped: { from: number; to: number; gained: number }[] = [];
   let prev = marginal[0];
   for (let i = 1; i < marginal.length; i++) {
@@ -420,7 +420,7 @@ function marginalReturnText(marginal: { daysUsed: number; awayDays: number }[]):
   }
   const sentences = grouped.map((g) => {
     const dayLabel = g.from === g.to ? `Day ${g.from}` : `Days ${g.from}–${g.to}`;
-    return `${dayLabel} add${g.from === g.to ? 's' : ''} ${g.gained} day${g.gained === 1 ? '' : 's'} away.`;
+    return `${dayLabel} add${g.from === g.to ? 's' : ''} ${g.gained} day${g.gained === 1 ? '' : 's'} off.`;
   });
   if (first.daysUsed === 0 && marginal[marginal.length - 1].daysUsed < 15) {
     sentences.push('Beyond that, the nearest free day is further out.');
@@ -440,7 +440,7 @@ function MarginalBars({ marginal, currentDaysUsed }: { marginal: { daysUsed: num
   const CHART = 88;
   return (
     <figure className="mt-5 max-w-2xl">
-      <div className="flex items-end gap-1 border-b border-ink sm:gap-1.5" role="img" aria-label={shown.map((g) => `day ${g.daysUsed} adds ${g.gained} days away`).join(', ')}>
+      <div className="flex items-end gap-1 border-b border-ink sm:gap-1.5" role="img" aria-label={shown.map((g) => `day ${g.daysUsed} adds ${g.gained} days off`).join(', ')}>
         {shown.map((g) => {
           const isCurrent = g.daysUsed === currentDaysUsed;
           return (
@@ -474,7 +474,7 @@ function SabbaticalLegend() {
     <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink">
       <li className="flex min-h-7 items-center gap-2">
         <span aria-hidden="true" className="h-6 w-9 rounded-[8px] border-b-[3px] border-accent bg-mark" />
-        Time away: the sabbatical and the weekends and holidays it joins
+        Days off: the sabbatical plus the weekends and holidays it joins
       </li>
       <li className="flex min-h-7 items-center gap-2">
         <span aria-hidden="true" className={`${swatch} border ${COLORS.ptoBorder} ${COLORS.ptoBg}`} />
@@ -574,7 +574,7 @@ function SabbaticalCalendar({
                       const holidayName = isHoliday ? holidayNameFor(iso) : undefined;
                       const dow = mondayIndexedDow(iso);
                       const isWeekend = dow >= 5;
-                      const state = isPto ? 'PTO day' : isUnpaid ? 'unpaid leave day' : coreSet.has(iso) ? 'sabbatical' : inRun ? 'day off joined to your time away' : '';
+                      const state = isPto ? 'PTO day' : isUnpaid ? 'unpaid leave day' : coreSet.has(iso) ? 'sabbatical' : inRun ? 'weekend or holiday joined to your sabbatical' : '';
                       const words = [`${MONTH_NAMES[mo - 1]} ${Number(iso.slice(8))}`, state, holidayName ? `public holiday: ${holidayName}` : '', iso === today ? 'today' : ''].filter(Boolean).join(', ');
                       const fill = isPto || isUnpaid
                         ? `${COLORS.ptoBg} border ${COLORS.ptoBorder} ${COLORS.ptoText} font-bold`
@@ -656,7 +656,7 @@ function SabbaticalExportRow({
     ctx.fillStyle = '#1b2935';
     ctx.font = '800 44px "Archivo Variable", system-ui, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(`Away for ${placement.totalAwayDays} consecutive days`, 60, 110);
+    ctx.fillText(`${placement.totalAwayDays} days off in a row`, 60, 110);
     ctx.font = '400 24px system-ui, sans-serif';
     ctx.fillStyle = '#536575';
     ctx.fillText(`${formatLong(placement.extendedStart)} – ${formatLong(placement.extendedEnd)}`, 60, 150);
@@ -673,9 +673,9 @@ function SabbaticalExportRow({
       <p className="mt-1 text-sm text-muted">{SHARE_LINK_SENTENCE}</p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button variant="secondary" onClick={() => downloadSabbaticalICS(placement.extendedStart, placement.extendedEnd, summary, description)}>
-          Add to calendar (.ics)
+          Download calendar file (.ics)
         </Button>
-        <Button variant="secondary" onClick={exportImage}>Copy as image</Button>
+        <Button variant="secondary" onClick={exportImage}>Copy plan as image</Button>
         <Button
           variant="secondary"
           onClick={async () => {
@@ -685,7 +685,7 @@ function SabbaticalExportRow({
             flash(ok ? 'Copied!' : 'Could not copy the plan link');
           }}
         >
-          Copy link
+          Copy plan link
         </Button>
         <span role="status" className="text-sm text-muted">{message ?? ''}</span>
       </div>

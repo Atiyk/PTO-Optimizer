@@ -39,7 +39,7 @@ export function Footer({ onShowShortcuts }: FooterProps) {
             <Logo size={28} tone="dark" />
           </p>
           <p className="mt-3 max-w-xs text-[15px] leading-6 text-[#e4e9ee]">{TAGLINE}</p>
-          <p className="mt-2 text-sm text-[#b3bfca]">Free, and every plan works without an account.</p>
+          <p className="mt-2 text-sm text-[#b3bfca]">Free. No account needed.</p>
         </div>
         <Column title="Explore">
           {tools.map((t) => (
@@ -99,7 +99,9 @@ export function Footer({ onShowShortcuts }: FooterProps) {
       </Container>
       <Container className="px-4 sm:px-6">
         <p className="border-t border-white/15 py-5 text-sm text-[#b3bfca]">
-          {PRODUCT_NAME}. Made for more confident time-off planning.
+          {PRODUCT_NAME}. Public holiday dates from{' '}
+          <a href="/data-sources" className="underline underline-offset-4 hover:text-white">Nager.Date</a>.
+          The planner runs in your browser.
         </p>
       </Container>
     </footer>

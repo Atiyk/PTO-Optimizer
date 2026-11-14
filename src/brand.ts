@@ -10,4 +10,5 @@
 export const PRODUCT_NAME = 'Timebower';
 /** For tight spaces: the header wordmark and structured metadata. */
 export const PRODUCT_SHORT_NAME = 'Timebower';
-export const TAGLINE = 'Your year, planned around the time that’s yours.';
+/** A plain, checkable statement of what the product does (F15). Shown in the footer. */
+export const TAGLINE = 'Plans your PTO around weekends and your country’s public holidays.';

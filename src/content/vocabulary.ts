@@ -17,6 +17,8 @@ export const VOCABULARY: { concept: string; use: string; banned: string[] }[] = 
   { concept: 'a bank with no fixed number of days', use: 'unlimited PTO', banned: ['flexible PTO', 'discretionary PTO'] },
   { concept: 'money paid out for unused days on leaving', use: 'payout', banned: ['cash-out'] },
   { concept: 'time away with no accrual and no pay', use: 'unpaid leave', banned: ['LOA'] },
+  // F29: one word for the result. "PTO days" stays the word for the cost.
+  { concept: 'every calendar day you are not working: weekends, holidays and PTO days', use: 'days off', banned: ['calendar days off', 'days away', 'calendar days away'] },
 ];
 
 const BANNED_WORDS = VOCABULARY.flatMap((v) => v.banned);

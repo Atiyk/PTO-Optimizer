@@ -8,7 +8,8 @@ interface SummaryMetricsProps {
   /** Kept for API stability: the headline states the break count. */
   breakCountActual: number;
   scores: Scores | null;
-  /** 'us': scored on 2025 US airport checkpoint counts. 'estimate': a seasonal rule of thumb. */
+  /** 'us': scored on 2025 US airport checkpoint counts. 'estimate': a seasonal rule of thumb
+   * with no country data behind it, so the travel tile is hidden (F24). */
   travelBasis?: 'us' | 'estimate';
 }
 
@@ -60,25 +61,26 @@ function trimDecimal(n: number): string {
  */
 export function SummaryMetrics({ budgetSpent, totalDaysOff, scores, travelBasis = 'estimate' }: SummaryMetricsProps) {
   const ratio = budgetSpent > 0 ? trimDecimal(totalDaysOff / budgetSpent) : null;
-  const travelFigure = scores
-    ? travelBasis === 'us' ? ['Busier', 'Typical', 'Quieter'][intensityBand(scores.travel.percentile)] : 'Seasonal'
-    : '—';
+  // Only the US has country-specific travel data. Elsewhere the tile could only say "generic
+  // seasonal estimate", which tells the reader nothing, so the ratio tile takes the row (F24).
+  const showTravel = travelBasis === 'us';
+  const travelFigure = scores ? ['Busier', 'Typical', 'Quieter'][intensityBand(scores.travel.percentile)] : '—';
   return (
-    <dl className="m-0 grid grid-cols-2 gap-x-4 border-t border-line pt-4 sm:gap-x-8">
+    <dl className={`m-0 grid gap-x-4 border-t border-line pt-4 sm:gap-x-8 ${showTravel ? 'grid-cols-2' : 'grid-cols-1'}`}>
       <Fact figure={ratio ? `${ratio}×` : '—'} label="Days off per PTO day" short="days off per PTO day">
         {/* The headline already states the total and its split; this line only says what the
             ratio means, so the same numbers are not read out a third time. */}
         {ratio
-          ? <>Calendar days off for each PTO day spent.</>
+          ? <>Days off, weekends and holidays included, for each PTO day you spend.</>
           : <>No PTO placed yet, so there is no ratio to show.</>}
       </Fact>
-      <Fact figure={travelFigure} label="Travel estimate" short="travel estimate">
-        {scores
-          ? travelBasis === 'us'
-            ? <>Relative comparison using a 7-day seasonal average of 2025 US airport checkpoint counts. Not a forecast or a fare price.</>
-            : <>Generic seasonal estimate without country-specific travel observations.</>
-          : <>Shows once your plan is ready.</>}
-      </Fact>
+      {showTravel && (
+        <Fact figure={travelFigure} label="Travel estimate" short="travel estimate">
+          {scores
+            ? <>How busy airports usually are on these dates, from a 7-day average of 2025 US airport checkpoint counts. Not a forecast or a fare price.</>
+            : <>Shows once your plan is ready.</>}
+        </Fact>
+      )}
     </dl>
   );
 }
