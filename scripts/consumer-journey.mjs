@@ -306,7 +306,9 @@ try {
     assert.equal(new URL(page.url()).searchParams.get('b'), '0', 'Reset must preserve the PTO budget.');
     assert.equal(new URL(page.url()).searchParams.get('s'), '2027-01-15', 'Reset must preserve the planning dates.');
     await waitForPlanner(page);
-    assert.equal(await page.getByRole('button', { name: 'Save this plan', exact: true }).isEnabled(), true, 'A valid zero-budget plan can still be saved.');
+    // F05: a real 0-day balance has nothing to save; the page says so and stays shareable.
+    await page.getByRole('heading', { level: 1, name: 'No PTO days to spend', exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Save this plan', exact: true }).count(), 0, 'A zero-budget plan offers no Save.');
     assert.equal(await page.getByRole('button', { name: 'Copy link', exact: true }).isEnabled(), true, 'A valid zero-budget scenario remains shareable.');
     await noOverflow(page);
     await screenshot(page, '06-pinned-recovery-after-320.png');
