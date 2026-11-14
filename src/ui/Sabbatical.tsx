@@ -151,7 +151,7 @@ export function Sabbatical() {
           {selected ? (
             <header className="max-w-4xl">
               <h1 className="text-h1 type-display text-ink">
-                Start on {formatLong(selected.start)} and get{' '}
+                Start your sabbatical on {formatLong(selected.start)} for{' '}
                 <span className="mark">{selected.totalAwayDays} days off in a row</span>.
               </h1>
               <p className="mt-3 text-base text-muted">

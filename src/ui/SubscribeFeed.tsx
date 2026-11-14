@@ -122,8 +122,12 @@ export function SubscribeFeed({ planSearch, observedHolidayDates, origin, path =
       ) : !links ? null : (
         <>
           <p className="max-w-prose text-sm text-muted">{description}</p>
-          {planFeed && <p className="max-w-prose text-xs text-muted">{shareObservedDates ? 'Uses your holiday dates, without their names.' : 'Uses public holiday defaults.'}</p>}
-          {shownCaveat && <p className="max-w-prose text-xs leading-5 text-muted">{shownCaveat}</p>}
+          {(planFeed || shownCaveat) && (
+            <p className="max-w-prose text-xs leading-5 text-muted">
+              {planFeed && (shareObservedDates ? 'Uses your holiday dates, without their names. ' : 'Uses public holidays. ')}
+              {shownCaveat}
+            </p>
+          )}
           {planFeed && caveat === undefined && (
             <details className="text-sm">
               <summary className="min-h-11 cursor-pointer py-3 font-semibold text-ink">How updates work</summary>
