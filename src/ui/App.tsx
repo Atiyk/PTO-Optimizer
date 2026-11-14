@@ -22,6 +22,7 @@ import { holidayLongWeekends, remainingHolidays } from './landingData';
 import { weightingShort } from './weightingCaptions';
 import { RelaxedMinimumNotice } from './PlanRecoveryNotice';
 import { PlanSliders } from './PlanSliders';
+import { PlanStylePicker } from './PlanStylePicker';
 import { SubdivisionSelect } from './CountrySelect';
 import { MoreOptions } from './MoreOptions';
 import { Calendar, HoldHeightWhile } from './Calendar';
@@ -216,8 +217,16 @@ export function App() {
   const fieldLabel = 'text-sm font-semibold text-ink';
   const selectClass = 'select-ink w-full min-w-0 text-[15px] font-normal';
   const stylePreset = planningStyleSettings(state.planningStyle);
-  const sliderLabel = (count: number) => count >= 7 ? 'as many breaks as possible' : count === 1 ? '1 long break' : `${count} breaks`;
-  const styleName = { balanced: 'Balanced', 'long-breaks': 'Long breaks', 'more-breaks': 'More breaks', custom: 'Custom' }[state.planningStyle];
+  const sliderLabel = (count: number) => count >= 7 ? 'as many breaks as possible' : count === 0 ? 'any number of breaks' : count === 1 ? '1 long break' : `${count} breaks`;
+  const styleName = {
+    balanced: 'Balanced', 'long-breaks': 'One big trip', 'more-breaks': 'Frequent long weekends', custom: 'Custom',
+    year: 'Spread across the year', max: 'Most days off', season: 'Seasonal priority',
+  }[state.planningStyle];
+  // The year-round styles plan season by season, so the sliders don't describe them.
+  const styleNote = !stylePreset ? 'Custom: the sliders keep your settings.'
+    : state.planningStyle === 'year' || state.planningStyle === 'season'
+      ? `${styleName}: planned season by season. Sliders switch to Custom.`
+      : `${styleName}: ${weightingShort(stylePreset.w)}, ${sliderLabel(stylePreset.breakCount)}. Sliders switch to Custom.`;
 
   const inputsSection = (
     <section aria-labelledby="plan-inputs-heading" className="flex min-w-0 flex-col gap-3.5">
@@ -283,43 +292,20 @@ export function App() {
   );
   const shapeSection = (
     <>
-      {/* Both sliders stay on screen at every width; never behind a disclosure. */}
+      {/* Goals first; the two sliders that fine-tune them live under More options. */}
       <section id="plan-shape" tabIndex={-1} aria-labelledby="plan-shape-heading" className={`flex min-w-0 flex-col gap-3 ${railHoldsShape ? 'mt-5 border-t border-line pt-4' : 'scroll-mt-2 md:scroll-mt-14'}`}>
         <div>
           <h2 id="plan-shape-heading" className="text-xl font-bold leading-6 text-ink type-condensed">Shape your plan</h2>
-          <p className="mt-1 text-sm text-muted">The plan updates as you move the sliders.</p>
+          <p className="mt-1 text-sm text-muted">The plan updates as you choose.</p>
         </div>
-        <div className={railHoldsShape ? 'contents' : 'grid min-w-0 gap-3 md:grid-cols-2 md:gap-x-10'}>
-        <PlanSliders
-          w={state.w}
-          onChangeW={state.setW}
-          manualBreakCount={state.manualBreakCount}
-          onChangeManualBreakCount={state.setManualBreakCount}
-          letSolverDecide={state.letSolverDecide}
-          onToggleLetSolverDecide={state.setLetSolverDecide}
-          breaks={state.breaks}
-          breakCountRequested={state.breakCountRequested}
-          breakCountActual={state.breakCountActual}
-          budget={state.effectiveBudget}
+        <PlanStylePicker
+          style={state.planningStyle}
+          onChangeStyle={state.setPlanningStyle}
+          season={state.season}
+          onChangeSeason={state.setSeason}
+          meta={state.planMeta}
           pending={state.planningPending}
         />
-        </div>
-        <label className="flex flex-col gap-1.5">
-          <span className={fieldLabel}>Planning style</span>
-          <select aria-label="Planning style" aria-describedby="planning-style-note" className={selectClass} value={state.planningStyle} onChange={event => state.setPlanningStyle(event.target.value as typeof state.planningStyle)}>
-            <option value="balanced">Balanced</option>
-            <option value="long-breaks">Long breaks</option>
-            <option value="more-breaks">More breaks</option>
-            <option value="custom">Custom</option>
-          </select>
-          {/* A style is a preset for the two sliders above; say what it sets, so a
-              change never moves the sliders without explanation. */}
-          <span id="planning-style-note" className="text-sm font-normal text-muted">
-            {stylePreset
-              ? `${styleName}: ${weightingShort(stylePreset.w)}, ${sliderLabel(stylePreset.breakCount)}. Moving a slider switches to Custom.`
-              : 'Custom: the sliders keep your settings.'}
-          </span>
-        </label>
       </section>
     </>
   );
@@ -339,11 +325,30 @@ export function App() {
         </button>
         {!optionsOpen && (
           <p className="mt-2 text-sm text-muted">
-            Reserve days, employer holidays, work week, notice period, days you can&apos;t take off.
+            Fine-tune sliders, reserve days, employer holidays, work week, notice period, days you can&apos;t take off.
           </p>
         )}
         {optionsOpen && (
           <div id="planning-options" ref={optionsRef} className="mt-5 flex scroll-mt-16 flex-col gap-5">
+            <section aria-labelledby="plan-fine-tune-heading" className="flex min-w-0 flex-col gap-3">
+              <h3 id="plan-fine-tune-heading" className="text-sm font-semibold text-ink">Fine-tune with sliders</h3>
+              <PlanSliders
+                w={state.w}
+                onChangeW={state.setW}
+                manualBreakCount={state.manualBreakCount}
+                onChangeManualBreakCount={state.setManualBreakCount}
+                letSolverDecide={state.letSolverDecide}
+                onToggleLetSolverDecide={state.setLetSolverDecide}
+                breaks={state.breaks}
+                breakCountRequested={state.breakCountRequested}
+                breakCountActual={state.breakCountActual}
+                budget={state.effectiveBudget}
+                pending={state.planningPending}
+              />
+              {/* A style is a preset for these sliders; say what it sets, so a change
+                  never moves the sliders without explanation. */}
+              <p id="planning-style-note" className="text-sm text-muted">{styleNote}</p>
+            </section>
             <ReserveControls
               budget={state.budget}
               reserveDays={state.reserveDays}
@@ -539,6 +544,11 @@ export function App() {
                     />
                   )}
                   <ValidationBanner issues={state.validationIssues} />
+                  {state.inputIssues.length > 0 && (
+                    <ul role="status" data-testid="input-issues" className="space-y-1 rounded-[10px] bg-surface-alt p-4 text-sm text-ink">
+                      {state.inputIssues.map(issue => <li key={`${issue.field}:${issue.message}`}>{issue.message}</li>)}
+                    </ul>
+                  )}
                   {state.relaxedMinimum !== undefined && (
                     <RelaxedMinimumNotice
                       minimum={state.relaxedMinimum}

@@ -60,10 +60,15 @@ describe('planner layout order (F02, F03)', () => {
     const rail = screen.getByRole('complementary', { name: 'Plan settings' });
     const pto = within(rail).getByLabelText('PTO days available');
     expect(precedes(pto, firstCard)).toBe(true);
+    const goals = within(rail).getByRole('group', { name: 'What do you want from your PTO?' });
+    expect(precedes(goals, firstCard)).toBe(true);
+    const more = within(rail).getByRole('button', { name: 'More options' });
+    expect(precedes(more, firstCard)).toBe(true);
+    // The two fine-tuning sliders live under More options, still in the rail.
+    fireEvent.click(more);
     const sliders = within(rail).getAllByRole('slider');
-    expect(sliders.length).toBeGreaterThanOrEqual(3);
+    expect(sliders.length).toBeGreaterThanOrEqual(2);
     for (const slider of sliders) expect(precedes(slider, firstCard)).toBe(true);
-    expect(precedes(within(rail).getByRole('button', { name: 'More options' }), firstCard)).toBe(true);
     // Desktop keeps one save button (the headline's) and jumps to the rail.
     expect(screen.getAllByRole('button', { name: 'Save this plan' })).toHaveLength(1);
     expect(screen.getByRole('link', { name: 'Adjust plan' }).getAttribute('href')).toBe('#plan-controls');
@@ -76,7 +81,7 @@ describe('planner layout order (F02, F03)', () => {
     expect(precedes(summary, pto)).toBe(true);
     expect(precedes(pto, firstCard)).toBe(true);
     const shape = document.getElementById('plan-shape')!;
-    expect(within(shape).getByRole('slider', { name: /What matters more/ })).toBeTruthy();
+    expect(within(shape).getByRole('group', { name: 'What do you want from your PTO?' })).toBeTruthy();
     expect(precedes(requests, shape)).toBe(true);
     const jump = within(summary).getByRole('navigation', { name: 'On this page' });
     expect(within(jump).getByRole('link', { name: 'Adjust plan' }).getAttribute('href')).toBe('#plan-shape');

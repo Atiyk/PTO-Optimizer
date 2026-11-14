@@ -22,6 +22,7 @@ import { isAlternatingFridayOff } from '@daysoff/engine/calendar/calendarMath';
 import type { NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
 import { isoToSerial, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { solveLegacyConsumer, type PlanningStyle } from '../planning/optimizer';
+import { DEFAULT_SEASON, type PlanStyleOptions, type Season } from '../planning/yearPlan';
 import { solveWithPinFallback, type PlannerOutcome } from '../ui/pinPreview';
 import { readFullStateFromURL, readOverlapPayloadFromURL, isValidISODate } from '../ui/urlState';
 import { validateInputs, isSupportedPlanningRange } from '../ui/validation';
@@ -192,11 +193,25 @@ export function buildSolveInput(f: SolveInputFields, policyAccrualFields = polic
   };
 }
 
-/** The planner's solve call: may throw, the caller decides what an exception means. */
-export function solvePlan(solveInput: SolveInput, planningVersion: 2 | undefined, minimumBreakDays: number, planningStyle: PlanningStyle): PlannerOutcome {
+/** The planner's solve call: may throw, the caller decides what an exception means.
+ * `plan` only affects the year-round styles (year, season); legacy styles ignore it. */
+export function solvePlan(solveInput: SolveInput, planningVersion: 2 | undefined, minimumBreakDays: number, planningStyle: PlanningStyle, plan?: PlanStyleOptions): PlannerOutcome {
   // Pinned days that cannot sit inside the minimum break no longer collapse the whole
   // plan: the minimum is set aside for that plan and App says so (see pinPreview.ts).
-  return planningVersion === 2 ? solveWithPinFallback(solveInput, { minimumBreakDays, style: planningStyle }) : solveLegacyConsumer(solveInput);
+  if (planningVersion !== 2) return solveLegacyConsumer(solveInput);
+  return solveWithPinFallback(solveInput, plan ? { minimumBreakDays, style: planningStyle, plan } : { minimumBreakDays, style: planningStyle });
+}
+
+/** What the year-round styles need beyond the SolveInput: the notice period (as calendar
+ * days), the reserve the person already holds back (so the auto reserve never doubles it)
+ * and the preferred season. Working-day notice is converted at 7 calendar days per 5. */
+export function planStyleOptionsFor(state: { noticePeriodDays: number; noticeUnit?: NoticeUnit; reserveDays: number; season?: Season }): PlanStyleOptions {
+  const notice = Number.isFinite(state.noticePeriodDays) ? Math.max(0, state.noticePeriodDays) : 14;
+  return {
+    noticeDays: state.noticeUnit === 'working' ? Math.ceil((notice * 7) / 5) : notice,
+    heldReserveDays: Number.isFinite(state.reserveDays) ? Math.max(0, state.reserveDays) : 0,
+    season: state.season ?? DEFAULT_SEASON,
+  };
 }
 
 export interface PtoDayContext {
@@ -271,6 +286,8 @@ export interface PlanState {
   sharedObservedHolidays?: string[];
   planningVersion: 2 | undefined;
   planningStyle: PlanningStyle;
+  /** Preferred season for `ps=season` (`sn`). */
+  season: Season;
   minimumBreakDays: number;
   rangeStart: string;
   rangeEnd: string;
@@ -314,6 +331,7 @@ export function planStateFromSearch(search: string, today: string, defaultCountr
     sharedObservedHolidays: initial.sharedObservedHolidays,
     planningVersion: initial.planningVersion,
     planningStyle: initial.planningStyle ?? 'custom',
+    season: initial.season ?? DEFAULT_SEASON,
     minimumBreakDays: initial.minimumBreakDays ?? 0,
     rangeStart: initial.rangeStart,
     rangeEnd: initial.rangeEnd,
@@ -380,7 +398,7 @@ export function planFromSearch(search: string, today: string, holidays: HolidayS
 
   let outcome: PlannerOutcome;
   try {
-    outcome = solvePlan(solveInput, state.planningVersion, state.minimumBreakDays, state.planningStyle);
+    outcome = solvePlan(solveInput, state.planningVersion, state.minimumBreakDays, state.planningStyle, planStyleOptionsFor(state));
   } catch {
     return { ok: false, issues: ['This combination could not be calculated. Check your dates and settings.'] };
   }

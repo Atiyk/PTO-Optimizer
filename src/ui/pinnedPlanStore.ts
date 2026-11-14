@@ -10,7 +10,8 @@ export const PINNED_PLANS_STORAGE_KEY = 'gapless.personal.pinned-plans.v1';
 export const MAX_PINNED_PLANS = 2;
 const MAX_STORAGE_LENGTH = 350_000;
 const CHANGE_EVENT = 'gapless:pinned-plans-changed';
-const STYLES = ['balanced', 'long-breaks', 'more-breaks', 'custom'];
+const STYLES = ['balanced', 'long-breaks', 'more-breaks', 'custom', 'year', 'max', 'season'];
+const SEASONS = ['spring', 'summer', 'fall', 'winter'];
 const BOOLEAN_FIELDS = [
   'letSolverDecide', 'accrualEnabled', 'expiryEnabled', 'altFridayEnabled',
   'applyTrackedRequests', 'reserveApprovedPto', 'unlimitedPto', 'peakCapEnabled',
@@ -38,6 +39,7 @@ function parseSnapshot(value: unknown): PlanSnapshot | null {
     || ![0, 1, 'auto'].includes(value.weekStartOverride as string | number)
     || !BOOLEAN_FIELDS.every(key => typeof value[key] === 'boolean')
     || !NUMBER_FIELDS.every(key => amount(value[key]))
+    || (value.season !== undefined && (typeof value.season !== 'string' || !SEASONS.includes(value.season)))
     || (value.noticePeriodDays !== undefined && !amount(value.noticePeriodDays))
     || (value.noticeUnit !== undefined && value.noticeUnit !== 'calendar' && value.noticeUnit !== 'working')
     || !date(value.rangeStart) || !date(value.rangeEnd)

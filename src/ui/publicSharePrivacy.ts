@@ -17,7 +17,8 @@ export function employerLabelsWouldBeShared(query: string): boolean {
 const PRIVATE_PLAN_FIELDS = PLAN_PRIVATE_KEYS.filter(key => key !== 'eh' && key !== 'hd');
 const NUMBER_FIELDS = { b: 400, w: 100, count: 7, mb: 60, rv: 400 } as const;
 const DATE_FIELDS = ['s', 'e', 'afs'] as const;
-const STYLE_NAMES = ['balanced', 'long-breaks', 'more-breaks', 'custom'];
+const STYLE_NAMES = ['balanced', 'long-breaks', 'more-breaks', 'custom', 'year', 'max', 'season'];
+const SEASON_NAMES = ['spring', 'summer', 'fall', 'winter'];
 
 /** Build the versioned, allowlisted public scenario. The optional dates are a
  * separate, deliberate selection, never extracted from the private query. The planner
@@ -46,6 +47,8 @@ export function buildPublicPlanSearch(planSearch: string, observedHolidayDates?:
   if (source.get('pv') === '2') {
     params.set('pv', '2');
     if (style && STYLE_NAMES.includes(style)) params.set('ps', style);
+    const season = source.get('sn');
+    if (style === 'season' && season && SEASON_NAMES.includes(season)) params.set('sn', season);
   }
   const weekStart = source.get('ws');
   if (weekStart === '0' || weekStart === '1') params.set('ws', weekStart);

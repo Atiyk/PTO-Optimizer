@@ -95,10 +95,27 @@ describe('/pto first screen (N1, N3, N2, F13)', () => {
     window.history.replaceState(null, '', `${base}&b=3`);
     render(<App />);
     await ready();
-    fireEvent.change(screen.getByLabelText('Planning style'), { target: { value: 'balanced' } });
+    fireEvent.click(screen.getByRole('radio', { name: /One big trip/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'More options' }));
     // R1: one short line naming the style, what it favors and the break count.
-    const helper = screen.getByText(/^Balanced: /);
-    expect(helper.textContent).toBe('Balanced: mostly days off, 3 breaks. Moving a slider switches to Custom.');
-    expect(helper.textContent!.split(/\s+/).length).toBeLessThanOrEqual(12);
+    const helper = screen.getByText(/^One big trip: /);
+    expect(helper.textContent).toBe('One big trip: mostly days off, 1 long break. Sliders switch to Custom.');
+    expect(helper.textContent!.split(/\s+/).length).toBeLessThanOrEqual(14);
+  });
+
+  it('shows an old balanced link as Balanced, and offers the goals as one radio group', async () => {
+    window.history.replaceState(null, '', `${base}&b=3&pv=2&ps=balanced`);
+    render(<App />);
+    await ready();
+    const group = screen.getByRole('group', { name: 'What do you want from your PTO?' });
+    const radios = within(group).getAllByRole('radio');
+    expect(radios.map(radio => radio.closest('label')!.querySelector('.font-semibold')!.textContent)).toEqual([
+      'Spread across the year', 'Most days off', 'One big trip', 'Frequent long weekends', 'Seasonal priority', 'Balanced',
+    ]);
+    expect((within(group).getByRole('radio', { name: /Balanced/ }) as HTMLInputElement).checked).toBe(true);
+    fireEvent.change(within(group).getByLabelText('Season for the big break'), { target: { value: 'winter' } });
+    expect((within(group).getByRole('radio', { name: /Seasonal priority/ }) as HTMLInputElement).checked).toBe(true);
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('sn')).toBe('winter'));
+    expect(new URLSearchParams(window.location.search).get('ps')).toBe('season');
   });
 });

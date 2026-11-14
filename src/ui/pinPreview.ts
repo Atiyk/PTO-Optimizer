@@ -1,5 +1,5 @@
 import type { SolveInput, SolveResult } from '@daysoff/engine/solver/types';
-import { solveConsumer, type ConsumerSolveOptions } from '../planning/optimizer';
+import { solveStyled, type PlanStyleMeta, type StyledSolveOptions } from '../planning/yearPlan';
 
 export interface PlannerOutcome {
   result: SolveResult;
@@ -8,6 +8,8 @@ export interface PlannerOutcome {
    * user's pinned dates: the minimum the person chose, so the UI can say so and offer a
    * way back. Never set silently: App renders a note whenever it is present. */
   relaxedMinimum?: number;
+  /** Year-round styles only: reserve kept, lead window, seasons and any note. */
+  meta?: PlanStyleMeta;
 }
 
 /**
@@ -18,12 +20,12 @@ export interface PlannerOutcome {
  * minimum and report that it was relaxed. The solver math itself is unchanged; if the
  * relaxed solve also fails, the original issue stands.
  */
-export function solveWithPinFallback(input: SolveInput, options: ConsumerSolveOptions): PlannerOutcome {
-  const outcome = solveConsumer(input, options);
+export function solveWithPinFallback(input: SolveInput, options: StyledSolveOptions): PlannerOutcome {
+  const outcome = solveStyled(input, options);
   const minimum = options.minimumBreakDays ?? 0;
   const hasPins = (input.mustIncludeDays ?? []).some((date) => date >= input.rangeStart && date <= input.rangeEnd);
   if (!outcome.issue || minimum <= 1 || !hasPins) return outcome;
-  const relaxed = solveConsumer(input, { ...options, minimumBreakDays: 0 });
+  const relaxed = solveStyled(input, { ...options, minimumBreakDays: 0 });
   if (relaxed.issue || relaxed.result.primary.length === 0) return outcome;
   return { ...relaxed, relaxedMinimum: minimum };
 }
@@ -37,7 +39,7 @@ export interface PinPreview {
 
 /** What the plan would actually become if `date` were pinned, from the same call the
  * planner makes - so a hover never promises a gain the solver cannot deliver. */
-export function previewPinnedDay(input: SolveInput, options: ConsumerSolveOptions, date: string): PinPreview {
+export function previewPinnedDay(input: SolveInput, options: StyledSolveOptions, date: string): PinPreview {
   const pinned: SolveInput = {
     ...input,
     mustIncludeDays: [...new Set([...(input.mustIncludeDays ?? []), date])],

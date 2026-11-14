@@ -39,7 +39,7 @@ describe('live homepage planner', () => {
     const html = renderToStaticMarkup(<Landing />);
     expect(html).toContain('Your plan: ');
     expect(html).toContain('days off');
-    expect(html).toMatch(/15 PTO days \+ \d+ weekend and holiday days, across/);
+    expect(html).toMatch(/13 PTO days \+ \d+ weekend and holiday days, across/);
     expect(html).not.toContain('Calculating');
     expect(html).not.toContain('Updating your holiday calendar');
     expect((html.match(/<h1\b/g) ?? []).length).toBe(1);
@@ -69,7 +69,7 @@ describe('live homepage planner', () => {
     await act(async () => { render(<Landing />); });
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('More days off from the same PTO.');
     expect(screen.getByRole('spinbutton', { name: 'PTO days available' }).getAttribute('value')).toBe('15');
-    expect(screen.getByText(/^15 PTO days \+ \d+ weekend and holiday days, across/)).toBeTruthy();
+    expect(screen.getByText(/^13 PTO days \+ \d+ weekend and holiday days, across/)).toBeTruthy();
     await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '5' } }); });
     expect(screen.getByText(/^5 PTO days \+ \d+ weekend and holiday days, across/)).toBeTruthy();
     const link = screen.getAllByRole('link', { name: 'See the full plan →' })[0] as HTMLAnchorElement;
@@ -224,7 +224,7 @@ describe('live homepage planner', () => {
   it('keeps planning available when saved preferences cannot be read', async () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('storage disabled'); });
     await act(async () => { render(<Landing />); });
-    expect(screen.getByText(/^15 PTO days \+/)).toBeTruthy();
+    expect(screen.getByText(/^13 PTO days \+/)).toBeTruthy();
     const link = screen.getAllByRole('link', { name: 'See the full plan →' })[0] as HTMLAnchorElement;
     expect(new URL(link.href).searchParams.has('eh')).toBe(false);
   });

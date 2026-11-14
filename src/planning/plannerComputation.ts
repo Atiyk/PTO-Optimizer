@@ -3,12 +3,15 @@ import type { Scores, SolveInput, SolveResult } from '@daysoff/engine/solver/typ
 import { solvePlan } from '../autopilot/planFromSearch';
 import type { PlannerOutcome } from '../ui/pinPreview';
 import type { PlanningStyle } from './optimizer';
+import type { PlanStyleOptions } from './yearPlan';
 
 export interface PlannerComputationInput {
   input: SolveInput;
   planningVersion: 2 | undefined;
   minimumBreakDays: number;
   style: PlanningStyle;
+  /** Notice, held reserve and season for the year-round styles. */
+  plan?: PlanStyleOptions;
 }
 
 export interface PlannerComputationJob {
@@ -33,9 +36,9 @@ const EMPTY_RESULT: SolveResult = {
 
 export const EMPTY_PLANNER_OUTCOME: PlannerOutcome = { result: EMPTY_RESULT };
 
-export function computePlannerOutcome({ input, planningVersion, minimumBreakDays, style }: PlannerComputationInput): PlannerOutcome {
+export function computePlannerOutcome({ input, planningVersion, minimumBreakDays, style, plan }: PlannerComputationInput): PlannerOutcome {
   try {
-    return solvePlan(input, planningVersion, minimumBreakDays, style);
+    return solvePlan(input, planningVersion, minimumBreakDays, style, plan);
   } catch {
     return { result: EMPTY_RESULT, issue: 'This combination could not be calculated. Check your dates and settings.' };
   }

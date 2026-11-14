@@ -1,6 +1,8 @@
 import { getConsumerHolidaysWithStatus as getHolidaysWithStatus, getConsumerSubdivisionCandidates as getSubdivisionCandidates, readPreloadedConsumerHolidays } from '../personal/consumerHolidays';
 import { SUBDIVISION_NAMES } from '@daysoff/engine/data/countries';
 import { planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
+import { DEFAULT_SEASON, type Season } from '../planning/yearPlan';
+import { planInputIssues, type InputIssue } from '../planning/inputIssues';
 import type { PinPreview } from './pinPreview';
 import { defaultEmployerCalendar, readEmployerCalendar, writeEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -20,7 +22,7 @@ import { classifyDay } from './dayCategory';
 import { alternativeForDate as alternativeForDateImpl } from './alternativeForDate';
 import { track } from './analytics';
 import { validateInputs, isSupportedPlanningRange } from './validation';
-import { defaultRangeEnd, defaultPlanRangeEnd, holidayEntriesFor, stateHolidayCandidatesFor, altFridayOffDatesFor, effectiveOffDaysFor, mustIncludeDaysFor, effectiveBlackoutsFor, effectiveBudgetFor, policyAccrualFieldsFor, buildSolveInput, isSuggestedPtoDay, type HolidayEntry } from '../autopilot/planFromSearch';
+import { defaultRangeEnd, defaultPlanRangeEnd, planStyleOptionsFor, holidayEntriesFor, stateHolidayCandidatesFor, altFridayOffDatesFor, effectiveOffDaysFor, mustIncludeDaysFor, effectiveBlackoutsFor, effectiveBudgetFor, policyAccrualFieldsFor, buildSolveInput, isSuggestedPtoDay, type HolidayEntry } from '../autopilot/planFromSearch';
 import { todayISO } from './today';
 import { PLANNER_REVISION } from '@daysoff/engine/solver/revision';
 import { publicHolidayFingerprint, type ShareSnapshot } from './shareSnapshot';
@@ -65,6 +67,8 @@ export function discoverSubdivisions(holidays: Holiday[]): string[] {
 export interface PlanSnapshot {
   planningVersion?: 2;
   planningStyle: PlanningStyle;
+  /** Preferred season for `ps=season`; older snapshots have none (summer). */
+  season?: Season;
   minimumBreakDays: number;
   employerCalendar: EmployerCalendar;
   country: string;
@@ -140,7 +144,9 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       return {
         employerCalendar: undefined as EmployerCalendar | undefined,
         planningVersion: 2 as const,
-        planningStyle: 'balanced' as PlanningStyle,
+        // A fresh visit (and the prerendered shell) starts on the year-round plan.
+        planningStyle: 'year' as PlanningStyle,
+        season: DEFAULT_SEASON,
         minimumBreakDays: 3,
         country: defaults.country,
         subdivision: undefined,
@@ -148,7 +154,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
         rangeEnd: defaults.rangeEnd,
         budget: defaults.budget,
         w: 30,
-        breakCount: 3,
+        breakCount: 0,
         weekStartOverride: 'auto' as const,
         accrualEnabled: false,
         accrualPerMonth: 1.25,
@@ -249,6 +255,8 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
 
   const [planningVersion, setPlanningVersion] = useState<2 | undefined>(initial.planningVersion);
   const [planningStyle, setPlanningStyleRaw] = useState<PlanningStyle>(initial.planningStyle ?? 'custom');
+  const [season, setSeasonRaw] = useState<Season>(initial.season ?? DEFAULT_SEASON);
+
   const [minimumBreakDays, setMinimumBreakDaysRaw] = useState(initial.minimumBreakDays ?? 0);
   const [w, setWRaw] = useState(initial.w);
   // breakCount 0 from the URL ("Any", now spelled "let the solver decide") maps to the
@@ -264,6 +272,8 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     const preset = planningStyleSettings(style);
     if (preset) { setWRaw(preset.w); setLetSolverDecideRaw(preset.breakCount === 0); if (preset.breakCount) setManualBreakCountRaw(preset.breakCount); }
   }, []);
+  /** Choosing a season also selects the seasonal-priority style. */
+  const setSeason = useCallback((value: Season) => { setPlanningVersion(2); setPlanningStyleRaw('season'); setSeasonRaw(value); }, []);
   const setMinimumBreakDays = useCallback((days: number) => { setPlanningVersion(2); setMinimumBreakDaysRaw(days); }, []);
   const setW = useCallback((value: number) => { setPlanningVersion(2); setPlanningStyleRaw('custom'); setWRaw(value); }, []);
   const setLetSolverDecide = useCallback((value: boolean) => { setPlanningVersion(2); setPlanningStyleRaw('custom'); setLetSolverDecideRaw(value); }, []);
@@ -420,6 +430,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       holidayFocusDate,
       planningVersion,
       planningStyle,
+      season,
       minimumBreakDays,
       rangeStart,
       rangeEnd,
@@ -457,6 +468,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     holidayFocusDate,
     planningVersion,
     planningStyle,
+    season,
     minimumBreakDays,
     rangeStart,
     rangeEnd,
@@ -703,8 +715,25 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
 
   // Wait for the current scope if the embedded calendar does not cover it.
   const waitingForCalendar = isValidInput && !holidaysReady;
+  // Notice, the reserve already held back and the season only shape the year-round styles.
+  const planOptions = useMemo(
+    () => planStyleOptionsFor({ noticePeriodDays, noticeUnit, reserveDays, season }),
+    [noticePeriodDays, noticeUnit, reserveDays, season],
+  );
+  // Non-blocking notes: a link value that was adjusted (kept until that field changes),
+  // an unknown country, a range longer than a year, more PTO than working days.
+  const inputIssues = useMemo((): InputIssue[] => {
+    const fromLink = (initial.inputIssues ?? []).filter((issue) => issue.field !== 'budget' || budget === initial.budget);
+    const offSet = new Set(solveInput.offDays);
+    const workingDaysInRange = isValidInput
+      ? rangeISO(rangeStart, rangeEnd).filter((d) => workWeek[mondayIndexedDow(d)] && !offSet.has(d)).length
+      : undefined;
+    const live = planInputIssues({ country, rangeStart, rangeEnd, budget, workingDaysInRange });
+    return [...fromLink, ...live.filter((issue) => !fromLink.some((link) => link.field === issue.field))];
+  }, [initial.inputIssues, initial.budget, budget, country, rangeStart, rangeEnd, workWeek, solveInput.offDays, isValidInput]);
+
   const { solved, scores, pending: computationPending } = usePlannerComputation(
-    solveInput, isValidInput && !waitingForCalendar, planningVersion, minimumBreakDays, planningStyle,
+    solveInput, isValidInput && !waitingForCalendar, planningVersion, minimumBreakDays, planningStyle, planOptions,
   );
   const planningPending = waitingForCalendar || computationPending;
   const solveResult = solved.result;
@@ -714,9 +743,9 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   // worker (see pinPreviewClient.ts): a 1-2 year plan took up to 0.6 s per hover here.
   const pinPreviewer = useMemo(
     () => isValidInput && !planningPending && planningVersion === 2
-      ? createPinPreviewer(solveInput, { minimumBreakDays, style: planningStyle })
+      ? createPinPreviewer(solveInput, { minimumBreakDays, style: planningStyle, plan: planOptions })
       : null,
-    [solveInput, isValidInput, planningPending, planningVersion, minimumBreakDays, planningStyle],
+    [solveInput, isValidInput, planningPending, planningVersion, minimumBreakDays, planningStyle, planOptions],
   );
   // A newer input supersedes this previewer: stop its in-flight solve.
   useEffect(() => () => pinPreviewer?.dispose(), [pinPreviewer]);
@@ -915,6 +944,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       employerCalendar,
       planningVersion,
       planningStyle,
+      season,
       minimumBreakDays,
       rangeStart,
       rangeEnd,
@@ -952,7 +982,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       },
     });
   }, [
-    country, subdivision, employerCalendar, planningVersion, planningStyle, minimumBreakDays, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
+    country, subdivision, employerCalendar, planningVersion, planningStyle, season, minimumBreakDays, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
     weekStartOverride, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap,
     overlapDays, blackouts, workWeek, forced, altFridayEnabled, altFridayStart,
     addPinnedPlan, canPin, reserveDays, applyTrackedRequests, reserveApprovedPto, unlimitedPto, noticePeriodDays, noticeUnit, peakCapEnabled, peakCapStart, peakCapEnd, peakCapMaxDays,
@@ -974,6 +1004,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       setBudget(snap.budget);
       setPlanningVersion(snap.planningVersion);
       setPlanningStyleRaw(snap.planningStyle);
+      setSeasonRaw(snap.season ?? DEFAULT_SEASON);
       setMinimumBreakDaysRaw(snap.minimumBreakDays);
       setWRaw(snap.w);
       setLetSolverDecideRaw(snap.letSolverDecide);
@@ -1040,12 +1071,17 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     solverIssue: solved.issue,
     planningPending,
     relaxedMinimum: solved.relaxedMinimum,
+    /** Year-round styles: reserve kept, lead window, seasons, and any note. */
+    planMeta: solved.meta,
+    inputIssues,
     previewPin,
     solveInput,
     planSearch,
     planningVersion,
     planningStyle,
     setPlanningStyle,
+    season,
+    setSeason,
     minimumBreakDays,
     setMinimumBreakDays,
     holidaysDegraded,
