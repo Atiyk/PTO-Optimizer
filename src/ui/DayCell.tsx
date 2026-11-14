@@ -70,6 +70,32 @@ export function UnpaidIcon({ className }: { className?: string }) {
   );
 }
 
+/** N-P2-1 (WCAG 2.4.3): a day action re-plans, and while the planner solves it swaps the
+ * calendar for a short "Updating" line, so the day button that held focus is gone and focus
+ * falls to <body>. The day to return to is remembered here, outside React state, and the
+ * re-mounted cell for that date takes focus back - only if focus is still nowhere (on
+ * <body>), and only for a few seconds, so it never steals focus the person moved on purpose. */
+const FOCUS_RETURN_MS = 5000;
+let pendingDayFocus: { date: string; at: number } | null = null;
+
+function focusDayButton(button: HTMLButtonElement | null | undefined) {
+  button?.focus();
+}
+
+function rememberDayFocus(date: string) {
+  pendingDayFocus = { date, at: Date.now() };
+}
+
+function claimDayFocus(date: string, button: HTMLButtonElement | null) {
+  const pending = pendingDayFocus;
+  if (!pending || pending.date !== date || !button) return;
+  pendingDayFocus = null;
+  if (Date.now() - pending.at > FOCUS_RETURN_MS) return;
+  const active = document.activeElement;
+  if (active && active !== document.body && active !== button) return;
+  focusDayButton(button);
+}
+
 function formatMonthDay(iso: string): string {
   const MONTHS = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -166,9 +192,21 @@ export function DayCell({
     sheetRef.current?.querySelector<HTMLButtonElement>('[data-sheet-option]')?.focus({ preventScroll: true });
   }, [tooltipOpen, hasHover]);
 
+  // A re-mounted cell for the day the person just acted on takes focus back (see above).
+  useEffect(() => {
+    claimDayFocus(date, dayButtonRef.current);
+  }, [date]);
+
   const closeSheet = () => {
     setTooltipOpen(false);
     dayButtonRef.current?.focus();
+  };
+
+  // After an action that changes the plan: close, focus the day now, and remember it so the
+  // cell that replaces this one (if the calendar re-mounts while the plan updates) gets it.
+  const closeSheetAfterAction = () => {
+    rememberDayFocus(date);
+    closeSheet();
   };
 
   const trapSheetFocus = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -246,6 +284,9 @@ export function DayCell({
     if (isOutOfRange) return; // no interaction at all - there's nothing here to toggle
     // Native button activation from the keyboard has no pointer click count.
     if (hasHover || event.detail === 0) {
+      // Enter/Space, or a click with a mouse: the button is focused now and must still be
+      // after the plan updates.
+      rememberDayFocus(date);
       primaryAction?.();
       if (event.detail === 0) setTooltipOpen(false);
       return;
@@ -375,15 +416,18 @@ export function DayCell({
         aria-expanded={!hasHover ? tooltipOpen : undefined}
         aria-controls={!hasHover && tooltipOpen ? `tooltip-${date}` : undefined}
         aria-describedby={hasHover && tooltipOpen ? `tooltip-${date}` : undefined}
-        className="group relative z-10 flex h-12 w-full cursor-pointer items-center justify-center text-sm font-medium tabular-nums focus-visible:outline-none"
+        className="group relative z-10 flex h-12 w-full cursor-pointer items-center justify-center text-sm font-medium tabular-nums transition-transform duration-150 ease-[var(--ease-out)] active:scale-[0.97] focus-visible:outline-none"
       >
+        {/* Press feedback (the button): the face, numeral and marks sink together to 0.97 on
+            the house 150ms ease-out, like every button; the face's hover outline and fills
+            change on the same timing. */}
         {/* Every day cell is click-to-force (pin in / rule out), not just the ones with a
             marginal-value tooltip - cursor-pointer plus a subtle hover outline is the only
             signal that's true everywhere, which is why it isn't gated on tooltipText. */}
         <span
           aria-hidden="true"
           data-day-face=""
-          className={`absolute inset-y-0 inset-x-0.5 rounded-[6px] transition-colors duration-150 group-hover:outline group-hover:outline-1 group-hover:outline-offset-1 group-hover:outline-[var(--text-primary)] group-focus-visible:ring-2 group-focus-visible:ring-offset-2 ${COLORS.focusRing} group-aria-expanded:outline group-aria-expanded:outline-2 group-aria-expanded:outline-offset-1 group-aria-expanded:outline-[var(--accent)] ${faceClasses} ${
+          className={`absolute inset-y-0 inset-x-0.5 rounded-[6px] transition-[background-color,border-color,outline-color] duration-150 ease-[var(--ease-out)] group-hover:outline group-hover:outline-1 group-hover:outline-offset-1 group-hover:outline-[var(--text-primary)] group-focus-visible:ring-2 group-focus-visible:ring-offset-2 ${COLORS.focusRing} group-aria-expanded:outline group-aria-expanded:outline-2 group-aria-expanded:outline-offset-1 group-aria-expanded:outline-[var(--accent)] ${faceClasses} ${
             // An alternative is a suggestion about a suggestion: a 1px dashed outline, no fill.
             isAlternative ? `border border-dashed ${COLORS.altBorder}` : ''
           } ${
@@ -481,7 +525,7 @@ export function DayCell({
                       aria-pressed={current}
                       onClick={() => {
                         onSetState(date, value);
-                        closeSheet();
+                        closeSheetAfterAction();
                       }}
                       className={`${sheetOption} ${sheetOptionState(current)}`}
                     >
@@ -499,7 +543,7 @@ export function DayCell({
                   aria-pressed={forcedState === 'exclude'}
                   onClick={() => {
                     onSetState(date, 'exclude');
-                    closeSheet();
+                    closeSheetAfterAction();
                   }}
                   className={`${sheetOption} ${sheetOptionState(forcedState === 'exclude')}`}
                 >
@@ -519,7 +563,7 @@ export function DayCell({
                 data-sheet-option=""
                 onClick={() => {
                   primaryAction?.();
-                  closeSheet();
+                  closeSheetAfterAction();
                 }}
                 className={buttonClasses('primary', 'md', 'mt-3 w-full')}
               >

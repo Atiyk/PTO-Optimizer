@@ -295,8 +295,23 @@
     border: 3px solid var(--bg-surface);
     background: var(--accent);
     box-shadow: 0 0 0 1px var(--accent-pressed), 0 1px 3px rgb(15 26 35 / 0.25);
+    transition: transform 150ms var(--ease-out);
   }
-  input[type='range']:active::-webkit-slider-thumb {
+  /* Press and hover feedback on the house 150ms ease-out, the same timing as buttons, the
+     stepper and day cells. The knob grows a little under the finger (it is the thing being
+     held); hover is for fine pointers only, so a tap never leaves it enlarged. */
+  @media (hover: hover) and (pointer: fine) {
+    input[type='range']:not(:disabled):hover::-webkit-slider-thumb {
+      transform: scale(1.05);
+    }
+    input[type='range']:not(:disabled):hover::-moz-range-thumb {
+      transform: scale(1.05);
+    }
+  }
+  input[type='range']:not(:disabled):active::-webkit-slider-thumb {
+    transform: scale(1.1);
+  }
+  input[type='range']:not(:disabled):active::-moz-range-thumb {
     transform: scale(1.1);
   }
   input[type='range']:focus-visible::-webkit-slider-thumb {
@@ -385,15 +400,16 @@
 }
 
 /* Motion is for comprehension here (a value changed, a day flipped), never decoration:
-   at most 200ms and none on page load. For prefers-reduced-motion it turns all of it off
-   instantly rather than just shortening it. */
+   at most 200ms and none on page load. For prefers-reduced-motion it turns all of it off.
+   `none`, not a 0.01ms duration: a near-zero transition still creates a running animation on
+   every hover and state change (measured: 1-2 per input on /pto), and nothing here listens
+   for transitionend or animationend. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    animation: none !important;
+    transition: none !important;
     scroll-behavior: auto !important;
   }
 }
@@ -416,17 +432,9 @@
   }
 }
 
-/* StatNumber's change cue: runs only when a value changes, never on load. */
-@keyframes stat-in {
-  from {
-    opacity: 0.35;
-    transform: translateY(3px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
+/* The figure-change cue (StatNumber.tsx, useFigureChangeCue) is a Web Animation, so it does
+   not depend on the blanket rule above: it checks prefers-reduced-motion itself and does not
+   run at all. */
 
 /* The homepage Country/PTO pair uses a container-width-aware inline CSS grid;
    its actual computed columns are asserted at 320 and 375 in consumer QA. */
