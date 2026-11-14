@@ -20,7 +20,7 @@ export function WeightingSlider({ value, onChange }: WeightingSliderProps) {
       </div>
       <div className="flex items-center justify-between gap-3 text-xs text-muted">
         <span>Most days off</span>
-        <span>Favor quieter estimates</span>
+        <span>Quieter travel weeks</span>
       </div>
       <input
         type="range"

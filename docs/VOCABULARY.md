@@ -20,6 +20,7 @@ flags any banned alternative found in a UI string literal.
 | A bank with no fixed number of days | unlimited PTO | flexible PTO, discretionary PTO |
 | Money paid out for unused days on leaving | payout | cash-out, PTO payout (redundant) |
 | Time away with no accrual and no pay | unpaid leave | LOA (spell out "leave of absence" on first use, then may alias) |
+| Every calendar day you're not working: weekends, holidays and PTO days together | days off ("31 days off", "18 days off in a row") | calendar days off, days away, time away, consecutive days. Keep "PTO days" for the cost: "18 days off for 10 PTO days" |
 
 This list grows as later Understand features add concepts; append, never silently rename an
 existing row (old links/content may already use the chosen word).

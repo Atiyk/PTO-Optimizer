@@ -208,14 +208,14 @@ function joinNames(names: string[]): string {
   return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
 }
 
-/** The one-line differentiator for a placement card - "41 days away · includes Christmas
+/** The one-line differentiator for a placement card - "41 days off · includes Christmas
  * and New Year's Day · peak travel" - every clause computed from real data, never a fixed
  * label (3A). Clauses with nothing to say (no holidays inside, no clear travel signal)
  * are simply omitted rather than padded with a generic "no holidays inside" repeated on
  * every card - see bestPlacements' `anyHolidayInAnyCandidate` for the ONE place that case
  * is actually said, once, at the top. */
 export function placementNote(p: SabbaticalPlacement): string {
-  const clauses = [`${p.totalAwayDays} days away`];
+  const clauses = [`${p.totalAwayDays} days off`];
   if (p.timeAwayHolidayNames.length > 0) clauses.push(`includes ${joinNames(p.timeAwayHolidayNames)}`);
   if (p.travelTag) clauses.push(p.travelTag);
   return clauses.join(' · ');
@@ -227,7 +227,7 @@ export function placementNote(p: SabbaticalPlacement): string {
 export function timeAwayHolidaySentence(p: Pick<SabbaticalPlacement, 'timeAwayHolidayNames'>): string {
   const n = p.timeAwayHolidayNames.length;
   if (n === 0) return '';
-  return `${n} public holiday${n === 1 ? ' falls' : 's fall'} in this time away: ${joinNames(p.timeAwayHolidayNames)}.`;
+  return `Includes ${n} public holiday${n === 1 ? '' : 's'}: ${joinNames(p.timeAwayHolidayNames)}.`;
 }
 
 export interface BestPlacementsResult {

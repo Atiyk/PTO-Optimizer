@@ -44,11 +44,21 @@ describe('SubscribeFeed', () => {
     expect(screen.getByText(/fixed snapshot/)).toBeTruthy();
   });
 
+  it('keeps every visible block short and puts the update mechanics behind a disclosure (F16)', () => {
+    render(<SubscribeFeed planSearch={SEARCH} origin={ORIGIN} />);
+    for (const p of document.querySelectorAll('p')) {
+      expect(p.textContent!.trim().split(/\s+/).length, p.textContent!).toBeLessThanOrEqual(25);
+    }
+    const summary = screen.getByText('How updates work', { selector: 'summary' });
+    expect(summary.closest('details')!.textContent).toContain('Edits you make after subscribing are not included.');
+  });
+
   it('says what the snapshot holds, that later edits are left out, and how to update and remove it', () => {
     render(<SubscribeFeed planSearch={SEARCH} origin={ORIGIN} />);
     const text = document.body.textContent ?? '';
     expect(text).toMatch(/fixed snapshot of this plan.s inputs/);
-    expect(text).toContain('PTO days, holidays and “book by” reminders');
+    expect(text).toContain('PTO days, holidays and request-by reminders');
+    expect(text).toContain('Anyone with the link can see the snapshot.');
     expect(text).toContain('Edits you make after subscribing are not included.');
     expect(text).toContain('To update, subscribe again, then remove the old “Timebower - PTO plan” calendar');
     expect(text).toContain('Each event notes the day the snapshot was made.');
@@ -95,13 +105,13 @@ describe('private employer calendar subscriptions', () => {
 
   it('requires a choice and uses date-only snapshots even after explicit opt-in', () => {
     const { rerender } = render(<SubscribeFeed planSearch={privateQuery} observedHolidayDates={observedHolidayDates} origin={ORIGIN} />);
-    expect(screen.getByText(/Choose the holiday assumptions/i)).toBeTruthy();
+    expect(screen.getByText(/Choose which holidays the subscription uses/i)).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Apple Calendar' })).toBeNull();
     expect(screen.queryByRole('link', { name: /Google Calendar/ })).toBeNull();
     expect(screen.queryByRole('link', { name: /Outlook/ })).toBeNull();
     expect(screen.queryByLabelText(/paste this link/i)).toBeNull();
     expect(document.body.textContent).not.toContain('PRIVATE_EMPLOYER_POLICY_TITLE');
-    fireEvent.click(screen.getByRole('button', { name: /Include observed holiday dates/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Use my holiday dates/i }));
     const google = screen.getByRole('link', { name: /Google Calendar/ });
     const outlook = screen.getByRole('link', { name: /Outlook/ });
     const external = new URL(outlook.getAttribute('href')!);
@@ -121,7 +131,7 @@ describe('private employer calendar subscriptions', () => {
 
   it('offers a public-holiday option even when private dates are unavailable', () => {
     render(<SubscribeFeed planSearch={privateQuery} origin={ORIGIN} />);
-    expect(screen.queryByRole('button', { name: /Include observed holiday dates/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Use my holiday dates/i })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Use public holidays' }));
     const query = new URL((screen.getByLabelText(/paste this link/i) as HTMLInputElement).value).searchParams;
     expect(query.get('sv')).toBe('1');

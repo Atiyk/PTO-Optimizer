@@ -49,9 +49,16 @@ export interface SubscribeFeedProps {
   idPrefix?: string;
 }
 
-const PLAN_DESCRIPTION = 'Subscribe to a fixed snapshot of this plan’s inputs as they are now. Your calendar app refreshes it with PTO days, holidays and “book by” reminders, recalculated from the refresh date.';
+const PLAN_DESCRIPTION = 'Subscribe to see this plan’s PTO days, holidays and request-by reminders in your calendar app.';
+/** F16: the update mechanics sit behind a "How updates work" disclosure, one short block each. */
+const planUpdateNotes = (calendarName: string) => [
+  'The subscription holds a fixed snapshot of this plan’s inputs as they are now. Your calendar app refreshes it and recalculates from the refresh date.',
+  'Edits you make after subscribing are not included.',
+  `To update, subscribe again, then remove the old “${calendarName}” calendar so days don’t appear twice.`,
+  'Each event notes the day the snapshot was made.',
+];
 /** Issue 19: nothing is stored server-side, so later edits never reach a subscription. */
-const planCaveat = (calendarName: string) => `Edits you make after subscribing are not included. To update, subscribe again, then remove the old “${calendarName}” calendar in your calendar app so the days don’t appear twice. Each event notes the day the snapshot was made. Anyone with the link can see the snapshot.`;
+const PLAN_PRIVACY = 'Anyone with the link can see the snapshot.';
 
 /** Mirrors the /api/feed bound so the page never offers a link the function will refuse. */
 function tooLargeForFeed(query: string): boolean {
@@ -83,7 +90,7 @@ export function SubscribeFeed({ planSearch, observedHolidayDates, origin, path =
   const query = planFeed
     ? `${buildPublicPlanSearch(planSearch, shareObservedDates ? observedHolidayDates : undefined)}&fc=${todayISO()}`
     : planSearch.replace(/^\?/, '');
-  const shownCaveat = caveat ?? (planFeed ? planCaveat(calendarName) : undefined);
+  const shownCaveat = caveat ?? (planFeed ? PLAN_PRIVACY : undefined);
   const links = resolvedOrigin && sharingAllowed ? feedLinks(resolvedOrigin, query, path, calendarName) : null;
   const tooLong = useMemo(() => query.length > MAX_FEED_QUERY_LENGTH || (planFeed && tooLargeForFeed(query)), [query, planFeed]);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
@@ -97,14 +104,14 @@ export function SubscribeFeed({ planSearch, observedHolidayDates, origin, path =
         <p className="max-w-prose text-sm text-muted">This plan is too large for a calendar subscription. Download the .ics file instead.</p>
       ) : !sharingAllowed ? (
         <>
-          <p className="max-w-prose text-sm text-muted">Choose the holiday assumptions for this snapshot. Private calendar names, scheduling details, and policy settings stay here, so the subscription may differ from your personal plan.</p>
+          <p className="max-w-prose text-sm text-muted">Choose which holidays the subscription uses. Your calendar names, scheduling details and policy settings stay here, so it can differ from your plan.</p>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => setChoice({ mode: 'defaults', source: planSearch, dates: datesKey })}>
               Use public holidays
             </Button>
             {observedHolidayDates !== undefined && (
               <Button variant="secondary" onClick={() => setChoice({ mode: 'dates', source: planSearch, dates: datesKey })}>
-                Include observed holiday dates
+                Use my holiday dates
               </Button>
             )}
           </div>
@@ -115,8 +122,20 @@ export function SubscribeFeed({ planSearch, observedHolidayDates, origin, path =
       ) : !links ? null : (
         <>
           <p className="max-w-prose text-sm text-muted">{description}</p>
-          {planFeed && <p className="max-w-prose text-xs text-muted">{shareObservedDates ? 'Uses your selected observed holiday dates, without their labels.' : 'Uses public holiday defaults.'}</p>}
-          {shownCaveat && <p className="max-w-prose text-xs leading-5 text-muted">{shownCaveat}</p>}
+          {(planFeed || shownCaveat) && (
+            <p className="max-w-prose text-xs leading-5 text-muted">
+              {planFeed && (shareObservedDates ? 'Uses your holiday dates, without their names. ' : 'Uses public holidays. ')}
+              {shownCaveat}
+            </p>
+          )}
+          {planFeed && caveat === undefined && (
+            <details className="text-sm">
+              <summary className="min-h-11 cursor-pointer py-3 font-semibold text-ink">How updates work</summary>
+              <div className="flex max-w-prose flex-col gap-2 text-muted">
+                {planUpdateNotes(calendarName).map((note) => <p key={note}>{note}</p>)}
+              </div>
+            </details>
+          )}
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" href={links.webcal}>Apple Calendar</Button>
             <Button variant="secondary" href={links.google} target="_blank" rel="noopener noreferrer">

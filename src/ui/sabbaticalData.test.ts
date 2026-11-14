@@ -84,17 +84,17 @@ describe('placementNote (3A)', () => {
   };
 
   it('always leads with the total away-days figure', () => {
-    expect(placementNote(base)).toBe('41 days away');
+    expect(placementNote(base)).toBe('41 days off');
   });
 
   it('adds an "includes ..." clause only when holidays actually fall inside', () => {
     const withHolidays = { ...base, timeAwayHolidayNames: ['Christmas Day', "New Year's Day"] };
-    expect(placementNote(withHolidays)).toBe("41 days away · includes Christmas Day and New Year's Day");
+    expect(placementNote(withHolidays)).toBe("41 days off · includes Christmas Day and New Year's Day");
   });
 
   it('adds the travel tag clause when present', () => {
     const peak = { ...base, timeAwayHolidayNames: ['Christmas Day'], travelTag: 'peak travel' as const };
-    expect(placementNote(peak)).toBe('41 days away · includes Christmas Day · peak travel');
+    expect(placementNote(peak)).toBe('41 days off · includes Christmas Day · peak travel');
   });
 });
 
@@ -199,8 +199,8 @@ describe('holidays in the time away (F18)', () => {
   });
 
   it('the summary counts and names them in one sentence, with singular grammar for one', () => {
-    expect(timeAwayHolidaySentence(jan)).toBe("3 public holidays fall in this time away: Christmas Day, New Year's Day, and Martin Luther King, Jr. Day.");
-    expect(timeAwayHolidaySentence({ ...jan, timeAwayHolidayNames: ['Memorial Day'] })).toBe('1 public holiday falls in this time away: Memorial Day.');
+    expect(timeAwayHolidaySentence(jan)).toBe("Includes 3 public holidays: Christmas Day, New Year's Day, and Martin Luther King, Jr. Day.");
+    expect(timeAwayHolidaySentence({ ...jan, timeAwayHolidayNames: ['Memorial Day'] })).toBe('Includes 1 public holiday: Memorial Day.');
     expect(timeAwayHolidaySentence({ ...jan, timeAwayHolidayNames: [] })).toBe('');
   });
 });

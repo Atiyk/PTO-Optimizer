@@ -14,16 +14,21 @@ describe('SummaryMetrics', () => {
     );
     // The multiplier (27 / 12 = 2.25) says what it means without restating the headline (F12).
     expect(html).toContain('2.25×');
-    expect(html).toContain('Calendar days off for each PTO day spent.');
+    expect(html).toContain('Days off, weekends and holidays included, for each PTO day you spend.');
     expect(html).not.toContain('27 days off for 12 PTO days');
     // Display only broad context and its source, even when the engine returns an internal percentile.
     expect(html).not.toContain('Efficiency percentile');
-    expect(html).toContain('Travel estimate');
     expect(html).not.toContain('78th');
-    expect(html).toContain('Generic seasonal estimate');
+    // Outside the US there is no country travel data, so the tile is hidden rather than
+    // showing an uninformative "generic seasonal estimate" (F24).
+    expect(html).not.toContain('Travel estimate');
+    expect(html).not.toMatch(/generic seasonal|Seasonal/);
+    expect(html).toContain('grid-cols-1');
     const us = renderToStaticMarkup(<SummaryMetrics budgetSpent={12} totalDaysOff={27} breakCountActual={3} scores={scores} travelBasis="us" />);
     expect(us).toContain('2025 US airport checkpoint counts');
     expect(us).toContain('Quieter');
+    expect(us).toContain('Travel estimate');
+    expect(us).toContain('grid-cols-2');
     expect(us).not.toContain('78th');
   });
 
@@ -47,7 +52,7 @@ describe('SummaryMetrics', () => {
 
   it('says the travel tile shows once the plan is ready, without "solved" jargon (F24/F05)', () => {
     const html = renderToStaticMarkup(
-      <SummaryMetrics budgetSpent={1} totalDaysOff={4} breakCountActual={1} scores={null} />,
+      <SummaryMetrics budgetSpent={1} totalDaysOff={4} breakCountActual={1} scores={null} travelBasis="us" />,
     );
     expect(html).toContain('Shows once your plan is ready.');
     expect(html).not.toMatch(/solved/i);
