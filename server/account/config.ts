@@ -36,7 +36,7 @@ export function readAccountConfig(env: Env = process.env): AccountConfig {
     gmailUser: value(env, 'GMAIL_USER'),
     // Google shows app passwords in groups of four ("abcd efgh ijkl mnop"); spaces are not part of it.
     gmailAppPassword: value(env, 'GMAIL_APP_PASSWORD')?.replace(/\s+/g, '') || null,
-    fromName: value(env, 'MAIL_FROM_NAME') ?? 'Gapless',
+    fromName: value(env, 'MAIL_FROM_NAME') ?? 'Timebower',
     databaseUrl: value(env, 'DATABASE_URL') ?? value(env, 'POSTGRES_URL'),
     appSecret: value(env, 'APP_SECRET'),
     cronSecret: value(env, 'CRON_SECRET'),

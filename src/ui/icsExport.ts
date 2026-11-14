@@ -76,7 +76,7 @@ export interface ReminderOptions {
  * only, unchanged. */
 const DEFAULT_REMINDER_OPTIONS: ReminderOptions = { enabled: false, leadDays: 14 };
 
-/** The per-PTO-day VEVENTs, shared by the downloaded .ics and the live feed (F1) so a
+/** The per-PTO-day VEVENTs, shared by the downloaded .ics and the subscription feed (F1) so a
  * subscribed calendar and a downloaded one carry byte-identical events for the same day. */
 export function ptoDayEventLines(breaks: Break[], isPtoDay: (iso: string) => boolean, dtstamp: string, note?: string): string[] {
   const lines: string[] = [];

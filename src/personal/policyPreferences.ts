@@ -46,7 +46,7 @@ export function rememberLoadedPolicy(): void {
 /** A non-destructive notice about the saved policy this page loaded, if any. */
 export function policyStorageNotice(): string | undefined {
   if (loadedState === 'unreadable') return 'Your saved policy in this browser could not be read. It is kept as it was; saving keeps a copy of it in this browser first.';
-  if (loadedState === 'newer-version') return 'Your policy was saved by a newer version of Gapless. Reload this page to use it; saving here will not overwrite it.';
+  if (loadedState === 'newer-version') return 'Your policy was saved by a newer version of Timebower. Reload this page to use it; saving here will not overwrite it.';
   return undefined;
 }
 

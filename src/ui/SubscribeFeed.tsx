@@ -18,7 +18,7 @@ export interface FeedLinks {
   outlook: string;
 }
 
-/** The live feed's URLs for a plan's query string. Formats checked against published
+/** The subscription feed's URLs for a plan's query string. Formats checked against published
  * subscribe links (Nov 2026): Google takes the webcal URL in `cid`; Outlook.com takes the
  * https URL in `url` plus a display `name`. */
 export function feedLinks(origin: string, planSearch: string, path = '/api/feed', calendarName = FEED_CALENDAR_NAME): FeedLinks {

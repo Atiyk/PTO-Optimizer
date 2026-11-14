@@ -134,7 +134,7 @@ function BalanceChart({ series, cap }: { series: { date: string; balance: number
 function savePolicyMessage(result: PolicySaveResult, setNotice: (notice: string | undefined) => void): string {
   if (result === 'saved') { setNotice(undefined); return 'Policy saved in this browser.'; }
   if (result === 'stale') return 'Another tab saved a different policy after this page loaded. Nothing was overwritten. Save again to replace it with the inputs on this page.';
-  if (result === 'newer-version') return 'A newer version of Gapless saved your policy. Nothing was overwritten. Reload this page to use it.';
+  if (result === 'newer-version') return 'A newer version of Timebower saved your policy. Nothing was overwritten. Reload this page to use it.';
   return 'Browser storage is unavailable. You can still use the forecast on this page.';
 }
 

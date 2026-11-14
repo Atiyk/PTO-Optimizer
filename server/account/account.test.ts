@@ -166,6 +166,59 @@ describe('/api/account', () => {
     expect((await from('203.0.113.7', 7)).status).toBe(200); // and the hour resets
   });
 
+  it('sends at most three sign-in links an hour and five a day to one address, from any IP', async () => {
+    const ctx = setup();
+    let minute = 0;
+    const ask = (ip: string) => {
+      minute += 3; // past the two-minute repeat guard each time
+      ctx.deps.now = () => new Date(NOW.getTime() + minute * 60_000);
+      return handleAccount(post({ action: 'login', email: 'target@example.com' }, { 'x-real-ip': ip }), ctx.deps);
+    };
+    for (let n = 0; n < 3; n++) expect((await ask(`198.51.100.${n}`)).status).toBe(200);
+    const limited = await ask('198.51.100.9');
+    expect(limited.status).toBe(429);
+    expect((await limited.json()).error).toMatch(/already sent to this address.*newest one/);
+    expect(ctx.sent).toHaveLength(3);
+    minute += 60; // next hour: two more, then the daily limit
+    for (let n = 0; n < 2; n++) expect((await ask(`203.0.113.${n}`)).status).toBe(200);
+    minute += 60;
+    expect((await ask('203.0.113.50')).status).toBe(429);
+    expect(ctx.sent).toHaveLength(5);
+    expect(ctx.sent.every((mail) => mail.to === 'target@example.com')).toBe(true);
+    // Other addresses are unaffected.
+    expect((await handleAccount(post({ action: 'login', email: 'other@example.com' }, { 'x-real-ip': '192.0.2.1' }), ctx.deps)).status).toBe(200);
+    expect(ctx.sent).toHaveLength(6);
+  });
+
+  it('caps one address\'s share of the daily email budget, and the site cap still answers plainly', async () => {
+    const env = { ...ENV, DAILY_EMAIL_CAP: '3' };
+    const ctx = setup(env);
+    for (let n = 0; n < 3; n++) {
+      expect((await handleAccount(post({ action: 'login', email: `u${n}@example.com` }, { 'x-real-ip': `192.0.2.${n}` }), ctx.deps)).status).toBe(200);
+    }
+    const capped = await handleAccount(post({ action: 'login', email: 'u9@example.com' }, { 'x-real-ip': '192.0.2.99' }), ctx.deps);
+    expect(capped.status).toBe(503);
+    expect((await capped.json()).error).toBe('Timebower has sent its email limit for today. Try again tomorrow.');
+    // Ten emails a day to one address at most, whatever sent them (digest, replies, links).
+    const share = setup();
+    for (let n = 0; n < 10; n++) await share.deps.store().takeRateSlot('mail-to:busy@example.com', 10, 86_400_000, NOW.getTime());
+    const res = await handleAccount(post({ action: 'login', email: 'busy@example.com' }, { 'x-real-ip': '192.0.2.200' }), share.deps);
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toMatch(/several emails from Timebower today/);
+    expect(share.sent).toHaveLength(0);
+  });
+
+  it('brands sign-in mail and pages as Timebower and keeps the sender address', async () => {
+    const ctx = setup();
+    await handleAccount(post({ action: 'login', email: 'me@example.com' }), ctx.deps);
+    expect(ctx.sent[0].subject).toBe('Your Timebower sign-in link');
+    expect(ctx.sent[0].text).not.toMatch(/Gapless/);
+    expect(readAccountConfig(ENV).fromName).toBe('Timebower');
+    expect(readAccountConfig(ENV).gmailUser).toBe('gapless.app@gmail.com');
+    const link = ctx.sent[0].text.match(/https:\/\/\S+verify=\S+/)![0];
+    expect(await (await handleAccount(new Request(link), ctx.deps)).text()).toContain('<title>Sign in to Timebower</title>');
+  });
+
   it('refuses cross-site and non-JSON posts', async () => {
     const ctx = setup();
     expect((await handleAccount(post({ action: 'login', email: 'a@b.co' }, { origin: 'https://evil.example' }), ctx.deps)).status).toBe(403);
