@@ -354,7 +354,7 @@ async function checkTouch(browser, name, result) {
     await day.waitFor({ state: 'visible' });
     await day.tap();
     if (!hover) {
-      const panel = page.getByRole('group', { name: 'Actions for January 20' });
+      const panel = page.getByRole('dialog', { name: 'Actions for January 20' });
       await panel.waitFor({ state: 'visible' });
       assert.equal(await day.getAttribute('aria-expanded'), 'true', 'a tap discloses the actions without changing the day');
       const bounds = await panel.boundingBox();

@@ -10,7 +10,9 @@ const STEPS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 describe('WeightingSlider (Phase 5.2: "don\'t assume travel")', () => {
   it('carries the "not traveling" clarification as a hover/focus hint on the label, not a standalone line', () => {
     const html = renderToStaticMarkup(<WeightingSlider value={30} onChange={() => {}} />);
-    expect(html).toContain('aria-label="Not traveling?');
+    // N5: the hint is a button named "About what matters more", described by the full text.
+    expect(html).toContain('aria-label="About what matters more"');
+    expect(html).toMatch(/role="tooltip" hidden=""[^>]*>Not traveling\?/);
     expect(html).toContain('Set this toward Most days off');
   });
 

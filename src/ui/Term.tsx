@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { findTerm } from '../content/glossary/terms';
 import { track } from './analytics';
 
@@ -11,6 +11,8 @@ import { track } from './analytics';
  */
 export function Term({ id, children }: { id: string; children?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  // A tap is followed by a compatibility mouseout; only a real mouse closes it by leaving.
+  const lastPointer = useRef<string>('mouse');
   const term = findTerm(id);
   if (!term) return <>{children ?? id}</>;
 
@@ -37,7 +39,8 @@ export function Term({ id, children }: { id: string; children?: React.ReactNode 
         // button, which is a real design tradeoff, not fully resolved - see PROGRESS.md.
         className={`cursor-help border-b border-dotted border-line-strong px-0.5 py-1 text-ink ${children === '?' ? 'inline-flex min-h-11 min-w-11 items-center justify-center border-b-0 font-semibold underline decoration-dotted underline-offset-4' : ''} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--focus-ring)]`}
         onMouseEnter={openPopover}
-        onMouseLeave={() => setOpen(false)}
+        onPointerDown={(event) => { lastPointer.current = event.pointerType; }}
+        onMouseLeave={() => { if (lastPointer.current === 'mouse') setOpen(false); }}
         onFocus={openPopover}
         onBlur={() => setOpen(false)}
         onClick={openPopover}

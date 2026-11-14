@@ -101,3 +101,57 @@ describe('PTO days: an empty field is unknown, 0 is a real balance (issue 15)', 
     expect(exact.value).toBe('15');
   });
 });
+
+describe('PTO days stepper (F28: the same −/+ pattern as /family and /sabbatical)', () => {
+  function LiveControls({ start = 15, onBudget = () => {}, onBlank = () => {} }: { start?: number; onBudget?: (n: number) => void; onBlank?: (b: boolean) => void }) {
+    const [budget, setBudget] = useState(start);
+    return <PrimaryControls {...baseProps} budget={budget} onChangeBudget={(n) => { onBudget(n); setBudget(n); }} onBudgetBlankChange={onBlank} budgetSpent={0} reserveDays={0} effectiveBudget={budget} unlimitedPto={false} />;
+  }
+
+  it('steps by one with 44px buttons, and the field and slider follow', () => {
+    render(<LiveControls />);
+    const exact = screen.getByRole<HTMLInputElement>('spinbutton', { name: 'PTO days available' });
+    const more = screen.getByRole('button', { name: 'One more PTO day' });
+    const fewer = screen.getByRole('button', { name: 'One fewer PTO day' });
+    expect(more.className).toContain('h-11 w-11');
+    expect(fewer.className).toContain('h-11 w-11');
+    fireEvent.click(more);
+    expect(exact.value).toBe('16');
+    fireEvent.click(fewer);
+    fireEvent.click(fewer);
+    expect(exact.value).toBe('14');
+    expect(screen.getByRole<HTMLInputElement>('slider', { name: 'Adjust PTO days' }).value).toBe('14');
+  });
+
+  it('cannot step below 0, and 0 stays a real value', () => {
+    const seen: number[] = [];
+    render(<LiveControls start={1} onBudget={(n) => seen.push(n)} />);
+    const fewer = screen.getByRole<HTMLButtonElement>('button', { name: 'One fewer PTO day' });
+    fireEvent.click(fewer);
+    expect(seen).toEqual([0]);
+    expect(fewer.disabled).toBe(true);
+    expect(screen.getByRole<HTMLInputElement>('spinbutton', { name: 'PTO days available' }).value).toBe('0');
+  });
+
+  it('keeps blank as "not entered" until a step, which applies to the value still in effect', () => {
+    const seen: number[] = [];
+    const blanks: boolean[] = [];
+    render(<LiveControls onBudget={(n) => seen.push(n)} onBlank={(b) => blanks.push(b)} />);
+    const exact = screen.getByRole<HTMLInputElement>('spinbutton', { name: 'PTO days available' });
+    fireEvent.change(exact, { target: { value: '' } });
+    expect(blanks.at(-1)).toBe(true);
+    expect(exact.getAttribute('aria-describedby')).toBeTruthy();
+    expect(seen).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'One more PTO day' }));
+    expect(seen).toEqual([16]);
+    expect(exact.value).toBe('16');
+    expect(blanks.at(-1)).toBe(false);
+    expect(screen.queryByText('Enter your PTO days. Enter 0 if you have none.')).toBeNull();
+  });
+
+  it('shows the slider value on its label row', () => {
+    render(<LiveControls start={12} />);
+    const slider = screen.getByRole('slider', { name: 'Adjust PTO days' });
+    expect(slider.parentElement!.textContent).toContain('12');
+  });
+});

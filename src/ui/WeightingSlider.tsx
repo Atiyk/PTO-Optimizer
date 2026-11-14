@@ -16,7 +16,7 @@ export function WeightingSlider({ value, onChange }: WeightingSliderProps) {
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-1.5 text-[15px] font-semibold text-ink">
         What matters more?
-        <InfoHint text={TRAVEL_HINT} />
+        <InfoHint text={TRAVEL_HINT} label="About what matters more" />
       </div>
       <div className="flex items-center justify-between gap-3 text-xs text-muted">
         <span>Most days off</span>

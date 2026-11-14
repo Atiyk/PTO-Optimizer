@@ -9,8 +9,10 @@ import { PinIcon } from './DayCell';
  * ring for today. Every entry is a shape plus words, never colour alone. Employer and
  * blackout entries appear only when the plan has such days.
  */
-export function Legend({ showCompany, showBlackout, showPinned, showAlternatives }: {
+export function Legend({ showCompany, showBlackout, showPinned, showAlternatives, showOutside }: {
   showCompany?: boolean;
+  /** F27: when the calendar shows dates before or after the planning range. */
+  showOutside?: boolean;
   showBlackout?: boolean;
   showPinned?: boolean;
   showAlternatives?: boolean;
@@ -53,6 +55,12 @@ export function Legend({ showCompany, showBlackout, showPinned, showAlternatives
         <li className="flex items-center gap-2">
           <span aria-hidden className="h-5 w-5 rounded-[6px] border border-line bg-[repeating-linear-gradient(135deg,var(--border-default)_0_2px,transparent_2px_7px)]" />
           Unavailable
+        </li>
+      )}
+      {showOutside && (
+        <li className="flex items-center gap-2">
+          <span aria-hidden className="flex h-5 w-5 items-center justify-center text-xs tabular-nums text-[var(--outside-text)]">9</span>
+          Outside your dates
         </li>
       )}
       <li className="flex items-center gap-2">

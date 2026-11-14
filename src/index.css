@@ -94,6 +94,10 @@
   --error: #b93838;
   --error-soft: #fbecec;
   --disabled-text: #9aa6b2;
+  /* F27: a calendar date outside the planning range. Still a date, so 3:1 or more on every
+     surface (3.5:1 on white), and lighter than the muted weekend numerals so it reads as
+     outside the plan rather than as a weekend. */
+  --outside-text: #7d8a96;
 
   --score-track: #dce3ea;
   --score-1: #245da6;
@@ -247,6 +251,75 @@
     touch-action: pan-y;
   }
 
+  /* One slider for the whole product, sized for a finger: the input itself is the 44px-tall
+     hit area (its h-11), the thumb is a 24px Signal Blue knob with a white rim (3:1 against
+     the track and the surface), the track a 6px rounded line that fills in blue up to the
+     thumb where the engine supports it. Disabled sliders go neutral, never a faded blue. */
+  input[type='range'] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    min-height: 2.75rem;
+  }
+  input[type='range']::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--border-default);
+  }
+  input[type='range']::-moz-range-track {
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--border-default);
+  }
+  input[type='range']::-moz-range-progress {
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--accent);
+  }
+  input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    margin-top: -9px;
+    border-radius: 9999px;
+    border: 3px solid var(--bg-surface);
+    background: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent-pressed), 0 1px 3px rgb(15 26 35 / 0.25);
+    transition: transform 150ms var(--ease-out);
+  }
+  input[type='range']::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 9999px;
+    border: 3px solid var(--bg-surface);
+    background: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent-pressed), 0 1px 3px rgb(15 26 35 / 0.25);
+  }
+  input[type='range']:active::-webkit-slider-thumb {
+    transform: scale(1.1);
+  }
+  input[type='range']:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 1px var(--accent-pressed), 0 0 0 4px var(--bg-surface), 0 0 0 6px var(--focus-ring);
+  }
+  input[type='range']:focus-visible {
+    outline: none;
+  }
+  input[type='range']:focus-visible::-moz-range-thumb {
+    box-shadow: 0 0 0 1px var(--accent-pressed), 0 0 0 4px var(--bg-surface), 0 0 0 6px var(--focus-ring);
+  }
+  input[type='range']:disabled::-webkit-slider-thumb {
+    background: var(--disabled-text);
+    box-shadow: 0 0 0 1px var(--border-strong);
+  }
+  input[type='range']:disabled::-moz-range-thumb {
+    background: var(--disabled-text);
+    box-shadow: 0 0 0 1px var(--border-strong);
+  }
+  input[type='range']:disabled::-moz-range-progress {
+    background: var(--border-strong);
+  }
+
   input[type='checkbox'],
   input[type='radio'] {
     accent-color: var(--accent);
@@ -322,6 +395,24 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* N4: the phone day sheet rises a short way from the bottom edge it is anchored to, and fades
+   in; 200ms on the house ease-out. No exit animation: closing is instant, so the next tap is
+   never waiting on it. Reduced motion (above) drops the movement. */
+.day-sheet {
+  transition:
+    opacity 200ms var(--ease-out),
+    translate 200ms var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    translate: 0 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .day-sheet {
+    translate: none;
   }
 }
 
