@@ -20,6 +20,11 @@ interface HeadlineProps {
   unlimitedPto?: boolean;
   /** PTO the planner reserves once for approved and tentative tracked requests. */
   trackedReservedDays?: number;
+  /** F05: a real 0-day balance. The result is what holidays give for free (this sentence),
+   * not a "0 days off" figure, and there is nothing to save. */
+  noPtoMessage?: string;
+  /** F06: the PTO field is blank, so the plan shown is still the one for this number. */
+  exampleFor?: number;
 }
 
 /**
@@ -72,17 +77,28 @@ export function balanceLine(budgetSpent: number, budget: number, reserveDays: nu
  * splits into beside it ("12 PTO days + 15 weekend and holiday days"). This is the page's single h1 and sits inside a polite
  * live region, so a screen reader hears the new result as the sliders move.
  */
-export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, reserveDays, canPin, onPin, pinnedCount, pending, unavailable, unlimitedPto = false, trackedReservedDays = 0 }: HeadlineProps) {
+export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, reserveDays, canPin, onPin, pinnedCount, pending, unavailable, unlimitedPto = false, trackedReservedDays = 0, noPtoMessage, exampleFor }: HeadlineProps) {
   if (pending || unavailable) {
     return <div className="min-w-0">
       <h1 className="text-h2 font-bold text-ink type-condensed">Your PTO plan</h1>
       {pending && <p role="status" className="mt-2 text-sm text-muted">Updating your plan…</p>}
     </div>;
   }
+  if (noPtoMessage !== undefined) {
+    return <div className="min-w-0">
+      <h1 className="m-0 text-h1 type-display text-ink">No PTO days to spend</h1>
+      <p role="status" className="mt-2 max-w-2xl text-base text-ink">{noPtoMessage}</p>
+    </div>;
+  }
   const saveTitle = pinnedCount >= 2 ? 'Remove a saved plan to make room for another.' : undefined;
   const offWord = totalDaysOff === 1 ? 'day' : 'days';
   return (
     <div className="min-w-0">
+      {exampleFor !== undefined && (
+        <p role="status" className="mb-2 text-sm font-semibold text-ink">
+          Example for {exampleFor} PTO {exampleFor === 1 ? 'day' : 'days'}. Enter yours to see your plan.
+        </p>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-x-6">
         <h1 className="m-0 min-w-0 text-ink" aria-live="polite">
           <span className="block text-display-sm type-display tabular-nums">

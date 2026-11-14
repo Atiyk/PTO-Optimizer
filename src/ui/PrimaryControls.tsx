@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useEffect, useId } from 'react';
 import { localeForCountry } from './locale';
 import { CountrySelect } from './CountrySelect';
 import { useWholeDayDraft } from './useWholeDayDraft';
@@ -19,6 +19,8 @@ interface PrimaryControlsProps {
   effectiveBudget: number;
   unlimitedPto: boolean;
   onToggleUnlimitedPto: (v: boolean) => void;
+  /** F06: tells the page when the PTO field is blank, so the result can say it is an example. */
+  onBudgetBlankChange?: (blank: boolean) => void;
 }
 
 const DATE_FIELD_CLASS =
@@ -44,12 +46,15 @@ export function PrimaryControls({
   effectiveBudget,
   unlimitedPto,
   onToggleUnlimitedPto,
+  onBudgetBlankChange,
 }: PrimaryControlsProps) {
   const locale = localeForCountry(country);
   const budgetId = useId();
   const sliderId = useId();
   const budgetHintId = useId();
   const budgetDraft = useWholeDayDraft(budget, onChangeBudget);
+  const budgetBlank = budgetDraft.empty;
+  useEffect(() => { onBudgetBlankChange?.(budgetBlank); }, [budgetBlank, onBudgetBlankChange]);
   const sliderBudget = Number.isFinite(budget) ? Math.max(0, budget) : 0;
   const maxSliderBudget = Math.max(60, sliderBudget);
 

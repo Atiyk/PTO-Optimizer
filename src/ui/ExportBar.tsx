@@ -14,6 +14,7 @@ import { EmailReminders } from './EmailReminders';
 import { ordinal } from './scoreFormat';
 import { buildPublicPlanLink, buildPublicPlanSearch, publicPlanOmissions } from './publicSharePrivacy';
 import type { ShareSnapshot } from './shareSnapshot';
+import { SHARE_LINK_SENTENCE } from './shareLinkCopy';
 
 interface ExportBarProps {
   breaks: Break[];
@@ -198,7 +199,7 @@ export function ExportBar(props: ExportBarProps) {
         )}
       </label>
       {planSearch !== undefined && (
-        <p className="text-xs text-muted">Public plan links include the scenario budget and planning controls. Employer names, blackout dates, partner availability, tracked requests and private policy settings stay in this browser. A recipient’s result may differ.</p>
+        <p className="text-xs text-muted">{SHARE_LINK_SENTENCE}</p>
       )}
       {planSearch !== undefined && observedDates !== undefined && (
         <details className="space-y-2 text-sm">

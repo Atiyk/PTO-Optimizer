@@ -21,6 +21,7 @@ import { downloadSabbaticalICS } from './icsExport';
 import { copyCanvasImage, SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT } from './imageExport';
 import { copyText } from './requestText';
 import { SABBATICAL_FAQ_ITEMS } from './sabbaticalFaqItems';
+import { SHARE_LINK_SENTENCE } from './shareLinkCopy';
 
 /**
  * Site restructure, Phase 4: /sabbatical. A distinct experience from /pto - placing ONE
@@ -669,7 +670,7 @@ function SabbaticalExportRow({
   return (
     <section aria-labelledby="sabbatical-export-heading">
       <h2 id="sabbatical-export-heading" className="text-h2 font-bold type-condensed text-ink">Keep it</h2>
-      <p className="mt-1 text-sm text-muted">The link reproduces this exact plan for anyone you send it to.</p>
+      <p className="mt-1 text-sm text-muted">{SHARE_LINK_SENTENCE}</p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button variant="secondary" onClick={() => downloadSabbaticalICS(placement.extendedStart, placement.extendedEnd, summary, description)}>
           Add to calendar (.ics)
