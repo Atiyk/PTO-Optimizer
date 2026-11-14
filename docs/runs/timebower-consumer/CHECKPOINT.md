@@ -13,7 +13,7 @@ Durable state for the scheduled orchestrator. Read this first on every run; upda
 
 - Scheduled task: "Timebower consumer UX orchestrator (every 5 hours)", id `trig_01XkzjtbzJy5ygY5ce7XfFy3`.
 - Cron (UTC) `58 */5 * * *`: fires at 00:58, 05:58, 10:58, 15:58, 20:58 UTC. Because `*/5` restarts at midnight, the 20:58→00:58 gap is 4 hours, not 5.
-- Wakes this same cloud session (remote; no computer needed). Enabled.
+- Wakes this same cloud session (remote; no computer needed). **Disabled 2026-11-14 18:34Z** after all three batches released.
 - Hard-stop behaviour: the task prompt itself refuses work after 02:30Z Nov 16 and tells the run to disable the task.
 
 ## Agents
@@ -23,9 +23,8 @@ Durable state for the scheduled orchestrator. Read this first on every run; upda
 | O | Orchestrator (this session) | active |
 | R | Design research | done: /mnt/project-files/timebower-consumer/research.md |
 | Q | Independent critic | baseline done: 29 findings (0 P0, 12 P1, 17 P2), critic-baseline/REPORT.md |
-| A (+C) | Activation + copy, worktree wt-activation, branch timebower/p0-activation | running: F01, honest split, F12, guesses labelled, F05/F06 |
-| F (+D) | Planner hierarchy, wt-planner, timebower/p0-planner | running: F02, F03, F11, F20, F22, F26 |
-| B | Bugs, wt-bugs, timebower/p0-bugs | running: F04, F18, F17, F13, F27, sweep |
+| A, B, B2, C, D, F, G | Workers across P0–P2 | all finished; work merged via integration branches |
+| Q, Q2, Q3 | Critic rounds | finished: GO on 557d127 (P0), e48fa38 (P1), 900d4ac (P2) |
 
 ## Baseline (main 7a488f9)
 
@@ -40,8 +39,8 @@ Durable state for the scheduled orchestrator. Read this first on every run; upda
 | --- | --- | --- | --- | --- | --- |
 | P0 | `timebower/p0` | #148 | GO on 557d127 (after GO on aa42812 + follow-ups) | e521a85 (Vercel production deployment: success) | RELEASED 2026-11-14 ~12:45Z |
 | P1 | `timebower/p1` | #149 | GO on e48fa38 | 84ca0ee (Vercel production: success; live pages show P1 copy) | RELEASED 2026-11-14 ~13:50Z |
-| P2 | `timebower/p2` (from 84ca0ee) | – | – | – | building: A (blank CTA, notice period, balance-only forecast), D (focus, sabbatical stepper, motion, CLS/perf), C (terms, SR labels, SEO/meta, trust) |
+| P2 | `timebower/p2` | #150 | GO on 900d4ac | e28eeab (Vercel production: success; cache-busted fetch confirmed) | RELEASED 2026-11-14 ~18:30Z |
 
 ## Next action
 
-Collect P2 workers → integrate → gates/CI → critic GO → merge → production verify → final report → disable schedule.
+None. Run complete. Final report: /mnt/project-files/timebower-consumer/FINAL-REPORT.md. Deferred P2 follow-ups are listed there in section F.
