@@ -21,9 +21,11 @@ Durable state for the scheduled orchestrator. Read this first on every run; upda
 | Agent | Role | Status |
 | --- | --- | --- |
 | O | Orchestrator (this session) | active |
-| R | Design research | running (baseline research) |
-| Q | Independent critic | running (baseline critique) |
-| D/F/C/A/B | Implementation | not started |
+| R | Design research | done: /mnt/project-files/timebower-consumer/research.md |
+| Q | Independent critic | baseline done: 29 findings (0 P0, 12 P1, 17 P2), critic-baseline/REPORT.md |
+| A (+C) | Activation + copy, worktree wt-activation, branch timebower/p0-activation | running: F01, honest split, F12, guesses labelled, F05/F06 |
+| F (+D) | Planner hierarchy, wt-planner, timebower/p0-planner | running: F02, F03, F11, F20, F22, F26 |
+| B | Bugs, wt-bugs, timebower/p0-bugs | running: F04, F18, F17, F13, F27, sweep |
 
 ## Baseline (main 7a488f9)
 
@@ -42,4 +44,4 @@ Durable state for the scheduled orchestrator. Read this first on every run; upda
 
 ## Next action
 
-Collect R and Q baseline reports → write P0 workstream contracts → implement.
+Wait for A/F/B → merge into timebower/p0 → full gates → critic Q on exact SHA → PR to main → merge → verify Vercel production SHA.
