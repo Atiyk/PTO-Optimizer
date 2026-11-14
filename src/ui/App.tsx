@@ -24,7 +24,7 @@ import { RelaxedMinimumNotice } from './PlanRecoveryNotice';
 import { PlanSliders } from './PlanSliders';
 import { SubdivisionSelect } from './CountrySelect';
 import { MoreOptions } from './MoreOptions';
-import { Calendar } from './Calendar';
+import { Calendar, HoldHeightWhile } from './Calendar';
 import { Legend } from './Legend';
 import { BreakCard } from './BreakCard';
 import { CommittedBreakCard } from './CommittedBreakCard';
@@ -437,6 +437,9 @@ export function App() {
           <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)] xl:gap-x-14">
 
             <section id="saved-plans" ref={resultRef} tabIndex={-1} aria-label="Your plan" data-plan-result={state.planningPending ? 'pending' : plannable ? 'ready' : 'unavailable'} className="flex min-w-0 scroll-mt-16 flex-col gap-4 sm:gap-5 lg:col-span-2 lg:col-start-1 lg:row-start-1">
+              {/* Visual stability: while the plan updates, the result keeps its last height (see
+                  HoldHeightWhile), so the controls below do not jump up and back down. */}
+              <HoldHeightWhile holding={state.planningPending} className="flex min-w-0 flex-col gap-4 sm:gap-5">
               <Headline
                 budgetSpent={state.budgetSpent}
                 totalDaysOff={state.totalDaysOff}
@@ -478,8 +481,11 @@ export function App() {
                   </a>
                 </p>
               )}
+              </HoldHeightWhile>
               <nav aria-label="On this page" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                {wide === false && plannable && !zeroBudget && !budgetBlank && (
+                {/* Kept (disabled: canPin is false) while the plan updates, so the links beside it
+                    do not reflow and jump back on every input. */}
+                {wide === false && (plannable || state.planningPending) && !zeroBudget && !budgetBlank && (
                   <button type="button" onClick={state.pinPlan} disabled={!(state.canPin && requestToolsReady)} title={state.pinnedPlans.length >= 2 ? 'Remove a saved plan to make room for another.' : undefined} className={buttonClasses('secondary', 'md', 'px-3! text-sm!')}>
                     Save this plan
                   </button>
@@ -577,6 +583,7 @@ export function App() {
               {!state.hasSharedHolidaySnapshot && (
                 <HolidayCoverageNotice country={state.country} rangeStart={state.rangeStart} rangeEnd={state.rangeEnd} />
               )}
+              <HoldHeightWhile holding={state.planningPending} className="min-w-0">
               <section aria-labelledby="breaks-heading" id="summary-heading" className="min-w-0 scroll-mt-16">
                 <h2 id="breaks-heading" tabIndex={-1} className="scroll-mt-16 text-h2 font-bold text-ink type-condensed">Requesting each break</h2>
                 {plannable && (state.breaks.length > 0 || state.committedEntries.length > 0) ? (
@@ -627,6 +634,7 @@ export function App() {
                   </ul>
                 ) : plannable && <p data-testid="no-breaks" className="mt-2 text-sm text-muted">{noBreaksMessage(state.budget, state.effectiveBudget)}</p>}
               </section>
+              </HoldHeightWhile>
               {plannable && <a href="#planning-assumptions" className="link-mark inline-flex min-h-11 w-fit items-center text-sm">Edit workweek and employer holidays</a>}
 
               {plannable && state.breaks.length > 0 && (
@@ -673,7 +681,7 @@ export function App() {
                   <span className="hidden [@media(hover:hover)]:inline">Click a day to cycle through take off, rule out, and let the planner decide. Arrow keys move between days.</span>
                   <span className="[@media(hover:hover)]:hidden">Tap a day to change its setting.</span>
                 </p>
-                <div className="mt-4 rounded-[10px] border border-line bg-surface p-3 sm:p-5 max-[400px]:-mx-4 max-[400px]:rounded-none max-[400px]:border-x-0 max-[400px]:px-1">
+                <HoldHeightWhile holding={state.planningPending} className="mt-4 rounded-[10px] border border-line bg-surface p-3 sm:p-5 max-[400px]:-mx-4 max-[400px]:rounded-none max-[400px]:border-x-0 max-[400px]:px-1">
                   {!state.validationIssues.length && !state.planningPending ? <CalendarErrorBoundary>
                     <Calendar
                       rangeStart={state.rangeStart}
@@ -709,7 +717,7 @@ export function App() {
                       <Legend showCompany={state.holidayEntries.some((h) => h.checked && h.source === 'custom')} showBlackout={state.hasBlackouts} showPinned={Object.values(state.forced).includes('include')} showAlternatives={state.showAlternatives} />
                     </div>
                   )}
-                </div>
+                </HoldHeightWhile>
               </section>
 
               <section aria-labelledby="take-it-heading" className="flex min-w-0 flex-col gap-5">

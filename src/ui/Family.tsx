@@ -13,6 +13,7 @@ import { Footer } from './Footer';
 import { Container } from './Container';
 import { CountrySelect } from './CountrySelect';
 import { Button } from './Button';
+import { NumberStepper } from './NumberStepper';
 import { getPrerenderedAt } from './prerenderedAt';
 import { geolocateCountry } from './geo';
 import { todayISO } from './today';
@@ -216,8 +217,6 @@ export function Family() {
   const shareLink = ({ includeSchool, availability }: { includeSchool: boolean; availability?: PartnerAvailability }) =>
     buildFamilyShareURL(origin, { customOffDays: includeSchool ? schoolOffDays : [], availability });
 
-  const stepBtn = `flex h-11 w-11 shrink-0 items-center justify-center text-lg font-semibold text-ink transition-colors duration-150 hover:bg-surface-alt disabled:opacity-40 ${FOCUS}`;
-  const numberInput = 'h-11 w-14 min-w-0 border-x border-line-strong bg-surface text-center text-base font-semibold text-ink [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
   const setBudget = (n: number) => {
     setPtoBudget(Math.max(0, Math.min(MAX_FAMILY_PTO, Math.round(n))));
     setBudgetMessage('');
@@ -348,13 +347,23 @@ export function Family() {
                     </div>
                     <div className="min-w-0">
                       <label className="block text-sm font-semibold text-ink" htmlFor={PTO_INPUT_ID}>PTO for school breaks</label>
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <div className="inline-flex items-stretch overflow-hidden rounded-[6px] border border-line-strong bg-surface">
-                          <button type="button" aria-label="One fewer PTO day" disabled={ptoBudget <= 0} onClick={() => setBudget(ptoBudget - 1)} className={stepBtn}>&minus;</button>
-                          <input id={PTO_INPUT_ID} type="number" min={0} max={MAX_FAMILY_PTO} step={1} value={budgetDraft.text} aria-describedby={budgetDraft.empty ? 'family-pto-hint' : undefined} onChange={(e) => budgetDraft.onChange(e.target.value)} onBlur={budgetDraft.onBlur} className={numberInput} />
-                          <button type="button" aria-label="One more PTO day" disabled={ptoBudget >= MAX_FAMILY_PTO} onClick={() => setBudget(ptoBudget + 1)} className={stepBtn}>+</button>
-                        </div>
-                        <span className="text-sm text-muted">days</span>
+                      <div className="mt-1.5">
+                        <NumberStepper
+                          id={PTO_INPUT_ID}
+                          value={budgetDraft.text}
+                          min={0}
+                          max={MAX_FAMILY_PTO}
+                          describedBy={budgetDraft.empty ? 'family-pto-hint' : undefined}
+                          onTextChange={budgetDraft.onChange}
+                          onBlur={budgetDraft.onBlur}
+                          onDecrement={() => setBudget(ptoBudget - 1)}
+                          onIncrement={() => setBudget(ptoBudget + 1)}
+                          decrementDisabled={ptoBudget <= 0}
+                          incrementDisabled={ptoBudget >= MAX_FAMILY_PTO}
+                          decrementLabel="One fewer PTO day"
+                          incrementLabel="One more PTO day"
+                          unit="days"
+                        />
                       </div>
                       <p id="family-pto-hint" role="status" className={budgetDraft.empty ? 'mt-1.5 text-sm text-muted' : 'sr-only'}>
                         {budgetDraft.empty ? 'Enter your PTO days. Enter 0 if you have none.' : ''}

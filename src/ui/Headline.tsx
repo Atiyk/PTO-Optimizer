@@ -1,6 +1,7 @@
 import { useEffect, useState, type RefObject } from 'react';
 import type { Scores } from '@daysoff/engine/solver/types';
 import { Button } from './Button';
+import { FigureChange } from './StatNumber';
 
 interface HeadlineProps {
   budgetSpent: number;
@@ -102,7 +103,7 @@ export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, 
       <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-x-6">
         <h1 className="m-0 min-w-0 text-ink" aria-live="polite">
           <span className="block text-display-sm type-display tabular-nums">
-            <span className="mark">{totalDaysOff} {offWord} off</span>
+            <FigureChange value={totalDaysOff} memoryKey="headline-days-off"><span className="mark">{totalDaysOff} {offWord} off</span></FigureChange>
           </span>{' '}
           <span className="mt-2 block text-h2 font-bold tabular-nums type-condensed">
             {daysOffSplit(budgetSpent, totalDaysOff, unlimitedPto ? 'target' : 'PTO')}

@@ -249,6 +249,25 @@ describe('Family planner', () => {
     expect(input.value).toBe('0');
   });
 
+  it('uses the shared PTO stepper: −/+ step by one, round-trip through the URL, and stop at 0 (F28)', () => {
+    go('c=US&s=2026-11-02&pto=1');
+    render(<Family />);
+    const input = screen.getByRole<HTMLInputElement>('spinbutton', { name: 'PTO for school breaks' });
+    const more = screen.getByRole<HTMLButtonElement>('button', { name: 'One more PTO day' });
+    const fewer = screen.getByRole<HTMLButtonElement>('button', { name: 'One fewer PTO day' });
+    // The shared NumberStepper's 44px step buttons, not the old page-local ones.
+    expect(more.className).toContain('h-11 w-11');
+    expect(more.className).toContain('active:scale-[0.94]');
+    fireEvent.click(more);
+    expect(input.value).toBe('2');
+    expect(new URLSearchParams(window.location.search).get('pto')).toBe('2');
+    fireEvent.click(fewer);
+    fireEvent.click(fewer);
+    expect(input.value).toBe('0');
+    expect(new URLSearchParams(window.location.search).get('pto')).toBe('0');
+    expect(fewer.disabled).toBe(true);
+  });
+
   it('copies a comparable saved balance into the family budget only on request', () => {
     savePolicyPreferences('c=US&u=1&cb=37&hpd=7.5&bao=2026-11-01');
     go('c=US&s=2026-11-02&pto=2');
