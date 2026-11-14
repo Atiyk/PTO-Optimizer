@@ -46,6 +46,7 @@ import { PRODUCT_NAME, PRODUCT_SHORT_NAME } from '../src/brand.ts';
 import { todayISO } from '../src/ui/today.ts';
 import { prerenderAppGuard } from './prerenderAppGuard.ts';
 import { lockPrerenderedControls } from './prerenderShell.ts';
+import { preloadScriptFor } from './prerenderPreload.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '..');
@@ -322,7 +323,7 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
   // (same injection point as the JSON-LD above) is the right place.
   const ssrCountry = entry.countryPreset ?? SSR_DEFAULT_COUNTRY;
   const { holidays, sourceYears } = loadStaticHolidaysForSsr(ssrCountry);
-  const preloadScript = `    <script>window.__PTO_PRELOADED_HOLIDAYS__ = ${JSON.stringify({ [ssrCountry]: holidays })}; window.__PTO_PRELOADED_HOLIDAY_YEARS__ = ${JSON.stringify({ [ssrCountry]: sourceYears })}; window.__PTO_PRERENDERED_AT__ = ${JSON.stringify(PRERENDERED_AT)};</script>`;
+  const preloadScript = preloadScriptFor(ssrCountry, holidays, sourceYears);
   // The static planner cannot read the viewer's local plan. The home route keeps
   // its simple query guard so its default preview does no additional startup work.
   const guardScript = entry.component === 'app' ? prerenderAppGuard(ssrCountry, renderedDate, !entry.countryPreset)

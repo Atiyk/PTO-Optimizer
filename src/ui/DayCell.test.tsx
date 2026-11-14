@@ -100,10 +100,11 @@ describe('DayCell category rendering', () => {
     expect(today).toContain('ring-offset-2');
   });
 
-  it('an out-of-range day is disabled, shows no fill/category treatment, and has no decorative markers', () => {
+  it('an out-of-range day is not a control (F27), shows no fill/category treatment, and has no decorative markers', () => {
     for (const category of ['public-holiday', 'suggested-pto', 'pinned'] as DayCategory[]) {
       const html = renderCell(category, { isOutOfRange: true });
-      expect(html).toContain('disabled');
+      expect(html).not.toContain('<button');
+      expect(html).toContain('aria-hidden="true"');
       expect(html).not.toContain(COLORS.ptoBg);
       expect(html).not.toContain(HOLIDAY_DOT);
       expect(html).not.toContain('<svg');
@@ -185,10 +186,17 @@ describe('DayCell coarse-pointer disclosure', () => {
     expect(onToggle).not.toHaveBeenCalled();
   });
 
-  it('keeps disabled out-of-range days noninteractive', () => {
-    const { day, onToggle } = mountTouchDay({ isOutOfRange: true });
-    expect((day as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(day);
+  it('keeps out-of-range days noninteractive', () => {
+    const onToggle = vi.fn();
+    render(
+      <DayCell
+        date="2026-07-04" dayOfMonth={4} category="working" hasOverlap={false} isAlternative={false}
+        isToday={false} inBand={false} isHighlighted={false} isBlackout={false} isOutOfRange
+        marginalValue={null} holidayName={undefined} hasHover={false} onToggle={onToggle}
+      />,
+    );
+    expect(screen.queryByRole('button')).toBeNull();
+    fireEvent.click(screen.getByText('4'));
     expect(screen.queryByRole('group')).toBeNull();
     expect(onToggle).not.toHaveBeenCalled();
   });

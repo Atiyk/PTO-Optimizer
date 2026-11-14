@@ -271,6 +271,25 @@ export function DayCell({
           isHighlighted ? 'bg-mark-strong' : ''
         }`;
 
+  // F27: a day outside the planning range is padding that keeps the month's shape, not a
+  // control. It used to be a disabled <button>, which screen readers still listed among the
+  // buttons ("November 10, outside the selected date range, dimmed"). A hidden numeral is
+  // enough: arrow-key navigation (Calendar/MonthGrid) never targets out-of-range days.
+  if (isOutOfRange) {
+    return (
+      <div className="relative">
+        <div
+          id={`day-${date}`}
+          data-date={date}
+          aria-hidden="true"
+          className={`relative z-10 flex h-12 w-full cursor-default items-center justify-center rounded-[6px] text-sm font-medium tabular-nums ${categoryClasses}`}
+        >
+          {dayOfMonth}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={wrapperRef}
@@ -289,8 +308,7 @@ export function DayCell({
         ref={dayButtonRef}
         id={`day-${date}`}
         data-date={date}
-        disabled={isOutOfRange}
-        tabIndex={isOutOfRange ? undefined : tabIndex}
+        tabIndex={tabIndex}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         onMouseEnter={() => {
