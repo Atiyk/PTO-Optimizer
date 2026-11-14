@@ -12,6 +12,13 @@ function DateRanges({ dates }: { dates: readonly string[] }) {
   return <>{ranges.map(({ start, end }) => formatDateRange(start, end)).join(' · ')}</>;
 }
 
+/** Sentence case, written out: "Proposed availability (11 dates)", not a CSS capitalize that
+ * read as "Proposed Availability (11 Dates)". */
+export function availabilityHeading(status: 'proposed' | 'confirmed' | undefined, count: number): string {
+  const label = status === 'confirmed' ? 'Confirmed availability' : status === 'proposed' ? 'Proposed availability' : 'Availability';
+  return `${label} (${count} ${count === 1 ? 'date' : 'dates'})`;
+}
+
 /** An exact preview of the date-only payload, before the user copies it. */
 export function ShareDatePreview({
   dates, status, freeDays, schoolDates, title = 'Preview shared dates', expanded = false,
@@ -32,10 +39,10 @@ export function ShareDatePreview({
           <dd><DateRanges dates={schoolDates} /></dd>
         </>}
         {dates && <>
-          <dt className="font-semibold capitalize text-ink">{status} availability ({dates.length} dates)</dt>
+          <dt className="font-semibold text-ink">{availabilityHeading(status, dates.length)}</dt>
           <dd><DateRanges dates={dates} /></dd>
           {freeDays === null
-            ? <dd>Which dates are already off and PTO costs are undisclosed.</dd>
+            ? <dd>This doesn’t share which days are already off or their PTO costs.</dd>
             : freeDays && <>
               <dt className="font-semibold text-ink">Already off ({freeDays.length})</dt>
               <dd><DateRanges dates={freeDays} /></dd>

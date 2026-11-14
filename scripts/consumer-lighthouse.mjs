@@ -34,8 +34,8 @@ const variants = [
 const routes = [
   { name: 'home', path: '/', title: /Timebower/ },
   { name: 'pto', path: '/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15', title: /Plan your PTO/ },
-  { name: 'policy', path: '/policy/', title: /Your Time-Off Policy/ },
-  { name: 'sabbatical', path: '/sabbatical/', title: /Sabbatical Planning/ },
+  { name: 'policy', path: '/policy/', title: /Your time-off policy/i },
+  { name: 'sabbatical', path: '/sabbatical/', title: /Sabbatical planning/i },
 ];
 const outputDirectory = resolve(values['out-dir']);
 const pinnedVersions = { lighthouse: '13.6.0', '@axe-core/playwright': '4.14.0', 'chrome-launcher': '1.2.2' };

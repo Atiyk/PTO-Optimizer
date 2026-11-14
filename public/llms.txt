@@ -6,6 +6,7 @@
 - [Plan PTO](https://pto-optimizer-seven.vercel.app/pto) — deterministic interactive time-off planner; all changes update live.
 - [Homepage](https://pto-optimizer-seven.vercel.app/) — first-time planning.
 - [Policy and balance forecast](https://pto-optimizer-seven.vercel.app/policy) — estimate accrual, carryover, expiration and PTO balance.
+- [Family and school breaks](https://pto-optimizer-seven.vercel.app/family) — line up PTO with your kids' school breaks.
 - [Sabbatical planner](https://pto-optimizer-seven.vercel.app/sabbatical) — explore extended leave.
 
 ## Understand

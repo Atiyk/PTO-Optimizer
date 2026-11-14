@@ -23,10 +23,16 @@ const STATE_WORDS: Record<FamilyDayState, string> = {
   none: '',
 };
 
+/** N-P2-5: on the example plan the PTO is the example's, not the person's. */
+export function familyStateWords(state: FamilyDayState, isExample = false): string {
+  if (isExample && state === 'pto') return 'school is off, example PTO: a day with the kids';
+  return STATE_WORDS[state];
+}
+
 const swatch = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px]';
 
 /** The legend draws exactly the marks the calendar draws. */
-export function FamilyLegend({ otherAdultStatus }: { otherAdultStatus?: 'proposed' | 'confirmed' }) {
+export function FamilyLegend({ otherAdultStatus, isExample = false }: { otherAdultStatus?: 'proposed' | 'confirmed'; isExample?: boolean }) {
   return (
     <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink">
       <li className="flex min-h-7 items-center gap-2">
@@ -35,7 +41,7 @@ export function FamilyLegend({ otherAdultStatus }: { otherAdultStatus?: 'propose
       </li>
       <li className="flex min-h-7 items-center gap-2">
         <span aria-hidden="true" className={`${swatch} border ${COLORS.ptoBorder} ${COLORS.ptoBg}`} />
-        Your PTO on a school day off
+        {isExample ? 'Example PTO on a school day off' : 'Your PTO on a school day off'}
       </li>
       {otherAdultStatus && (
         <li className="flex min-h-7 items-center gap-2">
@@ -70,8 +76,10 @@ function OtherAdultNotch() {
  * screen readers.
  */
 export function FamilyCalendar({
-  months, weekStart, today, stateFor, holidayNameFor, labelFor,
+  months, weekStart, today, stateFor, holidayNameFor, labelFor, isExample = false,
 }: {
+  /** The example plan (N-P2-5): PTO cells say "example PTO" to screen readers. */
+  isExample?: boolean;
   /** First-of-month ISO dates to draw, sorted. */
   months: readonly string[];
   weekStart: 0 | 1;
@@ -110,7 +118,7 @@ export function FamilyCalendar({
                         : state === 'other-adult-proposed' ? 'border-2 border-dashed border-ink bg-surface font-semibold text-ink'
                           : state === 'uncovered' ? 'border border-dashed border-ink bg-surface font-bold text-ink'
                             : state === 'free' ? 'bg-surface-alt text-muted' : 'text-ink';
-                const words = [`${MONTH_NAMES[mo - 1]} ${Number(iso.slice(8))}`, STATE_WORDS[state], label ?? '', holidayName ? `observed holiday: ${holidayName}` : '', iso === today ? 'today' : ''].filter(Boolean).join(', ');
+                const words = [`${MONTH_NAMES[mo - 1]} ${Number(iso.slice(8))}`, familyStateWords(state, isExample), label ?? '', holidayName ? `observed holiday: ${holidayName}` : '', iso === today ? 'today' : ''].filter(Boolean).join(', ');
                 return (
                   <span
                     key={iso}

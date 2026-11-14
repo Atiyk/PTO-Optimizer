@@ -123,8 +123,8 @@ export function PartnerPlanner({ breaks, freeDays, input, minimumBreakLength = 3
             Show options for time off together.
           </label>
           {prioritize && <>
-            <p className="mt-2 text-sm text-muted">Pick one option. Each fits your own PTO and rules. Options that overlap canPick one option. Each fits your own PTO and rules, but they overlap, so you can book only one.apos;t both be booked.</p>
-            {!opportunities.length && <p role="status" className="mt-3 text-sm text-ink">No shared break of at least {Math.max(3, minimumBreakLength)} days fits your disclosed dates and PTO rules. Adjust your own dates or constraints, or share different availability.</p>}
+            <p className="mt-2 text-sm text-muted">Pick one option. Each fits your own PTO and rules. Options that overlap can&apos;t both be booked.</p>
+            {!opportunities.length && <p role="status" className="mt-3 text-sm text-ink">No shared break of at least {Math.max(3, minimumBreakLength)} days fits the shared dates and your PTO rules. Adjust your own dates or constraints, or share different availability.</p>}
             <div className="mt-4 grid gap-3 lg:grid-cols-3">
               {opportunities.map(opportunity => <article key={opportunity.kind} className="min-w-0 rounded-[10px] border border-line bg-surface p-4">
                 <h4 className="text-sm font-semibold text-ink">{opportunity.kind === 'long-weekend' ? (opportunity.break.totalDaysOff <= 4 ? 'Best shared long weekend' : 'Best shared short break') : opportunity.kind === 'week' ? 'Best shared week-long break' : 'Best shared longer vacation'}</h4>
@@ -170,10 +170,10 @@ export function PartnerPlanner({ breaks, freeDays, input, minimumBreakLength = 3
           <p className="mt-3 text-sm font-semibold text-ink">Optional</p>
           <label className="flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" className={CHECK} checked={discloseFree} disabled={!selectedDays.length} onChange={event => setDiscloseFree(event.target.checked)} />Show which of these dates I already have off.</label>
           {!proposalDays && <label className="flex min-h-11 items-center gap-2 text-sm text-ink"><input type="checkbox" className={CHECK} checked={confirmed} disabled={!selectedDays.length} onChange={event => setConfirmedSelection(event.target.checked ? selectionKey : null)} />I have confirmed the availability I am sharing.</label>}
-          {!proposalDays && <p className="mt-1 text-sm text-muted">Leave &ldquo;confirmed&rdquo; unticked and your partner sees these as proposed dates.</p>}
+          {!proposalDays && <p className="mt-1 text-sm text-muted">Leave &ldquo;confirmed&rdquo; unchecked and your partner sees these as proposed dates.</p>}
           {selectedDays.length > 0
             ? <div className="mt-3"><ShareDatePreview expanded title="What your partner will see" dates={share.days} status={share.status} freeDays={share.freeDays} /></div>
-            : <p className="mt-3 text-sm text-ink">Tick at least one set of dates to make a link.</p>}
+            : <p className="mt-3 text-sm text-ink">Check at least one set of dates to make a link.</p>}
           <p className="mt-2 text-sm text-muted">Anyone with the link sees only these dates and whether they&apos;re proposed or confirmed. Your balance, employer and private notes stay in your plan.</p>
           <Button className="mt-3" variant="secondary" disabled={!selectedDays.length} onClick={async () => {
             try {

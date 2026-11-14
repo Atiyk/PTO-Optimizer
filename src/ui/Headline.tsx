@@ -117,6 +117,12 @@ export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, 
   );
 }
 
+/** N-P2-4: the phone bar's second line, whole words: "15 PTO days · 3 breaks" (was the
+ * clipped "from 15 PTO · 3 breaks"). */
+export function compactBarDetail(budgetSpent: number, breakCountActual: number): string {
+  return `${budgetSpent} PTO ${budgetSpent === 1 ? 'day' : 'days'} · ${breakCountActual} ${breakCountActual === 1 ? 'break' : 'breaks'}`;
+}
+
 /**
  * Phones only: once the result line has scrolled away, a slim bar pinned to the top keeps the
  * figure in view while the person works the sliders and the calendar below. It is a visual
@@ -139,8 +145,8 @@ export function CompactResultBar({ watch, totalDaysOff, budgetSpent, breakCountA
       className={`fixed inset-x-0 top-0 z-30 border-b border-line bg-page/95 backdrop-blur transition-transform duration-150 ease-[var(--ease-out)] lg:hidden [@media(max-height:500px)]:hidden ${visible ? 'translate-y-0' : '-translate-y-full'}`}
     >
       <div className="mx-auto flex h-11 max-w-7xl items-center gap-3 px-4 text-sm tabular-nums text-ink sm:px-6">
-        <span className="text-lg font-extrabold type-display"><span className="mark">{totalDaysOff} days off</span></span>
-        <span className="text-muted">from {budgetSpent} PTO · {breakCountActual} {breakCountActual === 1 ? 'break' : 'breaks'}</span>
+        <span className="text-lg font-extrabold type-display"><span className="mark">{totalDaysOff} {totalDaysOff === 1 ? 'day' : 'days'} off</span></span>
+        <span className="text-muted">{compactBarDetail(budgetSpent, breakCountActual)}</span>
       </div>
     </div>
   );

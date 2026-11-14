@@ -11,7 +11,7 @@ export const FAMILY_FAQ_ITEMS: FAQItem[] = [
   {
     question: 'What happens to a photo or screenshot of the school calendar?',
     answer:
-      'It is read on your device. The text recognition runs in your browser from files this site hosts itself, the image is never uploaded, and it is released from memory as soon as the text has been read. Only the dates you tick in the review list are added; the photo, the recognised text and the snippets shown next to each date are never stored or put in the link.',
+      'It is read on your device. The text recognition runs in your browser from files this site hosts itself, the image is never uploaded, and it is released from memory as soon as the text has been read. Only the dates you check in the review list are added; the photo, the recognized text and the snippets shown next to each date are never stored or put in the link.',
   },
   {
     question: 'What does a “Share with family” link contain?',

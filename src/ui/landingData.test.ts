@@ -12,6 +12,9 @@ import {
   findBridges,
   remainingHolidays,
   runLength,
+  runClipped,
+  bridgeLinkPhrase,
+  bridgeSentence,
 } from './landingData';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import type { Holiday } from '@daysoff/engine/data/holidays';
@@ -107,7 +110,7 @@ describe('findBridges', () => {
     // the real bridge in this calendar is nothing to find here since Thu->Fri->Sat/Sun has no
     // working-day gap at all (Thu is the holiday, Fri is the one working day before the
     // weekend). Confirm that single working day IS detected as the bridge.
-    expect(bridges).toEqual([{ bridgeDate: '2026-11-27', combined: { start: '2026-11-26', end: '2026-11-29' } }]);
+    expect(bridges).toEqual([{ bridgeDate: '2026-11-27', combined: { start: '2026-11-26', end: '2026-11-29' }, clipped: false }]);
   });
 
   it('finds no bridge when the gap between two off-runs is more than one working day', () => {
@@ -191,5 +194,42 @@ describe('holidayRunPhrase (F14)', () => {
     expect(holidayRunPhrase(4)).toBe('Already a 4-day weekend');
     expect(holidayRunPhrase(9)).toBe('Already 9 days off in a row');
     for (const n of [1, 2, 3, 4, 9]) expect(holidayRunPhrase(n)).not.toMatch(/PTO|calendar/);
+  });
+});
+
+describe('runs cut by the edge of the planning dates (N-P2-2)', () => {
+  // Veterans Day 2027 is Thursday Nov 11. A Friday PTO day makes Thu to Sun, but a window
+  // that ends on Saturday Nov 13 only sees Thu to Sat.
+  const VETERANS_2027: Holiday = { date: '2027-11-11', nominalDate: '2027-11-11', name: 'Veterans Day', countryCode: 'US', counties: null };
+  const set = holidaySet(VETERANS_2027);
+
+  it('marks the bridge as clipped when the window ends mid-weekend, and says the count is within the dates', () => {
+    const [bridge] = findBridges('2027-11-01', '2027-11-13', set);
+    expect(bridge).toEqual({ bridgeDate: '2027-11-12', combined: { start: '2027-11-11', end: '2027-11-13' }, clipped: true });
+    expect(bridgeLinkPhrase(bridge)).toBe('Connect 3 days off within your dates');
+    expect(bridgeSentence(bridge)).toBe('One PTO day connects 3 days off within your dates.');
+    expect(bridgeLinkPhrase(bridge)).not.toMatch(/3-day break/);
+  });
+
+  it('keeps the plain "N-day break" wording when the window holds the whole break', () => {
+    const [bridge] = findBridges('2027-11-01', '2027-11-30', set);
+    expect(bridge.clipped).toBe(false);
+    expect(bridgeLinkPhrase(bridge)).toBe('Connect a 4-day break');
+    expect(bridgeSentence(bridge)).toBe('One PTO day can connect a 4-day break.');
+  });
+
+  it('flags a holiday run cut at either edge, and phrases it as a count within the dates', () => {
+    // Window ends Saturday: the Sat run continues into Sunday.
+    expect(runClipped({ start: '2027-11-13', end: '2027-11-13' }, '2027-11-01', '2027-11-13', set)).toBe(true);
+    // Window ends Sunday: Monday is a working day, nothing is cut.
+    expect(runClipped({ start: '2027-11-13', end: '2027-11-14' }, '2027-11-01', '2027-11-14', set)).toBe(false);
+    // Today is Saturday: the run that starts Sunday began before the window.
+    expect(runClipped({ start: '2027-11-07', end: '2027-11-07' }, '2027-11-06', '2027-11-30', set)).toBe(true);
+    const thanksgivingFriday: Holiday = { date: '2027-11-26', nominalDate: '2027-11-26', name: 'Day after Thanksgiving', countryCode: 'US', counties: null };
+    const [entry] = remainingHolidays('2027-11-15', '2027-11-27', [thanksgivingFriday]);
+    expect(entry.clipped).toBe(true);
+    expect(holidayRunPhrase(entry.runLength, entry.clipped)).toBe('2 days off within your dates');
+    expect(holidayRunPhrase(1, true)).toBe('1 day off within your dates');
+    expect(nextHoliday('2027-11-01', '2027-11-13', [VETERANS_2027])?.bridge?.clipped).toBe(true);
   });
 });

@@ -34,8 +34,8 @@ try {
   await Promise.all([tracker.goto(new URL('/policy/', base).href), importer.goto(new URL('/policy/', base).href)]);
   assert.equal(await importer.evaluate(() => typeof navigator.locks?.request), 'function');
   await importer.getByText('Back up or move your saved data', { exact: true }).click();
-  const input = importer.getByLabel('Review a wallet backup');
-  const merge = importer.getByRole('button', { name: 'Merge wallet banks' });
+  const input = importer.getByLabel('Review a backup file');
+  const merge = importer.getByRole('button', { name: 'Merge with saved balances' });
   await importer.waitForFunction(() => {
     const field = document.querySelector('input[accept=".json,application/json"]');
     return field && !field.disabled;
@@ -47,12 +47,12 @@ try {
   await tracker.getByLabel(`Status for request ${date}`).selectOption('approved');
   await tracker.waitForFunction((key) => JSON.parse(localStorage.getItem(key)).requests[0].status === 'approved', storageKey);
   await merge.click();
-  await importer.getByText(/wallet or tracked requests changed/i).waitFor({ state: 'visible' });
+  await importer.getByText(/saved balances or tracked requests changed/i).waitFor({ state: 'visible' });
   assert.equal(await importer.evaluate((key) => localStorage.getItem(key), walletKey), null);
 
   await input.setInputFiles(backup);
   await merge.click();
-  await importer.getByText(/Wallet banks saved in this browser/).waitFor({ state: 'visible' });
+  await importer.getByText(/Balances from the backup are saved in this browser/).waitFor({ state: 'visible' });
   const saved = await importer.evaluate(({ walletKey, storageKey }) => ({
     bank: JSON.parse(localStorage.getItem(walletKey)).banks[0].name,
     request: JSON.parse(localStorage.getItem(storageKey)).requests[0],

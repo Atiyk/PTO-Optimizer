@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { headlineText, Headline, balanceLine, daysOffSplit } from './Headline';
+import { headlineText, Headline, balanceLine, daysOffSplit, compactBarDetail } from './Headline';
 
 describe('headlineText (Phase 3.1: reserve days read as deliberate, never as unspent budget)', () => {
   it('leads with "N of M days planned · R kept in reserve" when a reserve is set', () => {
@@ -129,5 +129,13 @@ describe('daysOffSplit (honest arithmetic under the total)', () => {
   it('makes no split claim when PTO bought nothing extra or nothing was placed', () => {
     expect(daysOffSplit(5, 5)).toBe('from 5 PTO days');
     expect(daysOffSplit(0, 0)).toBe('from 0 PTO days');
+  });
+});
+
+describe('compactBarDetail (N-P2-4)', () => {
+  it('says "15 PTO days" in whole words, not the clipped "from 15 PTO"', () => {
+    expect(compactBarDetail(15, 3)).toBe('15 PTO days · 3 breaks');
+    expect(compactBarDetail(1, 1)).toBe('1 PTO day · 1 break');
+    expect(compactBarDetail(15, 3)).not.toMatch(/^from/);
   });
 });
