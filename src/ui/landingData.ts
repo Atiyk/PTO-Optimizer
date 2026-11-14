@@ -133,6 +133,22 @@ export interface Bridge {
   bridgeDate: string;
   /** The combined run that results once `bridgeDate` is added. */
   combined: OffRun;
+  /** True when the combined run is cut by the edge of the planning dates and the days off
+   * carry on past it, so its length here is a count within the user's dates (N-P2-2). */
+  clipped: boolean;
+}
+
+/**
+ * N-P2-2: a run counted inside (today, horizonEnd] can stop at the window's edge while the
+ * days off carry on: Veterans Day 2027 is a Thursday, so a Friday PTO day makes Thu to Sun,
+ * but a window ending Saturday only sees Thu to Sat. True when the day just past either edge
+ * is also off, so the copy can say the count is "within your dates" instead of understating
+ * the break. Holidays outside the window may be missing from `holidaySet`; weekends are not.
+ */
+export function runClipped(run: OffRun, today: string, horizonEnd: string, holidaySet: ReadonlySet<string>, workWeek: WorkWeek = DEFAULT_WORK_WEEK): boolean {
+  const clippedAtStart = run.start === addDays(today, 1) && isOffDay(today, holidaySet, workWeek);
+  const clippedAtEnd = run.end === horizonEnd && isOffDay(addDays(horizonEnd, 1), holidaySet, workWeek);
+  return clippedAtStart || clippedAtEnd;
 }
 
 /** Every off-run in (today, horizonEnd] that is separated from the NEXT off-run by exactly
@@ -148,7 +164,8 @@ export function findBridges(today: string, horizonEnd: string, holidaySet: Reado
     const gapStart = addDays(a.end, 1);
     if (gapStart === b.start) continue; // adjacent already, nothing to bridge
     if (addDays(gapStart, 1) !== b.start) continue; // gap of more than one day - not a single-day bridge
-    bridges.push({ bridgeDate: gapStart, combined: { start: a.start, end: b.end } });
+    const combined = { start: a.start, end: b.end };
+    bridges.push({ bridgeDate: gapStart, combined, clipped: runClipped(combined, today, horizonEnd, holidaySet, workWeek) });
   }
   return bridges;
 }
@@ -159,6 +176,8 @@ export interface NextHoliday {
   /** The off-run (weekend+holiday stretch) this holiday already sits inside. */
   run: OffRun;
   runLength: number;
+  /** True when `run` is cut by the edge of the planning dates (see `runClipped`). */
+  clipped: boolean;
   /** The nearest bridge touching this holiday's own run, if one PTO day would extend it. */
   bridge: Bridge | undefined;
 }
@@ -178,7 +197,7 @@ export function nextHoliday(today: string, horizonEnd: string, holidays: Holiday
   if (!run) return undefined; // shouldn't happen - a holiday date is always off - defensive only
   const bridges = findBridges(today, horizonEnd, holidaySet, workWeek);
   const bridge = bridges.find((b) => b.combined.start === run.start || b.combined.end === run.end);
-  return { holiday, daysAway: daysBetween(today, holiday.date), run, runLength: runLength(run), bridge };
+  return { holiday, daysAway: daysBetween(today, holiday.date), run, runLength: runLength(run), clipped: runClipped(run, today, horizonEnd, holidaySet, workWeek), bridge };
 }
 
 export interface RemainingHoliday {
@@ -188,6 +207,8 @@ export interface RemainingHoliday {
   /** The off-run (weekend+holiday stretch) this holiday falls inside. */
   run: OffRun;
   runLength: number;
+  /** True when `run` is cut by the edge of the planning dates (see `runClipped`). */
+  clipped: boolean;
   /** True if this holiday's run is one PTO day away (either side) from a longer break. */
   isBridgeable: boolean;
   /** True if the published date differs from the nominal calendar date (weekend-shifted). */
@@ -230,6 +251,7 @@ export function remainingHolidays(
       daysAway: daysBetween(today, h.date),
       run,
       runLength: runLength(run),
+      clipped: runClipped(run, today, yearEnd, holidaySet, workWeek),
       isBridgeable: bridgeRunKeys.has(run.start),
       isObserved: h.date !== h.nominalDate,
     });
@@ -269,9 +291,30 @@ export function holidayDisplayName(name: string, country: string): string {
  * weekend" rather than "3 calendar days off before PTO". `runLength` is the number of days
  * off in a row, weekends included, around the holiday (Monday to Friday work week).
  */
-export function holidayRunPhrase(runLength: number): string {
+export function holidayRunPhrase(runLength: number, clipped = false): string {
+  // N-P2-2: a run cut by the edge of the planning dates is longer than this count, so say
+  // what was counted rather than call it a "3-day weekend".
+  if (clipped) return `${runLength} ${runLength === 1 ? 'day' : 'days'} off within your dates`;
   if (runLength <= 1) return 'A single day off';
   if (runLength === 2) return '2 days off in a row';
   if (runLength <= 4) return `Already a ${runLength}-day weekend`;
   return `Already ${runLength} days off in a row`;
+}
+
+/**
+ * N-P2-2: the holiday row's link text. A bridge cut by the edge of the planning dates gives
+ * the count within those dates ("Connect 3 days off within your dates") instead of calling a
+ * Thursday-to-Sunday break a "3-day break".
+ */
+export function bridgeLinkPhrase(bridge: Bridge): string {
+  const days = runLength(bridge.combined);
+  return bridge.clipped ? `Connect ${days} days off within your dates` : `Connect a ${days}-day break`;
+}
+
+/** N-P2-2: the "Next up" sentence's bridge clause, with the same edge-of-dates rule. */
+export function bridgeSentence(bridge: Bridge): string {
+  const days = runLength(bridge.combined);
+  return bridge.clipped
+    ? `One PTO day connects ${days} days off within your dates.`
+    : `One PTO day can connect a ${days}-day break.`;
 }

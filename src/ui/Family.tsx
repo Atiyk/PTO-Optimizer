@@ -499,6 +499,7 @@ export function Family() {
                     schoolLabels={schoolLabels}
                     otherAdultStatus={received.availability?.status}
                     headingSuffix={exampleTag}
+                    isExample={isExample}
                   />
 
                   <UncoveredSection plan={plan} schoolSources={schoolSources} calendarReady={calendarReady} isExample={isExample} />
@@ -659,9 +660,10 @@ function monthsOf(breaks: readonly SchoolBreak[]): string[] {
 }
 
 function CalendarSection({
-  plan, weekStart, today, parentFreeSet, holidayNames, schoolLabels, otherAdultStatus, headingSuffix = '',
+  plan, weekStart, today, parentFreeSet, holidayNames, schoolLabels, otherAdultStatus, headingSuffix = '', isExample = false,
 }: {
   headingSuffix?: string;
+  isExample?: boolean;
   plan: FamilyPlanResult;
   weekStart: 0 | 1;
   today: string;
@@ -691,8 +693,9 @@ function CalendarSection({
   return (
     <section aria-labelledby="family-calendar-heading">
       <h2 id="family-calendar-heading" className="text-h2 font-bold type-condensed text-ink">On the calendar{headingSuffix}</h2>
-      <FamilyLegend otherAdultStatus={otherAdultStatus} />
+      <FamilyLegend otherAdultStatus={otherAdultStatus} isExample={isExample} />
       <FamilyCalendar
+        isExample={isExample}
         months={months}
         weekStart={weekStart}
         today={today}

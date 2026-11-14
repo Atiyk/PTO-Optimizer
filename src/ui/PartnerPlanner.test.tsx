@@ -88,6 +88,8 @@ describe('partner planner controls', () => {
     window.history.replaceState(null, '', buildPartnerShareURL(window.location.origin, '/pto', { days, freeDays: null, status: 'proposed' }));
     render(<PartnerPlanner breaks={[otherBreak]} freeDays={['2027-07-03', '2027-07-05', '2027-09-04']} input={input} />);
     expect(screen.getAllByText('PTO not shared').length).toBeGreaterThan(0);
+    // P2: the options intro once shipped as a garbled double sentence ("...canPick one option...apos;t").
+    expect(screen.getByText("Pick one option. Each fits your own PTO and rules. Options that overlap can't both be booked.")).toBeTruthy();
     fireEvent.click(screen.getAllByRole('button', { name: 'Propose these dates' })[0]);
     expect(copied).toHaveLength(0);
     expect(screen.getByText('What your partner will see')).toBeTruthy();
@@ -104,7 +106,7 @@ describe('partner planner controls', () => {
     render(<PartnerPlanner breaks={[brk]} freeDays={[]} input={input} />);
     fireEvent.click(screen.getByRole('button', { name: 'Plan with someone' }));
     expect(screen.getByRole('group', { name: 'Dates you could take off' })).toBeTruthy();
-    expect(screen.getByText('Tick at least one set of dates to make a link.')).toBeTruthy();
+    expect(screen.getByText('Check at least one set of dates to make a link.')).toBeTruthy();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Jul 3 - Jul 11, 2027' }));
     expect(screen.getByText('What your partner will see')).toBeTruthy();
     expect(screen.getByText(/Anyone with the link sees only these dates/)).toBeTruthy();

@@ -46,9 +46,9 @@ const routes = [
   // Vite preview serves directory indexes at /pto/, whereas Vercel also maps the
   // clean /pto URL. A slashless preview URL silently falls back to the homepage.
   { name: 'pto', path: '/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15', title: /Plan your PTO/ },
-  { name: 'policy', path: '/policy/', title: /Your Time-Off Policy/ },
-  { name: 'sabbatical', path: '/sabbatical/', title: /Sabbatical Planning/ },
-  { name: 'family', path: '/family/?d=nyc-doe-2026-27&s=2026-11-04', title: /Family & School Breaks/ },
+  { name: 'policy', path: '/policy/', title: /Your time-off policy/i },
+  { name: 'sabbatical', path: '/sabbatical/', title: /Sabbatical planning/i },
+  { name: 'family', path: '/family/?d=nyc-doe-2026-27&s=2026-11-04', title: /Family (&|and) school breaks/i },
   { name: 'understand', path: '/glossary/', title: /Glossary/ },
   { name: 'guide-accrual', path: '/glossary/accrual/', title: /Glossary/, guideHeading: 'How to forecast the PTO you will earn' },
   { name: 'guide-carryover', path: '/glossary/carryover/', title: /Glossary/, guideHeading: 'What happens to unused PTO at year end?' },
