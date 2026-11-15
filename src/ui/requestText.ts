@@ -46,13 +46,20 @@ export function formatWorkingDaysList(brk: Break, isPtoDay: (iso: string) => boo
 function coverageSentence(brk: Break, ptoCount: number): string {
   const dayWord = ptoCount === 1 ? 'day' : 'days';
   const totalWord = brk.totalDaysOff === 1 ? 'day' : 'days';
-  return `I'd like to request time off covering ${formatCardDateRange(brk.start, brk.end)} — ${brk.totalDaysOff} ${totalWord} away from work in total, using ${ptoCount} PTO ${dayWord}.`;
+  return `I'd like to request time off covering ${datedSpan(brk.start, brk.end)} — ${brk.totalDaysOff} ${totalWord} away from work in total, using ${ptoCount} PTO ${dayWord}.`;
+}
+
+/** "Oct 24 – Nov 1, 2026": a request can be read months later, so the span carries its year. */
+function datedSpan(start: string, end: string): string {
+  const range = formatCardDateRange(start, end);
+  return start.slice(0, 4) === end.slice(0, 4) && !range.includes(start.slice(0, 4)) ? `${range}, ${start.slice(0, 4)}` : range;
 }
 
 function specificsSentence(dates: string[], freeDays: number): string {
   const list = dates.map(formatWeekdayDate).join(', ');
   if (freeDays > 0) {
-    return `The PTO days needed are ${list}, with the rest covered by the surrounding weekend${freeDays === 1 ? '' : 's'}/holiday${freeDays === 1 ? '' : 's'}.`;
+    const needed = dates.length === 1 ? `The PTO day needed is ${list}` : `The PTO days needed are ${list}`;
+    return `${needed}; the other ${freeDays === 1 ? 'day falls' : `${freeDays} days fall`} on a weekend or holiday.`;
   }
   return `All of this comes from my PTO balance: ${list}.`;
 }

@@ -74,12 +74,12 @@ afterEach(() => {
 describe('BreakCard defaultExpanded (regression: async holiday loading changes which break is "position 0")', () => {
   it('BUG FOUND: a plain useState(defaultExpanded) locked in a mount-time snapshot, so a break that was briefly "position 0" during an early render (before holidays loaded) stayed expanded forever, even after it moved away from position 0 once the real plan settled - leaving two cards expanded. Fixed: `expanded` now mirrors the CURRENT defaultExpanded prop every render, absent an explicit user choice.', () => {
     const { rerender } = mountInteractive({ defaultExpanded: true });
-    expect(container!.textContent).toContain('Hide request tools');
+    expect(container!.textContent).toContain('Hide request steps');
 
     // The plan settles (e.g. holidays finish loading) and this break is no longer position 0.
     rerender({ defaultExpanded: false });
     expect(container!.textContent).toContain('Request this time off');
-    expect(container!.textContent).not.toContain('Hide request tools');
+    expect(container!.textContent).not.toContain('Hide request steps');
   });
 
   it('an explicit user choice overrides the prop on every later render, in both directions', () => {
@@ -87,11 +87,11 @@ describe('BreakCard defaultExpanded (regression: async holiday loading changes w
     act(() => {
       container!.querySelector('button')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
-    expect(container!.textContent).toContain('Hide request tools');
+    expect(container!.textContent).toContain('Hide request steps');
 
     // Even if the prop later says this card should collapse, the user's own expand stands.
     rerender({ defaultExpanded: false });
-    expect(container!.textContent).toContain('Hide request tools');
+    expect(container!.textContent).toContain('Hide request steps');
   });
 });
 
@@ -135,11 +135,12 @@ describe('BreakCard collapse (UI density pass: collapsed by default, request too
       />,
     );
     expect(html).toContain('Copy request');
-    expect(html).toContain('Hide request tools');
+    expect(html).toContain('Sent it? Keep track here');
+    expect(html).toContain('Hide request steps');
     expect(html).not.toContain('Request this time off');
   });
 
-  it('a single "Copy request" control replaces the three always-visible copy buttons', () => {
+  it('a single primary "Copy request" control; the other formats sit behind one disclosure', () => {
     const html = renderToStaticMarkup(
       <BreakCard
         brk={makeBreak()}
@@ -154,10 +155,8 @@ describe('BreakCard collapse (UI density pass: collapsed by default, request too
         defaultExpanded
       />,
     );
-    expect(html).not.toContain('Copy date list</button>');
-    expect(html).not.toContain('Copy email draft</button>');
-    expect(html).not.toContain('Copy detailed email draft</button>');
-    expect((html.match(/Copy request/g) || []).length).toBe(1);
+    expect((html.match(/>Copy request</g) || []).length).toBe(1);
+    expect(html).toMatch(/<details[^>]*><summary[^>]*>Other formats and calendar file<\/summary>/);
   });
 });
 
@@ -181,109 +180,97 @@ describe('BreakCard reason (Phase 3 step 4: "why" line, computed by breakReason.
 });
 
 
-describe('BreakCard copy-request menu keyboard and touch access', () => {
-  function trigger(): HTMLButtonElement {
-    const button = Array.from(container!.querySelectorAll('button')).find((el) => el.textContent?.includes('Copy request'));
-    if (!button) throw new Error('Copy request trigger missing');
-    return button;
-  }
+describe('BreakCard request panel (one place to ask: workdays, ask-by date, copy, mark requested)', () => {
+  const june = makeBreak({
+    id: '2027-06-12|2027-06-20', start: '2027-06-12', end: '2027-06-20',
+    days: ['2027-06-12', '2027-06-13', '2027-06-14', '2027-06-15', '2027-06-16', '2027-06-17', '2027-06-18', '2027-06-19', '2027-06-20'],
+    totalDaysOff: 9, ptoCost: 4, multiplier: 2.25,
+  });
+  // Mon Jun 14 to Thu Jun 17 are PTO; Fri Jun 18 is a (Juneteenth-observed) holiday.
+  const isPto = (date: string) => ['2027-06-14', '2027-06-15', '2027-06-16', '2027-06-17'].includes(date);
+  const holiday = (date: string) => date === '2027-06-18' ? 'Juneteenth' : undefined;
+  const open = () => {
+    const toggle = Array.from(container!.querySelectorAll('button')).find((el) => el.textContent?.includes('Request this time off'))!;
+    act(() => { toggle.click(); });
+    return toggle;
+  };
+  const button = (name: string) => Array.from(container!.querySelectorAll('button')).find((el) => el.textContent?.trim() === name);
 
-  function key(target: EventTarget, value: string) {
-    act(() => {
-      target.dispatchEvent(new KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true }));
-    });
-  }
-
-  it('opens with focus on first item, supports arrow/Home/End navigation, and restores trigger focus on Escape', () => {
-    mountInteractive({ defaultExpanded: true });
-    const button = trigger();
-    expect(button.className).toContain('min-h-11');
-    act(() => { button.click(); });
-    const items = Array.from(container!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
-    expect(items).toHaveLength(3);
-    expect(document.activeElement).toBe(items[0]);
-    expect(button.getAttribute('aria-expanded')).toBe('true');
-    expect(button.getAttribute('aria-controls')).toBe(container!.querySelector('[role="menu"]')?.id);
-    for (const item of items) expect(item.className).toContain('min-h-11');
-
-    key(items[0], 'ArrowDown');
-    expect(document.activeElement).toBe(items[1]);
-    key(items[1], 'End');
-    expect(document.activeElement).toBe(items[2]);
-    key(items[2], 'ArrowDown');
-    expect(document.activeElement).toBe(items[0]);
-    key(items[0], 'Home');
-    expect(document.activeElement).toBe(items[0]);
-
-    key(document, 'Escape');
-    expect(container!.querySelector('[role="menu"]')).toBeNull();
-    expect(button.getAttribute('aria-expanded')).toBe('false');
-    expect(document.activeElement).toBe(button);
+  it('names exactly the workdays to ask for, the free days around them, and one ask-by date', () => {
+    mountInteractive({ brk: june, isPtoDay: isPto, holidayNameFor: holiday, today: '2027-05-01', noticePeriodDays: 14 });
+    const toggle = open();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const panel = container!.querySelector('[data-request-panel]')!;
+    expect(panel.querySelector('h4')?.textContent).toBe('Ask for 4 workdays off');
+    expect(Array.from(panel.querySelectorAll('ul[aria-label="PTO days to request"] li')).map((li) => li.textContent))
+      .toEqual(['Mon Jun 14', 'Tue Jun 15', 'Wed Jun 16', 'Thu Jun 17']);
+    expect(panel.textContent).toContain('The other 5 days are already off: weekend and Juneteenth');
+    // 14 calendar days before the first day away (Mon Jun 14) is Mon May 31.
+    const deadline = panel.querySelector('[data-request-deadline]')!;
+    expect(deadline.getAttribute('data-request-deadline')).toBe('2027-05-31');
+    expect(deadline.textContent).toBe('Ask by Mon May 31, 30 days from today, for 14-day notice.');
+    // One primary copy action; the other formats are behind one disclosure.
+    expect(Array.from(panel.querySelectorAll('button')).filter((el) => el.textContent === 'Copy request')).toHaveLength(1);
+    expect(panel.querySelector('details')?.open).toBe(false);
+    expect(panel.querySelector('summary')?.textContent).toBe('Other formats and calendar file');
   });
 
-  it('ArrowUp opens at the last format and ArrowDown wraps back to the first', () => {
-    mountInteractive({ defaultExpanded: true });
-    const button = trigger();
-    key(button, 'ArrowUp');
-    const items = Array.from(container!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
-    expect(document.activeElement).toBe(items[2]);
-    key(items[2], 'ArrowDown');
-    expect(document.activeElement).toBe(items[0]);
-    key(items[0], 'ArrowUp');
-    expect(document.activeElement).toBe(items[2]);
+  it('says to ask now once the notice window has opened', () => {
+    mountInteractive({ brk: june, isPtoDay: isPto, today: '2027-06-05', noticePeriodDays: 14 });
+    open();
+    const deadline = container!.querySelector('[data-request-deadline]')!;
+    expect(deadline.getAttribute('data-deadline-tone')).toBe('now');
+    expect(deadline.textContent).toBe('Ask now, the 14-day notice window opened Mon May 31.');
   });
 
-  it('copies the selected format, returns focus, and announces clipboard success', async () => {
+  it('copies a manager-ready request and announces it, without recording anything', async () => {
     const writeText = vi.fn(async (_text: string) => undefined);
+    const onMarkRequested = vi.fn(() => ({ ok: true, message: 'Marked requested' }));
     const previous = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
     try {
-      mountInteractive({ defaultExpanded: true });
-      const button = trigger();
-      act(() => { button.click(); });
-      const email = Array.from(container!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))[1];
-      await act(async () => {
-        email.click();
-        await Promise.resolve();
-      });
+      mountInteractive({ brk: june, isPtoDay: isPto, today: '2027-05-01', onMarkRequested });
+      open();
+      await act(async () => { button('Copy request')!.click(); await Promise.resolve(); });
       expect(writeText).toHaveBeenCalledOnce();
-      expect(writeText.mock.calls[0][0]).toContain("I'd like to request time off");
-      expect(container!.querySelector('[role="menu"]')).toBeNull();
-      expect(document.activeElement).toBe(button);
-      expect(container!.querySelector('[role="status"]')?.textContent).toContain('Request copied');
+      expect(writeText.mock.calls[0][0]).toContain("I'd like to request time off covering Jun 12 – 20, 2027");
+      expect(writeText.mock.calls[0][0]).toContain('Mon Jun 14, Tue Jun 15, Wed Jun 16, Thu Jun 17');
+      expect(container!.querySelector('[data-request-panel] [role="status"]')?.textContent).toBe('Request copied. Paste it into an email or your HR tool.');
+      // Copying text is not asking: nothing is recorded until the person says they asked.
+      expect(onMarkRequested).not.toHaveBeenCalled();
+      expect(button('Copied ✓')).toBeTruthy();
     } finally {
       if (previous) Object.defineProperty(navigator, 'clipboard', previous);
       else Reflect.deleteProperty(navigator, 'clipboard');
     }
   });
 
-  it('allows Tab to leave the menu without a keyboard trap', () => {
-    mountInteractive({ defaultExpanded: true });
-    act(() => { trigger().click(); });
-    const first = container!.querySelector<HTMLButtonElement>('[role="menuitem"]')!;
-    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
-    act(() => { first.dispatchEvent(event); });
-    expect(event.defaultPrevented).toBe(false);
-    expect(container!.querySelector('[role="menu"]')).toBeNull();
+  it('marks requested only on the explicit action, and shows a failure in place', () => {
+    const onMarkRequested = vi.fn(() => ({ ok: false, message: 'Browser storage could not be coordinated.' }));
+    mountInteractive({ brk: june, isPtoDay: isPto, today: '2027-05-01', onMarkRequested });
+    open();
+    act(() => { button('Mark requested')!.click(); });
+    expect(onMarkRequested).toHaveBeenCalledOnce();
+    expect(container!.querySelector('[data-request-panel] [role="status"]')?.textContent).toBe('Browser storage could not be coordinated.');
   });
 
-  it('dismisses on outside pointer interaction and outside keyboard focus without trapping focus', () => {
-    mountInteractive({ defaultExpanded: true });
-    const button = trigger();
-    act(() => { button.click(); });
-    act(() => { document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })); });
-    expect(container!.querySelector('[role="menu"]')).toBeNull();
+  it('never claims approval or that anything was sent', () => {
+    mountInteractive({ brk: june, isPtoDay: isPto, today: '2027-05-01', onMarkRequested: () => ({ ok: true, message: '' }) });
+    open();
+    const text = container!.textContent!;
+    expect(text).not.toMatch(/approved|request sent|submitted/i);
+    expect(text).toContain('Timebower doesn’t send anything or contact your employer.');
+  });
 
-    act(() => { button.click(); });
-    const outside = document.createElement('button');
-    document.body.appendChild(outside);
-    try {
-      act(() => { outside.focus(); });
-      expect(container!.querySelector('[role="menu"]')).toBeNull();
-      expect(document.activeElement).toBe(outside);
-    } finally {
-      outside.remove();
-    }
+  it('shows a saved, canceled or declined record and still lets the person ask', () => {
+    const { rerender } = mountInteractive({ brk: june, isPtoDay: isPto, record: 'considering', onSave: () => ({ ok: true, message: '' }) });
+    expect(container!.querySelector('[data-break-record]')?.textContent).toBe('Saved');
+    expect(button('Save break')).toBeUndefined();
+    expect(container!.textContent).toContain('Request this time off');
+    rerender({ record: 'rejected' });
+    expect(container!.querySelector('[data-break-record]')?.textContent).toBe('Declined in My PTO');
+    rerender({ record: 'canceled' });
+    expect(container!.querySelector('[data-break-record]')?.textContent).toBe('Canceled in My PTO');
   });
 });
 

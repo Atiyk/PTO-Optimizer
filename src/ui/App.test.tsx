@@ -39,11 +39,13 @@ describe('planner result actions', () => {
     const [card] = within(requests).getAllByRole('listitem');
     expect(card.getAttribute('data-break-pto')).toBe('1');
     expect(within(card).getByText('1 working day: Mon Jan 4')).toBeTruthy();
-    expect(within(card).getByRole('button', { name: 'Track this PTO request' })).toBeTruthy();
-    // F11: the first card's request tools start collapsed like every other card.
-    expect(within(card).queryByRole('button', { name: 'Export this break (.ics)' })).toBeNull();
+    // F11: the first card's request steps start collapsed like every other card.
+    expect(within(card).queryByRole('button', { name: 'Mark requested' })).toBeNull();
+    expect(within(card).queryByRole('button', { name: 'Download calendar file (.ics)' })).toBeNull();
     fireEvent.click(within(card).getByRole('button', { name: /Request this time off/ }));
-    expect(within(card).getByRole('button', { name: 'Export this break (.ics)' })).toBeTruthy();
+    expect(within(card).getByRole('button', { name: 'Copy request' })).toBeTruthy();
+    expect(within(card).getByRole('button', { name: 'Mark requested' })).toBeTruthy();
+    expect(within(card).getByRole('button', { name: 'Download calendar file (.ics)' })).toBeTruthy();
     // Export and share live in "More", right under the one primary action.
     const more = document.getElementById('more-actions')!;
     expect(within(more).getByRole('button', { name: 'Download once (.ics)' }).id).toBe('shortcut-download-ics');
@@ -57,46 +59,97 @@ describe('planner result actions', () => {
     expect(screen.getByRole('heading', { name: "My employer's holidays" })).toBeTruthy();
   });
 
-  it('restores the tracked card state from the same browser without offering a duplicate', async () => {
+  it('marks a break requested once, keeps it visible on return, and never offers a duplicate', async () => {
     const first = render(<App />);
-    const track = await screen.findByRole('button', { name: 'Track this PTO request' });
-    const card = track.closest('li')!;
+    const toggle = await screen.findByRole('button', { name: /Request this time off/ });
+    const card = toggle.closest('li')!;
     const [start, end] = [card.getAttribute('data-break-start'), card.getAttribute('data-break-end')];
-    fireEvent.click(track);
-    // The break stays in the results as a committed entry, with its confirmation on the card.
+    fireEvent.click(toggle);
+    fireEvent.click(within(card).getByRole('button', { name: 'Mark requested' }));
+    // The break stays in the results as a requested entry, with focus and its confirmation on it.
     const cards = () => screen.getByRole('region', { name: 'Requesting each break' });
     const committed = await within(cards()).findByTestId('committed-entry');
     expect(committed.getAttribute('data-committed-start')).toBe(start);
     expect(committed.getAttribute('data-committed-end')).toBe(end);
-    expect(document.activeElement).toBe(within(committed).getByRole('link', { name: 'See My PTO requests' }));
-    expect(within(committed).getByText('Tracked · planned')).toBeTruthy();
+    expect(committed.getAttribute('data-committed-status')).toBe('requested');
+    expect(document.activeElement).toBe(within(committed).getByRole('heading', { level: 3 }));
+    expect(committed.querySelector('[data-committed-label]')?.textContent).toBe('Requested');
     expect(within(committed).getByText('1 PTO day')).toBeTruthy();
-    expect(within(committed).getByRole('status').textContent).toBe('PTO request tracked in this browser.');
+    expect(within(committed).getByRole('status').textContent).toBe('Marked requested in this browser. When your manager answers, mark it approved here or in My PTO.');
     expect(within(committed).getByRole('link', { name: 'See My PTO requests' }).getAttribute('href')).toBe('#requests');
+    expect(within(committed).queryByText(/^Approved$/)).toBeNull();
     first.unmount();
     render(<App />);
     // Tentative time off: already off and its PTO reserved once, so it is not recommended
-    // or offered for tracking again, but it remains visible with its label.
+    // or offered for requesting again, but it remains visible with its label.
     const summary = await screen.findByTestId('tracked-requests-summary');
     expect(summary.textContent).toBe('Includes 0 approved days off · 1 tentative, 1 reserved from the budget.');
     await waitFor(() => expect(screen.getByRole('region', { name: 'Your plan' }).getAttribute('data-plan-result')).not.toBe('pending'));
     const restored = within(cards()).getByTestId('committed-entry');
-    expect(within(restored).getByText('Tracked · planned')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Track this PTO request' })).toBeNull();
+    expect(restored.querySelector('[data-committed-label]')?.textContent).toBe('Requested');
+    expect(screen.queryByRole('button', { name: 'Mark requested' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Request this time off/ })).toBeNull();
     // The planner links to the tracker in My PTO instead of repeating it (F20).
     const requestsLine = screen.getByRole('region', { name: 'My PTO requests' });
     expect(within(requestsLine).getByTestId('request-count').textContent).toBe('My PTO has 1 request from this browser.');
     expect(within(requestsLine).getByRole('link', { name: 'Manage requests in My PTO' }).getAttribute('href')).toBe('/policy#requests');
     expect(within(requestsLine).queryByRole('combobox')).toBeNull();
     const stored = JSON.parse(localStorage.getItem('gapless.personal.requests.v1')!);
-    expect(stored.requests[0].status).toBe('planned');
-    // Approving it in My PTO keeps it visible with the approved label and the same reserved budget.
-    stored.requests[0].status = 'approved';
-    localStorage.setItem('gapless.personal.requests.v1', JSON.stringify(stored));
+    expect(stored.requests).toHaveLength(1);
+    expect(stored.requests[0].status).toBe('requested');
+    expect(stored.requests[0].ptoDates).toEqual(['2027-01-04']);
+    // Marking it approved from the card updates the same record: still one request.
+    fireEvent.click(within(restored).getByRole('button', { name: 'Mark approved' }));
+    await waitFor(() => expect(within(cards()).getByTestId('committed-entry').querySelector('[data-committed-label]')?.textContent).toBe('Approved'));
+    const approved = JSON.parse(localStorage.getItem('gapless.personal.requests.v1')!);
+    expect(approved.requests).toHaveLength(1);
+    expect(approved.requests[0].status).toBe('approved');
+    expect(approved.requests[0].id).toBe(stored.requests[0].id);
     cleanup();
     render(<App />);
-    await waitFor(() => expect(within(within(cards()).getByTestId('committed-entry')).getByText('Approved')).toBeTruthy());
+    await waitFor(() => expect(within(cards()).getByTestId('committed-entry').querySelector('[data-committed-label]')?.textContent).toBe('Approved'));
     expect(screen.getByTestId('tracked-requests-summary').textContent).toBe('Includes 1 approved day off · 0 tentative, 1 reserved from the budget.');
+  });
+
+  it('turns a saved break into a request without a second record', async () => {
+    render(<App />);
+    const save = await screen.findByRole('button', { name: 'Save break' });
+    const card = save.closest('li')!;
+    fireEvent.click(save);
+    await waitFor(() => expect(card.querySelector('[data-break-record]')?.textContent).toBe('Saved'));
+    // Saving an idea does not re-plan: the same card stays mounted (a remount reset the phone
+    // strip to the first card and dropped focus).
+    expect(card.isConnected).toBe(true);
+    expect(screen.getByRole('region', { name: 'Your plan' }).getAttribute('data-plan-result')).toBe('ready');
+    const saved = JSON.parse(localStorage.getItem('gapless.personal.requests.v1')!);
+    expect(saved.requests).toHaveLength(1);
+    expect(saved.requests[0].status).toBe('considering');
+    fireEvent.click(within(card).getByRole('button', { name: /Request this time off/ }));
+    fireEvent.click(within(card).getByRole('button', { name: 'Mark requested' }));
+    const cards = screen.getByRole('region', { name: 'Requesting each break' });
+    await waitFor(() => expect(within(cards).getByTestId('committed-entry').getAttribute('data-committed-status')).toBe('requested'));
+    const after = JSON.parse(localStorage.getItem('gapless.personal.requests.v1')!);
+    expect(after.requests).toHaveLength(1);
+    expect(after.requests[0].id).toBe(saved.requests[0].id);
+    expect(after.requests[0].status).toBe('requested');
+  });
+
+  it('lets a declined request be asked again on the same record', async () => {
+    localStorage.setItem('gapless.personal.requests.v1', JSON.stringify({ version: 1, requests: [{
+      id: 'declined', start: '2027-01-01', end: '2027-01-04', ptoDates: ['2027-01-04'], ptoDays: 1,
+      status: 'rejected', note: 'private', createdAt: '2026-11-01T00:00:00.000Z', updatedAt: '2026-11-01T00:00:00.000Z',
+    }] }));
+    render(<App />);
+    const toggle = await screen.findByRole('button', { name: /Request this time off/ });
+    const card = toggle.closest('li')!;
+    expect([card.getAttribute('data-break-start'), card.getAttribute('data-break-end')]).toEqual(['2027-01-01', '2027-01-04']);
+    expect(card.querySelector('[data-break-record]')?.textContent).toBe('Declined in My PTO');
+    fireEvent.click(toggle);
+    fireEvent.click(within(card).getByRole('button', { name: 'Mark requested' }));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem('gapless.personal.requests.v1')!).requests[0].status).toBe('requested'));
+    const stored = JSON.parse(localStorage.getItem('gapless.personal.requests.v1')!);
+    expect(stored.requests).toHaveLength(1);
+    expect(stored.requests[0].note).toBe('private');
   });
 
   it('reserves an hourly half day from the budget once and labels it in hours and days', async () => {
@@ -123,7 +176,8 @@ describe('planner result actions', () => {
     await waitFor(() => expect(summary.getAttribute('data-plan-result')).toBe('ready'));
     const cards = screen.getByRole('region', { name: 'Requesting each break' });
     const committed = within(cards).getByTestId('committed-entry');
-    expect(within(committed).getByText('Tracked · requested')).toBeTruthy();
+    expect(committed.querySelector('[data-committed-label]')?.textContent).toBe('Requested');
+    expect(within(committed).getByRole('button', { name: 'Mark approved' })).toBeTruthy();
     expect(within(committed).getByText('5 PTO days')).toBeTruthy();
     const recommended = cards.querySelectorAll('li[data-break-start]:not([data-testid="committed-entry"])');
     expect(recommended.length).toBeGreaterThan(0);

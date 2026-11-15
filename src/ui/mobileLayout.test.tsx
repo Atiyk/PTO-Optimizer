@@ -26,16 +26,27 @@ describe('BreakStrip', () => {
     expect(screen.getByRole('button', { name: 'Previous break' })).toHaveProperty('disabled', true);
     expect(screen.getByRole('button', { name: 'Next break' })).toHaveProperty('disabled', false);
   });
-  it('scrolls a card into view when something inside it takes keyboard focus', () => {
+  it('scrolls a focused card into view sideways only, never the page', () => {
+    // scrollIntoView({ block: 'nearest' }) also scrolled the page when a card was taller than
+    // the space below it, so a tap's focus moved the button away before the release.
     const scrollIntoView = vi.fn();
     const original = HTMLElement.prototype.scrollIntoView;
     HTMLElement.prototype.scrollIntoView = scrollIntoView;
     try {
       render(<BreakStrip count={2} label="Breaks"><li>One</li><li><button type="button">Track two</button></li></BreakStrip>);
+      const list = screen.getByRole('list', { name: 'Breaks' });
+      const second = screen.getAllByRole('listitem')[1];
+      const box = (left: number, width: number) => ({ left, right: left + width, width, top: 400, bottom: 1400, height: 1000, x: left, y: 400, toJSON: () => ({}) });
+      list.getBoundingClientRect = () => box(0, 375) as DOMRect;
+      second.getBoundingClientRect = () => box(340, 322) as DOMRect;
+      const scrollBy = vi.fn();
+      list.scrollBy = scrollBy as typeof list.scrollBy;
       screen.getByRole('button', { name: 'Track two' }).focus();
-      expect(scrollIntoView).toHaveBeenCalledTimes(1);
-      expect(scrollIntoView.mock.contexts[0]).toBe(screen.getAllByRole('listitem')[1]);
-      expect(scrollIntoView).toHaveBeenCalledWith({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      expect(scrollBy).toHaveBeenCalledTimes(1);
+      const [options] = scrollBy.mock.calls[0] as [ScrollToOptions];
+      expect(options.top).toBeUndefined();
+      expect(options.left).toBe(287); // just enough to show its right edge
     } finally {
       HTMLElement.prototype.scrollIntoView = original;
     }

@@ -83,6 +83,9 @@ export interface SavedBreakInput extends RequestNotice {
   start: ISODate;
   end: ISODate;
   ptoDates: readonly ISODate[];
+  /** Default 'considering' (Save break). The planner's "Mark requested" records a break the
+   * person says they already asked for in one write, keeping the plan's exact PTO dates. */
+  status?: 'considering' | 'requested';
 }
 
 export interface RequestStorage {
@@ -171,7 +174,7 @@ export function createSavedBreakRequest(input: SavedBreakInput, calendar: Reques
   if (ptoDates.length !== input.ptoDates.length || !ptoDates.every(date => workDates.has(date))) return null;
   return {
     id, start: input.start, end: input.end, ptoDates, ptoDays: ptoDates.length,
-    status: 'considering', note: '', ...noticeFields(input), createdAt: now, updatedAt: now,
+    status: input.status === 'requested' ? 'requested' : 'considering', note: '', ...noticeFields(input), createdAt: now, updatedAt: now,
   };
 }
 

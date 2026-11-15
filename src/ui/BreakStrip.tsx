@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FocusEvent, type ReactNode } from 'react';
 import { useMinWidth } from './useMinWidth';
-import { scrollBehavior } from './scrollBehavior';
+import { revealInStrip } from './stripScroll';
 
 /** Classes each card's <li> adds so it sits in the phone strip; stacked from 768px up. */
 export const BREAK_STRIP_ITEM = 'max-md:w-[86%] max-md:shrink-0 max-md:snap-start';
@@ -30,7 +30,7 @@ export function BreakStrip({ count, label, children }: { count: number; label: s
     const list = listRef.current;
     const target = list?.children[Math.max(0, Math.min(count - 1, current + delta))] as HTMLElement | undefined;
     if (!list || !target) return;
-    target.scrollIntoView?.({ inline: 'start', block: 'nearest', behavior: scrollBehavior() });
+    revealInStrip(list, target, 'start');
   };
   // Tabbing to a button or link inside a card that sits off to the side brings that card
   // into view, so keyboard focus is never hidden in the strip.
@@ -38,7 +38,7 @@ export function BreakStrip({ count, label, children }: { count: number; label: s
     const list = listRef.current;
     if (stacked || !list || event.target === list) return;
     const card = [...list.children].find((child) => child.contains(event.target as Node)) as HTMLElement | undefined;
-    card?.scrollIntoView?.({ inline: 'nearest', block: 'nearest', behavior: scrollBehavior() });
+    if (card) revealInStrip(list, card, 'nearest');
   };
   const nav = 'inline-flex h-11 w-11 items-center justify-center rounded-[6px] border border-line-strong bg-surface text-ink hover:border-ink disabled:border-line disabled:text-[var(--disabled-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
   return (

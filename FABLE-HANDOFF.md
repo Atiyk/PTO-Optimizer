@@ -1,8 +1,18 @@
 # Fable handoff: Timebower planner redesign
 
-Date: 2026-11-15. Work is uncommitted in the working tree on `main` (the owner chose the
-checked-out branch; `CLAUDE.md` says never commit to `main`, so branch before committing).
-Nothing was pushed or deployed.
+Date: 2026-11-15.
+
+> **Status, corrected after the fact (Opus follow-up, same day).** This work was merged as
+> PR #152 (`544ccd5`) and deployed to production; the text below was written before that and
+> said it was uncommitted. Two corrections to the body:
+> - Item 3 below is wrong about today's default: `src/ui/urlState.ts` already opens a fresh,
+>   unparameterized `/pto` on "Spread across the year" (`'year'`); only links that carry planning
+>   parameters but no `ps` keep `'balanced'`, by design, so old links reproduce. No default change
+>   was made or approved.
+> - PR #152 shipped with its browser CI job failing: on phones the taller break cards made a tap
+>   on Save/Track scroll the page before the release, so the tap was lost, and the year line's
+>   8px links failed axe `target-size`. Both are fixed in the follow-up branch
+>   `opus/plan-request-track`, which also delivers items 2, 5, 6, 8 and part of 1, 4 and 9.
 
 ## 1. What was designed and implemented
 

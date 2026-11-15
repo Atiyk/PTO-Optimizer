@@ -33,7 +33,11 @@ export function PlannerNav({ watch, items, result }: PlannerNavProps) {
   useEffect(() => {
     const el = watch.current;
     if (!el || typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver(([entry]) => setVisible(!entry.isIntersecting && entry.boundingClientRect.top < 0));
+    // Entries arrive oldest first; a fast fling can queue several, and only the last is current.
+    const observer = new IntersectionObserver((entries) => {
+      const entry = entries[entries.length - 1];
+      if (entry) setVisible(!entry.isIntersecting && entry.boundingClientRect.top < 0);
+    });
     observer.observe(el);
     return () => observer.disconnect();
   }, [watch]);

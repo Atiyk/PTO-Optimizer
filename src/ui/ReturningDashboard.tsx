@@ -149,7 +149,7 @@ export function ReturningDashboard({ pinnedPlans, today, offDays }: {
 
   let primary: ReactNode;
   switch (model.action) {
-    case 'copy-request': primary = <Button onClick={() => void copyRequest()}>Copy request text</Button>; break;
+    case 'copy-request': primary = <Button onClick={() => void copyRequest()}>Copy request</Button>; break;
     case 'mark-requested': primary = <Button disabled={pending} onClick={() => void markRequested()}>Mark requested</Button>; break;
     case 'mark-approved': primary = <Button disabled={pending} onClick={() => void markApproved()}>Mark approved</Button>; break;
     case 'open-plan': primary = openPlan; break;

@@ -120,7 +120,14 @@ async function open(context, path) {
 }
 
 async function noOverflow(page) {
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, '375px page must not overflow horizontally.');
+  const overflow = await page.evaluate(() => {
+    if (document.documentElement.scrollWidth <= innerWidth + 1) return null;
+    // Name the widest unclipped element so a failure says what to fix.
+    const clipped = (element) => { for (let a = element.parentElement; a; a = a.parentElement) if (/(auto|scroll|hidden|clip)/.test(getComputedStyle(a).overflowX)) return true; return false; };
+    const culprit = [...document.querySelectorAll('body *')].filter((e) => e.getBoundingClientRect().right > innerWidth + 1 && !clipped(e)).pop();
+    return `${document.documentElement.scrollWidth}px wide at ${innerWidth}px: ${culprit ? `${culprit.tagName.toLowerCase()}.${String(culprit.className).slice(0, 80)} "${(culprit.textContent ?? '').slice(0, 60)}"` : 'unknown element'}`;
+  });
+  assert.equal(overflow, null, `Page must not overflow horizontally (${overflow}).`);
 }
 
 async function moreOptions(page) {
@@ -370,15 +377,25 @@ try {
       assert.notEqual(await main.locator('h1').innerText(), initialHeadline);
     }, 'PTO input should update the live plan without submission');
     assert.equal(await main.getByRole('button', { name: /^(?:Generate|Submit)/i }).count(), 0);
-    const trackButton = main.getByRole('region', { name: 'Requesting each break', exact: true }).getByRole('button', { name: 'Track this PTO request', exact: true }).first();
-    await trackButton.click();
+    // One request panel per break: exact workdays, ask-by date, copy, then "Mark requested"
+    // once the person has actually asked (copying alone records nothing).
+    const firstCard = main.getByRole('region', { name: 'Requesting each break', exact: true }).locator('li[data-break-start]:not([data-testid="committed-entry"])').first();
+    await firstCard.getByRole('button', { name: 'Request this time off', exact: true }).click();
+    const panel = firstCard.locator('[data-request-panel]');
+    await panel.getByRole('button', { name: 'Copy request', exact: true }).click();
+    assert.match(await clipboardText(main), /I'd like to request time off covering/);
+    assert.equal(await main.evaluate(() => localStorage.getItem('gapless.personal.requests.v1')), null, 'Copying must not record a request.');
+    assert.match(await panel.locator('[data-request-deadline]').innerText(), /^Ask (by|now|today)/);
+    const trackButton = main.getByRole('region', { name: 'Requesting each break', exact: true }).getByRole('button', { name: 'Mark requested', exact: true });
+    await trackButton.first().click();
     // The planner confirms on the card and counts the request; the tracker itself lives in
     // My PTO (one place to edit requests), reached from the planner's request line.
     const cards = main.getByRole('region', { name: 'Requesting each break', exact: true });
     const requestLine = main.getByRole('region', { name: 'My PTO requests', exact: true });
     await cards.getByTestId('committed-entry').waitFor({ state: 'visible' });
     assert.equal(await cards.getByTestId('committed-entry').count(), 1);
-    assert.match(await cards.getByTestId('committed-entry').innerText(), /Tracked/);
+    assert.match(await cards.getByTestId('committed-entry').innerText(), /Requested/);
+    assert.doesNotMatch(await cards.getByTestId('committed-entry').innerText(), /\bApproved\b/);
     assert.equal(await requestLine.getByTestId('request-count').innerText(), 'My PTO has 1 request from this browser.');
     // The card recognizes the saved request on return and never offers a duplicate.
     assert.equal(await trackButton.count(), 0, 'A tracked break must confirm in place instead of offering Track again.');

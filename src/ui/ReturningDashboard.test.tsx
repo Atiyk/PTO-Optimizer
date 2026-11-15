@@ -47,7 +47,7 @@ describe('ReturningDashboard (P3)', () => {
     expect(region.textContent).toContain('Next break: Mar 20 – Apr 4, 2027');
     expect(region.textContent).toContain('In your saved plan · 16 days off · 9 PTO days · Submit by Mar 8 · 14-day notice');
     expect(screen.getByTestId('pto-line').textContent).toBe('15 PTO days in your plan · 9 planned · 6 not yet planned');
-    expect(within(region).getAllByRole('button').map((b) => b.textContent)).toEqual(['Copy request text']);
+    expect(within(region).getAllByRole('button').map((b) => b.textContent)).toEqual(['Copy request']);
     expect(within(region).getByRole('link', { name: 'Plan something new ↓' }).getAttribute('href')).toBe('#landing-heading');
     expect(within(region).getByRole('link', { name: 'Open saved plan →' }).getAttribute('href')).toMatch(/^\/pto\?/);
     // Calm: no streaks, badges or urgency words.
@@ -56,7 +56,7 @@ describe('ReturningDashboard (P3)', () => {
 
   it('walks copy → mark requested → mark approved → open plan, saving to My PTO', async () => {
     renderDashboard();
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy request text' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy request' })); });
     expect(clipboard[0]).toContain('I\'d like to request time off covering');
     expect(clipboard[0]).toContain('Mon Mar 22');
     expect(clipboard[0]).not.toMatch(/quieter period/);

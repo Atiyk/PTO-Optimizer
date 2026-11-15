@@ -53,8 +53,17 @@ describe('formatManagerEmailShort (Phase 4.3: leads with coverage, not the raw P
     const email = formatManagerEmailShort(makeBreak(), isPtoDay);
     // Coverage comes first, the granular day list is secondary.
     expect(email.indexOf('Oct 24')).toBeLessThan(email.indexOf('Mon Oct 26'));
-    expect(email).toContain("I'd like to request time off covering Oct 24 – Nov 1 — 9 days away from work in total, using 5 PTO days.");
+    expect(email).toContain("I'd like to request time off covering Oct 24 – Nov 1, 2026 — 9 days away from work in total, using 5 PTO days.");
     expect(email).toContain('The PTO days needed are Mon Oct 26, Tue Oct 27, Wed Oct 28, Thu Oct 29, Fri Oct 30');
+  });
+
+  it('dates the span with its year and says the free days in plain words', () => {
+    const one = new Set(['2026-10-26']);
+    const brk = makeBreak({ start: '2026-10-24', end: '2026-10-26', days: ['2026-10-24', '2026-10-25', '2026-10-26'], totalDaysOff: 3, ptoCost: 1 });
+    const email = formatManagerEmailShort(brk, (iso) => one.has(iso));
+    expect(email).toContain('covering Oct 24 – 26, 2026 — 3 days away from work in total, using 1 PTO day.');
+    expect(email).toContain('The PTO day needed is Mon Oct 26; the other 2 days fall on a weekend or holiday.');
+    expect(email.split(/(?<=[.?!])\s+/).filter(Boolean)).toHaveLength(3);
   });
 
   it('handles a break with no free days gained (every day in the span is a PTO cost day)', () => {
@@ -93,7 +102,7 @@ describe('formatManagerEmailDetailed', () => {
 
   it('includes the coverage opening and the full PTO-day specifics, same as the short variant', () => {
     const email = formatManagerEmailDetailed(makeBreak(), isPtoDay, 14, DEFAULT_WORK_WEEK);
-    expect(email).toContain("I'd like to request time off covering Oct 24 – Nov 1");
+    expect(email).toContain("I'd like to request time off covering Oct 24 – Nov 1, 2026");
     expect(email).toContain('The PTO days needed are Mon Oct 26, Tue Oct 27, Wed Oct 28, Thu Oct 29, Fri Oct 30');
     expect(email).toContain('Let me know if this works');
   });

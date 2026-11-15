@@ -127,7 +127,7 @@ export function useRequestLedger() {
         return result;
       }
       const persisted = persist([...requests, request]);
-      const label = savedBreak ? 'Break saved as Considering' : 'PTO request tracked';
+      const label = !savedBreak ? 'PTO request tracked' : request.status === 'requested' ? 'Marked requested' : 'Break saved as Considering';
       const result = { ok: true, id, persisted, existing: false, message: persisted
         ? `${label} in this browser.`
         : `${label} for this visit. Browser storage is unavailable.` };
