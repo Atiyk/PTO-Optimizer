@@ -5,6 +5,7 @@ import { App } from './App';
 import { readBrowserPlanSearch } from './urlState';
 import {
   defaultEmployerCalendar,
+  freshEmployerCalendar,
   EMPLOYER_STORAGE_PREFIX,
   encodeEmployerCalendar,
   saveEmployerCalendar,
@@ -68,14 +69,36 @@ describe('employer calendar integrated with the live consumer state', () => {
     const first = renderHook(() => useAppState());
     await waitFor(() => expect(first.result.current.holidayEntries).toHaveLength(1));
     act(() => first.result.current.toggleHoliday('2027-12-24', 'Christmas Day'));
-    act(() => first.result.current.saveEmployerHolidays());
-    expect(first.result.current.employerCalendarMessage).toContain('saved in this browser');
+    // No save step: the edit auto-saves after a short pause.
+    await waitFor(() => expect(first.result.current.employerCalendarMessage).toBe('Saved for United States.'));
     first.unmount();
 
     navigate(); // Strip the generated share parameter to exercise saved-preference fallback.
     const second = renderHook(() => useAppState());
     await waitFor(() => expect(second.result.current.holidayEntries[0]?.checked).toBe(false));
     expect(second.result.current.effectiveOffDays).not.toContain('2027-12-24');
+  });
+
+  it('a state adds no regional days off by default; a chip opts one in, auto-saves, and a fresh visit restores it', async () => {
+    const search = '?c=US&sd=US-CA&s=2027-03-01&e=2027-04-30&b=4&rv=0';
+    navigate(search);
+    const first = renderHook(() => useAppState());
+    await waitFor(() => expect(first.result.current.holidayChoices.some((c) => c.kind === 'regional')).toBe(true));
+    const chavez = first.result.current.holidayEntries.find((h) => h.source === 'state' && h.date === '2027-03-31')!;
+    expect(chavez.checked).toBe(false);
+    expect(first.result.current.effectiveOffDays).not.toContain('2027-03-31');
+    const chip = first.result.current.holidayChoices.find((c) => c.kind === 'regional' && c.dates.includes('2027-03-31'))!;
+    act(() => first.result.current.toggleHolidayChoice(chip.id));
+    expect(first.result.current.effectiveOffDays).toContain('2027-03-31');
+    await waitFor(() => expect(first.result.current.employerCalendarMessage).toBe('Saved for California, United States.'));
+    first.unmount();
+
+    navigate(search); // a new visit: no history-state draft, no eh in the address
+    expect(window.history.state).toBeNull();
+    const second = renderHook(() => useAppState());
+    await waitFor(() => expect(second.result.current.effectiveOffDays).toContain('2027-03-31'));
+    act(() => second.result.current.undoEmployerHolidays()); // nothing to undo on a new visit
+    expect(second.result.current.effectiveOffDays).toContain('2027-03-31');
   });
 
   it('explicit shared defaults outrank recipient saved exclusions without overwriting them', async () => {
@@ -112,7 +135,7 @@ describe('employer calendar integrated with the live consumer state', () => {
 
     act(() => result.current.setCountry('US'));
     await waitFor(() => expect(result.current.holidayEntries[0]?.date).toBe('2027-12-24'));
-    expect(result.current.employerCalendar).toEqual(defaultEmployerCalendar('US'));
+    expect(result.current.employerCalendar).toEqual(freshEmployerCalendar('US'));
     expect(result.current.effectiveOffDays).not.toContain('2027-12-28');
     expect(result.current.effectiveOffDays).toContain('2027-12-24');
   });
@@ -124,7 +147,7 @@ describe('employer calendar integrated with the live consumer state', () => {
     const { result } = renderHook(() => useAppState());
     expect(result.current.employerCalendar).toEqual(newYork);
     act(() => result.current.setSubdivision('US-CA'));
-    expect(result.current.employerCalendar).toEqual(defaultEmployerCalendar('US', 'US-CA'));
+    expect(result.current.employerCalendar).toEqual(freshEmployerCalendar('US', 'US-CA'));
     act(() => result.current.setSubdivision('US-NY'));
     expect(result.current.employerCalendar).toEqual(newYork);
   });
@@ -141,7 +164,7 @@ describe('employer calendar integrated with the live consumer state', () => {
     act(() => result.current.removeHoliday('2027-12-24', 'Company closure'));
     expect(result.current.effectiveOffDays).not.toContain('2027-12-24');
     act(() => result.current.resetEmployerHolidays());
-    expect(result.current.employerCalendar).toEqual(defaultEmployerCalendar('US'));
+    expect(result.current.employerCalendar).toEqual(freshEmployerCalendar('US'));
     expect(result.current.effectiveOffDays).toContain('2027-12-24');
   });
 

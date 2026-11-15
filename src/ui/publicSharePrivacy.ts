@@ -1,4 +1,4 @@
-import { decodeEmployerCalendar } from '../personal/employerCalendar';
+import { decodeEmployerCalendar, employerCalendarCustomized } from '../personal/employerCalendar';
 import { isValidISODate, parseDateList } from './urlState';
 import { isPlanShareKey, PLAN_PRIVATE_KEYS, PUBLIC_SHARE_VERSION } from './shareFormat';
 import { PLANNER_REVISION } from '@daysoff/engine/solver/revision';
@@ -9,7 +9,10 @@ export function employerLabelsWouldBeShared(query: string): boolean {
   const raw = new URLSearchParams(query).get('eh');
   if (!raw) return false;
   const calendar = decodeEmployerCalendar(raw);
-  return !calendar || calendar.custom.length > 0 || calendar.excluded.length > 0;
+  if (!calendar) return true;
+  // A version 2 calendar with a region resolves regional days differently from the
+  // public-holiday default a recipient sees, so it counts as a calendar to choose about.
+  return employerCalendarCustomized(calendar) || (calendar.version === 2 && calendar.subdivision !== undefined && calendar.country === 'US');
 }
 
 // Private scheduling and policy settings, from the shared classification. `eh` is

@@ -31,6 +31,33 @@ export function consumerHolidayLookupEnd(country: string, rangeStart: string, ra
   return isValidISODate(nextNewYear) && mondayIndexedDow(nextNewYear) === 5 ? nextNewYear : rangeEnd;
 }
 
+/** Countries whose source data lists some country-wide days per region. A day listed
+ * for every one of these regions is a national holiday (GB: Nager lists New Year's Day
+ * for England, Northern Ireland, Scotland and Wales, never as national). */
+const ALL_REGIONS: Record<string, readonly string[]> = {
+  GB: ['GB-ENG', 'GB-NIR', 'GB-SCT', 'GB-WLS'],
+};
+
+/** Marks a holiday observed in every region of its country as national (counties null). */
+export function normalizeNationwide(holidays: Holiday[]): Holiday[] {
+  return holidays.map((holiday) => {
+    const regions = holiday && ALL_REGIONS[holiday.countryCode];
+    return regions && Array.isArray(holiday.counties) && regions.every((region) => holiday.counties!.includes(region))
+      ? { ...holiday, counties: null } : holiday;
+  });
+}
+
+/** With no region chosen, ask the loader for one region so nationwide days listed per
+ * region are included, then keep only the national ones. */
+function nationwideLookupRegion(country: string, subdivision?: string): string | undefined {
+  return subdivision ?? ALL_REGIONS[country]?.[0];
+}
+
+function onlyScope(holidays: Holiday[], country: string, subdivision?: string): Holiday[] {
+  const normalized = normalizeNationwide(holidays);
+  return subdivision || !ALL_REGIONS[country] ? normalized : normalized.filter((holiday) => !holiday.counties);
+}
+
 /** Keep distinct holiday names for employer controls; repeated copies of the same
  * named day merge their regional coverage instead of counting or losing a date twice. */
 export function observedEntries(holidays: Holiday[], country: string, start: string, end: string): Holiday[] {
@@ -72,7 +99,7 @@ export function readPreloadedConsumerHolidays(country: string, start: string, en
     if (!years.includes(year)) return;
   }
   try {
-    const preloaded = getPreloadedHolidays(country).filter(holiday => !holiday.counties || (subdivision && holiday.counties.includes(subdivision)));
+    const preloaded = normalizeNationwide(getPreloadedHolidays(country)).filter(holiday => !holiday.counties || (subdivision && holiday.counties.includes(subdivision)));
     return observedEntries(preloaded, country, start, end);
   } catch { return undefined; }
 }
@@ -82,9 +109,9 @@ export async function getConsumerHolidaysWithStatus(
 ): Promise<HolidayFetchResult> {
   if (!validScope(country, rangeStart, rangeEnd, subdivision)) return { holidays: [], degraded: true };
   try {
-    const result = await getHolidaysWithStatus(country, rangeStart, consumerHolidayLookupEnd(country, rangeStart, rangeEnd), subdivision);
+    const result = await getHolidaysWithStatus(country, rangeStart, consumerHolidayLookupEnd(country, rangeStart, rangeEnd), nationwideLookupRegion(country, subdivision));
     if (typeof result.degraded !== 'boolean') throw new Error('Holiday status is invalid.');
-    const holidays = observedEntries(result.holidays, country, rangeStart, rangeEnd);
+    const holidays = observedEntries(onlyScope(result.holidays, country, subdivision), country, rangeStart, rangeEnd);
     if (!Array.isArray(result.uncoveredYears)) return { holidays, degraded: result.degraded };
     // Issue 17: report only the plan's own years, never a lookup-only spillover year.
     const first = Number(rangeStart.slice(0, 4)), last = Number(rangeEnd.slice(0, 4));
@@ -102,7 +129,7 @@ export async function getConsumerHolidays(
 ): Promise<Holiday[]> {
   if (!validScope(country, rangeStart, rangeEnd, subdivision)) return [];
   try {
-    return observedEntries(await getHolidays(country, rangeStart, consumerHolidayLookupEnd(country, rangeStart, rangeEnd), subdivision), country, rangeStart, rangeEnd);
+    return observedEntries(onlyScope(await getHolidays(country, rangeStart, consumerHolidayLookupEnd(country, rangeStart, rangeEnd), nationwideLookupRegion(country, subdivision)), country, subdivision), country, rangeStart, rangeEnd);
   } catch { return []; }
 }
 

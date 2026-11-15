@@ -1,4 +1,5 @@
 import { getConsumerHolidaysWithStatus as getHolidaysWithStatus } from '../personal/consumerHolidays';
+import { holidayDisplayName } from '../personal/holidayDisplayNames';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { SiteHeader } from './SiteHeader';
 import { Footer } from './Footer';
@@ -320,7 +321,7 @@ export function Sabbatical() {
                     coreSet={coreSet}
                     ptoSet={ptoSpentSet}
                     unpaidSet={unpaidSpentSet}
-                    holidayNameFor={(iso) => holidayState.holidays.find((h) => h.date === iso)?.name}
+                    holidayNameFor={(iso) => { const h = holidayState.holidays.find((x) => x.date === iso); return h && holidayDisplayName(h.name, h.countryCode); }}
                     holidaySet={holidaySet}
                   />
                 </section>

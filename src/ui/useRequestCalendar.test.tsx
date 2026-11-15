@@ -131,7 +131,9 @@ describe('personal request calendar', () => {
     const { result } = renderHook(() => useRequestCalendar({ ...options, subdivision: 'US-CA' }));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.degraded).toBe(true);
-    expect(result.current.calendar.offDays).toEqual(['2027-01-01', '2027-03-31']);
+    // California's state-government day (Cesar Chavez Day, 2027-03-31) is opt-in now: a
+    // new visitor's employer calendar does not count it as a day off.
+    expect(result.current.calendar.offDays).toEqual(['2027-01-01']);
   });
 
   it('loads a New Year observed on December 31 from the next nominal year and charges it only once', async () => {

@@ -27,8 +27,9 @@ import { solveWithPinFallback, type PlannerOutcome } from '../ui/pinPreview';
 import { readFullStateFromURL, readOverlapPayloadFromURL, isValidISODate } from '../ui/urlState';
 import { validateInputs, isSupportedPlanningRange } from '../ui/validation';
 import { policyFromLegacyPtoState, toLegacySolverFields } from '../policy/model';
-import { defaultEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
-import { consumerHolidayLookupEnd, observedEntries, validScope } from '../personal/consumerHolidays';
+import { defaultEmployerCalendar, freshEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
+import { resolveHolidayEntries, type HolidayEntry } from '../personal/employerHolidayChoices';
+import { consumerHolidayLookupEnd, normalizeNationwide, observedEntries, validScope } from '../personal/consumerHolidays';
 import type { ForcedState } from '../ui/types';
 
 /** Below this many days remaining in the current year, the default range rolls forward to
@@ -65,12 +66,7 @@ export function yearsBetween(rangeStart: string, rangeEnd: string): number[] {
   return years;
 }
 
-export interface HolidayEntry {
-  date: string;
-  name: string;
-  source: 'public' | 'custom' | 'state';
-  checked: boolean;
-}
+export type { HolidayEntry };
 
 /** US state holidays: the live data's subdivision-specific entries plus the static
  * supplementary table for the years in range (US only - see usStateHolidays.ts). */
@@ -91,26 +87,13 @@ export function stateHolidayCandidatesFor(withSubdivision: Holiday[], country: s
   return stateOnly;
 }
 
+/** Shared with the hook, the feed and the homepage: see personal/employerHolidayChoices. */
 export function holidayEntriesFor(nationalHolidays: Holiday[], stateHolidayCandidates: Holiday[], employerCalendar: EmployerCalendar, rangeStart: string, rangeEnd: string, sharedObservedHolidays?: readonly string[]): HolidayEntry[] {
   if (sharedObservedHolidays !== undefined) {
     return sharedObservedHolidays.filter(date => date >= rangeStart && date <= rangeEnd)
       .map(date => ({ date, name: 'Shared observed holiday', source: 'custom', checked: true }));
   }
-  const excluded = new Set(employerCalendar.excluded);
-  const entries = new Map<string, HolidayEntry>();
-  for (const h of nationalHolidays) {
-    const key = `${h.date}|${h.name}`;
-    entries.set(key, { date: h.date, name: h.name, source: 'public', checked: !excluded.has(key) });
-  }
-  for (const h of stateHolidayCandidates) {
-    const key = `${h.date}|${h.name}`;
-    if (!entries.has(key)) entries.set(key, { date: h.date, name: h.name, source: 'state', checked: !excluded.has(key) });
-  }
-  for (const h of employerCalendar.custom) {
-    const key = `${h.date}|${h.name}`;
-    if (!entries.has(key) && h.date >= rangeStart && h.date <= rangeEnd) entries.set(key, { ...h, source: 'custom', checked: !excluded.has(key) });
-  }
-  return [...entries.values()].sort((a, b) => `${a.date}|${a.name}`.localeCompare(`${b.date}|${b.name}`));
+  return resolveHolidayEntries(nationalHolidays, stateHolidayCandidates, employerCalendar, rangeStart, rangeEnd);
 }
 
 export function altFridayOffDatesFor(altFridayEnabled: boolean, altFridayStart: string, rangeStart: string, rangeEnd: string): string[] {
@@ -267,7 +250,7 @@ export function consumerHolidaysFromSource(source: HolidaySource, country: strin
       const data = source(country, year);
       if (Array.isArray(data)) raw.push(...data);
     }
-    const holidays = rawHolidaysToHolidays(raw as Parameters<typeof rawHolidaysToHolidays>[0]);
+    const holidays = normalizeNationwide(rawHolidaysToHolidays(raw as Parameters<typeof rawHolidaysToHolidays>[0]));
     return observedEntries(filterAndSort(holidays, rangeStart, lookupEnd, subdivision), country, rangeStart, rangeEnd);
   } catch {
     return [];
@@ -327,7 +310,11 @@ export function planStateFromSearch(search: string, today: string, defaultCountr
   return {
     country,
     subdivision: initial.subdivision,
-    employerCalendar: initial.employerCalendar ?? defaultEmployerCalendar(country, initial.subdivision),
+    // Mirrors the hook: a public link (sv=1) without a calendar uses the legacy public
+    // default (regional days on), as it always has; any other link without one starts from
+    // a new visitor's calendar (public holidays on, regional and employer-only days opt-in).
+    employerCalendar: initial.employerCalendar ?? (initial.publicShareVersion === 1
+      ? defaultEmployerCalendar(country, initial.subdivision) : freshEmployerCalendar(country, initial.subdivision)),
     sharedObservedHolidays: initial.sharedObservedHolidays,
     planningVersion: initial.planningVersion,
     planningStyle: initial.planningStyle ?? 'custom',
