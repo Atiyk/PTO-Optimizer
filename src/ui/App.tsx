@@ -678,7 +678,26 @@ export function App() {
                   {holidayFocusRun && holidayFocusRun.length > 1 && (
                     <p className="mt-1">{holidayFocusRun.length} days off in a row · {formatCardDateRange(holidayFocusRun.start, holidayFocusRun.end)}</p>
                   )}
-                  {!state.planningPending && !state.validationIssues.length && <a className="link-mark inline-flex min-h-11 items-center" href={`#day-${holidayFocusDate}`}>Find this date on the calendar</a>}
+                  {!state.planningPending && !state.validationIssues.length && <a
+                    className="link-mark inline-flex min-h-11 items-center"
+                    href={`#day-${holidayFocusDate}`}
+                    onClick={(event) => {
+                      // Phones build the month grids only on "Show month details", so the
+                      // day cell may not exist yet: open the details, then jump to it.
+                      const target = document.getElementById(`day-${holidayFocusDate}`);
+                      if (target && target.offsetParent !== null) return;
+                      event.preventDefault();
+                      setMonthDetails(true);
+                      const jump = (tries: number) => {
+                        const cell = document.getElementById(`day-${holidayFocusDate}`);
+                        if (cell && cell.offsetParent !== null) {
+                          cell.scrollIntoView?.({ block: 'center', behavior: scrollBehavior() });
+                          cell.focus?.({ preventScroll: true });
+                        } else if (tries > 0) requestAnimationFrame(() => jump(tries - 1));
+                      };
+                      requestAnimationFrame(() => jump(30));
+                    }}
+                  >Find this date on the calendar</a>}
                 </div>
               )}
               <LegacyPlanNotice />
