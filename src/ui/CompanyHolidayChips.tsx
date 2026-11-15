@@ -63,12 +63,12 @@ export function CompanyHolidayChips(props: CompanyHolidayChipsProps) {
     <section data-holiday-chips aria-labelledby={`${id}-q`} className="flex min-w-0 flex-col gap-2">
       <h3 id={`${id}-q`} className={compact ? 'text-base font-semibold text-ink' : 'text-lg font-semibold text-ink'}>{HOLIDAY_QUESTION}</h3>
       {props.country === 'US' && <p className="max-w-prose text-sm text-muted">{US_HELPER}</p>}
-      <ul className="flex min-w-0 flex-wrap gap-2" aria-label="Holidays">
+      <ul className="relative flex min-w-0 flex-wrap gap-2 max-md:-mx-4 max-md:flex-nowrap max-md:overflow-x-auto max-md:px-4 max-md:pb-1" aria-label="Holidays">
         {visible.map((choice) => {
           const hint = choice.kind === 'regional' && props.country !== 'US' ? 'regional' : KIND_HINT[choice.kind];
           const on = choice.pressed;
           return (
-            <li key={choice.id} className="min-w-0 max-w-full">
+            <li key={choice.id} className="min-w-0 max-w-full max-md:max-w-none max-md:shrink-0">
               <button
                 type="button"
                 aria-pressed={on}

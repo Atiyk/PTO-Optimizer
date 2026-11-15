@@ -137,10 +137,10 @@ function ToolGroup({ title, rows }: { title: string; rows: { href: string; title
     <h3 className="mb-3 text-sm font-semibold text-muted">{title}</h3>
     <ul className="divide-y divide-line overflow-hidden rounded-[10px] border border-line bg-surface">
       {rows.map((row) => <li key={row.title}>
-        <a href={row.href} className="group flex min-h-16 items-center gap-4 px-4 py-4 transition-colors duration-150 hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:px-5">
+        <a href={row.href} className="group flex min-h-14 items-center gap-4 px-4 py-3 transition-colors duration-150 hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:px-5">
           <span className="min-w-0 flex-1">
             <span className="block text-lg font-semibold text-ink">{row.title}</span>
-            <span className="mt-0.5 block text-[15px] leading-6 text-muted">{row.body}</span>
+            <span className="mt-0.5 block text-[15px] leading-6 text-muted max-sm:sr-only">{row.body}</span>
           </span>
           <span aria-hidden="true" className="text-xl text-muted transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-accent">→</span>
         </a>
@@ -358,7 +358,7 @@ export function Landing() {
                 <p className="text-h2 font-bold type-condensed text-ink tabular-nums">{formatShort(entry.holiday.date)}</p>
                 <div className="min-w-0">
                   <p className="text-lg font-semibold text-ink">{entry.holiday.name}</p>
-                  <p className="text-sm text-muted">{entry.weekday}, {formatLong(entry.holiday.date)}{entry.isObserved ? ' · observed' : ''} · {entry.runLength >= 3 ? <span className="mark text-ink">{holidayRunPhrase(entry.runLength, entry.clipped)}</span> : holidayRunPhrase(entry.runLength, entry.clipped)}</p>
+                  <p className="text-sm text-muted">{entry.weekday}<span className="max-sm:sr-only">, {formatLong(entry.holiday.date)}</span>{entry.isObserved ? ' · observed' : ''} · {entry.runLength >= 3 ? <span className="mark text-ink">{holidayRunPhrase(entry.runLength, entry.clipped)}</span> : holidayRunPhrase(entry.runLength, entry.clipped)}</p>
                 </div>
                 <a href={landingHolidayHref(state, entry.holiday.date, bridge?.bridgeDate)} className={`${LINK} col-start-2 text-sm sm:col-start-3 sm:justify-self-end`}>{bridge
                   ? <>{bridgeLinkPhrase(bridge)}<span className="sr-only"> around {entry.holiday.name}</span></>
@@ -377,7 +377,7 @@ export function Landing() {
       {/* How it works: a plain statement, then two facts with their sources. It is the last
           section, so it sits on the page itself rather than a band that would stop short of
           the footer. */}
-      <section aria-labelledby="landing-how" className="mt-20 lg:mt-28">
+      <section aria-labelledby="landing-how" className="mt-14 sm:mt-20 lg:mt-28">
         <Container className="grid gap-x-16 gap-y-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <div className="min-w-0">
             <h2 id="landing-how" className="max-w-[12ch] text-display-sm type-display text-ink">Same inputs, same plan.</h2>

@@ -332,7 +332,7 @@ export function MoreOptions(props: MoreOptionsProps) {
       </section>
 
       <section>
-        <h3 className={H4_CLASS}>Days I can&apos;t take off</h3>
+        <h3 id="unavailable-days" tabIndex={-1} className={`${H4_CLASS} scroll-mt-16`}>Days I can&apos;t take off</h3>
         <p className="mb-2 text-sm text-muted">
           Mandatory coverage, notice periods, quarter close, or any week you simply don&apos;t want. These
           narrow what the solver can pick. The efficiency score compares plans under the same limits.

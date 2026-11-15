@@ -329,6 +329,42 @@ export function Policy() {
     if (unit === 'hours' && publishedShiftKey) publishWorkdaySchedule({ shiftMinutes: publishedShiftKey.split(',').map(Number), hoursPerDay: policyHoursPerDay });
   }, [unit, publishedShiftKey, policyHoursPerDay]);
 
+  // The answer at the top of the page, filled in live from the same forecast the card below
+  // shows: the balance on the chosen date, and the soonest PTO the policy will take away.
+  const balanceOnlyForecast = useMemo(() => !canProjectBalance && !needsBalance && accrualOnlyIssue !== undefined
+    ? forecastWithRequests(withoutAccrual(policy), forecastDate, ledger.requests) : null,
+  [canProjectBalance, needsBalance, accrualOnlyIssue, policy, forecastDate, ledger.requests]);
+  const glanceBalance = (selectedForecast ?? balanceOnlyForecast)?.confirmed.balance;
+  const glanceNumber = (value: number) => new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(value);
+  const glance = accrualKind === 'unlimited' ? null : (
+    <section aria-labelledby="policy-glance-heading" data-testid="policy-glance" className="mt-5 max-w-3xl rounded-[10px] border border-line bg-surface p-4 sm:p-5">
+      <h2 id="policy-glance-heading" className="text-sm font-semibold text-muted">Your PTO at a glance</h2>
+      <div aria-live="polite">
+        {needsBalance ? (
+          <p className="mt-1 text-base text-ink">Enter your current balance below. This fills in with how much PTO you&apos;ll have and anything you&apos;re about to lose.</p>
+        ) : glanceBalance === null || glanceBalance === undefined ? (
+          <p className="mt-1 text-base text-ink">Check the inputs below to see your forecast.</p>
+        ) : (
+          <>
+            <p className="mt-1 text-xl font-bold leading-7 text-ink type-condensed tabular-nums">
+              You&apos;ll have <span className="mark">{glanceNumber(glanceBalance)} {glanceBalance === 1 && unit === 'days' ? 'day' : unit}</span> on {compactDate(forecastDate)}{balanceOnlyForecast ? ', before new accrual' : ''}.
+            </p>
+            {upcomingLoss && (
+              <p className="mt-1 flex gap-2 text-[15px] text-ink">
+                <span aria-hidden="true" className="mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-warning text-[10px] font-bold text-white">!</span>
+                <span>{compactDatesIn(upcomingLoss.text)} Last day to use it: {compactDate(upcomingLoss.deadline)}.</span>
+              </p>
+            )}
+          </>
+        )}
+      </div>
+      <p className="mt-1 flex flex-wrap gap-x-5 text-sm">
+        <a href="#balance" className="link-mark inline-flex min-h-11 items-center font-semibold">{needsBalance ? 'Enter my balance' : 'See how it adds up'}</a>
+        {upcomingLoss && !needsBalance && <a href="#expiration" className="link-mark inline-flex min-h-11 items-center font-semibold">What you could lose</a>}
+      </p>
+    </section>
+  );
+
   const decoded = useMemo(() => decodeParagraph(pastedText), [pastedText]);
   const decodedTerms = useMemo(() => uniqueMatchedTerms(decoded), [decoded]);
 
@@ -368,6 +404,8 @@ export function Policy() {
               <a href="/pto#saved-plans" className="link-mark inline-flex min-h-11 items-center font-semibold">View saved plans</a>
             </aside>
           )}
+
+          {glance}
 
           {/* Result first: the balance input and its forecast are one card, then what drives
               the number. On desktop the drivers sit beside the answer. */}

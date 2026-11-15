@@ -29,12 +29,13 @@ describe('planner result actions', () => {
     const summary = screen.getByRole('region', { name: 'Your plan' });
     await waitFor(() => expect(summary.getAttribute('data-plan-result')).toBe('ready'));
 
-    // F02: the core inputs sit directly under the result, the break cards right after them.
+    // Phones (and the prerender): the break cards come straight after the result, the core
+    // inputs right after the cards and their primary action.
     const settings = screen.getByRole('complementary', { name: 'Plan settings' });
-    expect(summary.nextElementSibling).toBe(settings);
     expect(within(settings).getByLabelText('PTO days available')).toBeTruthy();
     const requests = screen.getByRole('region', { name: 'Requesting each break' });
-    expect(settings.nextElementSibling?.contains(requests)).toBe(true);
+    expect(summary.nextElementSibling?.contains(requests)).toBe(true);
+    expect(summary.nextElementSibling?.nextElementSibling).toBe(settings);
     const [card] = within(requests).getAllByRole('listitem');
     expect(card.getAttribute('data-break-pto')).toBe('1');
     expect(within(card).getByText('1 working day: Mon Jan 4')).toBeTruthy();
@@ -43,7 +44,9 @@ describe('planner result actions', () => {
     expect(within(card).queryByRole('button', { name: 'Export this break (.ics)' })).toBeNull();
     fireEvent.click(within(card).getByRole('button', { name: /Request this time off/ }));
     expect(within(card).getByRole('button', { name: 'Export this break (.ics)' })).toBeTruthy();
-    expect(within(summary).getByRole('link', { name: 'Export and share' }).getAttribute('href')).toBe('#take-it-heading');
+    // Export and share live in "More", right under the one primary action.
+    const more = document.getElementById('more-actions')!;
+    expect(within(more).getByRole('button', { name: 'Download once (.ics)' }).id).toBe('shortcut-download-ics');
   });
 
   it('opens the work week from the planning assumptions URL', async () => {
@@ -179,7 +182,7 @@ describe('planner result actions', () => {
 
   it('offers the same saved plan after reload from the saved plans anchor', async () => {
     const first = render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Save this plan' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep this plan' }));
     const saved = await screen.findByRole('list', { name: 'Saved plans' });
     expect(saved.closest('#saved-plans')).toBeTruthy();
     expect(within(saved).getByRole('button', { name: 'Open saved plan' })).toBeTruthy();
@@ -204,6 +207,7 @@ describe('planner result actions', () => {
     render(<App />);
     expect(await screen.findByRole('heading', { level: 1, name: 'No PTO days to spend' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Save this plan' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Keep this plan' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Copy plan link' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Save break' })).toBeNull();
   });

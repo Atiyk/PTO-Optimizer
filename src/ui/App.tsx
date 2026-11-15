@@ -30,7 +30,14 @@ import { Legend } from './Legend';
 import { BreakCard } from './BreakCard';
 import { CommittedBreakCard } from './CommittedBreakCard';
 import { PinnedPlansStrip } from './PinnedPlansStrip';
-import { SaveConfirmation } from './SaveConfirmation';
+import { PlanActions } from './PlanActions';
+import { BreakStrip, BREAK_STRIP_ITEM } from './BreakStrip';
+import { YearOverview } from './YearOverview';
+import { PlanStyleCompare, usePlanStyleComparison } from './PlanStyleCompare';
+import { choosePrimaryAction, isPlanKept } from './primaryAction';
+import { MAX_PINNED_PLANS, PLAN_SAVED_MESSAGE } from './pinnedPlanStore';
+import { formatManagerEmailShort, formatWorkingDaysList } from './requestText';
+import { planStyleOptionsFor } from '../autopilot/planFromSearch';
 import { SharedPlanNotice } from './SharedPlanNotice';
 import { LegacyPlanNotice } from './LegacyPlanNotice';
 import { ExportBar } from './ExportBar';
@@ -56,6 +63,9 @@ import { useMinWidth } from './useMinWidth';
 import { noBreaksMessage } from './noBreaksMessage';
 import { PlannerHolidayQuestion } from './CompanyHolidayChips';
 
+/** Links that open More options at a section: the work week, and the days someone can't take off. */
+const OPTION_ANCHORS = ['#planning-assumptions', '#unavailable-days'];
+
 const dayNumber = new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format;
 /** Day-equivalents keep a singular unit up to one: "0.5 day", "1 day", "1.5 days". */
 const dayWord = (days: number) => days > 0 && days <= 1 ? 'day' : 'days';
@@ -65,6 +75,10 @@ export function App() {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [allMonthsShown, setAllMonthsShown] = useState(false);
+  // Phones: the "More" disclosure under the primary action, and the month grids behind the
+  // year overview. Both start closed; nothing in them is removed from the page.
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [monthDetails, setMonthDetails] = useState(false);
   const resultRef = useRef<HTMLElement>(null);
   const workspace = usePersonalWorkspace();
   const ledger = workspace.ledger;
@@ -157,7 +171,7 @@ export function App() {
   const optionsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const openAssumptions = () => {
-      if (window.location.hash !== '#planning-assumptions') return;
+      if (!OPTION_ANCHORS.includes(window.location.hash)) return;
       setOptionsOpen(true);
     };
     openAssumptions();
@@ -165,18 +179,20 @@ export function App() {
     return () => window.removeEventListener('hashchange', openAssumptions);
   }, []);
   useEffect(() => {
-    if (!optionsOpen || window.location.hash !== '#planning-assumptions') return;
-    const heading = document.getElementById('planning-assumptions');
+    if (!optionsOpen || !OPTION_ANCHORS.includes(window.location.hash)) return;
+    const heading = document.getElementById(window.location.hash.slice(1));
     heading?.scrollIntoView?.({ block: 'start' });
     heading?.focus({ preventScroll: true });
   }, [optionsOpen]);
   const toggleOptions = () => {
     const next = !optionsOpen;
     setOptionsOpen(next);
-    if (next && window.location.hash !== '#planning-assumptions') requestAnimationFrame(() => optionsRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }));
+    if (next && !OPTION_ANCHORS.includes(window.location.hash)) requestAnimationFrame(() => optionsRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }));
   };
   const [partnerOpen, setPartnerOpen] = useState<{ key: number; breakId?: string }>({ key: 0 });
   const openPartnerPlanner = (breakId?: string) => {
+    // On a phone the partner planner sits inside "More"; open it so the scroll lands.
+    setMoreOpen(true);
     setPartnerOpen((previous) => ({ key: previous.key + 1, breakId }));
     requestAnimationFrame(() => document.getElementById('partner-planner')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }));
   };
@@ -186,6 +202,41 @@ export function App() {
   // CSS grid still places in the left column on a wide screen until the script runs.
   const wide = useMinWidth(1024);
   const railHoldsShape = wide === true;
+
+  // One primary action under the plan, chosen by state (see primaryAction.ts).
+  const keptBreaks = useMemo(
+    () => state.breaks.map((brk) => ({ start: brk.start, end: brk.end, ptoDates: brk.days.filter(state.isSuggestedPto) })),
+    [state.breaks, state.isSuggestedPto],
+  );
+  const planKept = isPlanKept(state.pinnedPlans, { country: state.country, rangeStart: state.rangeStart, rangeEnd: state.rangeEnd, breaks: keptBreaks });
+  const nextToRequest = state.orderedBreaks.find(({ brk }) => !requestsByDates.has(`${brk.start}|${brk.end}`));
+  const trackedRequestCount = ledger.requests.filter((request) => request.status !== 'considering').length;
+  const primaryKind = choosePrimaryAction({
+    kept: planKept,
+    roomToKeep: state.pinnedPlans.length < MAX_PINNED_PLANS,
+    trackedRequests: trackedRequestCount,
+    hasUnrequestedBreak: nextToRequest !== undefined,
+  });
+  const showPrimary = (plannable || state.planningPending) && !zeroBudget;
+  const primaryDisabled = primaryKind === 'keep'
+    ? !(state.canPin && requestToolsReady) || budgetBlank
+    : !requestToolsReady;
+  const primaryRequest = nextToRequest && requestToolsReady
+    ? { text: formatManagerEmailShort(nextToRequest.brk, state.isSuggestedPto), range: datedRange(nextToRequest.brk.start, nextToRequest.brk.end) }
+    : undefined;
+  const justKept = state.pinMessage === PLAN_SAVED_MESSAGE && planKept;
+
+  // Plan styles side by side, next to the goal picker (worked out just after the plan).
+  const styleComparison = usePlanStyleComparison(
+    state.solveInput,
+    state.minimumBreakDays,
+    planStyleOptionsFor({ noticePeriodDays: state.noticePeriodDays, noticeUnit: state.noticeUnit, reserveDays: state.reserveDays, season: state.season }),
+    state.reserveDays,
+    plannable && state.holidaysReady && !zeroBudget && !state.unlimitedPto,
+  );
+  const styleCompare = (layout: 'narrow' | 'wide') => styleComparison && (
+    <PlanStyleCompare entries={styleComparison} style={state.planningStyle} onChangeStyle={state.setPlanningStyle} layout={layout} />
+  );
   const holidayFocusDate = state.holidayFocusDate;
   const holidayFocusRun = state.holidayFocusRun;
   useEffect(() => {
@@ -309,6 +360,9 @@ export function App() {
           meta={state.planMeta}
           pending={state.planningPending}
         />
+        {/* Narrower than the rail layout, the comparison sits right under the goals; on a
+            desktop it has the main column's width, beside the break cards. */}
+        {!railHoldsShape && styleCompare('narrow')}
       </section>
     </>
   );
@@ -358,6 +412,8 @@ export function App() {
               onChangeReserveDays={state.setReserveDays}
               unlimitedPto={state.unlimitedPto}
               onToggleUnlimitedPto={state.setUnlimitedPto}
+              autoKept={state.planMeta?.reserveKept ?? 0}
+              autoKeptBy={styleName}
             />
             <SubdivisionSelect
               subdivisions={state.discoveredSubdivisions}
@@ -435,6 +491,53 @@ export function App() {
     </>
   );
 
+  // Export, share, subscribe, image and partner: a section of its own on a desktop, inside
+  // "More" under the primary action on phones and tablets. Rendered once either way, so the
+  // keyboard shortcuts and "Add to calendar" always find the same buttons.
+  const takeItWithYou = (
+    <>
+    {requestToolsReady ? <ExportBar
+      breaks={state.breaks}
+      isSuggestedPto={state.isSuggestedPto}
+      categoryOf={state.categoryOf}
+      rangeStart={state.rangeStart}
+      rangeEnd={state.rangeEnd}
+      weekStart={state.weekStart}
+      budgetSpent={state.budgetSpent}
+      totalDaysOff={state.totalDaysOff}
+      travelPercentile={state.scores?.travel.percentile ?? null}
+      efficiencyPercentile={state.scores?.efficiency.percentile ?? null}
+      noticePeriodDays={state.noticePeriodDays}
+      noticeUnit={state.noticeUnit}
+      workWeek={state.workWeek}
+      offDays={state.effectiveOffDays}
+      observedHolidayDates={state.holidaysReady && !state.holidaysDegraded ? state.holidayEntries.filter(holiday => holiday.checked).map(holiday => holiday.date) : undefined}
+      onPlanWithPartner={() => openPartnerPlanner()}
+      planSearch={state.planSearch}
+      shareSnapshot={state.shareSnapshot}
+    /> : <p className="text-sm text-muted">{
+      !plannable && !state.planningPending ? 'Check your planning inputs before exporting.'
+        : 'Calendar and sharing tools appear when a plan and its holidays are ready.'
+    }</p>}
+
+    {plannable && state.holidaysReady && !state.holidaysDegraded && (
+      <PortraitShare breaks={state.breaks} rangeStart={state.rangeStart} rangeEnd={state.rangeEnd} holidayAssumption={state.employerCalendar.custom.length ? 'company' : state.employerCalendar.excluded.length ? 'customized' : 'public'} remainingBalance={state.unlimitedPto ? undefined : Math.max(0, state.budget - state.budgetSpent)} holidayNamesOf={brk => [...new Set(state.holidayEntries.filter(holiday => holiday.checked && holiday.date >= brk.start && holiday.date <= brk.end).map(holiday => holiday.source === 'custom' ? 'Company holiday' : holiday.name))]} />
+    )}
+    <div id="partner-planner" className="scroll-mt-16">
+      {requestToolsReady && <PartnerPlanner openKey={partnerOpen.key} selectedBreakId={partnerOpen.breakId} breaks={partnerBreaks} freeDays={freeDays} input={state.solveInput} minimumBreakLength={state.minimumBreakDays} />}
+    </div>
+    </>
+  );
+
+  const settingsAside = (
+    <aside id="plan-controls" aria-label="Plan settings" tabIndex={-1} className={`min-w-0 scroll-mt-16 lg:col-start-1 lg:row-start-2 lg:self-start ${railHoldsShape ? 'lg:sticky lg:top-4 lg:row-span-3 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:overscroll-auto' : ''}`}>
+      <div className="rounded-[10px] border border-line bg-surface p-4 sm:p-5">
+        {inputsSection}
+        {railHoldsShape && <>{shapeSection}{optionsBlock}</>}
+      </div>
+    </aside>
+  );
+
   return (
     <div className="min-h-screen bg-page">
       <SiteHeader active="pto" />
@@ -464,13 +567,13 @@ export function App() {
                 unlimitedPto={state.unlimitedPto}
                 noPtoMessage={noPtoMessage}
                 exampleFor={budgetBlank && plannable && !zeroBudget ? state.budget : undefined}
+                showSave={false}
               />
               <PinnedPlansStrip
                 summaries={state.pinnedPlans.map((p) => p.summary)}
                 onRestore={state.restorePlan}
                 onRemove={state.removePinnedPlan}
               />
-              <SaveConfirmation message={state.pinMessage} />
               {plannable && !zeroBudget && (
                 <SummaryMetrics
                   budgetSpent={state.budgetSpent}
@@ -490,35 +593,38 @@ export function App() {
                 </p>
               )}
               </HoldHeightWhile>
-              <nav aria-label="On this page" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                {/* Kept (disabled: canPin is false) while the plan updates, so the links beside it
-                    do not reflow and jump back on every input. */}
-                {wide === false && (plannable || state.planningPending) && !zeroBudget && !budgetBlank && (
-                  <button type="button" onClick={state.pinPlan} disabled={!(state.canPin && requestToolsReady)} title={state.pinnedPlans.length >= 2 ? 'Remove a saved plan to make room for another.' : undefined} className={buttonClasses('secondary', 'md', 'px-3! text-sm!')}>
-                    Save this plan
-                  </button>
-                )}
-                {[
-                  ['#take-it-heading', 'Export and share'],
-                  [railHoldsShape ? '#plan-controls' : '#plan-shape', 'Adjust plan'],
-                  ['#complete-plan-heading', 'Calendar'],
-                ].map(([href, label]) => (
-                  <a key={label} href={href} className={buttonClasses('secondary', 'md', 'px-3! text-sm!')}>{label}</a>
-                ))}
-                <a href="#compare-plans" onClick={() => setComparisonOpen(true)} className={buttonClasses('secondary', 'md', 'hidden! px-3! text-sm! lg:inline-flex!')}>Compare options</a>
-              </nav>
+              {/* Desktop: one primary action (chosen by state) beside the page's jump links.
+                  Phones and tablets get the same action under the break cards instead. */}
+              {wide === true && (
+                <PlanActions
+                  layout="wide"
+                  kind={showPrimary ? primaryKind : null}
+                  disabled={primaryDisabled}
+                  disabledTitle={state.pinnedPlans.length >= MAX_PINNED_PLANS ? 'Remove a saved plan to make room for another.' : undefined}
+                  onKeep={state.pinPlan}
+                  request={primaryRequest}
+                  pinMessage={state.pinMessage}
+                  justKept={justKept}
+                >
+                  <nav aria-label="On this page" className="flex flex-wrap gap-2">
+                    {[
+                      ['#take-it-heading', 'Export and share'],
+                      ['#plan-controls', 'Adjust plan'],
+                      ['#complete-plan-heading', 'Calendar'],
+                    ].map(([href, label]) => (
+                      <a key={label} href={href} className={buttonClasses('secondary', 'md', 'px-3! text-sm!')}>{label}</a>
+                    ))}
+                    <a href="#compare-plans" onClick={() => setComparisonOpen(true)} className={buttonClasses('secondary', 'md', 'px-3! text-sm!')}>Compare options</a>
+                  </nav>
+                </PlanActions>
+              )}
             </section>
 
             {/* DOM order is reading order at every width. Desktop: the rail (inputs, sliders,
                 options) is the left column, so it comes before the break cards. Narrower: the
                 inputs sit right under the result, the way the landing page pairs its answer
                 with "I have 15 PTO days", and the sliders follow the break cards. */}
-            <aside id="plan-controls" aria-label="Plan settings" tabIndex={-1} className={`min-w-0 scroll-mt-16 lg:col-start-1 lg:row-start-2 lg:self-start ${railHoldsShape ? 'lg:sticky lg:top-4 lg:row-span-3 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:overscroll-auto' : ''}`}>
-              <div className="rounded-[10px] border border-line bg-surface p-4 sm:p-5">
-                {inputsSection}
-                {railHoldsShape && <>{shapeSection}{optionsBlock}</>}
-              </div>
-            </aside>
+{wide === true && settingsAside}
 
             <div className="flex min-w-0 flex-col gap-5 lg:col-start-2 lg:row-span-2 lg:row-start-2">
               {holidayFocusDate && (
@@ -601,9 +707,9 @@ export function App() {
               <section aria-labelledby="breaks-heading" id="summary-heading" className="min-w-0 scroll-mt-16">
                 <h2 id="breaks-heading" tabIndex={-1} className="scroll-mt-16 text-h2 font-bold text-ink type-condensed">Requesting each break</h2>
                 {plannable && (state.breaks.length > 0 || state.committedEntries.length > 0) ? (
-                  <ul className="m-0 mt-3 flex list-none flex-col gap-3 p-0">
+                  <BreakStrip count={state.committedEntries.length + state.orderedBreaks.length} label="Breaks">
                     {state.committedEntries.map(entry => (
-                      <li key={`committed-${entry.id}`} data-testid="committed-entry" data-committed-start={entry.start} data-committed-end={entry.end} data-committed-status={entry.status} data-break-start={entry.start} data-break-end={entry.end} data-break-pto={entry.ptoDays} className="rounded-[10px] border border-line bg-surface-alt">
+                      <li key={`committed-${entry.id}`} data-testid="committed-entry" data-committed-start={entry.start} data-committed-end={entry.end} data-committed-status={entry.status} data-break-start={entry.start} data-break-end={entry.end} data-break-pto={entry.ptoDays} className={`rounded-[10px] border border-line bg-surface-alt ${BREAK_STRIP_ITEM}`}>
                         <CommittedBreakCard
                           entry={entry}
                           message={justTracked?.id === entry.id ? justTracked.message : undefined}
@@ -620,7 +726,7 @@ export function App() {
                       const requestDatesChanged = request && (request.ptoDates.length !== ptoDates.length
                         || request.ptoDates.some(date => !ptoDates.includes(date)));
                       return (
-                        <li key={brk.id} id={`break-card-${index}`} tabIndex={-1} data-break-start={brk.start} data-break-end={brk.end} data-break-pto={brk.ptoCost} className="scroll-mt-16 rounded-[10px] border border-line bg-surface">
+                        <li key={brk.id} id={`break-card-${index}`} tabIndex={-1} data-break-start={brk.start} data-break-end={brk.end} data-break-pto={brk.ptoCost} className={`scroll-mt-16 rounded-[10px] border border-line bg-surface ${BREAK_STRIP_ITEM}`}>
                           <BreakCard
                             onSave={breakReady ? () => recordBreak(brk, ptoDates, 'saved') : undefined}
                             onTrack={breakReady ? () => recordBreak(brk, ptoDates, 'tracked') : undefined}
@@ -645,12 +751,51 @@ export function App() {
                         </li>
                       );
                     })}
-                  </ul>
+                  </BreakStrip>
                 ) : plannable && <p data-testid="no-breaks" className="mt-2 text-sm text-muted">{noBreaksMessage(state.budget, state.effectiveBudget)}</p>}
               </section>
               </HoldHeightWhile>
-              {plannable && <a href="#planning-assumptions" className="link-mark inline-flex min-h-11 w-fit items-center text-sm">Edit workweek and employer holidays</a>}
+              {/* Phones: the strip shows one card at a time, so every PTO date to request is
+                  also listed here, each break linking to its card. */}
+              {plannable && requestToolsReady && state.orderedBreaks.length > 1 && (
+                <section aria-labelledby="pto-dates-heading" className="min-w-0 md:hidden">
+                  <h2 id="pto-dates-heading" className="text-base font-bold text-ink">PTO dates to request</h2>
+                  <ul className="m-0 mt-1 flex list-none flex-col p-0 text-sm text-ink">
+                    {state.orderedBreaks.map(({ index, brk }) => (
+                      <li key={brk.id} className="border-b border-line last:border-b-0">
+                        <a href={`#break-card-${index}`} className="block min-h-11 py-2 tabular-nums">
+                          <span className="link-mark font-semibold">Break {index}: {datedRange(brk.start, brk.end)}</span>
+                          <span className="block text-muted">{formatWorkingDaysList(brk, state.isSuggestedPto)}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+              {wide !== true && (
+                <PlanActions
+                  layout="narrow"
+                  kind={showPrimary ? primaryKind : null}
+                  disabled={primaryDisabled}
+                  disabledTitle={state.pinnedPlans.length >= MAX_PINNED_PLANS ? 'Remove a saved plan to make room for another.' : undefined}
+                  onKeep={state.pinPlan}
+                  request={primaryRequest}
+                  pinMessage={state.pinMessage}
+                  justKept={justKept}
+                  moreOpen={moreOpen}
+                  onMoreOpenChange={setMoreOpen}
+                >
+                  {takeItWithYou}
+                </PlanActions>
+              )}
+              {plannable && (
+                <p className="flex flex-wrap gap-x-5 text-sm">
+                  <a href="#unavailable-days" className="link-mark inline-flex min-h-11 items-center font-semibold">Can&apos;t do some dates?</a>
+                  <a href="#planning-assumptions" className="link-mark inline-flex min-h-11 items-center">Edit workweek and employer holidays</a>
+                </p>
+              )}
               {plannable && <PlannerHolidayQuestion state={state} />}
+              {railHoldsShape && styleCompare('wide')}
 
               {plannable && state.breaks.length > 0 && (
                 <PlanExplanation
@@ -662,6 +807,10 @@ export function App() {
                 />
               )}
             </div>
+
+            {/* Phones and tablets: the inputs follow the result, its breaks and the primary
+                action, so the first screens answer "what should I request?" first. */}
+            {wide !== true && settingsAside}
 
             {!railHoldsShape && (
               <div className="min-w-0 rounded-[10px] border border-line bg-surface p-4 sm:p-5 lg:col-start-1 lg:row-start-3 lg:self-start">
@@ -691,6 +840,26 @@ export function App() {
 
               <section aria-labelledby="complete-plan-heading" className="min-w-0">
                 <h2 id="complete-plan-heading" tabIndex={-1} className="scroll-mt-16 text-h2 font-bold text-ink type-condensed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Your complete plan</h2>
+                {/* Phones: the whole year on about one screen by default; the month grids, where
+                    days can be set, are one tap away. CSS-only, so the prerender is right too. */}
+                {!state.validationIssues.length && !state.planningPending && (
+                  <div className="mt-3 flex flex-col gap-3 md:hidden">
+                    <div className="rounded-[10px] border border-line bg-surface p-3">
+                      <YearOverview rangeStart={state.rangeStart} rangeEnd={state.rangeEnd} breaks={state.breaks} isPtoDay={state.isSuggestedPto} categoryOf={state.categoryOf} />
+                    </div>
+                    <button
+                      type="button"
+                      aria-expanded={monthDetails}
+                      aria-controls="calendar-month-details"
+                      onClick={() => setMonthDetails(!monthDetails)}
+                      className={buttonClasses('secondary', 'md', 'w-full justify-between!')}
+                    >
+                      <span>{monthDetails ? 'Hide month details' : 'Show month details'}</span>
+                      <PlusMinus open={monthDetails} />
+                    </button>
+                  </div>
+                )}
+                <div id="calendar-month-details" className={monthDetails || state.validationIssues.length > 0 || state.planningPending ? '' : 'max-md:hidden'}>
                 <p className="mt-1 max-w-prose text-sm text-muted">
                   {/* Chosen by CSS, not JS, so the prerendered page is right on touch from the first paint. */}
                   <span className="hidden [@media(hover:hover)]:inline">Click a day to cycle through take off, rule out, and let the planner decide. Arrow keys move between days.</span>
@@ -733,44 +902,16 @@ export function App() {
                     </div>
                   )}
                 </HoldHeightWhile>
+                </div>
               </section>
 
-              <section aria-labelledby="take-it-heading" className="flex min-w-0 flex-col gap-5">
+              {wide === true && <section aria-labelledby="take-it-heading" className="flex min-w-0 flex-col gap-5">
                 <div>
                   <h2 id="take-it-heading" tabIndex={-1} className="scroll-mt-16 text-h2 font-bold text-ink type-condensed">Take it with you</h2>
                   <p className="mt-1 text-sm text-muted">Download your calendar, copy a shareable plan link, or plan with a partner.</p>
                 </div>
-                {requestToolsReady ? <ExportBar
-                  breaks={state.breaks}
-                  isSuggestedPto={state.isSuggestedPto}
-                  categoryOf={state.categoryOf}
-                  rangeStart={state.rangeStart}
-                  rangeEnd={state.rangeEnd}
-                  weekStart={state.weekStart}
-                  budgetSpent={state.budgetSpent}
-                  totalDaysOff={state.totalDaysOff}
-                  travelPercentile={state.scores?.travel.percentile ?? null}
-                  efficiencyPercentile={state.scores?.efficiency.percentile ?? null}
-                  noticePeriodDays={state.noticePeriodDays}
-                  noticeUnit={state.noticeUnit}
-                  workWeek={state.workWeek}
-                  offDays={state.effectiveOffDays}
-                  observedHolidayDates={state.holidaysReady && !state.holidaysDegraded ? state.holidayEntries.filter(holiday => holiday.checked).map(holiday => holiday.date) : undefined}
-                  onPlanWithPartner={() => openPartnerPlanner()}
-                  planSearch={state.planSearch}
-                  shareSnapshot={state.shareSnapshot}
-                /> : <p className="text-sm text-muted">{
-                  !plannable && !state.planningPending ? 'Check your planning inputs before exporting.'
-                    : 'Calendar and sharing tools appear when a plan and its holidays are ready.'
-                }</p>}
-
-                {plannable && state.holidaysReady && !state.holidaysDegraded && (
-                  <PortraitShare breaks={state.breaks} rangeStart={state.rangeStart} rangeEnd={state.rangeEnd} holidayAssumption={state.employerCalendar.custom.length ? 'company' : state.employerCalendar.excluded.length ? 'customized' : 'public'} remainingBalance={state.unlimitedPto ? undefined : Math.max(0, state.budget - state.budgetSpent)} holidayNamesOf={brk => [...new Set(state.holidayEntries.filter(holiday => holiday.checked && holiday.date >= brk.start && holiday.date <= brk.end).map(holiday => holiday.source === 'custom' ? 'Company holiday' : holiday.name))]} />
-                )}
-                <div id="partner-planner" className="scroll-mt-16">
-                  {requestToolsReady && <PartnerPlanner openKey={partnerOpen.key} selectedBreakId={partnerOpen.breakId} breaks={partnerBreaks} freeDays={freeDays} input={state.solveInput} minimumBreakLength={state.minimumBreakDays} />}
-                </div>
-              </section>
+                {takeItWithYou}
+              </section>}
 
               {/* The full request tracker lives in My PTO; the planner shows where it is and how
                   many requests it holds, so there is one place to edit them. */}
