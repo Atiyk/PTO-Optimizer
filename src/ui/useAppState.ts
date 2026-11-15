@@ -18,7 +18,7 @@ import { FRESH_VISIT_RESERVE_DAYS, readBrowserPlanSearch, readBrowserFullState, 
 import type { DayCategory, ForcedState } from './types';
 import { classifyDay } from './dayCategory';
 import { alternativeForDate as alternativeForDateImpl } from './alternativeForDate';
-import { track, trackSharedLinkOpened } from './analytics';
+import { track, trackReturnOncePerSession, trackSharedLinkOpened } from './analytics';
 import { validateInputs, isSupportedPlanningRange } from './validation';
 import { defaultRangeEnd, defaultPlanRangeEnd, holidayEntriesFor, stateHolidayCandidatesFor, altFridayOffDatesFor, effectiveOffDaysFor, mustIncludeDaysFor, effectiveBlackoutsFor, effectiveBudgetFor, policyAccrualFieldsFor, buildSolveInput, isSuggestedPtoDay, type HolidayEntry } from '../autopilot/planFromSearch';
 import { todayISO } from './today';
@@ -28,7 +28,7 @@ import type { PtoRequest } from '../personal/requestLedger';
 import { committedPlanEntries, planningCommitments, type WorkdaySchedule } from '../personal/workspace';
 import { usePlannerComputation } from '../planning/usePlannerComputation';
 import { createPinPreviewer } from '../planning/pinPreviewClient';
-import { MAX_PINNED_PLANS, usePinnedPlans } from './pinnedPlanStore';
+import { MAX_PINNED_PLANS, PINNED_PLANS_STORAGE_KEY, usePinnedPlans } from './pinnedPlanStore';
 
 export { defaultRangeEnd };
 export type { HolidayEntry };
@@ -175,23 +175,21 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     return readBrowserFullState(window.location.search, window.history.state, defaults);
   }, []);
 
-  // 'returned_with_saved_url' (Phase 3 item 9): fired once, only when the page was loaded
-  // with a full plan already in the query string - evidence someone kept/reopened a
-  // previously-shared link, as opposed to a fresh visit with no state to read. Captured
-  // from the RAW incoming search string, at mount, before this component's own URL-sync
-  // effect (below) rewrites the address bar with a full set of params regardless of how
-  // the visitor arrived - checking `window.location.search` again after that effect runs
-  // would always read "true" and defeat the whole signal.
-  const arrivedWithSavedUrl = useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    const params = new URLSearchParams(window.location.search);
-    return params.has('s') && params.has('b');
-  }, []);
-  // Same raw arrival string, read once before the URL sync rewrites it (share-only keys
-  // such as sv are not kept in the address bar).
+  // 'returned_with_saved_url' (Phase 3 item 9, narrowed in baseline item 15): a genuine
+  // return only - a private plan link the person kept (not a homepage CTA, a share link, a
+  // partner link or an on-device hand-off), or any visit while a saved plan is in this
+  // browser - and at most once per browser session (analytics.ts trackReturnOncePerSession).
+  // Read from the RAW arrival string, before the URL sync below rewrites the address bar.
+  // A share-link arrival is 'shared_link_opened' instead, never both.
   const arrivalSearch = useMemo(() => (typeof window === 'undefined' ? '' : window.location.search), []);
   useEffect(() => {
-    if (arrivedWithSavedUrl) track('returned_with_saved_url');
+    let savedPlanPresent = false;
+    try {
+      const raw = window.localStorage.getItem(PINNED_PLANS_STORAGE_KEY);
+      const parsed: unknown = raw ? JSON.parse(raw) : null;
+      savedPlanPresent = Array.isArray(parsed) ? parsed.length > 0 : Array.isArray((parsed as { plans?: unknown })?.plans) && ((parsed as { plans: unknown[] }).plans.length > 0);
+    } catch { /* blocked storage: no saved plan signal */ }
+    trackReturnOncePerSession(arrivalSearch, savedPlanPresent);
     trackSharedLinkOpened(arrivalSearch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -955,6 +953,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
         travelPercentile: scores?.travel.percentile ?? null,
       },
     });
+    track('plan_saved');
   }, [
     country, subdivision, employerCalendar, planningVersion, planningStyle, minimumBreakDays, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
     weekStartOverride, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap,

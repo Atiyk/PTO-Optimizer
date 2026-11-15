@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
-import { isShareLinkArrival, track, trackBreakAction, trackOnceInDocument, trackSharedLinkOpened, type AnalyticsEvent } from './analytics';
+import { isGenuineReturn, isShareLinkArrival, track, trackReturnOncePerSession, trackBreakAction, trackOnceInDocument, trackSharedLinkOpened, type AnalyticsEvent } from './analytics';
 import analyticsSource from './analytics.ts?raw';
 
 beforeEach(() => {
@@ -148,5 +148,43 @@ describe('event payload privacy', () => {
     expect(analyticsSource).toMatch(/window\.plausible\(event, \{ url \}\)/);
     // A future `track(event, props)` would have to change these lines and fail here.
     expect(track.length).toBe(1);
+  });
+});
+
+describe('returned_with_saved_url: genuine returns only (baseline item 15)', () => {
+  afterEach(() => { window.sessionStorage.clear(); });
+
+  it('ignores homepage CTAs, share links, hand-offs and partner links', () => {
+    expect(isGenuineReturn('?c=US&b=15&s=2026-11-14&e=2027-11-13&pv=2&lp=1', false)).toBe(false);
+    expect(isGenuineReturn('?sv=1&c=US&b=15&s=2027-01-01&e=2027-12-31', false)).toBe(false);
+    expect(isGenuineReturn('?c=US&b=15&s=2027-01-01&hx=abc', false)).toBe(false);
+    expect(isGenuineReturn('?pp=xyz&s=2027-01-01&b=3', false)).toBe(false);
+    expect(isGenuineReturn('', false)).toBe(false);
+  });
+
+  it('counts a kept private plan link, or any visit with a saved plan, once per session', () => {
+    expect(isGenuineReturn('?c=US&b=15&s=2027-01-01&e=2027-12-31', false)).toBe(true);
+    expect(isGenuineReturn('', true)).toBe(true);
+    const spy = vi.fn();
+    window.plausible = spy;
+    trackReturnOncePerSession('?c=US&b=15&s=2027-01-01&e=2027-12-31', false);
+    trackReturnOncePerSession('', true);
+    expect(spy).toHaveBeenCalledExactlyOnceWith('returned_with_saved_url', { url: window.location.origin + '/pto' });
+  });
+
+  it('a share-link arrival counts as shared_link_opened and not as a return', () => {
+    const spy = vi.fn();
+    window.plausible = spy;
+    const shared = '?sv=1&c=US&b=15&s=2027-01-01&e=2027-12-31';
+    trackReturnOncePerSession(shared, false);
+    expect(spy).not.toHaveBeenCalled();
+    expect(isShareLinkArrival(shared)).toBe(true); // counted once per document by trackSharedLinkOpened (tested above)
+  });
+
+  it('plan_saved is an event name with no properties', () => {
+    const spy = vi.fn();
+    window.plausible = spy;
+    track('plan_saved');
+    expect(spy).toHaveBeenCalledExactlyOnceWith('plan_saved', { url: window.location.origin + '/pto' });
   });
 });
