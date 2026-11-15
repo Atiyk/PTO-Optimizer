@@ -168,7 +168,7 @@ export function DeparturePayoutEstimator({
         </div>
       </div>
       <div className="mt-5 max-w-3xl space-y-2 border-t border-line pt-4 text-sm leading-6 text-muted">
-        <p><strong className="text-ink">Employment law is not verified here.</strong> Your employer's stated rule may differ from what the law requires where you work. This is not a legal entitlement or take-home pay, and we do not calculate either.</p>
+        <p><strong className="text-ink">Employment law is not verified here.</strong> Your employer's stated rule may differ from what the law requires where you work. This is not a legal entitlement or take-home pay, and we do not calculate either. Check your state law and your contract.</p>
         <p><strong className="text-ink">Confirm with HR:</strong> Is unused PTO paid when you leave, which leave types count, is there a cap, and what are the final accrual and pay-period rules?</p>
         <a href="/glossary/payout" className="link-mark inline-flex min-h-11 items-center font-semibold">
           Read the guide to unused PTO at departure
