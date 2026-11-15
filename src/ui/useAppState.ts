@@ -108,6 +108,18 @@ export interface PlanSnapshot {
     breakCountActual: number;
     travelPercentile: number | null;
   };
+  /** P3: the plan's breaks as they were when saved, for the homepage's "Next break". Older
+   * saved plans have none; readers then fall back to the summary. Never read to restore. */
+  breaks?: SavedPlanBreak[];
+}
+
+export interface SavedPlanBreak {
+  start: string;
+  end: string;
+  totalDaysOff: number;
+  ptoCost: number;
+  /** The working days this break charges, as the planner priced them. */
+  ptoDates: string[];
 }
 
 const NO_REQUESTS: readonly PtoRequest[] = [];
@@ -980,13 +992,16 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
         breakCountActual,
         travelPercentile: scores?.travel.percentile ?? null,
       },
+      breaks: breaks.map((brk) => ({
+        start: brk.start, end: brk.end, totalDaysOff: brk.totalDaysOff, ptoCost: brk.ptoCost, ptoDates: brk.days.filter(isSuggestedPto),
+      })),
     });
   }, [
     country, subdivision, employerCalendar, planningVersion, planningStyle, season, minimumBreakDays, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
     weekStartOverride, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap,
     overlapDays, blackouts, workWeek, forced, altFridayEnabled, altFridayStart,
     addPinnedPlan, canPin, reserveDays, applyTrackedRequests, reserveApprovedPto, unlimitedPto, noticePeriodDays, noticeUnit, peakCapEnabled, peakCapStart, peakCapEnd, peakCapMaxDays,
-    budgetSpent, totalDaysOff, breakCountActual, scores,
+    budgetSpent, totalDaysOff, breakCountActual, scores, breaks, isSuggestedPto,
   ]);
 
   // Restores every input the snapshot carries - the raw setters (not `changeCountry`, which

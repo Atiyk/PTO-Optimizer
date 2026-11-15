@@ -311,16 +311,16 @@ describe('returning visitors (research rec 10)', () => {
     ]);
     await act(async () => { render(<Landing />); });
     const row = screen.getByRole('region', { name: 'Welcome back' });
-    expect(row.textContent).toContain('Next up: Dec 21 – 23, 2026');
+    expect(row.textContent).toContain('Next break: Dec 21 – 23, 2026');
     expect(row.textContent).toContain('Planned · 3 PTO days');
     // 14 calendar days before Monday Dec 21 is Monday Dec 7. N-P1-2: the tracker's wording.
     expect(row.textContent).toContain('Submit by Dec 7 · 14-day notice');
-    const links = row.querySelectorAll('a');
-    expect(links).toHaveLength(1);
-    expect(links[0].getAttribute('href')).toBe('/policy#requests');
-    // It sits at the top of the result area, before the answer.
-    const result = document.querySelector('[data-plan-result]')!;
-    expect(result.firstElementChild).toBe(row);
+    // P3: one next step, plus where the break lives and a way back to the planner.
+    expect(within(row).getAllByRole('button').map((button) => button.textContent)).toEqual(['Copy request text']);
+    expect([...row.querySelectorAll('a')].map((link) => link.getAttribute('href'))).toEqual(['/policy#requests', '#landing-heading']);
+    // P3: it leads the homepage, before the regular planner heading, which stays on the page.
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(row.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('opens a saved plan from its own planner link, keeping private settings off the address', async () => {
@@ -426,12 +426,13 @@ describe('welcome row notice period (N-P1-2)', () => {
     expect(row.textContent).not.toMatch(/Submit|Request by/);
   });
 
-  it('follows the call to action on phones and leads the answer from sm up (N-P2-3)', async () => {
+  it('keeps the regular planner and its call to action for returning visitors (P3, was N-P2-3)', async () => {
     writeRequestLedger([request('2026-12-21', '2026-12-23', 'planned', 'next')]);
     await act(async () => { render(<Landing />); });
     const row = screen.getByRole('region', { name: 'Welcome back' });
-    expect(row.className).toMatch(/(^| )order-1( |$)/);
-    expect(row.className).toMatch(/sm:order-none/);
+    // The dashboard sits above the homepage, not inside the answer; the answer keeps its order.
+    expect(document.querySelector('[data-plan-result]')!.contains(row)).toBe(false);
+    expect(screen.getByRole('link', { name: 'See the full plan →' })).toBeTruthy();
     const longest = screen.getByText(/^Longest:/);
     expect(longest.className).toMatch(/(^| )order-2( |$)/);
   });

@@ -18,7 +18,8 @@ function summaryText(s: PinnedPlanSummary): string {
   return `${s.budgetSpent} PTO ${dayWord} → ${s.totalDaysOff} ${offWord} off · ${s.breakCountActual} ${breakWord}`;
 }
 
-/** Up to two saved scenarios, with their original settings available to restore. */
+/** Up to two saved scenarios. "Open saved plan" (P3; formerly "Restore") puts back every
+ * setting the plan was saved with, exactly as before. */
 export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlansStripProps) {
   if (summaries.length === 0) return null;
   return (
@@ -33,9 +34,10 @@ export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlans
           <button
             type="button"
             onClick={() => onRestore(i)}
+            aria-label={summaries.length > 1 ? `Open saved plan ${i + 1}` : undefined}
             className="flex min-h-11 items-center px-2 font-semibold underline underline-offset-[0.22em] hover:bg-surface-alt"
           >
-            Restore
+            Open saved plan
           </button>
           <button
             type="button"

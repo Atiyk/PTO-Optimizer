@@ -10,6 +10,10 @@ import {
 import type { PreparedWalletImport } from '../integration/walletImportLedgerGate';
 import { Button } from './Button';
 import { compactDate } from './compactDate';
+import {
+  browserEnumerableStorage, downloadSavedDataBackup, MAX_SAVED_DATA_BACKUP_LENGTH, parseSavedDataBackup, restoreSavedDataBackup,
+} from '../personal/savedDataBackup';
+import { updateRetentionStatus } from '../personal/retentionStatus';
 
 /** "1 balance" / "3 balances": each saved bank of days (vacation, sick, …) is a balance. */
 export function balanceCount(n: number): string {
@@ -105,7 +109,9 @@ export function WalletTransfer({ policy, requests, forecastDate }: {
         <span aria-hidden="true" className="shrink-0 text-xl leading-none group-open:rotate-45 motion-safe:transition-transform">+</span>
       </summary>
       <div className="space-y-3 border-t border-line px-4 pb-4 pt-3 text-sm text-muted sm:px-6">
-        <p>A backup file holds your saved PTO balances and policy settings, without tracked requests or notes. Use it to move them to another browser. Imported balances stay in this browser and show separately from the policy above.</p>
+        <FullBackup />
+        <h3 className="border-t border-line pt-3 font-semibold text-ink">Balances and policy only</h3>
+        <p>This smaller backup file holds your saved PTO balances and policy settings, without tracked requests or notes. Use it to move them to another browser. Imported balances stay in this browser and show separately from the policy above.</p>
         {!lockSupport && <p>Importing or removing saved balances needs a browser that supports cross-tab storage locks. The request tracker still works.</p>}
         {wallet && wallet.banks.length > 0 && (
           <ul className="space-y-2">
@@ -171,5 +177,67 @@ export function WalletTransfer({ policy, requests, forecastDate }: {
         {message && <p role="status">{message}</p>}
       </div>
     </details>
+  );
+}
+
+/**
+ * P3 storage honesty: everything Timebower saved in this browser, in one file. Restoring
+ * adds only what this browser doesn't have; anything already saved here stays as it is.
+ */
+export function restoreSummary(added: number, kept: number, failed: number, merged = 0): string {
+  if (failed > 0) return `Storage is full or unavailable, so ${failed} saved ${failed === 1 ? 'item' : 'items'} from the backup could not be added. Nothing saved here was changed.`;
+  if (added === 0 && kept === 0 && merged === 0) return 'Everything in this backup is already saved in this browser.';
+  const parts = [`Added ${added} saved ${added === 1 ? 'item' : 'items'} this browser didn’t have.`];
+  if (merged > 0) parts.push('Saved plans or employer calendars from the backup were added next to the ones here.');
+  if (kept > 0) parts.push(`${kept} ${kept === 1 ? 'item differs' : 'items differ'} from what’s saved here and ${kept === 1 ? 'was' : 'were'} left as ${kept === 1 ? 'it is' : 'they are'}.`);
+  return `${parts.join(' ')} Reload the page to see them.`;
+}
+
+function FullBackup() {
+  const id = useId();
+  const [message, setMessage] = useState('');
+  async function restore(file: File) {
+    const storage = browserEnumerableStorage();
+    if (!storage) { setMessage('Browser storage is unavailable, so nothing can be restored here.'); return; }
+    let text = '';
+    try { text = file.size <= MAX_SAVED_DATA_BACKUP_LENGTH ? await file.text() : ''; } catch { text = ''; }
+    const parsed = parseSavedDataBackup(text);
+    if (!parsed.ok) {
+      setMessage(parsed.reason === 'balances-only'
+        ? 'This is a balances backup. Use “Review a backup file” below for it.'
+        : parsed.reason === 'newer-version'
+          ? 'This backup was made by a newer version of Timebower. Reload the page and try again.'
+          : 'This file could not be read as a Timebower backup. Nothing saved here has changed.');
+      return;
+    }
+    const result = restoreSavedDataBackup(storage, parsed.backup);
+    setMessage(restoreSummary(result.added.length, result.kept.length, result.failed.length, result.merged.length));
+  }
+  return (
+    <section aria-label="Everything saved here" className="space-y-3">
+      <p className="text-ink">Your saved plans, tracked requests, balances, policy and employer holidays are kept only in this browser on this device. They aren’t in an account or synced. A full backup file keeps a copy you can restore here or in another browser.</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button variant="secondary" onClick={() => {
+          const now = new Date();
+          if (downloadSavedDataBackup(browserEnumerableStorage(), now)) {
+            updateRetentionStatus({ lastBackupAt: now.toISOString() });
+            setMessage('Backup file downloaded. Keep it outside this browser, for example in your files or email.');
+          } else {
+            setMessage('The backup file could not be made in this browser.');
+          }
+        }}>Download a full backup</Button>
+        <div className="min-w-0 max-w-full">
+          <label htmlFor={id} className="mb-1 block font-semibold text-ink">Restore from a full backup</label>
+          <input id={id} className="max-w-full" type="file" accept=".json,application/json"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (file) void restore(file);
+            }} />
+          <p className="mt-1">Adds only what this browser doesn’t have, including saved plans and employer calendars. Nothing saved here is replaced.</p>
+        </div>
+      </div>
+      {message && <p role="status">{message}</p>}
+    </section>
   );
 }

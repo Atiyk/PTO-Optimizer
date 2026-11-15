@@ -7,6 +7,7 @@
  *   public/icons/icon-192.png       PWA icon, transparent around the mark
  *   public/icons/icon-512.png
  *   public/icons/icon-maskable-512.png  the mark inside the 80% safe zone on a solid background
+ *   public/icons/icon-maskable-192.png  the same, for launchers that want the smaller size
  *
  * Run manually after changing the mark and commit the output (like the OG images):
  *   npx tsx --tsconfig tsconfig.app.json scripts/build-icons.ts
@@ -74,8 +75,9 @@ async function main(): Promise<void> {
   writeFileSync(resolve(publicDir, 'icons/icon-512.png'), await render(512, 0.06, null));
   // Maskable: the platform may crop to a circle, so the mark stays inside the central 80%.
   writeFileSync(resolve(publicDir, 'icons/icon-maskable-512.png'), await render(512, 0.16, LOGO_COLORS.page));
+  writeFileSync(resolve(publicDir, 'icons/icon-maskable-192.png'), await render(192, 0.16, LOGO_COLORS.page));
   await browser.close();
-  console.log('Icons written: favicon.svg, favicon.ico, apple-touch-icon.png, icons/icon-{192,512,maskable-512}.png');
+  console.log('Icons written: favicon.svg, favicon.ico, apple-touch-icon.png, icons/icon-{192,512,maskable-512,maskable-192}.png');
 }
 
 main();

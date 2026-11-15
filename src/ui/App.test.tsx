@@ -182,7 +182,7 @@ describe('planner result actions', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Save this plan' }));
     const saved = await screen.findByRole('list', { name: 'Saved plans' });
     expect(saved.closest('#saved-plans')).toBeTruthy();
-    expect(within(saved).getByRole('button', { name: 'Restore' })).toBeTruthy();
+    expect(within(saved).getByRole('button', { name: 'Open saved plan' })).toBeTruthy();
     first.unmount();
     render(<App />);
     expect(await screen.findByRole('list', { name: 'Saved plans' })).toBeTruthy();

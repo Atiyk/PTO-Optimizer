@@ -23,11 +23,8 @@ import { useWholeDayDraft } from './useWholeDayDraft';
 import { daysOffSplit } from './Headline';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import { SHARE_LINK_SENTENCE } from './shareLinkCopy';
-import { readRequestLedger } from '../personal/requestLedger';
 import { usePinnedPlans } from './pinnedPlanStore';
-import { nextReturnItem, type ReturnItem } from './returnVisit';
-import { handOffOnClick } from './planHandoff';
-import { noticePhrase } from '@daysoff/engine/calendar/requestDeadline';
+import { ReturningDashboard } from './ReturningDashboard';
 
 /** A control set inside the sentence: it takes the sentence's own size and weight. */
 const INLINE_FIELD = 'h-[1.45em] min-h-11 rounded-[6px] border border-line-strong bg-surface px-[0.3em] align-baseline font-bold text-ink hover:border-ink';
@@ -132,34 +129,6 @@ function PlanYear({ breaks, best, rangeStart, rangeEnd, holidayName, weekStart }
 /** The holidays list starts with this many rows; the rest sit behind one disclosure. */
 const HOLIDAYS_SHOWN = 3;
 
-/**
- * Research rec 10: one compact row for a returning visitor, from what this browser saved.
- * N-P2-3: on phones it follows the call to action, so the action stays above the tab bar.
- * N-P1-2: the submit-by date uses the tracker's rule and wording, with the notice period
- * the break was planned with when it was saved from the planner.
- */
-function WelcomeBack({ item, today }: { item: ReturnItem; today: string }) {
-  const submitBy = item.kind === 'request' ? item.submitBy : undefined;
-  const notice = submitBy ? `${noticePhrase(submitBy.noticePeriodDays, submitBy.noticeUnit)} notice` : '';
-  const body = item.kind === 'request' ? <>
-    <p className="font-semibold text-ink">Welcome back. Next up: <span className="tabular-nums">{breakDates(item.request)}</span></p>
-    <p className="text-muted">{item.status} · {plural(item.request.ptoDays, 'PTO day')}{submitBy?.date
-      ? submitBy.date < today
-        ? <> · <strong className="font-semibold text-ink">Submit now</strong>: the {notice} window opened {formatShort(submitBy.date)}</>
-        : <> · <strong className="font-semibold text-ink">Submit by {formatShort(submitBy.date)}</strong> · {notice}</>
-      : ''}</p>
-  </> : <>
-    <p className="font-semibold text-ink">Welcome back. Your saved plan: {item.plan.summary.totalDaysOff} days off for {plural(item.plan.summary.budgetSpent, 'PTO day')}</p>
-    <p className="text-muted tabular-nums">{plural(item.plan.summary.breakCountActual, 'break')} between {breakDates({ start: item.plan.rangeStart, end: item.plan.rangeEnd })}</p>
-  </>;
-  return <section aria-label="Welcome back" data-testid="welcome-back" className="order-1 mt-4 flex flex-wrap items-center justify-between gap-x-4 rounded-[10px] border border-line bg-surface px-4 py-1.5 text-[15px] leading-6 sm:order-none sm:mt-0 sm:mb-4 sm:py-2">
-    <div className="min-w-0 py-1">{body}</div>
-    {item.kind === 'request'
-      ? <a href="/policy#requests" className={LINK}>Open in My PTO →</a>
-      : <a href={item.href} onClick={handOffOnClick(item.href, item.privateSearch)} className={LINK}>Open saved plan →</a>}
-  </section>;
-}
-
 /** One live engine calculation drives the preview and full-plan handoff. */
 function ToolGroup({ title, rows }: { title: string; rows: { href: string; title: string; body: string }[] }) {
   return <div className="min-w-0">
@@ -182,8 +151,6 @@ export function Landing() {
   const today = todayISO();
   const [allHolidays, setAllHolidays] = useState(false);
   const { pinnedPlans } = usePinnedPlans();
-  // Read once: the landing page only shows what this browser already saved.
-  const [savedRequests] = useState(() => typeof window === 'undefined' ? [] : readRequestLedger().requests);
   const [state, setState] = useState(() => readLandingState(typeof window === 'undefined' ? '' : window.location.search, today, geolocateCountry()));
   const { country, budget, rangeStart, rangeEnd } = state;
   const employer = useMemo(() => readEmployerCalendar(country), [country]);
@@ -239,7 +206,7 @@ export function Landing() {
   const budgetBlank = budgetDraft.empty;
   // R2: a blank field has no number to carry, so the planner opens on its own defaults.
   const href = validRange ? landingPlanHref(state, undefined, budgetBlank) : '/pto';
-  const returnItem = useMemo(() => nextReturnItem(savedRequests, pinnedPlans, today, holidays.map((holiday) => holiday.date)), [savedRequests, pinnedPlans, today, holidays]);
+  const holidayDates = useMemo(() => holidays.map((holiday) => holiday.date), [holidays]);
   const shownHolidays = allHolidays ? upcoming : upcoming.slice(0, HOLIDAYS_SHOWN);
   const countryName = COUNTRIES.find((entry) => entry.code === country)?.name ?? country;
   const showGuess = guessing && budget === 15 && !budgetBlank;
@@ -255,8 +222,10 @@ export function Landing() {
     <main id="main-content" tabIndex={-1}>
       {/* First screen: what this is, the sentence that drives it, the answer, the schedule. */}
       <Container className="px-4 pt-5 sm:px-6 sm:pt-12 lg:pt-14">
+        {/* P3: someone who saved a plan or a request here sees it first; the planner follows. */}
+        <ReturningDashboard pinnedPlans={pinnedPlans} today={today} offDays={holidayDates} />
         <section aria-labelledby="landing-heading">
-          <h1 id="landing-heading" className="max-w-[17ch] text-[clamp(2rem,0.95rem+5vw,4.75rem)] leading-[1.04] type-display text-ink">More days off from the same PTO.</h1>
+          <h1 id="landing-heading" className="scroll-mt-16 max-w-[17ch] text-[clamp(2rem,0.95rem+5vw,4.75rem)] leading-[1.04] type-display text-ink">More days off from the same PTO.</h1>
 
           <div className="mt-4 grid min-w-0 gap-x-14 gap-y-4 sm:mt-10 sm:gap-y-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
             <div className="min-w-0 lg:col-start-1 lg:row-start-1">
@@ -275,7 +244,6 @@ export function Landing() {
             </div>
 
             <section aria-labelledby="landing-result" data-plan-result={!validRange ? 'unavailable' : loading ? 'pending' : 'ready'} className="flex min-w-0 flex-col lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-1">
-              {returnItem && <WelcomeBack item={returnItem} today={today} />}
               {/* N-P1-1: the blank state reserves the plan's height, so the call to action
                   stays where it was when the field empties. */}
               <div className={budgetBlank ? 'min-h-[9.375rem] sm:min-h-[9.5rem] lg:min-h-[11.75rem]' : undefined}>
