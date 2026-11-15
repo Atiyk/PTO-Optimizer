@@ -4,7 +4,7 @@ import { noticePhrase } from '@daysoff/engine/calendar/requestDeadline';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { useRequestLedger } from './useRequestLedger';
 import { settleLedgerAction } from '../integration/browserWalletStore';
-import { buildDashboard, breakForRequestText, type DashboardModel, type DashboardReminder, type NextBreak, type PtoLine } from './returningDashboard';
+import { buildDashboard, breakForRequestText, type DashboardModel, type DashboardReminder, type NextBreak, type PtoLine } from './returningDashboardModel';
 import { copyText, formatManagerEmailDetailed, formatManagerEmailShort } from './requestText';
 import { handOffOnClick } from './planHandoff';
 import { Button } from './Button';

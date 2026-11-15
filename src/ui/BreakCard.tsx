@@ -10,6 +10,7 @@ import { settleLedgerAction, type LedgerAction } from '../integration/browserWal
 import { ActionButton } from './ExportBar';
 import { downloadICS } from './icsExport';
 import { trackBreakAction } from './analytics';
+import { BreakRibbon } from './BreakRibbon';
 
 type RequestAction = () => LedgerAction<{ ok: boolean; message: string }>;
 
@@ -35,6 +36,8 @@ interface BreakCardProps {
    * breakReason.ts, computed in App.tsx (it needs holidayNameFor, which BreakCard doesn't
    * otherwise touch). Always present, for every card, not just the low-value ones. */
   reason: string;
+  /** Names the holidays inside the break on its day ribbon. */
+  holidayNameFor?: (iso: string) => string | undefined;
   today: string;
   noticePeriodDays: number;
   /** Calendar or working days; default calendar. */
@@ -195,6 +198,7 @@ export function BreakCard({
   onHover,
   isMostContested,
   reason,
+  holidayNameFor,
   today,
   noticePeriodDays,
   noticeUnit = 'calendar',
@@ -258,7 +262,7 @@ export function BreakCard({
       onMouseLeave={() => onHover(null)}
       onFocus={() => onHover(brk.id)}
       onBlur={() => onHover(null)}
-      className={`grid scroll-mt-16 grid-cols-1 gap-x-3 rounded-[10px] px-3 py-4 sm:grid-cols-[auto_minmax(0,1fr)] transition-colors duration-150 ease-[var(--ease-out)] sm:gap-x-4 sm:px-4 ${
+      className={`grid scroll-mt-16 grid-cols-1 gap-x-3 rounded-[14px] px-4 py-4 sm:grid-cols-[auto_minmax(0,1fr)] transition-colors duration-150 ease-[var(--ease-out)] sm:gap-x-4 sm:px-4 ${
         // The hovered break gets one tone step (chrome never takes the marker; its days get
         // the stronger marker pass on the calendar at the same moment).
         highlighted ? 'bg-surface-alt' : 'bg-transparent'
@@ -288,6 +292,9 @@ export function BreakCard({
           )}
         </p>
 
+        {/* The break itself, day by day: which days are PTO and which were already off. */}
+        <BreakRibbon days={brk.days} isPtoDay={isPtoDay} holidayNameFor={holidayNameFor} className="my-1.5 max-w-xl" />
+
         {/* Every recommendation states its own reasoning, visibly, not in a tooltip. */}
         <p className="text-sm text-muted">{reason}</p>
 
@@ -311,7 +318,7 @@ export function BreakCard({
               type="button"
               disabled={requestActionPending}
               onClick={() => runRequestAction(onSave)}
-              className={buttonClasses('secondary', 'md', 'min-h-11 px-3! text-sm!')}
+              className={buttonClasses('quiet', 'md', 'min-h-11 px-2! text-sm!')}
             >
               Save break
             </button>
@@ -328,7 +335,7 @@ export function BreakCard({
               <a ref={requestLinkRef} href="#requests" className="link-mark inline-flex min-h-11 items-center">See My PTO requests</a>
             </p>
           )}
-          <button type="button" aria-expanded={expanded} aria-controls={requestToolsId} onClick={() => setUserExpanded(!expanded)} className={buttonClasses('quiet', 'md', 'min-h-11 px-2! text-sm!')}>
+          <button type="button" aria-expanded={expanded} aria-controls={requestToolsId} onClick={() => setUserExpanded(!expanded)} className={buttonClasses('secondary', 'md', 'order-first min-h-11 border-accent! px-3.5! text-sm! text-accent-ink! hover:bg-accent-soft!')}>
             {expanded ? 'Hide request tools' : 'Request this time off'} <Chevron direction={expanded ? 'up' : 'down'} />
           </button>
         </div>}

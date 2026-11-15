@@ -9,7 +9,9 @@ import { settleLedgerAction } from '../integration/browserWalletStore';
 import { track, trackBreakAction } from './analytics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SiteHeader } from './SiteHeader';
-import { CompactResultBar, Headline } from './Headline';
+import { Headline } from './Headline';
+import { PlannerNav } from './PlannerNav';
+import { YearLine } from './YearLine';
 import { buttonClasses } from './Button';
 import { SummaryMetrics } from './SummaryMetrics';
 import { PlanExplanation } from './PlanExplanation';
@@ -117,6 +119,7 @@ export function App() {
   }, [plannable, zeroBudget, state.orderedBreaks]);
   // Issue 8/17: plan years without holiday data are limited source data for the comparison.
   const uncoveredHolidayYears = useUncoveredHolidayYears(state.country, state.rangeStart, state.rangeEnd);
+  const yearLineHolidays = useMemo(() => state.holidayEntries.filter((entry) => entry.checked).map((entry) => entry.date), [state.holidayEntries]);
   const requestToolsReady = plannable && state.holidaysReady && !state.holidaysDegraded;
   const requestCount = ledger.requests.length;
   const requestsByDates = useMemo(() => new Map(ledger.requests.map(request => [`${request.start}|${request.end}`, request])), [ledger.requests]);
@@ -263,7 +266,7 @@ export function App() {
     compareNear && plannable && state.holidaysReady && !zeroBudget && !state.unlimitedPto,
   );
   const styleCompare = (layout: 'narrow' | 'wide') => styleComparison && (
-    <PlanStyleCompare entries={styleComparison} style={state.planningStyle} onChangeStyle={state.setPlanningStyle} layout={layout} />
+    <PlanStyleCompare entries={styleComparison} style={state.planningStyle} onChangeStyle={state.setPlanningStyle} layout={layout} range={{ start: state.rangeStart, end: state.rangeEnd }} />
   );
   const holidayFocusDate = state.holidayFocusDate;
   const holidayFocusRun = state.holidayFocusRun;
@@ -558,7 +561,7 @@ export function App() {
   );
 
   const settingsAside = (
-    <aside id="plan-controls" aria-label="Plan settings" tabIndex={-1} className={`min-w-0 scroll-mt-16 lg:col-start-1 lg:row-start-2 lg:self-start ${railHoldsShape ? 'lg:sticky lg:top-4 lg:row-span-3 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:overscroll-auto' : ''}`}>
+    <aside id="plan-controls" aria-label="Plan settings" tabIndex={-1} className={`min-w-0 scroll-mt-16 lg:col-start-1 lg:row-start-2 lg:self-start ${railHoldsShape ? 'lg:sticky lg:top-16 lg:row-span-3 lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto lg:overscroll-auto' : ''}`}>
       <div className="rounded-[10px] border border-line bg-surface p-4 sm:p-5">
         {inputsSection}
         {railHoldsShape && <>{shapeSection}{optionsBlock}</>}
@@ -569,13 +572,24 @@ export function App() {
   return (
     <div className="min-h-screen bg-page">
       <SiteHeader active="pto" />
-      {plannable && !zeroBudget && <CompactResultBar watch={resultRef} totalDaysOff={state.totalDaysOff} budgetSpent={state.budgetSpent} breakCountActual={state.breakCountActual} />}
+      <PlannerNav
+        watch={resultRef}
+        result={plannable && !zeroBudget ? { totalDaysOff: state.totalDaysOff, budgetSpent: state.budgetSpent, breakCountActual: state.breakCountActual } : undefined}
+        items={[
+          { id: 'breaks-heading', label: 'Breaks' },
+          { id: 'complete-plan-heading', label: 'Calendar' },
+          // Desktop keeps the settings in the sticky rail, always in view, so the bar offers
+          // sharing instead. Narrower, sharing sits right under the result ("More") and the
+          // settings are the long scroll away.
+          wide === true ? { id: 'take-it-heading', label: 'Share' } : { id: 'plan-controls', label: 'Adjust' },
+        ]}
+      />
 
       <main id="main-content" tabIndex={-1} className="focus:outline-none" data-plan-ready={state.holidaysReady && !state.planningPending}>
         <Container className="px-4 pb-16 pt-6 sm:px-6 lg:pb-24 lg:pt-10">
           <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)] xl:gap-x-14">
 
-            <section id="saved-plans" ref={resultRef} tabIndex={-1} aria-label="Your plan" data-plan-result={state.planningPending ? 'pending' : plannable ? 'ready' : 'unavailable'} className="flex min-w-0 scroll-mt-16 flex-col gap-4 sm:gap-5 lg:col-span-2 lg:col-start-1 lg:row-start-1">
+            <section id="saved-plans" ref={resultRef} tabIndex={-1} aria-label="Your plan" data-plan-result={state.planningPending ? 'pending' : plannable ? 'ready' : 'unavailable'} className="plan-card flex min-w-0 scroll-mt-16 flex-col gap-4 p-4 sm:gap-5 sm:p-6 lg:col-span-2 lg:col-start-1 lg:row-start-1 lg:p-8">
               {/* Visual stability: while the plan updates, the result keeps its last height (see
                   HoldHeightWhile), so the controls below do not jump up and back down. */}
               <HoldHeightWhile holding={state.planningPending} className="flex min-w-0 flex-col gap-4 sm:gap-5">
@@ -597,6 +611,18 @@ export function App() {
                 exampleFor={budgetBlank && plannable && !zeroBudget ? state.budget : undefined}
                 showSave={false}
               />
+              {plannable && !zeroBudget && state.orderedBreaks.length > 0 && (
+                <YearLine
+                  rangeStart={state.rangeStart}
+                  rangeEnd={state.rangeEnd}
+                  breaks={state.orderedBreaks.map(({ brk }) => brk)}
+                  holidayDates={yearLineHolidays}
+                  hrefFor={(_, index) => `#break-card-${index + 1}`}
+                  activeId={state.hoveredBreakId}
+                  onHover={state.setHoveredBreakId}
+                  className="mt-1"
+                />
+              )}
               <PinnedPlansStrip
                 summaries={state.pinnedPlans.map((p) => p.summary)}
                 onRestore={state.restorePlan}
@@ -789,7 +815,7 @@ export function App() {
                       const requestDatesChanged = request && (request.ptoDates.length !== ptoDates.length
                         || request.ptoDates.some(date => !ptoDates.includes(date)));
                       return (
-                        <li key={brk.id} id={`break-card-${index}`} tabIndex={-1} data-break-start={brk.start} data-break-end={brk.end} data-break-pto={brk.ptoCost} className={`scroll-mt-16 rounded-[10px] border border-line bg-surface ${BREAK_STRIP_ITEM}`}>
+                        <li key={brk.id} id={`break-card-${index}`} tabIndex={-1} data-break-start={brk.start} data-break-end={brk.end} data-break-pto={brk.ptoCost} className={`scroll-mt-16 rounded-[14px] border border-line bg-surface ${BREAK_STRIP_ITEM}`}>
                           <BreakCard
                             onSave={breakReady ? () => recordBreak(brk, ptoDates, 'saved') : undefined}
                             onTrack={breakReady ? () => recordBreak(brk, ptoDates, 'tracked') : undefined}
@@ -804,6 +830,7 @@ export function App() {
                             onHover={state.setHoveredBreakId}
                             isMostContested={brk.id === mostContestedId}
                             reason={breakReason(brk, state.holidayNameFor)}
+                            holidayNameFor={state.holidayNameFor}
                             today={today}
                             noticePeriodDays={state.noticePeriodDays}
                             noticeUnit={state.noticeUnit}

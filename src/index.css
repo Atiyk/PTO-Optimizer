@@ -358,6 +358,25 @@
     font-stretch: 92%;
   }
 
+  /* The plan card: the one raised object on a page. It holds the answer (the figure, the year
+     line, the next action) on white, lifted off the canvas by a soft two-layer shadow, so the
+     result reads as a thing you can keep rather than a paragraph in a form. Everything else
+     stays flat (hairlines and tone steps), which is what lets this one float. */
+  .plan-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 18px;
+    box-shadow:
+      0 1px 2px rgb(15 26 35 / 0.04),
+      0 14px 36px -14px rgb(15 26 35 / 0.14);
+  }
+  @media (prefers-contrast: more) {
+    .plan-card {
+      border-color: var(--border-strong);
+      box-shadow: none;
+    }
+  }
+
   /* Emphasis inside a sentence ("9 days off"): weight and ink, never a fill behind text. */
   .mark {
     font-weight: 700;

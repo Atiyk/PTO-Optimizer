@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { createPtoRequest, type PtoRequest } from '../personal/requestLedger';
-import { buildDashboard, breakForRequestText } from './returningDashboard';
+import { buildDashboard, breakForRequestText } from './returningDashboardModel';
 import { isQuietWindow } from '@daysoff/engine/calendar/requestDeadline';
 import type { PlanSnapshot } from './useAppState';
 

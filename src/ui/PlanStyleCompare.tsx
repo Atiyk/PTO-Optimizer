@@ -3,6 +3,7 @@ import type { SolveInput } from '@daysoff/engine/solver/types';
 import type { PlanningStyle } from '../planning/optimizer';
 import type { PlanComparisonEntry } from '../planning/planComparison';
 import type { PlanStyleOptions, Season } from '../planning/yearPlan';
+import { YearLine } from './YearLine';
 
 const SEASON_LABEL: Record<Season, string> = { spring: 'Spring', summer: 'Summer', fall: 'Fall', winter: 'Winter' };
 const days = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`;
@@ -43,6 +44,9 @@ interface PlanStyleCompareProps {
   onChangeStyle: (style: PlanningStyle) => void;
   /** "wide" puts the cards side by side (desktop main column); "narrow" is a swipe strip. */
   layout: 'narrow' | 'wide';
+  /** With the planning dates, each option draws its breaks on the year line, so the
+   * difference between two plans is something you see before you read the figures. */
+  range?: { start: string; end: string };
 }
 
 /**
@@ -50,7 +54,7 @@ interface PlanStyleCompareProps {
  * the goal (the same `ps` value the goal picker sets) and the plan updates at once: a live
  * choice, never a submit. Each card is one radio, labelled by the whole card.
  */
-export function PlanStyleCompare({ entries, style, onChangeStyle, layout }: PlanStyleCompareProps) {
+export function PlanStyleCompare({ entries, style, onChangeStyle, layout, range }: PlanStyleCompareProps) {
   if (entries.length < 2) return null;
   const strip = layout === 'narrow';
   return (
@@ -74,7 +78,7 @@ export function PlanStyleCompare({ entries, style, onChangeStyle, layout }: Plan
               key={entry.style}
               htmlFor={id}
               data-compare-style={entry.style}
-              className={`flex min-w-0 cursor-pointer snap-start flex-col gap-2 rounded-[10px] border bg-surface p-3 text-sm text-ink transition-colors duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--focus-ring)] ${chosen ? 'border-ink' : 'border-line hover:border-line-strong'} ${strip ? 'w-[82%] shrink-0 sm:w-[46%]' : ''}`}
+              className={`flex min-w-0 cursor-pointer snap-start flex-col gap-2 rounded-[14px] border bg-surface p-4 text-sm text-ink transition-colors duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--focus-ring)] ${chosen ? 'border-ink' : 'border-line hover:border-line-strong'} ${strip ? 'w-[82%] shrink-0 sm:w-[46%]' : ''}`}
             >
               <span className="flex items-start gap-2">
                 <input
@@ -91,6 +95,7 @@ export function PlanStyleCompare({ entries, style, onChangeStyle, layout }: Plan
                 {chosen && <span className="shrink-0 rounded-[6px] bg-surface-alt px-1.5 text-xs font-semibold">Your plan</span>}
               </span>
               <span className="text-xl font-bold tabular-nums"><span className="mark">{entry.totalDaysOff} days off</span></span>
+              {range && <span aria-hidden="true" className="block"><YearLine rangeStart={range.start} rangeEnd={range.end} breaks={entry.breaks.slice().sort((a, b) => a.start.localeCompare(b.start))} compact /></span>}
               <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 tabular-nums">
                 <dt className="text-muted">PTO used</dt><dd className="m-0 text-right">{days(entry.ptoUsed)}</dd>
                 <dt className="text-muted">Longest break</dt><dd className="m-0 text-right">{days(entry.longestBreak)}</dd>

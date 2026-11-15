@@ -27,6 +27,8 @@ import { SHARE_LINK_SENTENCE } from './shareLinkCopy';
 import { usePinnedPlans } from './pinnedPlanStore';
 import { REQUEST_STORAGE_KEY } from '../personal/requestLedger';
 import { HomeHolidayQuestion } from './CompanyHolidayChips';
+import { BreakRibbon, BreakRibbonKey } from './BreakRibbon';
+import { YearLine } from './YearLine';
 
 // The returning-visitor dashboard (and the request, backup and wallet code behind it) loads
 // only when this browser has a saved plan or request; a first visit never downloads it.
@@ -118,7 +120,9 @@ function PlanYear({ breaks, best, rangeStart, rangeEnd, holidayName, weekStart }
     </div>
   </div>;
 
-  return <figure className="min-w-0 rounded-[10px] bg-surface p-3 sm:p-5">
+  const isPto = (date: string) => ptoDays.has(date);
+  const nameOf = (date: string) => holidayName.get(date);
+  return <figure className="min-w-0 rounded-[18px] border border-line bg-surface p-4 sm:p-6">
     <figcaption className="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
       <span className="text-h2 font-bold type-condensed">Every break in this plan</span>
       <span className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
@@ -128,9 +132,10 @@ function PlanYear({ breaks, best, rangeStart, rangeEnd, holidayName, weekStart }
         <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="relative size-3.5 bg-holiday-soft"><span className={`absolute bottom-0.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${HOLIDAY_DOT}`} /></span>Public holiday</span>
       </span>
     </figcaption>
-    <ol aria-label="Breaks in this plan" className="mb-5 grid list-none gap-x-8 gap-y-1 p-0 text-base text-ink sm:grid-cols-2 lg:grid-cols-3">
-      {chronological.map((brk) => <li key={brk.id} data-break-start={brk.start} data-break-end={brk.end} data-break-pto={brk.ptoCost}>
-        <span className="font-semibold">{breakDates(brk)}</span>: {brk.totalDaysOff} days off for {plural(brk.ptoCost, 'PTO day')}{brk.id === best.id ? ' (longest)' : ''}
+    <ol aria-label="Breaks in this plan" className="mb-6 grid list-none gap-x-8 gap-y-5 p-0 text-base text-ink sm:grid-cols-2">
+      {chronological.map((brk) => <li key={brk.id} data-break-start={brk.start} data-break-end={brk.end} data-break-pto={brk.ptoCost} className="min-w-0">
+        <p className="mb-2"><span className="text-lg font-bold type-condensed">{breakDates(brk)}</span>: <span className="tabular-nums text-muted">{brk.totalDaysOff} days off for {plural(brk.ptoCost, 'PTO day')}{brk.id === best.id ? ' (longest)' : ''}</span></p>
+        <BreakRibbon days={brk.days} isPtoDay={isPto} holidayNameFor={nameOf} size="sm" />
       </li>)}
     </ol>
     <div className="grid gap-x-12 gap-y-4 lg:grid-cols-2">{columns.map(block)}</div>
@@ -247,7 +252,7 @@ export function Landing() {
         <section aria-labelledby="landing-heading">
           <h1 id="landing-heading" className="scroll-mt-16 max-w-[17ch] text-[clamp(2rem,0.95rem+5vw,4.75rem)] leading-[1.04] type-display text-ink">More days off from the same PTO.</h1>
 
-          <div className="mt-4 grid min-w-0 gap-x-14 gap-y-4 sm:mt-10 sm:gap-y-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+          <div className="mt-4 grid min-w-0 gap-x-14 gap-y-4 sm:mt-10 sm:gap-y-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:grid-rows-[auto_1fr]">
             <div className="min-w-0 lg:col-start-1 lg:row-start-1">
             <p className="min-w-0 text-[1.375rem] leading-[1.5] font-medium text-ink sm:text-[1.75rem]">
               I have{' '}
@@ -263,7 +268,7 @@ export function Landing() {
             {showGuess && <p className="mt-1.5 text-sm text-muted sm:mt-2 sm:text-[15px]">A starting guess: 15 PTO days and {countryName} holidays. Change either to match yours.</p>}
             </div>
 
-            <section aria-labelledby="landing-result" data-plan-result={!validRange ? 'unavailable' : loading ? 'pending' : 'ready'} className="flex min-w-0 flex-col lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-1">
+            <section aria-labelledby="landing-result" data-plan-result={!validRange ? 'unavailable' : loading ? 'pending' : 'ready'} className="plan-card flex min-w-0 flex-col p-4 sm:p-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start lg:p-7">
               {/* N-P1-1: the blank state reserves the plan's height, so the call to action
                   stays where it was when the field empties. */}
               <div className={budgetBlank ? 'min-h-[9.375rem] sm:min-h-[9.5rem] lg:min-h-[11.75rem]' : undefined}>
@@ -285,7 +290,13 @@ export function Landing() {
                 <p className="mt-2 text-base text-muted" role="status">{emptyMessage}</p>
               </>}
               </div>
-              {!budgetBlank && bestBreak && <p className="order-2 mt-3 text-base text-muted sm:order-none sm:mt-2">Longest: <strong className="font-semibold text-ink"><span className="tabular-nums">{breakDates(bestBreak)}</span>, {bestBreak.totalDaysOff} days off for {plural(bestBreak.ptoCost, 'PTO day')}</strong>. {breakReason(bestBreak, (date) => holidayName.get(date))}</p>}
+              {!budgetBlank && bestBreak && plan && <YearLine className="mt-5 max-sm:hidden" rangeStart={rangeStart} rangeEnd={rangeEnd}
+                breaks={plan.result.primary.slice().sort((a, b) => a.start.localeCompare(b.start))} holidayDates={holidayDates} />}
+              {!budgetBlank && bestBreak && <p className="order-2 mt-3 text-base text-muted sm:order-none sm:mt-4">Longest: <strong className="font-semibold text-ink"><span className="tabular-nums">{breakDates(bestBreak)}</span>, {bestBreak.totalDaysOff} days off for {plural(bestBreak.ptoCost, 'PTO day')}</strong>. {breakReason(bestBreak, (date) => holidayName.get(date))}</p>}
+              {!budgetBlank && bestBreak && <div className="order-2 mt-3 sm:order-none">
+                <BreakRibbon days={bestBreak.days} isPtoDay={(date) => !holidayName.has(date) && mondayIndexedDow(date) < 5} holidayNameFor={(date) => holidayName.get(date)} size="sm" />
+                <BreakRibbonKey className="mt-2" />
+              </div>}
               {/* F21: on phones the action sits right under the answer, so it clears the tab bar
                   on a 320x568 screen; the welcome row and the longest-break detail follow it. */}
               <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 sm:mt-5">
