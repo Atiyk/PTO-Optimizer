@@ -108,7 +108,7 @@ describe('DayCell category rendering', () => {
       expect(html).not.toContain(COLORS.ptoBg);
       expect(html).not.toContain(HOLIDAY_DOT);
       expect(html).not.toContain('<svg');
-      // F27 (P1): its own outside-range tone (3:1+, tokens.test.ts), regular weight, no fill.
+      // F27 (P1): its own outside-range tone (4.5:1+, tokens.test.ts), regular weight, no fill.
       expect(html).toContain('text-[var(--outside-text)]');
       expect(html).toContain('font-normal');
       expect(html).not.toContain('text-slate-300');
