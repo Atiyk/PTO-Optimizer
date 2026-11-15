@@ -29,6 +29,7 @@ import { Legend } from './Legend';
 import { BreakCard } from './BreakCard';
 import { CommittedBreakCard } from './CommittedBreakCard';
 import { PinnedPlansStrip } from './PinnedPlansStrip';
+import { SaveConfirmation } from './SaveConfirmation';
 import { SharedPlanNotice } from './SharedPlanNotice';
 import { ExportBar } from './ExportBar';
 import { PartnerOverlapBanner } from './PartnerOverlapBanner';
@@ -462,7 +463,7 @@ export function App() {
                 onRestore={state.restorePlan}
                 onRemove={state.removePinnedPlan}
               />
-              {state.pinMessage && <p role="status" className="text-sm text-muted">{state.pinMessage}</p>}
+              <SaveConfirmation message={state.pinMessage} />
               {plannable && !zeroBudget && (
                 <SummaryMetrics
                   budgetSpent={state.budgetSpent}

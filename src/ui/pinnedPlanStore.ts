@@ -2,12 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { isValidWorkWeek, type WorkWeek } from '@daysoff/engine/solver/types';
 import { encodeEmployerCalendar, decodeEmployerCalendar, employerScope } from '../personal/employerCalendar';
 import { DEFAULT_NOTICE_PERIOD_DAYS } from '../personal/outOfOffice';
-import type { PlanSnapshot } from './useAppState';
+import type { PlanSnapshot, SavedPlanBreak } from './useAppState';
+import { noteFirstSave, requestPersistentStorageOnce } from '../personal/retentionStatus';
 import { isValidISODate } from './urlState';
 import { validateInputs } from './validation';
 
 export const PINNED_PLANS_STORAGE_KEY = 'gapless.personal.pinned-plans.v1';
 export const MAX_PINNED_PLANS = 2;
+/** The status line after a successful save; the planner's save confirmation keys off it. */
+export const PLAN_SAVED_MESSAGE = 'Plan saved in this browser.';
 const MAX_STORAGE_LENGTH = 350_000;
 const CHANGE_EVENT = 'gapless:pinned-plans-changed';
 const STYLES = ['balanced', 'long-breaks', 'more-breaks', 'custom'];
@@ -29,6 +32,20 @@ const record = (value: unknown): value is Record<string, unknown> =>
 const amount = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 const date = (value: unknown): value is string => typeof value === 'string' && isValidISODate(value);
 const dateList = (value: unknown): value is string[] => Array.isArray(value) && value.length <= 4000 && value.every(date);
+
+/** P3: the saved breaks are derived data. Anything unexpected drops the list (the plan
+ * itself still opens), so a malformed or future list never blocks reading saved plans. */
+function parseBreaks(value: unknown): SavedPlanBreak[] | undefined {
+  if (!Array.isArray(value) || value.length > 60) return undefined;
+  const breaks: SavedPlanBreak[] = [];
+  for (const entry of value) {
+    if (!record(entry) || !date(entry.start) || !date(entry.end) || entry.end < entry.start
+      || !amount(entry.totalDaysOff) || !amount(entry.ptoCost) || !dateList(entry.ptoDates)
+      || !entry.ptoDates.every((day) => day >= (entry.start as string) && day <= (entry.end as string))) return undefined;
+    breaks.push({ start: entry.start, end: entry.end, totalDaysOff: entry.totalDaysOff, ptoCost: entry.ptoCost, ptoDates: [...entry.ptoDates] });
+  }
+  return breaks;
+}
 
 function parseSnapshot(value: unknown): PlanSnapshot | null {
   if (!record(value) || typeof value.country !== 'string' || !/^[A-Z]{2}$/.test(value.country)
@@ -60,7 +77,9 @@ function parseSnapshot(value: unknown): PlanSnapshot | null {
 
   const employerCalendar = decodeEmployerCalendar(encodeEmployerCalendar(snapshot.employerCalendar));
   if (!employerCalendar || employerScope(employerCalendar.country, employerCalendar.subdivision) !== employerScope(snapshot.country, snapshot.subdivision)) return null;
-  return { ...snapshot, employerCalendar, noticePeriodDays: value.noticePeriodDays ?? DEFAULT_NOTICE_PERIOD_DAYS } as PlanSnapshot;
+  const { breaks: rawBreaks, ...rest } = snapshot;
+  const breaks = rawBreaks === undefined ? undefined : parseBreaks(rawBreaks);
+  return { ...rest, ...(breaks ? { breaks } : {}), employerCalendar, noticePeriodDays: value.noticePeriodDays ?? DEFAULT_NOTICE_PERIOD_DAYS } as PlanSnapshot;
 }
 
 /** A corrupt or unrecognized value is left intact, while new pins can work for this visit. */
@@ -140,6 +159,11 @@ export function usePinnedPlans() {
       const persistent = saved !== null && writePlans(plans);
       apply({ plans, persistent });
       if (persistent) window.dispatchEvent(new Event(CHANGE_EVENT));
+      if (persistent && label === 'Plan saved') {
+        // P3: date the first save (for the backup reminder) and ask once to keep storage.
+        noteFirstSave();
+        void requestPersistentStorageOnce();
+      }
       setPinMessage(persistent ? `${label} in this browser.` : `${label} for this visit. Browser storage is unavailable.`);
     }
     if (typeof navigator.locks?.request === 'function') {

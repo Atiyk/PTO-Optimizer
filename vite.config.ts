@@ -5,6 +5,7 @@ import { getSiteUrl } from './scripts/siteUrl.ts'
 import { GLOSSARY_TERMS } from './src/content/glossary/terms.ts'
 import { PRODUCT_NAME } from './src/brand.ts'
 import { ocrAssetsPlugin } from './scripts/ocrAssets.ts'
+import { serviceWorkerPlugin } from './scripts/serviceWorkerPlugin.ts'
 
 // Country landing pages (Phase 2B): each is a real static HTML file at the project root
 // (uk/index.html, canada/index.html, ...), loading the same app bundle as / but with its
@@ -51,7 +52,7 @@ process.env.VITE_GAPLESS_ACCOUNTS = process.env.GMAIL_USER && process.env.GMAIL_
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), siteUrlHtmlPlugin(), ocrAssetsPlugin(import.meta.dirname)],
+  plugins: [react(), siteUrlHtmlPlugin(), ocrAssetsPlugin(import.meta.dirname), serviceWorkerPlugin(import.meta.dirname)],
   build: {
     rollupOptions: {
       input: {

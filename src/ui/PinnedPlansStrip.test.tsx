@@ -20,7 +20,8 @@ describe('PinnedPlansStrip (UI density pass: chips only - the Pin button/hint mo
     expect(html).toContain('32 days off');
     expect(html).toContain('5 breaks');
     expect(html).not.toContain('Travel 70th');
-    expect(html).toContain('Restore');
+    expect(html).toContain('Open saved plan');
+    expect(html).not.toContain('Restore');
   });
 
   it('omits the travel percentile when the pinned plan had none (no valid plan at pin time)', () => {
