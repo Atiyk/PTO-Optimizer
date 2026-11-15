@@ -247,7 +247,7 @@ export function App() {
         budgetSpent={state.budgetSpent}
         reserveDays={state.reserveDays}
         onChangeReserveDays={state.setReserveDays}
-        effectiveBudget={state.effectiveBudget}
+        effectiveBudget={Math.max(0, state.effectiveBudget - (state.planMeta?.reserveKept ?? 0))}
         unlimitedPto={state.unlimitedPto}
         onToggleUnlimitedPto={state.setUnlimitedPto}
         onBudgetBlankChange={setBudgetBlank}
@@ -454,7 +454,7 @@ export function App() {
                 breakCountActual={state.breakCountActual}
                 scores={state.scores}
                 budget={state.budget}
-                reserveDays={state.reserveDays}
+                reserveDays={state.reserveDays + (state.planMeta?.reserveKept ?? 0)}
                 trackedReservedDays={state.reservedPtoDays}
                 canPin={state.canPin && requestToolsReady && !budgetBlank}
                 pending={state.planningPending}
@@ -531,7 +531,8 @@ export function App() {
                   {!state.planningPending && !state.validationIssues.length && <a className="link-mark inline-flex min-h-11 items-center" href={`#day-${holidayFocusDate}`}>Find this date on the calendar</a>}
                 </div>
               )}
-              {(state.partnerOverlapReceived || state.sharedPlanDifferences || partnerReceived.invalid || workWeekNotice || partnerReceived.availability || state.validationIssues.length > 0 || state.solverIssue || state.relaxedMinimum !== undefined || state.peakCapApplied || state.holidaysDegraded) && (
+              <LegacyPlanNotice />
+              {(state.partnerOverlapReceived || state.sharedPlanDifferences || partnerReceived.invalid || workWeekNotice || partnerReceived.availability || state.validationIssues.length > 0 || state.inputIssues.length > 0 || state.solverIssue || state.relaxedMinimum !== undefined || state.peakCapApplied || state.holidaysDegraded) && (
                 <div className="flex flex-col gap-3">
                   {state.partnerOverlapReceived && (
                     <PartnerOverlapBanner overlapDayCount={state.overlapDays.length} onDismiss={state.dismissPartnerOverlapBanner} />
@@ -539,7 +540,6 @@ export function App() {
                   {partnerReceived.invalid && <p role="alert" className="rounded-[10px] border border-error bg-error-soft p-4 text-sm text-ink">This partner availability link is invalid or too large. Ask for a new link with fewer dates.</p>}
                   {partnerReceived.availability && <p role="status" className="rounded-[10px] bg-surface-alt p-4 text-sm text-ink">Someone shared {partnerReceived.availability.days.length} {partnerReceived.availability.status} available dates. Your own PTO budget and calendar apply. <a className="link-mark font-semibold" href="#partner-planner">See dates you can both take off</a></p>}
                   {workWeekNotice && <p role="status" className="rounded-[10px] bg-surface-alt p-4 text-sm text-ink">{workWeekNotice}</p>}
-                  <LegacyPlanNotice />
                   {state.sharedPlanDifferences && (
                     <SharedPlanNotice
                       differences={state.sharedPlanDifferences}

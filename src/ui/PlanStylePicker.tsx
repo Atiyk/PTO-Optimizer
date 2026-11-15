@@ -84,7 +84,7 @@ export function PlanStylePicker({ style, onChangeStyle, season, onChangeSeason, 
 
 function PlanStyleSummary({ meta }: { meta: PlanStyleMeta }) {
   const lines: string[] = [];
-  if (meta.reserveKept > 0) lines.push(`${meta.reserveKept} PTO ${meta.reserveKept === 1 ? 'day' : 'days'} kept for surprises.`);
+  if (meta.reserveKept > 0) lines.push(`${meta.reserveKept} PTO ${meta.reserveKept === 1 ? 'day' : 'days'} kept in reserve for surprises.`);
   if (meta.leadUntil) lines.push(`New breaks start from ${formatLong(meta.leadUntil)}, leaving time to request them.`);
   if (meta.note) lines.push(meta.note);
   if (lines.length === 0) return null;

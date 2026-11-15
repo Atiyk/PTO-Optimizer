@@ -119,3 +119,26 @@ describe('/pto first screen (N1, N3, N2, F13)', () => {
     expect(new URLSearchParams(window.location.search).get('ps')).toBe('season');
   });
 });
+
+describe('input notes and older links are visible inside the planner (critic R1 #1)', () => {
+  it('a negative balance shows a note instead of silently changing', async () => {
+    window.history.replaceState(null, '', `${base}&b=-5&pv=2&ps=balanced`);
+    render(<App />);
+    await ready();
+    expect(screen.getByTestId('input-issues').textContent).toMatch(/PTO can't be negative/);
+  });
+
+  it('a balance above a year shows the limit', async () => {
+    window.history.replaceState(null, '', `${base}&b=400&pv=2&ps=balanced`);
+    render(<App />);
+    await ready();
+    expect(screen.getByTestId('input-issues').textContent).toMatch(/365/);
+  });
+
+  it('a link without pv shows the older-version notice', async () => {
+    window.history.replaceState(null, '', `${base}&b=10`);
+    render(<App />);
+    await ready();
+    expect(screen.getByText(/older version of Timebower/)).toBeTruthy();
+  });
+});
