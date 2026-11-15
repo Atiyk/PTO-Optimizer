@@ -30,7 +30,7 @@ describe('full backup of everything saved here (P3 storage honesty)', () => {
     expect(region.textContent).toContain('kept only in this browser on this device. They aren’t in an account or synced.');
     expect(screen.getByRole('button', { name: 'Download a full backup' })).toBeTruthy();
     expect(screen.getByLabelText('Restore from a full backup')).toBeTruthy();
-    expect(region.textContent).toContain('Adds only what this browser doesn’t have. Nothing saved here is replaced.');
+    expect(region.textContent).toContain('Adds only what this browser doesn’t have, including saved plans and employer calendars. Nothing saved here is replaced.');
   });
 
   it('restores a file into this browser without overwriting what is here', async () => {

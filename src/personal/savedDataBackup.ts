@@ -8,7 +8,8 @@
  * The values are copied exactly as stored (each record keeps its own version and
  * revision), so the stores' own readers validate them as they always do.
  */
-import { PINNED_PLANS_STORAGE_KEY } from '../ui/pinnedPlanStore';
+import { MAX_PINNED_PLANS, parseStoredPlans, PINNED_PLANS_STORAGE_KEY } from '../ui/pinnedPlanStore';
+import { decodeEmployerWorkProfiles, EMPLOYER_PROFILES_STORAGE_KEY, encodeEmployerWorkProfiles, MAX_EMPLOYER_PROFILES } from './employerProfiles';
 import { parseRequestLedger, REQUEST_STORAGE_KEY } from './requestLedger';
 import { RETENTION_STORAGE_KEY } from './retentionStatus';
 
@@ -87,15 +88,55 @@ export interface RestoreResult {
   added: string[];
   /** Items already saved here with the same content. */
   same: string[];
+  /** Saved plans or employer calendar profiles combined: everything here stays, entries from
+   * the backup with new ids are added. */
+  merged: string[];
   /** Items saved here with different content: left exactly as they were. */
   kept: string[];
   /** Items that could not be written (storage full or unavailable). */
   failed: string[];
 }
 
-/** Adds what this browser lacks. Never overwrites, merges or deletes saved data. */
+const rawEntries = (raw: string, field: string): Record<string, unknown>[] => {
+  const list = (JSON.parse(raw) as Record<string, unknown>)[field];
+  return Array.isArray(list) ? list as Record<string, unknown>[] : [];
+};
+
+/**
+ * Saved plans and employer calendar profiles are lists with ids, so two browsers' lists can
+ * be combined: every entry saved here stays exactly as stored, and backup entries with an id
+ * (and content) not here are appended. Returns the combined value, or null to keep this
+ * browser's value untouched (unreadable on either side, nothing new, or over the limit).
+ */
+export function mergeListRecord(key: string, current: string, incoming: string): string | null {
+  try {
+    if (key === PINNED_PLANS_STORAGE_KEY) {
+      if (!parseStoredPlans(current) || !parseStoredPlans(incoming)) return null;
+      const mine = rawEntries(current, 'plans');
+      const seen = new Set(mine.map((entry) => JSON.stringify(entry.snapshot)));
+      const ids = new Set(mine.map((entry) => entry.id));
+      const added = rawEntries(incoming, 'plans').filter((entry) => !ids.has(entry.id) && !seen.has(JSON.stringify(entry.snapshot)));
+      if (!added.length || mine.length + added.length > MAX_PINNED_PLANS) return null;
+      const merged = JSON.stringify({ ...JSON.parse(current), plans: [...mine, ...added] });
+      return parseStoredPlans(merged) ? merged : null;
+    }
+    if (key === EMPLOYER_PROFILES_STORAGE_KEY) {
+      const mine = decodeEmployerWorkProfiles(current);
+      const theirs = decodeEmployerWorkProfiles(incoming);
+      if (!mine || !theirs) return null;
+      const ids = new Set(mine.map((profile) => profile.id));
+      const added = theirs.filter((profile) => !ids.has(profile.id));
+      if (!added.length || mine.length + added.length > MAX_EMPLOYER_PROFILES) return null;
+      return encodeEmployerWorkProfiles([...mine, ...added]) || null;
+    }
+  } catch { /* unreadable: keep what is here */ }
+  return null;
+}
+
+/** Adds what this browser lacks and combines saved plan and employer profile lists. Never
+ * replaces, rewrites or deletes an entry already saved here. */
 export function restoreSavedDataBackup(storage: EnumerableStorage, backup: SavedDataBackup): RestoreResult {
-  const result: RestoreResult = { added: [], same: [], kept: [], failed: [] };
+  const result: RestoreResult = { added: [], same: [], merged: [], kept: [], failed: [] };
   for (const [key, value] of Object.entries(backup.items)) {
     if (!isBackedUpKey(key)) continue;
     try {
@@ -106,7 +147,13 @@ export function restoreSavedDataBackup(storage: EnumerableStorage, backup: Saved
       } else if (current === value) {
         result.same.push(key);
       } else {
-        result.kept.push(key);
+        const merged = mergeListRecord(key, current, value);
+        if (merged !== null) {
+          storage.setItem(key, merged);
+          result.merged.push(key);
+        } else {
+          result.kept.push(key);
+        }
       }
     } catch {
       result.failed.push(key);

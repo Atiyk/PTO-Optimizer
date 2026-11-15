@@ -184,10 +184,11 @@ export function WalletTransfer({ policy, requests, forecastDate }: {
  * P3 storage honesty: everything Timebower saved in this browser, in one file. Restoring
  * adds only what this browser doesn't have; anything already saved here stays as it is.
  */
-export function restoreSummary(added: number, kept: number, failed: number): string {
+export function restoreSummary(added: number, kept: number, failed: number, merged = 0): string {
   if (failed > 0) return `Storage is full or unavailable, so ${failed} saved ${failed === 1 ? 'item' : 'items'} from the backup could not be added. Nothing saved here was changed.`;
-  if (added === 0 && kept === 0) return 'Everything in this backup is already saved in this browser.';
+  if (added === 0 && kept === 0 && merged === 0) return 'Everything in this backup is already saved in this browser.';
   const parts = [`Added ${added} saved ${added === 1 ? 'item' : 'items'} this browser didn’t have.`];
+  if (merged > 0) parts.push('Saved plans or employer calendars from the backup were added next to the ones here.');
   if (kept > 0) parts.push(`${kept} ${kept === 1 ? 'item differs' : 'items differ'} from what’s saved here and ${kept === 1 ? 'was' : 'were'} left as ${kept === 1 ? 'it is' : 'they are'}.`);
   return `${parts.join(' ')} Reload the page to see them.`;
 }
@@ -210,7 +211,7 @@ function FullBackup() {
       return;
     }
     const result = restoreSavedDataBackup(storage, parsed.backup);
-    setMessage(restoreSummary(result.added.length, result.kept.length, result.failed.length));
+    setMessage(restoreSummary(result.added.length, result.kept.length, result.failed.length, result.merged.length));
   }
   return (
     <section aria-label="Everything saved here" className="space-y-3">
@@ -233,7 +234,7 @@ function FullBackup() {
               event.target.value = '';
               if (file) void restore(file);
             }} />
-          <p className="mt-1">Adds only what this browser doesn’t have. Nothing saved here is replaced.</p>
+          <p className="mt-1">Adds only what this browser doesn’t have, including saved plans and employer calendars. Nothing saved here is replaced.</p>
         </div>
       </div>
       {message && <p role="status">{message}</p>}

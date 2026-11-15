@@ -47,9 +47,56 @@ describe('full saved-data backup (P3 storage honesty)', () => {
     localStorage.setItem(REQUESTS, 'R');
     const backup = { format: 'timebower-saved-data', version: 1, exportedAt: '2026-01-01T00:00:00Z', items: { [PLANS]: 'older plans', [REQUESTS]: 'R', [POLICY]: 'policy' } } as const;
     const result = restoreSavedDataBackup(localStorage, backup);
-    expect(result).toEqual({ added: [POLICY], same: [REQUESTS], kept: [PLANS], failed: [] });
+    expect(result).toEqual({ added: [POLICY], same: [REQUESTS], merged: [], kept: [PLANS], failed: [] });
     expect(localStorage.getItem(PLANS)).toBe('newer plans here');
     expect(localStorage.getItem(POLICY)).toBe('policy');
+  });
+
+  it('combines saved plans from the backup with the ones here, never replacing one (baseline: plans were left out)', () => {
+    const plan = (budget: number) => ({
+      country: 'US', planningVersion: 2, planningStyle: 'balanced', minimumBreakDays: 3,
+      employerCalendar: { version: 1, country: 'US', excluded: [], custom: [] },
+      rangeStart: '2027-01-01', rangeEnd: '2027-12-31', budget, w: 30,
+      letSolverDecide: false, manualBreakCount: 3, weekStartOverride: 'auto', accrualEnabled: false,
+      accrualPerMonth: 1.25, expiryEnabled: false, expiryDate: '', carryoverCap: 0,
+      overlapDays: [], blackouts: [], workWeek: [true, true, true, true, true, false, false], forced: {}, altFridayEnabled: false, altFridayStart: '',
+      reserveDays: 0, applyTrackedRequests: false, reserveApprovedPto: false, unlimitedPto: false, noticePeriodDays: 14,
+      peakCapEnabled: false, peakCapStart: '', peakCapEnd: '', peakCapMaxDays: 5,
+      summary: { budgetSpent: budget, totalDaysOff: 26, breakCountActual: 3, travelPercentile: null },
+    });
+    const mine = JSON.stringify({ version: 1, plans: [{ id: 'here', snapshot: plan(10) }] });
+    localStorage.setItem(PLANS, mine);
+    const backup = { format: 'timebower-saved-data', version: 1, exportedAt: 'x', items: {
+      [PLANS]: JSON.stringify({ version: 1, plans: [{ id: 'there', snapshot: plan(12) }] }) } } as const;
+    expect(restoreSavedDataBackup(localStorage, backup).merged).toEqual([PLANS]);
+    const stored = JSON.parse(localStorage.getItem(PLANS)!);
+    expect(stored.plans.map((entry: { id: string }) => entry.id)).toEqual(['here', 'there']);
+    expect(stored.plans[0]).toEqual(JSON.parse(mine).plans[0]);
+
+    // Over the two-plan limit: what is here stays exactly as it is.
+    const full = localStorage.getItem(PLANS)!;
+    const more = { ...backup, items: { [PLANS]: JSON.stringify({ version: 1, plans: [{ id: 'third', snapshot: plan(14) }] }) } };
+    expect(restoreSavedDataBackup(localStorage, more).kept).toEqual([PLANS]);
+    expect(localStorage.getItem(PLANS)).toBe(full);
+    // An unreadable backup list never touches the saved one.
+    const broken = { ...backup, items: { [PLANS]: '{"version":1,"plans":[{"id":"x","snapshot":{}}]}' } };
+    expect(restoreSavedDataBackup(localStorage, broken).kept).toEqual([PLANS]);
+    expect(localStorage.getItem(PLANS)).toBe(full);
+  });
+
+  it('combines employer calendar profiles by id, keeping the ones here', () => {
+    const profile = (id: string, name: string) => ({
+      version: 1, id, name, calendar: { version: 1, country: 'US', excluded: [], custom: [] },
+      workWeek: [true, true, true, true, true, false, false], altFridayEnabled: false, altFridayStart: null,
+      blackoutDays: [], planningYearStart: { month: 1, day: 1 },
+    });
+    const PROFILES = 'gapless.employer.profiles.v1';
+    localStorage.setItem(PROFILES, JSON.stringify({ version: 1, profiles: [profile('acme', 'Acme here')] }));
+    const backup = { format: 'timebower-saved-data', version: 1, exportedAt: 'x', items: {
+      [PROFILES]: JSON.stringify({ version: 1, profiles: [profile('acme', 'Acme there'), profile('globex', 'Globex')] }) } } as const;
+    expect(restoreSavedDataBackup(localStorage, backup).merged).toEqual([PROFILES]);
+    const stored = JSON.parse(localStorage.getItem(PROFILES)!);
+    expect(stored.profiles.map((p: { id: string; name: string }) => `${p.id}:${p.name}`)).toEqual(['acme:Acme here', 'globex:Globex']);
   });
 
   it('refuses files that are not a full backup, or that name keys outside saved data', () => {

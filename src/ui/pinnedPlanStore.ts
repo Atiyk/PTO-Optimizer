@@ -22,7 +22,7 @@ const NUMBER_FIELDS = [
   'minimumBreakDays', 'budget', 'w', 'manualBreakCount', 'accrualPerMonth', 'carryoverCap', 'reserveDays', 'peakCapMaxDays',
 ] as const;
 
-interface SavedPlan {
+export interface SavedPlan {
   id: string;
   snapshot: PlanSnapshot;
 }
@@ -86,7 +86,16 @@ function parseSnapshot(value: unknown): PlanSnapshot | null {
 function readPlans(): SavedPlan[] | null {
   try {
     if (typeof window === 'undefined') return null;
-    const raw = window.localStorage.getItem(PINNED_PLANS_STORAGE_KEY);
+    return parseStoredPlans(window.localStorage.getItem(PINNED_PLANS_STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+/** The stored value's plans, [] when absent, or null when this version can't read it all
+ * (P3: the full backup's restore merges only plans this check accepts). */
+export function parseStoredPlans(raw: string | null): SavedPlan[] | null {
+  try {
     if (raw === null) return [];
     if (raw.length > MAX_STORAGE_LENGTH) return null;
     const data: unknown = JSON.parse(raw);
@@ -103,6 +112,12 @@ function readPlans(): SavedPlan[] | null {
   } catch {
     return null;
   }
+}
+
+/** The stored form of a plan list, or null when it would not fit. */
+export function serializeStoredPlans(plans: SavedPlan[]): string | null {
+  const raw = JSON.stringify({ version: 1, plans });
+  return raw.length > MAX_STORAGE_LENGTH ? null : raw;
 }
 
 function writePlans(plans: SavedPlan[]): boolean {

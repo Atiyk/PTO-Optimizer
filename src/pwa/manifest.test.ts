@@ -5,7 +5,7 @@ const manifestText = Object.values(import.meta.glob('../../public/manifest.webma
 const PUBLIC_FILES = Object.keys(import.meta.glob('../../public/{icons/*.png,apple-touch-icon.png}', { query: '?url', import: 'default', eager: true }))
   .map((path) => path.replace('../../public', ''));
 const PAGES: Record<string, string> = import.meta.glob(
-  ['../../index.html', '../../*/index.html', '../../glossary/*/index.html', '!../../_dev/**'],
+  ['../../index.html', '../../*/index.html', '../../glossary/*/index.html', '!../../_dev/**', '!../../dist/**', '!../../node_modules/**', '!../../public/**'],
   { query: '?raw', import: 'default', eager: true },
 );
 const GLOSSARY_GENERATOR = Object.values(import.meta.glob('../../scripts/generate-glossary-html.ts', { query: '?raw', import: 'default', eager: true }))[0] as string;
