@@ -15,7 +15,9 @@ import { bridgeLinkPhrase, bridgeSentence, findBridges, holidayDisplayName, holi
 import { downloadHolidaysICS } from './icsExport';
 import { track } from './analytics';
 import { computeLandingPlan, landingHolidayHref, landingPlanHref, landingSearch, readLandingState, validLandingRange } from './landingState';
-import { readEmployerCalendar } from '../personal/employerCalendar';
+import { employerCalendarCustomized } from '../personal/employerCalendar';
+import { useEmployerHolidayProfile } from './useEmployerHolidayProfile';
+import { HomeHolidayQuestion } from './CompanyHolidayChips';
 import { landingObservedHolidays, useLandingHolidays } from './landingCalendar';
 import { weekStartForCountry } from './locale';
 import { HOLIDAY_DOT } from './colorScheme';
@@ -186,8 +188,8 @@ export function Landing() {
   const [savedRequests] = useState(() => typeof window === 'undefined' ? [] : readRequestLedger().requests);
   const [state, setState] = useState(() => readLandingState(typeof window === 'undefined' ? '' : window.location.search, today, geolocateCountry()));
   const { country, budget, rangeStart, rangeEnd } = state;
-  const employer = useMemo(() => readEmployerCalendar(country), [country]);
-  const customizedHolidays = employer.excluded.length > 0 || employer.custom.length > 0;
+  const holidayProfile = useEmployerHolidayProfile(country); const employer = holidayProfile.calendar;
+  const customizedHolidays = employerCalendarCustomized(employer);
   const validRange = validLandingRange(rangeStart, rangeEnd);
   const calendar = useLandingHolidays(country, rangeStart, rangeEnd, validRange);
   const engaged = useRef(false);
@@ -337,6 +339,7 @@ export function Landing() {
               <a href={`${href}#planning-assumptions`} className={`${LINK} text-sm`}>Customize workweek and employer holidays →</a>
             </div>
             {calendar.degraded && <p className="mt-2 text-sm font-semibold text-ink" role="status">Some holiday data is unavailable. This preview may miss public holidays.</p>}
+            {validRange && !loading && <HomeHolidayQuestion profile={holidayProfile} publicHolidays={calendar.holidays} rangeStart={rangeStart} rangeEnd={rangeEnd} />}
           </div>
         </section>
       </Container>

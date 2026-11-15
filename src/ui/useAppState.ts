@@ -2,7 +2,9 @@ import { getConsumerHolidaysWithStatus as getHolidaysWithStatus, getConsumerSubd
 import { SUBDIVISION_NAMES } from '@daysoff/engine/data/countries';
 import { planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
 import type { PinPreview } from './pinPreview';
-import { defaultEmployerCalendar, readEmployerCalendar, writeEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
+import { defaultEmployerCalendar, readEmployerCalendar, writeEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, employerCalendarCustomized, hasStoredEmployerCalendar, freshEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
+import { holidayChoices as holidayChoicesFor, toggleHolidayChoice as toggleChoiceIn, toggleHolidayEntry, entryKey, type HolidayChoice } from '../personal/employerHolidayChoices';
+import { employerPlaceLabel } from '../personal/holidayDisplayNames';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { computeMarginalValues } from '@daysoff/engine/solver/marginalValue';
 import type { Alternative, Break, SolveInput, WorkWeek } from '@daysoff/engine/solver/types';
@@ -103,6 +105,8 @@ export interface PlanSnapshot {
     totalDaysOff: number;
     breakCountActual: number;
     travelPercentile: number | null;
+    /** Display only, never stored: this pin counts different holiday dates than the plan now. */
+    differentHolidays?: boolean;
   };
 }
 
@@ -345,8 +349,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     [sharedObservedHolidays, sharedPublicCalendar, country, subdivision]);
   const hasSavedCalendarOffForSharedPlan = useMemo(() => {
     if (!sharedPublicCalendar && sharedObservedHolidays === undefined) return false;
-    const saved = readEmployerCalendar(country, subdivision);
-    return saved.custom.length > 0 || saved.excluded.length > 0;
+    return hasStoredEmployerCalendar(country, subdivision) && employerCalendarCustomized(readEmployerCalendar(country, subdivision));
   }, [sharedPublicCalendar, sharedObservedHolidays, country, subdivision]);
   const [employerCalendars, setEmployerCalendars] = useState<Record<string, EmployerCalendar>>(() => ({
     [currentEmployerScope]: initial.employerCalendar ?? calendarForScope(),
@@ -355,9 +358,24 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   const restoreMyEmployerCalendar = useCallback(() => {
     setUseSharedHolidaySnapshot(false);
     setUseSharedPublicCalendar(false);
+    protectedEmployerScopes.current.delete(currentEmployerScope);
     setEmployerCalendars(previous => ({ ...previous, [currentEmployerScope]: readEmployerCalendar(country, subdivision) }));
   }, [currentEmployerScope, country, subdivision]);
-  const [employerCalendarMessage, setEmployerCalendarMessage] = useState('');
+  const employerPlace = employerPlaceLabel(country, subdivision);
+  const [employerCalendarMessage, setEmployerCalendarMessage] = useState(() =>
+    hasStoredEmployerCalendar(country, subdivision) ? `Saved for ${employerPlaceLabel(country, subdivision)}.` : '');
+  // Edits auto-save (debounced, this browser only) to the profile for this country and
+  // region. A scope opened from a public link while a different calendar is saved stays
+  // protected: its edits apply to this tab and never replace the saved calendar.
+  const pendingEmployerSave = useRef<string | null>(null);
+  // A link that carried its own calendar (`eh`) different from the one saved here is shown
+  // as sent; editing it does not replace the saved calendar (Reset starts fresh).
+  const [linkCalendarScope] = useState(() => initial.employerCalendar
+    && encodeEmployerCalendar(initial.employerCalendar) !== encodeEmployerCalendar(readEmployerCalendar(country, subdivision))
+    ? currentEmployerScope : undefined);
+  const protectedEmployerScopes = useRef(new Set<string>(linkCalendarScope ? [linkCalendarScope] : []));
+  const employerUndo = useRef<{ scope: string; calendar: EmployerCalendar } | null>(null);
+  const [canUndoEmployerHolidays, setCanUndoEmployerHolidays] = useState(false);
   const updateEmployerCalendar = useCallback((update: (current: EmployerCalendar) => EmployerCalendar) => {
     setUseSharedHolidaySnapshot(false);
     setUseSharedPublicCalendar(false);
@@ -367,39 +385,76 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       return { ...previous, [currentEmployerScope]: next };
     });
   }, [currentEmployerScope, calendarForScope]);
-  const toggleHoliday = useCallback((date: string, name: string) => {
-    updateEmployerCalendar(current => {
-      const key = `${date}|${name}`;
-      return { ...current, excluded: current.excluded.includes(key) ? current.excluded.filter(item => item !== key) : [...current.excluded, key] };
-    });
-    setEmployerCalendarMessage('Calendar updated for this plan. Save to use it on future visits.');
+  /** A user edit: remembered for undo, then auto-saved. */
+  const editEmployerCalendar = useCallback((update: (current: EmployerCalendar) => EmployerCalendar) => {
+    if (sharedPublicCalendar && hasSavedCalendarOffForSharedPlan) protectedEmployerScopes.current.add(currentEmployerScope);
+    employerUndo.current = { scope: currentEmployerScope, calendar: employerCalendar };
+    setCanUndoEmployerHolidays(true);
+    pendingEmployerSave.current = currentEmployerScope;
+    updateEmployerCalendar(update);
     track('holiday_preference_customized');
-  }, [updateEmployerCalendar]);
-  const saveEmployerHolidays = useCallback(() => {
-    if (sharedObservedHolidays !== undefined) return;
-    // Saving the shared plan's public-only calendar would silently replace the saved one.
-    if (sharedPublicCalendar && hasSavedCalendarOffForSharedPlan) {
-      setEmployerCalendarMessage('Your saved calendar was not changed. This shared plan uses public holidays only. Choose "Use my saved calendar" to edit yours.');
+  }, [sharedPublicCalendar, hasSavedCalendarOffForSharedPlan, currentEmployerScope, employerCalendar, updateEmployerCalendar]);
+  const latestEmployerCalendar = useRef(employerCalendar);
+  latestEmployerCalendar.current = employerCalendar;
+  const flushEmployerSave = useCallback(() => {
+    const scope = pendingEmployerSave.current;
+    const calendar = latestEmployerCalendar.current;
+    if (scope === null || employerScope(calendar.country, calendar.subdivision) !== scope) return;
+    pendingEmployerSave.current = null;
+    if (protectedEmployerScopes.current.has(scope)) {
+      setEmployerCalendarMessage(scope === linkCalendarScope
+        ? 'Your saved calendar was not changed. This link brought its own company holidays; choose Reset to start your own.'
+        : 'Your saved calendar was not changed. This shared plan uses public holidays only. Choose "Use my saved calendar" to edit yours.');
       return;
     }
-    const saved = writeEmployerCalendar(employerCalendar);
-    setEmployerCalendarMessage(saved === 'saved' ? 'Employer calendar saved in this browser.'
-      : saved === 'stale' ? 'Another tab saved a different employer calendar after this page loaded it. Nothing was overwritten. Save again to replace it with this plan\'s calendar.'
-        : 'Browser storage is unavailable. Your changes still apply to this tab.');
-  }, [employerCalendar, sharedObservedHolidays, sharedPublicCalendar, hasSavedCalendarOffForSharedPlan]);
+    const saved = writeEmployerCalendar(calendar);
+    setEmployerCalendarMessage(saved === 'saved' ? `Saved for ${employerPlaceLabel(calendar.country, calendar.subdivision)}.`
+      : saved === 'stale' ? 'Another tab changed these holidays after this page loaded them. Nothing was overwritten; your next change here will save.'
+        : saved === 'newer-version' ? 'Not saved: a newer version of Timebower saved these holidays. Reload to use them.'
+          : 'Browser storage is unavailable. Your choices apply to this tab only.');
+  }, [linkCalendarScope]);
+  // Debounced: a run of chip taps is one write. Flushed when the page is hidden or left.
+  useEffect(() => {
+    if (pendingEmployerSave.current !== currentEmployerScope || sharedObservedHolidays !== undefined) return;
+    const timer = window.setTimeout(flushEmployerSave, 400);
+    return () => window.clearTimeout(timer);
+  }, [employerCalendar, currentEmployerScope, sharedObservedHolidays, flushEmployerSave]);
+  useEffect(() => {
+    const flush = () => flushEmployerSave();
+    window.addEventListener('pagehide', flush);
+    return () => { window.removeEventListener('pagehide', flush); flush(); };
+  }, [flushEmployerSave]);
+  /** Kept for callers of the old explicit save: saves now. */
+  const saveEmployerHolidays = useCallback(() => {
+    if (sharedObservedHolidays !== undefined) return;
+    if (sharedPublicCalendar && hasSavedCalendarOffForSharedPlan) protectedEmployerScopes.current.add(currentEmployerScope);
+    pendingEmployerSave.current = currentEmployerScope;
+    flushEmployerSave();
+  }, [sharedObservedHolidays, currentEmployerScope, flushEmployerSave, sharedPublicCalendar, hasSavedCalendarOffForSharedPlan]);
   const resetEmployerHolidays = useCallback(() => {
     if (sharedObservedHolidays !== undefined) return;
-    const removed = deleteEmployerCalendar(country, subdivision);
-    updateEmployerCalendar(() => defaultEmployerCalendar(country, subdivision));
-    setEmployerCalendarMessage(removed ? 'Public-holiday defaults restored. Saved customization deleted.' : 'Public-holiday defaults restored for this plan. Browser storage is unavailable.');
-  }, [country, subdivision, sharedObservedHolidays, updateEmployerCalendar]);
+    employerUndo.current = { scope: currentEmployerScope, calendar: employerCalendar };
+    setCanUndoEmployerHolidays(true);
+    pendingEmployerSave.current = null;
+    const removed = protectedEmployerScopes.current.has(currentEmployerScope) && currentEmployerScope !== linkCalendarScope
+      ? false : deleteEmployerCalendar(country, subdivision);
+    if (currentEmployerScope === linkCalendarScope) protectedEmployerScopes.current.delete(currentEmployerScope);
+    updateEmployerCalendar(() => freshEmployerCalendar(country, subdivision));
+    setEmployerCalendarMessage(removed ? `Reset to public holidays for ${employerPlace}.` : 'Public holidays restored for this plan.');
+  }, [country, subdivision, sharedObservedHolidays, updateEmployerCalendar, currentEmployerScope, employerCalendar, employerPlace, linkCalendarScope]);
+  const undoEmployerHolidays = useCallback(() => {
+    const previous = employerUndo.current;
+    if (!previous || previous.scope !== currentEmployerScope) return;
+    employerUndo.current = null;
+    setCanUndoEmployerHolidays(false);
+    pendingEmployerSave.current = currentEmployerScope;
+    updateEmployerCalendar(() => previous.calendar);
+  }, [currentEmployerScope, updateEmployerCalendar]);
   const addCustomHoliday = useCallback((date: string, name: string) => {
     if (!validCalendarDate(date)) { setEmployerCalendarMessage('Choose a valid company holiday date.'); return; }
     const cleanName = name.trim().replace(/[\u0000-\u001f]/g, '').slice(0, 160) || 'Company holiday';
-    updateEmployerCalendar(current => ({ ...current, custom: [...current.custom.filter(item => item.date !== date || item.name !== cleanName), { date, name: cleanName }], excluded: current.excluded.filter(key => key !== `${date}|${cleanName}`) }));
-    setEmployerCalendarMessage('Company holiday added to this plan. Save to keep it in this browser.');
-    track('holiday_preference_customized');
-  }, [updateEmployerCalendar]);
+    editEmployerCalendar(current => ({ ...current, custom: [...current.custom.filter(item => item.date !== date || item.name !== cleanName), { date, name: cleanName }], excluded: current.excluded.filter(key => key !== `${date}|${cleanName}`) }));
+  }, [editEmployerCalendar]);
 
   const [forced, setForced] = useState<Record<string, ForcedState>>(() => {
     const init: Record<string, ForcedState> = {};
@@ -593,6 +648,25 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     () => holidayEntriesFor(nationalHolidays ?? NO_HOLIDAYS, regionalHolidays ?? NO_HOLIDAYS, employerCalendar, rangeStart, rangeEnd, sharedObservedHolidays),
     [nationalHolidays, regionalHolidays, employerCalendar, rangeStart, rangeEnd, sharedObservedHolidays],
   );
+  /** One chip per holiday for "Which of these holidays does your company give you off?". */
+  const holidayChoices: HolidayChoice[] = useMemo(
+    () => sharedObservedHolidays !== undefined || !holidaysReady ? [] : holidayChoicesFor(holidayEntries, country, { start: rangeStart, end: rangeEnd }),
+    [holidayEntries, country, sharedObservedHolidays, holidaysReady, rangeStart, rangeEnd],
+  );
+  const toggleHolidayChoice = useCallback((id: string) => {
+    const choice = holidayChoices.find(item => item.id === id);
+    if (!choice) return;
+    editEmployerCalendar(current => toggleChoiceIn(current, choice, holidayEntries));
+  }, [holidayChoices, holidayEntries, editEmployerCalendar]);
+  /** One dated row in the detailed list; `name` is the source name (entryKey's half). */
+  const toggleHoliday = useCallback((date: string, name: string) => {
+    const entry = holidayEntries.find(item => entryKey(item) === `${date}|${name}`);
+    if (entry) editEmployerCalendar(current => toggleHolidayEntry(current, entry, holidayEntries));
+    else editEmployerCalendar(current => {
+      const key = `${date}|${name}`;
+      return { ...current, excluded: current.excluded.includes(key) ? current.excluded.filter(item => item !== key) : [...current.excluded, key] };
+    });
+  }, [holidayEntries, editEmployerCalendar]);
 
   // Alternating Fridays are calendar days off. Pins pass separately so a pinned
   // working day still costs PTO and a pinned holiday keeps its existing zero cost.
@@ -959,6 +1033,19 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     budgetSpent, totalDaysOff, breakCountActual, scores,
   ]);
 
+  // A pin keeps its own employer calendar (snapshots are never rewritten). When it counts
+  // different holiday dates than the current calendar for the same place and dates, say so.
+  const pinnedPlansForDisplay = useMemo(() => pinnedPlans.map((snap) => {
+    if (snap.country !== country || snap.subdivision !== subdivision || snap.rangeStart !== rangeStart
+      || snap.rangeEnd !== rangeEnd || !holidaysReady || sharedObservedHolidays !== undefined) return snap;
+    const datesFor = (calendar: EmployerCalendar) => holidayEntriesFor(nationalHolidays ?? NO_HOLIDAYS, regionalHolidays ?? NO_HOLIDAYS, calendar, rangeStart, rangeEnd)
+      .filter((entry) => entry.checked).map((entry) => entry.date);
+    const pinned = new Set(datesFor(snap.employerCalendar));
+    const current = new Set(datesFor(employerCalendar));
+    const differentHolidays = pinned.size !== current.size || [...pinned].some((date) => !current.has(date));
+    return differentHolidays ? { ...snap, summary: { ...snap.summary, differentHolidays } } : snap;
+  }), [pinnedPlans, country, subdivision, rangeStart, rangeEnd, holidaysReady, sharedObservedHolidays, nationalHolidays, regionalHolidays, employerCalendar]);
+
   // Restores every input the snapshot carries - the raw setters (not `changeCountry`, which
   // also clears subdivision) so a pinned plan's subdivision comes back too.
   const restorePlan = useCallback(
@@ -1151,7 +1238,12 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     resetEmployerHolidays,
     toggleHoliday,
     effectiveOffDays,
-    removeHoliday: (date: string, name: string) => updateEmployerCalendar(current => ({ ...current, custom: current.custom.filter(item => item.date !== date || item.name !== name), excluded: [...new Set([...current.excluded, `${date}|${name}`])] })),
+    holidayChoices,
+    toggleHolidayChoice,
+    undoEmployerHolidays,
+    canUndoEmployerHolidays,
+    employerPlace,
+    removeHoliday: (date: string, name: string) => editEmployerCalendar(current => ({ ...current, custom: current.custom.filter(item => item.date !== date || item.name !== name), excluded: [...new Set([...current.excluded, `${date}|${name}`])] })),
     toggleStateHoliday: toggleHoliday,
     addCustomHoliday,
     breaks,
@@ -1176,7 +1268,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     toggleDay,
     clearForcedDays,
     forced,
-    pinnedPlans,
+    pinnedPlans: pinnedPlansForDisplay,
     pinMessage,
     canPin,
     pinPlan,

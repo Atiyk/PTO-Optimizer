@@ -1,4 +1,5 @@
 import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
+import { holidayDisplayNames } from '../personal/holidayDisplayNames';
 import { parseISO, addDays } from '@daysoff/engine/solver/dateUtils';
 import { formatDateRange, formatCardDateRange, formatShort } from '@daysoff/engine/calendar/dateFormat';
 import { noticePhrase, requestByDate, type NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
@@ -236,7 +237,7 @@ export function generateHolidaysICS(holidays: Holiday[], now: Date = new Date())
     lines.push(`DTSTAMP:${dtstamp}`);
     lines.push(`DTSTART;VALUE=DATE:${dateStart}`);
     lines.push(`DTEND;VALUE=DATE:${dateEnd}`);
-    lines.push(foldLine(`SUMMARY:${escapeText(holiday.name)}`));
+    lines.push(foldLine(`SUMMARY:${escapeText(holidayDisplayNames(holiday.name, holiday.countryCode))}`));
     lines.push('TRANSP:TRANSPARENT');
     lines.push('END:VEVENT');
   }

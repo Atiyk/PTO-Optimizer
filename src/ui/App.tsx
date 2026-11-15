@@ -51,6 +51,7 @@ import { PortfolioComparison } from '../planning/PortfolioComparison';
 import { useHasHover } from './useHasHover';
 import { useMinWidth } from './useMinWidth';
 import { noBreaksMessage } from './noBreaksMessage';
+import { PlannerHolidayQuestion } from './CompanyHolidayChips';
 
 const dayNumber = new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format;
 /** Day-equivalents keep a singular unit up to one: "0.5 day", "1 day", "1.5 days". */
@@ -636,6 +637,7 @@ export function App() {
               </section>
               </HoldHeightWhile>
               {plannable && <a href="#planning-assumptions" className="link-mark inline-flex min-h-11 w-fit items-center text-sm">Edit workweek and employer holidays</a>}
+              {plannable && <PlannerHolidayQuestion state={state} />}
 
               {plannable && state.breaks.length > 0 && (
                 <PlanExplanation

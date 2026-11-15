@@ -73,6 +73,7 @@ interface MoreOptionsProps {
   onToggleStateHoliday: (date: string, name: string) => void;
   onAddCustomHoliday: (date: string, name: string) => void;
   onToggleHoliday?: (date: string, name: string) => void;
+  /** No longer rendered: edits auto-save. Kept so existing callers still type-check. */
   onSaveEmployerHolidays?: () => void;
   onResetEmployerHolidays?: () => void;
   employerCalendarMessage?: string;
@@ -366,7 +367,7 @@ export function MoreOptions(props: MoreOptionsProps) {
         <h3 id="employer-holidays" className={`${H4_CLASS} scroll-mt-16`}>My employer&apos;s holidays</h3>
         <p className="mb-3 max-w-prose text-sm text-muted">{props.sharedHolidaySnapshot
           ? 'These dates came from the shared plan. Switch to your saved calendar to edit employer holidays.'
-          : 'Adjust these dates if your company follows a different calendar. Changes update your plan immediately.'}</p>
+          : 'Every date your plan counts as a holiday. Untick a single date your company works; changes update your plan and save in this browser.'}</p>
         <fieldset disabled={props.sharedHolidaySnapshot} className="min-w-0 border-0 p-0" aria-label="Employer holiday settings">
           <div className="flex max-h-64 flex-col overflow-auto border-y border-line">
             {props.holidayEntries.map((h) => (
@@ -376,7 +377,7 @@ export function MoreOptions(props: MoreOptionsProps) {
                     <input
                       type="checkbox"
                       checked={h.checked}
-                      onChange={() => (props.onToggleHoliday ?? props.onToggleStateHoliday)(h.date, h.name)}
+                      onChange={() => (props.onToggleHoliday ?? props.onToggleStateHoliday)(h.date, h.sourceName ?? h.name)}
                     />
                   )}
                   <span className="truncate">
@@ -384,7 +385,7 @@ export function MoreOptions(props: MoreOptionsProps) {
                     <span className="ml-1 text-xs text-muted">({h.source === 'state' ? 'regional' : h.source === 'custom' ? 'company' : 'national'})</span>
                   </span>
                 </label>
-                {h.source === 'custom' && <button
+                {h.source === 'custom' && !h.extra && <button
                   type="button"
                   aria-label={`Delete ${h.name}`}
                   onClick={() => props.onRemoveHoliday(h.date, h.name)}
@@ -396,7 +397,7 @@ export function MoreOptions(props: MoreOptionsProps) {
             ))}
             {props.holidayEntries.some((h) => h.source === 'state') && (
               <p className={NOTE}>
-                Regional holidays are included by default. Uncheck any your employer does not observe.
+                Regional (state) holidays are off unless your company gives them. Tick any it does.
               </p>
             )}
             {props.holidayEntries.length === 0 && <span className="py-2 text-sm text-muted">None loaded yet.</span>}
@@ -431,12 +432,11 @@ export function MoreOptions(props: MoreOptionsProps) {
               Add
             </button>
           </div>
-          <div className="mt-3 flex flex-wrap gap-3">
-            <button type="button" onClick={props.onSaveEmployerHolidays} className={buttonClasses('secondary', 'md')}>Save employer calendar</button>
-            <button type="button" onClick={props.onResetEmployerHolidays} className={buttonClasses('quiet', 'md')}>Restore public holidays</button>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4">
+            {/* Quiet status, not a live region: the question under the plan announces saves. */}
+            <p className="text-sm text-muted">{props.employerCalendarMessage || 'Changes save automatically in this browser, for this country and region only.'}</p>
+            <button type="button" onClick={props.onResetEmployerHolidays} className={buttonClasses('quiet', 'md')}>Reset to public holidays</button>
           </div>
-          <p className="mt-2 text-sm text-muted">Saved calendars stay in this browser and apply only to this country and region.</p>
-          {props.employerCalendarMessage && <p role="status" className="mt-2 text-sm text-ink">{props.employerCalendarMessage}</p>}
         </fieldset>
       </section>
     </div>

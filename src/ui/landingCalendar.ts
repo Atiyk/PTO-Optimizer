@@ -1,6 +1,7 @@
 import type { Holiday } from '@daysoff/engine/data/holidays';
 import type { EmployerCalendar } from '../personal/employerCalendar';
 import { holidayEntriesFor } from '../autopilot/planFromSearch';
+import { entrySourceName } from '../personal/employerHolidayChoices';
 import { useEffect, useMemo, useState } from 'react';
 import { getConsumerHolidaysWithStatus, readPreloadedConsumerHolidays } from '../personal/consumerHolidays';
 
@@ -36,10 +37,11 @@ export function landingObservedHolidays(
   const dates = new Map<string, { holiday: Holiday; names: Set<string> }>();
   const entries = holidayEntriesFor(national, [], employer, start, end);
   entries.sort((a, b) => Number(a.source === 'custom') - Number(b.source === 'custom'));
-  for (const { checked, date, name } of entries) {
+  for (const entry of entries) {
+    const { checked, date, name } = entry;
     if (!checked) continue;
     const existing = dates.get(date);
-    const holiday = publicByKey.get(`${date}|${name}`) ?? { date, name, nominalDate: date, countryCode: employer.country, counties: null };
+    const holiday = publicByKey.get(`${date}|${entrySourceName(entry)}`) ?? { date, name, nominalDate: date, countryCode: employer.country, counties: null };
     if (existing) {
       existing.names.add(name);
       // Keep the observed label when any included holiday moved to this date.

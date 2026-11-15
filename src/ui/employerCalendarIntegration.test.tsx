@@ -5,6 +5,7 @@ import { App } from './App';
 import { readBrowserPlanSearch } from './urlState';
 import {
   defaultEmployerCalendar,
+  freshEmployerCalendar,
   EMPLOYER_STORAGE_PREFIX,
   encodeEmployerCalendar,
   saveEmployerCalendar,
@@ -68,8 +69,8 @@ describe('employer calendar integrated with the live consumer state', () => {
     const first = renderHook(() => useAppState());
     await waitFor(() => expect(first.result.current.holidayEntries).toHaveLength(1));
     act(() => first.result.current.toggleHoliday('2027-12-24', 'Christmas Day'));
-    act(() => first.result.current.saveEmployerHolidays());
-    expect(first.result.current.employerCalendarMessage).toContain('saved in this browser');
+    // No save step: the edit auto-saves after a short pause.
+    await waitFor(() => expect(first.result.current.employerCalendarMessage).toBe('Saved for United States.'));
     first.unmount();
 
     navigate(); // Strip the generated share parameter to exercise saved-preference fallback.
@@ -112,7 +113,7 @@ describe('employer calendar integrated with the live consumer state', () => {
 
     act(() => result.current.setCountry('US'));
     await waitFor(() => expect(result.current.holidayEntries[0]?.date).toBe('2027-12-24'));
-    expect(result.current.employerCalendar).toEqual(defaultEmployerCalendar('US'));
+    expect(result.current.employerCalendar).toEqual(freshEmployerCalendar('US'));
     expect(result.current.effectiveOffDays).not.toContain('2027-12-28');
     expect(result.current.effectiveOffDays).toContain('2027-12-24');
   });
@@ -124,7 +125,7 @@ describe('employer calendar integrated with the live consumer state', () => {
     const { result } = renderHook(() => useAppState());
     expect(result.current.employerCalendar).toEqual(newYork);
     act(() => result.current.setSubdivision('US-CA'));
-    expect(result.current.employerCalendar).toEqual(defaultEmployerCalendar('US', 'US-CA'));
+    expect(result.current.employerCalendar).toEqual(freshEmployerCalendar('US', 'US-CA'));
     act(() => result.current.setSubdivision('US-NY'));
     expect(result.current.employerCalendar).toEqual(newYork);
   });
@@ -141,7 +142,7 @@ describe('employer calendar integrated with the live consumer state', () => {
     act(() => result.current.removeHoliday('2027-12-24', 'Company closure'));
     expect(result.current.effectiveOffDays).not.toContain('2027-12-24');
     act(() => result.current.resetEmployerHolidays());
-    expect(result.current.employerCalendar).toEqual(defaultEmployerCalendar('US'));
+    expect(result.current.employerCalendar).toEqual(freshEmployerCalendar('US'));
     expect(result.current.effectiveOffDays).toContain('2027-12-24');
   });
 

@@ -1,4 +1,5 @@
 import { addDays, mondayIndexedDow } from '@daysoff/engine/solver/dateUtils';
+import { holidayDisplayName } from '../personal/holidayDisplayNames';
 import { isOffDay, daysBetween } from './landingData';
 import { DEFAULT_WORK_WEEK, type WorkWeek } from '@daysoff/engine/solver/types';
 import { demandFor } from '@daysoff/engine/data/demandIndex';
@@ -270,7 +271,7 @@ export function bestPlacements(
     const holidayNames: string[] = [];
     for (let x = d; x <= coreEnd; x = addDays(x, 1)) {
       const match = holidays.find((h) => h.date === x);
-      if (match) holidayNames.push(match.name);
+      if (match) holidayNames.push(holidayDisplayName(match.name, match.countryCode));
     }
 
     const extended = extendSabbatical(d, coreEnd, ptoToAdd, unpaidToAdd, holidaySet, workWeek, minStart);
@@ -282,7 +283,7 @@ export function bestPlacements(
       holidays
         .filter((h) => h.date >= extended.start && h.date <= extended.end)
         .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
-        .map((h) => h.name),
+        .map((h) => holidayDisplayName(h.name, h.countryCode)),
     )];
 
     candidates.push({

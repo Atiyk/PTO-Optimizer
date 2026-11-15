@@ -3,6 +3,8 @@ export interface PinnedPlanSummary {
   totalDaysOff: number;
   breakCountActual: number;
   travelPercentile: number | null;
+  /** Made with a different employer holiday calendar than the plan uses now. */
+  differentHolidays?: boolean;
 }
 
 interface PinnedPlansStripProps {
@@ -29,7 +31,10 @@ export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlans
           className="flex min-h-11 items-center gap-1 rounded-[6px] border border-line bg-surface pl-3 text-sm tabular-nums text-ink"
         >
           <span aria-hidden="true" className="mr-1 inline-block h-2.5 w-2.5 shrink-0 rounded-[2px] bg-accent" />
-          <span>{summaryText(s)}</span>
+          <span>
+            {summaryText(s)}
+            {s.differentHolidays && <span className="block text-xs text-muted">Made with different company holidays</span>}
+          </span>
           <button
             type="button"
             onClick={() => onRestore(i)}
