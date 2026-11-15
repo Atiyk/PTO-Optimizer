@@ -4,7 +4,8 @@ import { captureInstallPrompt } from './installOffer';
  * P3 PWA: registers /sw.js (built by scripts/serviceWorkerPlugin.ts) on every consumer page.
  *   - production builds only: never in the dev server or in tests (the worker file only exists
  *     in a build, and a dev worker would cache files that change on every save);
- *   - after the page's `load` event, so it never competes with the first paint;
+ *   - after the page's `load` event and then when the page is idle, so it never competes
+ *     with the first paint or the first render;
  *   - the update flow is described in src/pwa/sw.ts: a waiting new version shows one quiet
  *     "A new version of Timebower is available. Reload" line; Reload switches and reloads.
  */
@@ -99,7 +100,13 @@ export function registerServiceWorker(env: RegistrationEnv = currentRegistration
       .then((registration) => registration.active?.postMessage({ type: 'WARM', urls: loadedUrls() }))
       .catch(() => { /* no worker: the site works exactly as before */ });
   };
-  if (document.readyState === 'complete') start();
-  else window.addEventListener('load', start, { once: true });
+  // After load and then once the page is idle, so registering (and the worker's precache
+  // downloads) never competes with the first render. Without requestIdleCallback: 1 s later.
+  const whenIdle = () => {
+    if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(start, { timeout: 5000 });
+    else window.setTimeout(start, 1000);
+  };
+  if (document.readyState === 'complete') whenIdle();
+  else window.addEventListener('load', whenIdle, { once: true });
   return true;
 }

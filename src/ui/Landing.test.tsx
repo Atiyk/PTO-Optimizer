@@ -296,6 +296,12 @@ const SAVED_PLAN = {
   summary: { budgetSpent: 10, totalDaysOff: 26, breakCountActual: 3, travelPercentile: null },
 };
 
+/** The returning-visitor row loads on its own (React.lazy): wait for that import, then read it. */
+async function welcomeRow() {
+  await act(async () => { await vi.dynamicImportSettled(); });
+  return screen.getByRole('region', { name: 'Welcome back' });
+}
+
 describe('returning visitors (research rec 10)', () => {
   it('shows nothing new to a first-time visitor', async () => {
     await act(async () => { render(<Landing />); });
@@ -310,7 +316,7 @@ describe('returning visitors (research rec 10)', () => {
       request('2026-11-20', '2026-11-20', 'canceled', 'dropped'),
     ]);
     await act(async () => { render(<Landing />); });
-    const row = screen.getByRole('region', { name: 'Welcome back' });
+    const row = (await welcomeRow());
     expect(row.textContent).toContain('Next break: Dec 21 – 23, 2026');
     expect(row.textContent).toContain('Planned · 3 PTO days');
     // 14 calendar days before Monday Dec 21 is Monday Dec 7. N-P1-2: the tracker's wording.
@@ -326,7 +332,7 @@ describe('returning visitors (research rec 10)', () => {
   it('opens a saved plan from its own planner link, keeping private settings off the address', async () => {
     localStorage.setItem(PINNED_PLANS_STORAGE_KEY, JSON.stringify({ version: 1, plans: [{ id: 'one', snapshot: SAVED_PLAN }] }));
     await act(async () => { render(<Landing />); });
-    const row = screen.getByRole('region', { name: 'Welcome back' });
+    const row = (await welcomeRow());
     expect(row.textContent).toContain('Your saved plan: 26 days off for 10 PTO days');
     const link = screen.getByRole('link', { name: 'Open saved plan →' }) as HTMLAnchorElement;
     const url = new URL(link.href);
@@ -406,7 +412,7 @@ describe('welcome row notice period (N-P1-2)', () => {
     const planned = createPtoRequest({ start: '2026-12-21', end: '2026-12-23', status: 'planned', noticePeriodDays: 30 }, REQUEST_CALENDAR, 'np30')!;
     writeRequestLedger([planned]);
     await act(async () => { render(<Landing />); });
-    const row = screen.getByRole('region', { name: 'Welcome back' });
+    const row = (await welcomeRow());
     // 30 calendar days before Monday Dec 21 is Saturday Nov 21, moved back to Friday Nov 20.
     expect(row.textContent).toContain('Submit by Nov 20 · 30-day notice');
     expect(row.textContent).not.toMatch(/14-day/);
@@ -415,13 +421,13 @@ describe('welcome row notice period (N-P1-2)', () => {
   it('says to submit now once the notice window has opened', async () => {
     writeRequestLedger([createPtoRequest({ start: '2026-11-09', end: '2026-11-10', status: 'planned', noticePeriodDays: 10, noticeUnit: 'working' }, REQUEST_CALENDAR, 'soon')!]);
     await act(async () => { render(<Landing />); });
-    expect(screen.getByRole('region', { name: 'Welcome back' }).textContent).toMatch(/Submit now: the 10-working-day notice window opened Oct 26/);
+    expect((await welcomeRow()).textContent).toMatch(/Submit now: the 10-working-day notice window opened Oct 26/);
   });
 
   it('shows no date for a break still being considered, as the tracker does', async () => {
     writeRequestLedger([request('2026-12-21', '2026-12-23', 'considering', 'maybe')]);
     await act(async () => { render(<Landing />); });
-    const row = screen.getByRole('region', { name: 'Welcome back' });
+    const row = (await welcomeRow());
     expect(row.textContent).toContain('Considering · 3 PTO days');
     expect(row.textContent).not.toMatch(/Submit|Request by/);
   });
@@ -429,7 +435,7 @@ describe('welcome row notice period (N-P1-2)', () => {
   it('keeps the regular planner and its call to action for returning visitors (P3, was N-P2-3)', async () => {
     writeRequestLedger([request('2026-12-21', '2026-12-23', 'planned', 'next')]);
     await act(async () => { render(<Landing />); });
-    const row = screen.getByRole('region', { name: 'Welcome back' });
+    const row = (await welcomeRow());
     // The dashboard sits above the homepage, not inside the answer; the answer keeps its order.
     expect(document.querySelector('[data-plan-result]')!.contains(row)).toBe(false);
     expect(screen.getByRole('link', { name: 'See the full plan →' })).toBeTruthy();

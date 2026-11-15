@@ -135,6 +135,14 @@ async function openMoreActions(page) {
   if (await more.count() && !await more.evaluate((element) => element.open)) await more.locator(':scope > summary').click();
 }
 
+/** A calendar day's label. Phones build the month grids only once "Show month details" is
+ * opened, so open it first when it is there. */
+async function dayLabel(page, iso) {
+  const toggle = page.getByRole('button', { name: 'Show month details' });
+  if (await toggle.isVisible()) await toggle.click();
+  return page.locator(`#day-${iso}`).getAttribute('aria-label', { timeout: 5000 });
+}
+
 function holidaySection(page) {
   return page.locator('section').filter({ has: page.getByRole('heading', { name: "My employer's holidays", exact: true }) });
 }
@@ -436,7 +444,7 @@ try {
   await check('Employer calendar saves, resets, and public share reproduces the sender plan without overwriting recipient preferences', async () => {
     const recipientContext = await mobileContext();
     const recipient = await open(recipientContext, holidayPath);
-    await eventually(async () => assert.match(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Public holidays should load');
+    await eventually(async () => assert.match(await dayLabel(recipient, '2027-12-24'), /public holiday/), 'Public holidays should load');
     await moreOptions(recipient);
     const holidays = holidaySection(recipient);
     await holidays.getByRole('checkbox', { name: /2027-12-24.*Christmas Day/ }).uncheck();
@@ -450,7 +458,7 @@ try {
     assert.ok(saved?.includes('Christmas Day'));
     await recipient.goto(new URL(holidayPath, origin).href, { waitUntil: 'domcontentloaded' });
     await waitForPlanner(recipient);
-    await eventually(async () => assert.doesNotMatch(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Saved exclusions should survive a fresh URL');
+    await eventually(async () => assert.doesNotMatch(await dayLabel(recipient, '2027-12-24'), /public holiday/), 'Saved exclusions should survive a fresh URL');
     const sender = await open(await mobileContext(), holidayPath);
     await openMoreActions(sender);
     await sender.getByRole('button', { name: 'Copy plan link', exact: true }).click();
@@ -460,14 +468,14 @@ try {
     await waitForPlanner(recipient);
     // Issue 9: the shared plan is the sender's (public holidays); the recipient's saved
     // calendar is offered, applied only on request, and never overwritten.
-    await eventually(async () => assert.match(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Public plans must reproduce the sender plan, not apply the recipient saved calendar.');
+    await eventually(async () => assert.match(await dayLabel(recipient, '2027-12-24'), /public holiday/), 'Public plans must reproduce the sender plan, not apply the recipient saved calendar.');
     assert.match(await recipient.getByTestId('shared-plan-notice').innerText(), /saved company calendar isn.t applied/);
     await recipient.getByRole('button', { name: 'Use my saved calendar', exact: true }).click();
-    await eventually(async () => assert.doesNotMatch(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Use my saved calendar must apply the recipient saved holiday exclusions.');
+    await eventually(async () => assert.doesNotMatch(await dayLabel(recipient, '2027-12-24'), /public holiday/), 'Use my saved calendar must apply the recipient saved holiday exclusions.');
     assert.equal(await recipient.evaluate(() => localStorage.getItem('gapless.employer.v1:US:')), saved);
     await recipient.goto(new URL(holidayPath, origin).href, { waitUntil: 'domcontentloaded' });
     await waitForPlanner(recipient);
-    await eventually(async () => assert.doesNotMatch(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Opening a share must not persist someone else’s preferences');
+    await eventually(async () => assert.doesNotMatch(await dayLabel(recipient, '2027-12-24'), /public holiday/), 'Opening a share must not persist someone else’s preferences');
     await moreOptions(recipient);
     // December 31 is the observed New Year's Day holiday from 2028; choose a
     // distinct workday so this assertion exercises the new company holiday.
@@ -479,14 +487,14 @@ try {
       'A new company holiday should save automatically');
     await recipient.goto(new URL(holidayPath, origin).href, { waitUntil: 'domcontentloaded' });
     await waitForPlanner(recipient);
-    await eventually(async () => assert.match(await recipient.locator('#day-2027-12-30').getAttribute('aria-label'), /QA company closure 2027/), 'Company holidays must persist');
+    await eventually(async () => assert.match(await dayLabel(recipient, '2027-12-30'), /QA company closure 2027/), 'Company holidays must persist');
     await moreOptions(recipient);
     await holidaySection(recipient).getByRole('button', { name: 'Reset to public holidays', exact: true }).click();
     await recipient.goto(new URL(holidayPath, origin).href, { waitUntil: 'domcontentloaded' });
     await waitForPlanner(recipient);
     await eventually(async () => {
-      assert.match(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/);
-      assert.doesNotMatch(await recipient.locator('#day-2027-12-30').getAttribute('aria-label'), /QA company closure 2027/);
+      assert.match(await dayLabel(recipient, '2027-12-24'), /public holiday/);
+      assert.doesNotMatch(await dayLabel(recipient, '2027-12-30'), /QA company closure 2027/);
     }, 'Reset must remove saved exceptions');
     await noOverflow(recipient); await screenshot(recipient, '03-employer-calendar-reset-375.png');
   });
@@ -537,7 +545,7 @@ try {
     assert.ok(!optedIn.includes(secret) && !optedInParams.has('eh'), 'Opt-in links share dates only.');
     await recipient.goto(optedIn, { waitUntil: 'domcontentloaded' });
     await waitForPlanner(recipient);
-    await eventually(async () => assert.match(await recipient.locator('#day-2027-12-30').getAttribute('aria-label'), /Shared observed holiday/i),
+    await eventually(async () => assert.match(await dayLabel(recipient, '2027-12-30'), /Shared observed holiday/i),
       'The recipient should reproduce the selected observed date without its original label');
     await subscriptions.getByRole('button', { name: /Use my holiday dates/ }).click();
     const google = new URL(await subscriptions.getByRole('link', { name: /Google Calendar/ }).getAttribute('href'));

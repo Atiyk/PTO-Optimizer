@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Button } from './Button';
 import { PLAN_SAVED_MESSAGE } from './pinnedPlanStore';
-import { browserEnumerableStorage, downloadSavedDataBackup } from '../personal/savedDataBackup';
 import { readRetentionStatus, updateRetentionStatus } from '../personal/retentionStatus';
 import { installPlatform, iosDeviceName, promptInstall, useInstallEnvironment } from '../pwa/installOffer';
 
@@ -28,8 +27,10 @@ function SavedHere() {
     }
     document.getElementById('complete-plan-heading')?.scrollIntoView({ block: 'start' });
   };
-  const backUp = () => {
+  // The backup code loads only when someone asks for a backup, not with the planner.
+  const backUp = async () => {
     const now = new Date();
+    const { browserEnumerableStorage, downloadSavedDataBackup } = await import('../personal/savedDataBackup');
     if (downloadSavedDataBackup(browserEnumerableStorage(), now)) {
       updateRetentionStatus({ lastBackupAt: now.toISOString() });
       setBackupMessage('Backup file downloaded. Keep it outside this browser, for example in your files or email.');

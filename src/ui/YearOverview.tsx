@@ -14,7 +14,8 @@ interface YearOverviewProps {
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
-const SHORT = new Intl.DateTimeFormat('en', { month: 'short', timeZone: 'UTC' });
+let short: Intl.DateTimeFormat | undefined;
+const SHORT = () => (short ??= new Intl.DateTimeFormat('en', { month: 'short', timeZone: 'UTC' }));
 
 /**
  * The phone calendar's default view: one row per month, one thin cell per day, so the whole
@@ -46,7 +47,7 @@ export function YearOverview({ rangeStart, rangeEnd, breaks, isPtoDay, categoryO
           return (
             <li key={key} data-overview-month={key} className="grid min-w-0 grid-cols-[3rem_minmax(0,1fr)_3rem] items-center gap-2">
               <span aria-hidden="true" className="text-xs font-semibold text-ink">
-                {SHORT.format(new Date(Date.UTC(year, month - 1, 1)))}
+                {SHORT().format(new Date(Date.UTC(year, month - 1, 1)))}
                 {month === 1 || key === rangeStart.slice(0, 7) ? <span className="text-[10px] font-normal text-muted"> {String(year).slice(2)}&rsquo;</span> : null}
               </span>
               <span aria-hidden="true" className="grid h-4 min-w-0 grid-cols-[repeat(31,minmax(0,1fr))] gap-px">

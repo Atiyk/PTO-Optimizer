@@ -32,13 +32,14 @@ describe('save confirmation (P3 storage honesty)', () => {
     download.remove();
   });
 
-  it('Back up downloads every saved item and records when', () => {
+  it('Back up downloads every saved item and records when', async () => {
     localStorage.setItem('gapless.personal.pinned-plans.v1', '{"version":1,"plans":[]}');
     let blob: Blob | undefined;
     Object.assign(URL, { createObjectURL: vi.fn((value: Blob) => { blob = value; return 'blob:x'; }), revokeObjectURL: vi.fn() });
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     render(<SaveConfirmation message={PLAN_SAVED_MESSAGE} />);
     fireEvent.click(screen.getByRole('button', { name: 'Back up' }));
+    expect(await screen.findByText(/Backup file downloaded/)).toBeTruthy();
     expect(click).toHaveBeenCalled();
     expect(blob?.type).toBe('application/json');
     expect(readRetentionStatus().lastBackupAt).toBeTruthy();

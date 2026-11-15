@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { SolveInput } from '@daysoff/engine/solver/types';
 import type { PlanningStyle } from '../planning/optimizer';
-import { comparePlanStyles, type PlanComparisonEntry } from '../planning/planComparison';
+import type { PlanComparisonEntry } from '../planning/planComparison';
 import type { PlanStyleOptions, Season } from '../planning/yearPlan';
 
 const SEASON_LABEL: Record<Season, string> = { spring: 'Spring', summer: 'Summer', fall: 'Fall', winter: 'Winter' };
@@ -20,14 +20,19 @@ export function usePlanStyleComparison(input: SolveInput | undefined, minimumBre
   const [entries, setEntries] = useState<PlanComparisonEntry[] | null>(null);
   useEffect(() => {
     if (!enabled || !input) return;
+    // The comparison code loads with the first comparison, not with the planner.
+    let cancelled = false;
     const timer = window.setTimeout(() => {
-      try {
-        setEntries(comparePlanStyles({ input, minimumBreakDays, plan: JSON.parse(planKey) as PlanStyleOptions, heldReserveDays }));
-      } catch {
-        setEntries([]);
-      }
+      import('../planning/planComparison').then(({ comparePlanStyles }) => {
+        if (cancelled) return;
+        try {
+          setEntries(comparePlanStyles({ input, minimumBreakDays, plan: JSON.parse(planKey) as PlanStyleOptions, heldReserveDays }));
+        } catch {
+          setEntries([]);
+        }
+      }, () => { if (!cancelled) setEntries([]); });
     }, 150);
-    return () => window.clearTimeout(timer);
+    return () => { cancelled = true; window.clearTimeout(timer); };
   }, [input, minimumBreakDays, planKey, heldReserveDays, enabled]);
   return enabled ? entries : null;
 }

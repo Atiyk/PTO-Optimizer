@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { COUNTRIES } from '@daysoff/engine/data/countries';
 import { addDays, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import type { Break } from '@daysoff/engine/solver/types';
@@ -17,7 +17,6 @@ import { track } from './analytics';
 import { computeLandingPlan, landingHolidayHref, landingPlanHref, landingSearch, readLandingState, validLandingRange } from './landingState';
 import { employerCalendarCustomized } from '../personal/employerCalendar';
 import { useEmployerHolidayProfile } from './useEmployerHolidayProfile';
-import { HomeHolidayQuestion } from './CompanyHolidayChips';
 import { landingObservedHolidays, useLandingHolidays } from './landingCalendar';
 import { weekStartForCountry } from './locale';
 import { HOLIDAY_DOT } from './colorScheme';
@@ -26,7 +25,17 @@ import { daysOffSplit } from './Headline';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import { SHARE_LINK_SENTENCE } from './shareLinkCopy';
 import { usePinnedPlans } from './pinnedPlanStore';
-import { ReturningDashboard } from './ReturningDashboard';
+import { REQUEST_STORAGE_KEY } from '../personal/requestLedger';
+import { HomeHolidayQuestion } from './CompanyHolidayChips';
+
+// The returning-visitor dashboard (and the request, backup and wallet code behind it) loads
+// only when this browser has a saved plan or request; a first visit never downloads it.
+const ReturningDashboard = lazy(() => import('./ReturningDashboard').then((m) => ({ default: m.ReturningDashboard })));
+
+/** Whether this browser holds tracked requests, read without loading the request ledger. */
+function hasStoredRequests(): boolean {
+  try { return typeof localStorage !== 'undefined' && localStorage.getItem(REQUEST_STORAGE_KEY) !== null; } catch { return false; }
+}
 
 /** A control set inside the sentence: it takes the sentence's own size and weight. */
 const INLINE_FIELD = 'h-[1.45em] min-h-11 rounded-[6px] border border-line-strong bg-surface px-[0.3em] align-baseline font-bold text-ink hover:border-ink';
@@ -153,6 +162,13 @@ export function Landing() {
   const today = todayISO();
   const [allHolidays, setAllHolidays] = useState(false);
   const { pinnedPlans } = usePinnedPlans();
+  const [storedRequests, setStoredRequests] = useState(hasStoredRequests);
+  // A request tracked in another tab shows the dashboard here too, as before.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => { if (event.key === null || event.key === REQUEST_STORAGE_KEY) setStoredRequests(hasStoredRequests()); };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
   const [state, setState] = useState(() => readLandingState(typeof window === 'undefined' ? '' : window.location.search, today, geolocateCountry()));
   const { country, budget, rangeStart, rangeEnd } = state;
   const holidayProfile = useEmployerHolidayProfile(country); const employer = holidayProfile.calendar;
@@ -225,7 +241,9 @@ export function Landing() {
       {/* First screen: what this is, the sentence that drives it, the answer, the schedule. */}
       <Container className="px-4 pt-5 sm:px-6 sm:pt-12 lg:pt-14">
         {/* P3: someone who saved a plan or a request here sees it first; the planner follows. */}
-        <ReturningDashboard pinnedPlans={pinnedPlans} today={today} offDays={holidayDates} />
+        {(pinnedPlans.length > 0 || storedRequests) && (
+          <Suspense fallback={null}><ReturningDashboard pinnedPlans={pinnedPlans} today={today} offDays={holidayDates} /></Suspense>
+        )}
         <section aria-labelledby="landing-heading">
           <h1 id="landing-heading" className="scroll-mt-16 max-w-[17ch] text-[clamp(2rem,0.95rem+5vw,4.75rem)] leading-[1.04] type-display text-ink">More days off from the same PTO.</h1>
 

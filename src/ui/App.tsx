@@ -83,6 +83,9 @@ export function App() {
   const [moreOpen, setMoreOpen] = useState(() => typeof window !== 'undefined'
     && readPartnerAvailability(readBrowserPlanSearch(window.location.search, window.history.state)).availability !== null);
   const [monthDetails, setMonthDetails] = useState(false);
+  // Phones: once the month grids are built (opened, or shown for a planning problem) they
+  // stay built, so a calendar someone is working in never disappears under them.
+  const [gridsMounted, setGridsMounted] = useState(false);
   const resultRef = useRef<HTMLElement>(null);
   const workspace = usePersonalWorkspace();
   const ledger = workspace.ledger;
@@ -205,6 +208,11 @@ export function App() {
   // follow the break cards. Unknown width (the prerender, tests) uses the narrow order, which
   // CSS grid still places in the left column on a wide screen until the script runs.
   const wide = useMinWidth(1024);
+  // Phones (known narrower than 768px) build the month grids only once someone opens them:
+  // they are hidden there until then, and they are most of the page's DOM. Unknown width
+  // (the prerender) keeps them, so the static page is right at every width.
+  const phone = useMinWidth(768) === false;
+  if (phone && !gridsMounted && (monthDetails || state.solverIssue)) setGridsMounted(true);
   const railHoldsShape = wide === true;
 
   // One primary action under the plan, chosen by state (see primaryAction.ts).
@@ -230,13 +238,29 @@ export function App() {
     : undefined;
   const justKept = state.pinMessage === PLAN_SAVED_MESSAGE && planKept;
 
-  // Plan styles side by side, next to the goal picker (worked out just after the plan).
+  // Plan styles side by side, next to the goal picker. A few full solves on the main thread,
+  // so they are worked out only once the goal picker nears the screen (on a phone it sits well
+  // below the first screen), never while the page starts up. Without IntersectionObserver: at once.
+  const [compareNear, setCompareNear] = useState(() => typeof IntersectionObserver === 'undefined');
+  // Observed only once the plan is on screen: before that the page is short and the goal
+  // picker would count as near the screen on every phone.
+  const planShown = plannable && state.holidaysReady && !state.planningPending;
+  useEffect(() => {
+    if (compareNear || !planShown) return;
+    const target = document.getElementById('plan-shape');
+    if (!target) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) { observer.disconnect(); setCompareNear(true); }
+    }, { rootMargin: '600px 0px' });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [compareNear, planShown, railHoldsShape]);
   const styleComparison = usePlanStyleComparison(
     state.solveInput,
     state.minimumBreakDays,
     planStyleOptionsFor({ noticePeriodDays: state.noticePeriodDays, noticeUnit: state.noticeUnit, reserveDays: state.reserveDays, season: state.season }),
     state.reserveDays,
-    plannable && state.holidaysReady && !zeroBudget && !state.unlimitedPto,
+    compareNear && plannable && state.holidaysReady && !zeroBudget && !state.unlimitedPto,
   );
   const styleCompare = (layout: 'narrow' | 'wide') => styleComparison && (
     <PlanStyleCompare entries={styleComparison} style={state.planningStyle} onChangeStyle={state.setPlanningStyle} layout={layout} />
@@ -870,7 +894,7 @@ export function App() {
                   <span className="[@media(hover:hover)]:hidden">Tap a day to change its setting.</span>
                 </p>
                 <HoldHeightWhile holding={state.planningPending} className="mt-4 rounded-[10px] border border-line bg-surface p-3 sm:p-5 max-[400px]:-mx-4 max-[400px]:rounded-none max-[400px]:border-x-0 max-[400px]:px-1">
-                  {!state.validationIssues.length && !state.planningPending ? <CalendarErrorBoundary>
+                  {!state.validationIssues.length && !state.planningPending ? (phone && !gridsMounted ? null : <CalendarErrorBoundary>
                     <Calendar
                       rangeStart={state.rangeStart}
                       rangeEnd={state.rangeEnd}
@@ -899,7 +923,7 @@ export function App() {
                       narrowShowAll={allMonthsShown}
                       onNarrowShowAllChange={setAllMonthsShown}
                     />
-                  </CalendarErrorBoundary> : <p className="text-sm text-muted">{state.planningPending ? 'Updating the calendar…' : 'Check your dates and PTO balance to see the calendar.'}</p>}
+                  </CalendarErrorBoundary>) : <p className="text-sm text-muted">{state.planningPending ? 'Updating the calendar…' : 'Check your dates and PTO balance to see the calendar.'}</p>}
                   {!state.validationIssues.length && !state.planningPending && (
                     <div className="mt-5 border-t border-line pt-4">
                       <Legend showCompany={state.holidayEntries.some((h) => h.checked && h.source === 'custom')} showBlackout={state.hasBlackouts} showPinned={Object.values(state.forced).includes('include')} showAlternatives={state.showAlternatives} />

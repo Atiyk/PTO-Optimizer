@@ -178,7 +178,10 @@ function choiceIdFor(entry: HolidayEntry): { id: string; kind: HolidayChoiceKind
   return { id: `custom:${entryKey(entry)}`, kind: 'custom' };
 }
 
-const SHORT_DATE = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+// Built on first use: an Intl formatter costs real time to construct, and this module loads
+// with every page's first script.
+let shortDate: Intl.DateTimeFormat | undefined;
+const SHORT_DATE = () => (shortDate ??= new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }));
 
 /** Chips for these entries; with `range`, the employer extras not yet given are offered too. */
 export function holidayChoices(entries: readonly HolidayEntry[], country: string, range?: { start: string; end: string }): HolidayChoice[] {
@@ -210,7 +213,7 @@ export function holidayChoices(entries: readonly HolidayEntry[], country: string
     const on = group.filter((entry) => entry.checked).length;
     const first = group[0];
     const label = kind === 'custom'
-      ? `${first.name} · ${SHORT_DATE.format(new Date(`${first.date}T00:00:00Z`))}`
+      ? `${first.name} · ${SHORT_DATE().format(new Date(`${first.date}T00:00:00Z`))}`
       : kind === 'extra' ? first.name : holidayChipLabel(entrySourceName(first), country);
     return {
       id, kind, label,

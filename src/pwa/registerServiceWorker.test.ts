@@ -31,14 +31,19 @@ describe('service worker registration (P3 PWA)', () => {
     Reflect.deleteProperty(navigator, 'serviceWorker');
   });
 
-  it('waits for the page load event before registering in production', () => {
+  it('waits for the page load event, then idle time, before registering in production', () => {
     const register = vi.fn(() => new Promise(() => {}));
     Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { register, ready: new Promise(() => {}) } });
     const readyState = vi.spyOn(document, 'readyState', 'get').mockReturnValue('loading');
+    vi.useFakeTimers();
     expect(registerServiceWorker(PROD)).toBe(true);
     expect(register).not.toHaveBeenCalled();
     window.dispatchEvent(new Event('load'));
+    // Then it waits for the page to go idle (a timer where requestIdleCallback is missing).
+    expect(register).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000);
     expect(register).toHaveBeenCalledWith('/sw.js', { scope: '/', updateViaCache: 'none' });
+    vi.useRealTimers();
     readyState.mockRestore();
     Reflect.deleteProperty(navigator, 'serviceWorker');
   });

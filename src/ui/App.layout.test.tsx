@@ -144,6 +144,9 @@ describe('phone calendar keeps the months the person changed (F11)', () => {
     setViewport(375);
     window.history.replaceState(null, '', `${scenario}&bo=2027-03-10`);
     await renderReady();
+    // Phones build the month grids only once they are opened.
+    expect(document.getElementById('day-2027-03-10')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show month details' }));
     await waitFor(() => expect(document.getElementById('day-2027-03-10')).toBeTruthy());
     expect(document.getElementById('day-2027-03-10')!.closest('[data-collapsed-month="true"]')).toBeNull();
     expect(screen.getByRole('button', { name: /Show all \d+ months/ })).toBeTruthy();
