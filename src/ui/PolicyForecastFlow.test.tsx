@@ -65,6 +65,10 @@ describe('quick policy forecast in the real consumer page', () => {
     fireEvent.change(quickInputs().getByLabelText('Days earned each pay period'), { target: { value: '2' } });
     expectForecast('24 days');
     expect(quickInputs().queryByRole('button', { name: /generate|calculate/i })).toBeNull();
+    // The summary at the top of the page answers from the same forecast, live.
+    const glance = screen.getByRole('region', { name: 'Your PTO at a glance' });
+    expect(glance.textContent).toMatch(/You'll have 24 days on /);
+    expect(within(glance).getByRole('link', { name: 'See how it adds up' }).getAttribute('href')).toBe('#balance');
   });
 
   it('opens legacy fd/car inputs, scrubs private URL values and restores the same-tab draft', () => {

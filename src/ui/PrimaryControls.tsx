@@ -157,8 +157,12 @@ export function PrimaryControls({
 
 /** Reserve days and unlimited PTO: balance settings that live with the other advanced
  * options in More options (PrimaryControls still renders them inline when `advanced`). */
-export function ReserveControls({ budget, reserveDays, onChangeReserveDays, unlimitedPto, onToggleUnlimitedPto }: {
+export function ReserveControls({ budget, reserveDays, onChangeReserveDays, unlimitedPto, onToggleUnlimitedPto, autoKept = 0, autoKeptBy }: {
   budget: number;
+  /** PTO a year-round style holds back on its own (planMeta.reserveKept), so this field
+   * never reads 0 while days are in fact being kept. */
+  autoKept?: number;
+  autoKeptBy?: string;
   reserveDays: number;
   onChangeReserveDays: (v: number) => void;
   unlimitedPto: boolean;
@@ -180,6 +184,11 @@ export function ReserveControls({ budget, reserveDays, onChangeReserveDays, unli
           className={`${DATE_FIELD_CLASS} w-24`}
         />
       </label>
+      {autoKept > 0 && (
+        <span data-testid="auto-kept-reserve" className="text-sm text-muted">
+          Plus {autoKept} kept automatically{autoKeptBy ? ` by ${autoKeptBy}` : ''}.
+        </span>
+      )}
       {/* Phase 3.2: unlimited-PTO workers still self-cap, so this seeds a concrete starting
           number; the budget field stays fully editable either way. */}
       <label htmlFor="unlimited-pto" className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-sm text-ink">

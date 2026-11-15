@@ -41,6 +41,7 @@ describe('/pto with 0 PTO days (F05)', () => {
     expect(within(summary).queryByText(/0 days off/)).toBeNull();
     expect(within(summary).queryByText('Days off per PTO day')).toBeNull();
     expect(within(summary).queryByRole('button', { name: 'Save this plan' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Keep this plan' })).toBeNull();
     expect(document.body.textContent).not.toMatch(/once the plan is solved/);
   });
 });
@@ -54,7 +55,8 @@ describe('/pto with the PTO field blank (F06)', () => {
     fireEvent.change(screen.getByLabelText('PTO days available'), { target: { value: '' } });
     expect(within(summary).getByText('Example for 15 PTO days. Enter yours to see your plan.')).toBeTruthy();
     // R2: an example plan is not the user's own, so it can't be saved.
-    for (const save of screen.queryAllByRole<HTMLButtonElement>('button', { name: 'Save this plan' })) expect(save.disabled).toBe(true);
+    const keep = screen.getAllByRole<HTMLButtonElement>('button', { name: 'Keep this plan' });
+    for (const save of keep) expect(save.disabled).toBe(true);
     fireEvent.change(screen.getByLabelText('PTO days available'), { target: { value: '12' } });
     expect(within(summary).queryByText(/Example for/)).toBeNull();
   });
