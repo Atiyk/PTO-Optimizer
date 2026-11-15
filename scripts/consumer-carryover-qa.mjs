@@ -23,7 +23,9 @@ try {
     });
     const r = { width, errors, status: 'failed' };
     try {
-      await page.goto(new URL('/policy/', base).href, { waitUntil: 'networkidle', timeout: 30000 });
+      // The guard renders once a balance can be projected (gated since P2), so open the
+      // same synthetic policy the after-checks use rather than an empty /policy.
+      await page.goto(new URL('/policy/?c=US&cb=12&bao=2027-01-01&ak=fl&am=0&gd=2027-01-01&cm=a&ace=0', base).href, { waitUntil: 'networkidle', timeout: 30000 });
       await page.getByRole('heading', { name: 'PTO expiration guard' }).waitFor();
       if (mode === 'before') {
         await page.screenshot({ path: resolve(output, 'carryover-before-' + width + '.png'), fullPage: true });
