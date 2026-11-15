@@ -1,8 +1,7 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { COUNTRIES } from '@daysoff/engine/data/countries';
-import { addDays, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
-import type { Break } from '@daysoff/engine/solver/types';
-import { formatCardDateRange, formatLong, formatShort, monthShortName } from '@daysoff/engine/calendar/dateFormat';
+import { addDays } from '@daysoff/engine/solver/dateUtils';
+import { formatCardDateRange, formatLong, formatShort } from '@daysoff/engine/calendar/dateFormat';
 import { SiteHeader } from './SiteHeader';
 import { Footer } from './Footer';
 import { Container } from './Container';
@@ -10,7 +9,6 @@ import { Button } from './Button';
 import { YearStrip } from './YearStrip';
 import { geolocateCountry } from './geo';
 import { todayISO } from './today';
-import { breakReason } from './breakReason';
 import { bridgeLinkPhrase, bridgeSentence, findBridges, holidayDisplayName, holidayLongWeekends, holidayRunPhrase, nextHoliday, remainingHolidays } from './landingData';
 import { downloadHolidaysICS } from './icsExport';
 import { track } from './analytics';
@@ -18,17 +16,14 @@ import { computeLandingPlan, landingHolidayHref, landingPlanHref, landingSearch,
 import { employerCalendarCustomized } from '../personal/employerCalendar';
 import { useEmployerHolidayProfile } from './useEmployerHolidayProfile';
 import { landingObservedHolidays, useLandingHolidays } from './landingCalendar';
-import { weekStartForCountry } from './locale';
-import { HOLIDAY_DOT } from './colorScheme';
 import { useWholeDayDraft } from './useWholeDayDraft';
 import { daysOffSplit } from './Headline';
-import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import { SHARE_LINK_SENTENCE } from './shareLinkCopy';
 import { usePinnedPlans } from './pinnedPlanStore';
 import { REQUEST_STORAGE_KEY } from '../personal/requestLedger';
 import { HomeHolidayQuestion } from './CompanyHolidayChips';
-import { BreakRibbon, BreakRibbonKey } from './BreakRibbon';
 import { YearLine } from './YearLine';
+import { Chevron } from './Chevron';
 
 // The returning-visitor dashboard (and the request, backup and wallet code behind it) loads
 // only when this browser has a saved plan or request; a first visit never downloads it.
@@ -50,96 +45,24 @@ function breakDates(brk: { start: string; end: string }): string {
   return brk.start.slice(0, 4) === brk.end.slice(0, 4) ? `${range}, ${brk.end.slice(0, 4)}` : range;
 }
 
-const SUNDAY_FIRST_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-const MONTH_SLOTS = 37; // a month spans at most 37 weekday-aligned columns (6 offset + 31 days)
-
-function nextMonthFirst(month: string): string {
-  const [y, m] = month.split('-').map(Number);
-  return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
-}
-
-function monthsBetween(start: string, end: string): string[] {
-  const months: string[] = [];
-  let [y, m] = start.split('-').map(Number);
-  const last = end.slice(0, 7);
-  for (;;) {
-    const key = `${y}-${String(m).padStart(2, '0')}`;
-    months.push(key);
-    if (key >= last) return months;
-    m += 1;
-    if (m === 13) { m = 1; y += 1; }
-  }
-}
-
 /**
- * The whole plan as a printed year schedule: one row per month, days aligned under the same
- * weekday columns (week start as on /pto: Sunday for US/CA/JP, Monday elsewhere), every
- * break of the plan drawn as a soft blue run with a Signal Blue rule and each PTO day a solid blue block; holidays sit on soft teal. The holiday dot is
- * the planner's own. The grid is a picture (aria-hidden); the visible list names
- * every break in words, so nothing depends on colour or on seeing the grid.
+ * The plan's one assumption that most often differs from real life, stated beside the
+ * answer: which holidays the person actually gets off. One tap opens the company-holiday
+ * chips in place; each chip re-plans at once and saves in this browser for the planner too.
  */
-function PlanYear({ breaks, best, rangeStart, rangeEnd, holidayName, weekStart }: {
-  breaks: Break[]; best: Break; rangeStart: string; rangeEnd: string;
-  holidayName: ReadonlyMap<string, string>; weekStart: WeekStart;
+function HolidayCheck({ id, summary, open, onToggle, className = '', children }: {
+  id: string; summary: string; open: boolean; onToggle: () => void; className?: string; children: ReactNode;
 }) {
-  const offDays = new Set<string>();
-  const ptoDays = new Set<string>();
-  for (const brk of breaks) {
-    for (const date of brk.days) {
-      offDays.add(date);
-      if (!holidayName.has(date) && mondayIndexedDow(date) < 5) ptoDays.add(date);
-    }
-  }
-  const months = monthsBetween(rangeStart, rangeEnd);
-  const half = months.length > 6 ? Math.ceil(months.length / 2) : months.length;
-  const columns = [months.slice(0, half), months.slice(half)].filter((group) => group.length > 0);
-  const chronological = breaks.slice().sort((a, b) => a.start.localeCompare(b.start));
-  const slotStyle = { gridTemplateColumns: `2.75rem repeat(${MONTH_SLOTS}, minmax(0, 1fr))` } as CSSProperties;
-
-  const block = (group: string[]) => <div key={group[0]} className="min-w-0">
-    <div aria-hidden="true" className="mb-1 hidden text-center text-xs text-muted sm:grid" style={slotStyle}>
-      <span />
-      {Array.from({ length: MONTH_SLOTS }, (_, i) => <span key={i}>{SUNDAY_FIRST_LETTERS[(weekStart + i) % 7]}</span>)}
+  return <div data-holiday-check className={`mt-4 rounded-[12px] bg-surface-alt px-3 sm:px-4 ${className}`}>
+    <div className="flex flex-wrap items-center justify-between gap-x-3 py-1">
+      <p className="min-w-0 py-1.5 text-[15px] text-ink">{summary}</p>
+      <button type="button" aria-expanded={open} aria-controls={id} onClick={onToggle}
+        className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink">
+        {open ? 'Done' : 'Check company holidays'} <Chevron direction={open ? 'up' : 'down'} />
+      </button>
     </div>
-    <div aria-hidden="true" className="grid gap-y-[3px]">
-      {group.map((month) => {
-        const first = `${month}-01`;
-        const offset = (mondayIndexedDow(first) + (weekStart === 0 ? 1 : 0)) % 7;
-        const days = rangeISO(first, addDays(nextMonthFirst(month), -1));
-        return <div key={month} className="grid items-center" style={slotStyle}>
-          <span className="text-xs font-semibold text-ink">{monthShortName(first)}{month.endsWith('-01') || month === months[0] ? ` ’${month.slice(2, 4)}` : ''}</span>
-          {days.map((date, index) => {
-            const inRange = date >= rangeStart && date <= rangeEnd;
-            const tone = !inRange ? 'bg-transparent' : ptoDays.has(date) ? 'bg-accent' : offDays.has(date) ? 'bg-mark shadow-[inset_0_-3px_0_var(--accent)]' : holidayName.has(date) ? 'bg-holiday-soft' : mondayIndexedDow(date) >= 5 ? 'bg-surface-alt' : 'bg-page';
-            return <span key={date} className={`relative h-5 lg:h-6 ${tone}`} style={index === 0 ? { gridColumnStart: offset + 2 } : undefined}>
-              {inRange && holidayName.has(date) && <span className={`absolute bottom-0.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${HOLIDAY_DOT}`} />}
-            </span>;
-          })}
-        </div>;
-      })}
-    </div>
+    <div id={id} hidden={!open} className="flex flex-col gap-2 pb-3 [&_[data-holiday-chips]]:mt-0 [&>div:first-child]:mt-0 [&>div:first-child]:border-t-0 [&>div:first-child]:pt-0">{open && children}</div>
   </div>;
-
-  const isPto = (date: string) => ptoDays.has(date);
-  const nameOf = (date: string) => holidayName.get(date);
-  return <figure className="min-w-0 rounded-[18px] border border-line bg-surface p-4 sm:p-6">
-    <figcaption className="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-      <span className="text-h2 font-bold type-condensed">Every break in this plan</span>
-      <span className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
-        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="size-3.5 rounded-[3px] bg-accent" />PTO day</span>
-        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-3.5 w-6 rounded-[3px] bg-mark shadow-[inset_0_-3px_0_var(--accent)]" />Day off in a recommended break</span>
-        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="size-3.5 bg-surface-alt" />Weekend</span>
-        <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="relative size-3.5 bg-holiday-soft"><span className={`absolute bottom-0.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${HOLIDAY_DOT}`} /></span>Public holiday</span>
-      </span>
-    </figcaption>
-    <ol aria-label="Breaks in this plan" className="mb-6 grid list-none gap-x-8 gap-y-5 p-0 text-base text-ink sm:grid-cols-2">
-      {chronological.map((brk) => <li key={brk.id} data-break-start={brk.start} data-break-end={brk.end} data-break-pto={brk.ptoCost} className="min-w-0">
-        <p className="mb-2"><span className="text-lg font-bold type-condensed">{breakDates(brk)}</span>: <span className="tabular-nums text-muted">{brk.totalDaysOff} days off for {plural(brk.ptoCost, 'PTO day')}{brk.id === best.id ? ' (longest)' : ''}</span></p>
-        <BreakRibbon days={brk.days} isPtoDay={isPto} holidayNameFor={nameOf} size="sm" />
-      </li>)}
-    </ol>
-    <div className="grid gap-x-12 gap-y-4 lg:grid-cols-2">{columns.map(block)}</div>
-  </figure>;
 }
 
 /** The holidays list starts with this many rows; the rest sit behind one disclosure. */
@@ -149,7 +72,7 @@ const HOLIDAYS_SHOWN = 3;
 function ToolGroup({ title, rows }: { title: string; rows: { href: string; title: string; body: string }[] }) {
   return <div className="min-w-0">
     <h3 className="mb-3 text-sm font-semibold text-muted">{title}</h3>
-    <ul className="divide-y divide-line overflow-hidden rounded-[10px] border border-line bg-surface">
+    <ul className="divide-y divide-line overflow-hidden rounded-[14px] border border-line bg-surface">
       {rows.map((row) => <li key={row.title}>
         <a href={row.href} className="group flex min-h-14 items-center gap-4 px-4 py-3 transition-colors duration-150 hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:px-5">
           <span className="min-w-0 flex-1">
@@ -215,7 +138,6 @@ export function Landing() {
     .map((holiday) => ({ ...holiday, name: holiday.name.split(' / ').map((name) => holidayDisplayName(name, country)).join(' / ') })),
   [calendar.holidays, employer, rangeStart, rangeEnd, country]);
   const holidaySet = useMemo(() => new Set(holidays.map((holiday) => holiday.date)), [holidays]);
-  const holidayName = useMemo(() => new Map(holidays.map((holiday) => [holiday.date, holiday.name])), [holidays]);
   const plan = useMemo(() => validRange && !loading ? computeLandingPlan(state, holidays) : null, [state, validRange, loading, holidays]);
   const bestBreak = useMemo(() => plan?.result.primary.slice().sort((a, b) => b.totalDaysOff - a.totalDaysOff || b.multiplier - a.multiplier || a.start.localeCompare(b.start))[0], [plan]);
   const used = plan?.result.primary.reduce((total, brk) => total + brk.ptoCost, 0) ?? 0;
@@ -236,6 +158,8 @@ export function Landing() {
   // With 0 PTO days there is nothing to place, but the holidays still make long weekends.
   const longWeekends = useMemo(() => holidayLongWeekends(upcoming), [upcoming]);
   const zeroBudget = budget === 0 && validRange && !loading;
+  const orderedPlan = useMemo(() => plan?.result.primary.slice().sort((a, b) => a.start.localeCompare(b.start)) ?? [], [plan]);
+  const [holidayCheckOpen, setHolidayCheckOpen] = useState(false);
   const emptyMessage = !validRange ? 'Your preview will appear once the planning dates are valid.'
     : loading ? 'Updating your holiday calendar…'
       : plan?.issue ?? 'No break of 3 days or more fits these dates and PTO days. Try a longer date range or more PTO days.';
@@ -250,7 +174,7 @@ export function Landing() {
           <Suspense fallback={null}><ReturningDashboard pinnedPlans={pinnedPlans} today={today} offDays={holidayDates} /></Suspense>
         )}
         <section aria-labelledby="landing-heading">
-          <h1 id="landing-heading" className="scroll-mt-16 max-w-[17ch] text-[clamp(2rem,0.95rem+5vw,4.75rem)] leading-[1.04] type-display text-ink">More days off from the same PTO.</h1>
+          <h1 id="landing-heading" className="scroll-mt-16 max-w-[17ch] text-[clamp(2rem,0.95rem+5vw,4.75rem)] leading-[1.04] type-display text-ink">Time off that fits your year.</h1>
 
           <div className="mt-4 grid min-w-0 gap-x-14 gap-y-4 sm:mt-10 sm:gap-y-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:grid-rows-[auto_1fr]">
             <div className="min-w-0 lg:col-start-1 lg:row-start-1">
@@ -290,20 +214,36 @@ export function Landing() {
                 <p className="mt-2 text-base text-muted" role="status">{emptyMessage}</p>
               </>}
               </div>
-              {!budgetBlank && bestBreak && plan && <YearLine className="mt-5 max-sm:hidden" rangeStart={rangeStart} rangeEnd={rangeEnd}
-                breaks={plan.result.primary.slice().sort((a, b) => a.start.localeCompare(b.start))} holidayDates={holidayDates} />}
-              {!budgetBlank && bestBreak && <p className="order-2 mt-3 text-base text-muted sm:order-none sm:mt-4">Longest: <strong className="font-semibold text-ink"><span className="tabular-nums">{breakDates(bestBreak)}</span>, {bestBreak.totalDaysOff} days off for {plural(bestBreak.ptoCost, 'PTO day')}</strong>. {breakReason(bestBreak, (date) => holidayName.get(date))}</p>}
-              {!budgetBlank && bestBreak && <div className="order-2 mt-3 sm:order-none">
-                <BreakRibbon days={bestBreak.days} isPtoDay={(date) => !holidayName.has(date) && mondayIndexedDow(date) < 5} holidayNameFor={(date) => holidayName.get(date)} size="sm" />
-                <BreakRibbonKey className="mt-2" />
-              </div>}
-              {/* F21: on phones the action sits right under the answer, so it clears the tab bar
-                  on a 320x568 screen; the welcome row and the longest-break detail follow it. */}
-              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 sm:mt-5">
+              {!budgetBlank && bestBreak && plan && <>
+                <ol aria-label="Breaks in this plan" data-landing-breaks className="order-3 m-0 mt-4 list-none divide-y divide-line border-y border-line p-0">
+                  {orderedPlan.map((brk) => <li key={brk.id} data-break-start={brk.start} data-break-end={brk.end} data-break-pto={brk.ptoCost}
+                    className="flex min-h-11 flex-wrap items-baseline justify-between gap-x-4 py-2 tabular-nums">
+                    <span className="font-semibold text-ink">{breakDates(brk)}</span>
+                    <span className="text-[15px] text-muted"><span className="font-semibold text-ink">{brk.totalDaysOff} days off</span> · {plural(brk.ptoCost, 'PTO day')}</span>
+                  </li>)}
+                </ol>
+                <YearLine className="order-3 mt-4" rangeStart={rangeStart} rangeEnd={rangeEnd} breaks={orderedPlan} holidayDates={holidayDates} />
+              </>}
+              {validRange && !loading && !budgetBlank && <HolidayCheck
+                id="landing-holiday-check"
+                summary={customizedHolidays
+                  ? `Uses your company’s holidays: ${plural(holidays.length, 'day')} off in these dates${employer.custom.length > 0 ? ', including company days' : ''}.`
+                  : `Assumes you get all ${plural(holidays.length, countryName === 'United States' ? 'US public holiday' : 'public holiday')} off in these dates.`}
+                open={holidayCheckOpen}
+                onToggle={() => setHolidayCheckOpen((value) => !value)}
+                className="order-2"
+              >
+                <HomeHolidayQuestion profile={holidayProfile} publicHolidays={calendar.holidays} rangeStart={rangeStart} rangeEnd={rangeEnd} />
+                <a href={`${href}#planning-assumptions`} className={`${LINK} text-sm`}>Change your workweek in the planner →</a>
+              </HolidayCheck>}
+              {/* F21: the action sits right under the answer at every width, so it clears the tab
+                  bar on a 320x568 phone and the fold at 1440x900; the holiday check and the dates
+                  follow it. */}
+              <div className="order-1 mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 sm:mt-5">
                 <Button href={href}>{budgetBlank ? 'Open the planner →' : 'See the full plan →'}</Button>
                 <span className="text-sm text-muted">{budgetBlank ? 'It starts at 15 PTO days. Change them there.' : 'Free, no account needed.'}</span>
               </div>
-              <p className="order-3 mt-4 text-[15px] text-muted sm:order-none">
+              <p className="order-4 mt-4 text-[15px] text-muted">
                 Planning around <a className="link-mark font-semibold" href={`/family?c=${encodeURIComponent(country)}`}>school breaks</a> or <a className="link-mark font-semibold" href={`/sabbatical?c=${encodeURIComponent(country)}`}>a sabbatical</a>?
               </p>
             </section>
@@ -329,14 +269,9 @@ export function Landing() {
             </div>
           </div>
 
-          <div className="mt-8 sm:mt-10">
-            {bestBreak && plan && !budgetBlank && <PlanYear breaks={plan.result.primary} best={bestBreak} rangeStart={rangeStart} rangeEnd={rangeEnd} holidayName={holidayName} weekStart={weekStartForCountry(country)} />}
-            <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-8 gap-y-1">
-              <p className="max-w-3xl text-sm text-muted">Preview assumes a Monday–Friday workweek. {customizedHolidays ? 'Your saved employer holiday calendar is applied' : 'National public holidays are assumed to be observed by your employer'}{employer.custom.length > 0 ? ', including additional company days off' : ''}. Days off include weekends, holidays and PTO days.</p>
-              <a href={`${href}#planning-assumptions`} className={`${LINK} text-sm`}>Customize workweek and employer holidays →</a>
-            </div>
+          <div className="mt-6 sm:mt-8">
+            <p className="max-w-3xl text-sm text-muted">Preview assumes a Monday–Friday workweek. Days off include weekends, holidays and PTO days.</p>
             {calendar.degraded && <p className="mt-2 text-sm font-semibold text-ink" role="status">Some holiday data is unavailable. This preview may miss public holidays.</p>}
-            {validRange && !loading && <HomeHolidayQuestion profile={holidayProfile} publicHolidays={calendar.holidays} rangeStart={rangeStart} rangeEnd={rangeEnd} />}
           </div>
         </section>
       </Container>
@@ -375,7 +310,7 @@ export function Landing() {
             {holidays.length > 0 && <Button variant="secondary" onClick={() => downloadHolidaysICS(holidays)}>Download holidays (.ics)</Button>}
           </div>
 
-          {validRange && holidays.length > 0 && <div className="mt-6 min-w-0 rounded-[10px] bg-surface p-4 sm:p-5">
+          {validRange && holidays.length > 0 && <div className="mt-6 min-w-0 rounded-[14px] border border-line bg-surface p-4 sm:p-5">
             <YearStrip today={rangeStart} stripEnd={rangeEnd} holidays={holidays} bridgeableHolidayDates={bridgeableDates} />
             <p className="mt-2 text-sm text-muted">Tall marked ticks are holidays that already make a long weekend or sit one PTO day from one. Shaded stretches run eight days or more without a holiday.</p>
           </div>}

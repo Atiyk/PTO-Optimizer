@@ -67,7 +67,7 @@ describe('live homepage planner', () => {
     const event = vi.fn();
     window.plausible = event;
     await act(async () => { render(<Landing />); });
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('More days off from the same PTO.');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Time off that fits your year.');
     expect(screen.getByRole('spinbutton', { name: 'PTO days available' }).getAttribute('value')).toBe('15');
     expect(screen.getByText(/^13 PTO days \+ \d+ weekend and holiday days, across/)).toBeTruthy();
     await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '5' } }); });
@@ -103,20 +103,39 @@ describe('live homepage planner', () => {
     expect(screen.getByRole('heading', { name: 'Plan the breaks, then keep track of the days.' })).toBeTruthy();
   });
 
-  it('draws every break of the plan on a weekday-aligned year schedule and names each one in words', async () => {
+  it('lists every break of the plan once, in date order, with its days off and PTO cost', async () => {
     await act(async () => { render(<Landing />); });
     const breaks = screen.getByRole('list', { name: 'Breaks in this plan' });
-    expect(breaks.querySelectorAll('li').length).toBe(Number(/across (\d+) break/.exec(document.body.textContent ?? '')![1]));
-    expect(breaks.textContent).toContain('(longest)');
-    expect(screen.getByText('Day off in a recommended break')).toBeTruthy();
+    const rows = [...breaks.querySelectorAll('li')];
+    expect(rows.length).toBe(Number(/across (\d+) break/.exec(document.body.textContent ?? '')![1]));
+    const starts = rows.map((row) => row.getAttribute('data-break-start')!);
+    expect(starts).toEqual([...starts].sort());
+    for (const row of rows) expect(row.textContent).toMatch(/\d+ days off · \d+ PTO days?$/);
+    // The PTO in the rows adds up to the headline's PTO figure.
+    const used = Number(/^(\d+) PTO days? \+/.exec(screen.getByText(/^\d+ PTO days? \+/).textContent!)![1]);
+    expect(rows.reduce((sum, row) => sum + Number(row.getAttribute('data-break-pto')), 0)).toBe(used);
+    // One view of the year, not three: no month grid, no second list of ribbons.
+    expect(screen.queryByRole('figure')).toBeNull();
+    expect(screen.queryByText('Every break in this plan')).toBeNull();
   });
 
-  it('starts the schedule week on the same day as the planner for the chosen country', async () => {
+  it('states the holiday assumption beside the answer and re-plans at once when a holiday is not given', async () => {
     await act(async () => { render(<Landing />); });
-    const header = () => screen.getByRole('figure').querySelector('[aria-hidden="true"].sm\\:grid')!.textContent;
-    expect(header()).toMatch(/^SMTWTFS/);
-    await act(async () => { fireEvent.change(screen.getByLabelText('Country'), { target: { value: 'GB' } }); });
-    expect(header()).toMatch(/^MTWTFSS/);
+    const card = document.querySelector('[data-plan-result]')!;
+    const check = card.querySelector('[data-holiday-check]')!;
+    expect(check.textContent).toMatch(/^Assumes you get all \d+ US public holidays off in these dates\./);
+    const toggle = within(check as HTMLElement).getByRole('button', { name: /Check company holidays/ });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    await act(async () => { fireEvent.click(toggle); });
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const before = card.querySelector('#landing-result')!.textContent;
+    const pressed = within(check as HTMLElement).getAllByRole('button', { pressed: true });
+    expect(pressed.length).toBeGreaterThan(0);
+    // Not getting the holidays inside the plan's breaks changes the plan on the spot.
+    for (const chip of pressed) await act(async () => { fireEvent.click(chip); });
+    expect(card.querySelector('#landing-result')!.textContent).not.toBe(before);
+    expect(check.textContent).toMatch(/^Uses your company’s holidays: \d+ days? off in these dates\./);
+    expect(screen.getAllByRole('link', { name: 'See the full plan →' })).toHaveLength(1);
   });
 
   it('uses one label for the primary planner action everywhere on the page', async () => {
@@ -209,7 +228,7 @@ describe('live homepage planner', () => {
     await act(async () => { render(<Landing />); });
     expect(screen.queryByText('Christmas Day')).toBeNull();
     expect(screen.getAllByText('Company day off').length).toBeGreaterThan(0);
-    expect(screen.getByText(/Your saved employer holiday calendar is applied/)).toBeTruthy();
+    expect(document.querySelector('[data-holiday-check]')!.textContent).toMatch(/^Uses your company’s holidays: \d+ days off in these dates, including company days\./);
     const link = screen.getAllByRole('link', { name: 'See the full plan →' })[0] as HTMLAnchorElement;
     expect(new URL(link.href).searchParams.has('eh')).toBe(false);
     expect(write).not.toHaveBeenCalled();
@@ -266,12 +285,6 @@ describe('live homepage planner', () => {
     expect(screen.queryByText(/A starting guess/)).toBeNull();
   });
 
-  it('states only new information after the longest break, never the trade twice (F12)', async () => {
-    await act(async () => { render(<Landing />); });
-    const longest = screen.getByText(/^Longest:/);
-    expect(longest.textContent).not.toMatch(/—/);
-    expect((longest.textContent!.match(/PTO days? for|days off for/g) ?? []).length).toBe(1);
-  });
 });
 
 describe('share-link claim (N2/F10)', () => {
@@ -322,7 +335,7 @@ describe('returning visitors (research rec 10)', () => {
     // 14 calendar days before Monday Dec 21 is Monday Dec 7. N-P1-2: the tracker's wording.
     expect(row.textContent).toContain('Submit by Dec 7 · 14-day notice');
     // P3: one next step, plus where the break lives and a way back to the planner.
-    expect(within(row).getAllByRole('button').map((button) => button.textContent)).toEqual(['Copy request text']);
+    expect(within(row).getAllByRole('button').map((button) => button.textContent)).toEqual(['Copy request']);
     expect([...row.querySelectorAll('a')].map((link) => link.getAttribute('href'))).toEqual(['/policy#requests', '#landing-heading']);
     // P3: it leads the homepage, before the regular planner heading, which stays on the page.
     const heading = screen.getByRole('heading', { level: 1 });
@@ -439,8 +452,10 @@ describe('welcome row notice period (N-P1-2)', () => {
     // The dashboard sits above the homepage, not inside the answer; the answer keeps its order.
     expect(document.querySelector('[data-plan-result]')!.contains(row)).toBe(false);
     expect(screen.getByRole('link', { name: 'See the full plan →' })).toBeTruthy();
-    const longest = screen.getByText(/^Longest:/);
-    expect(longest.className).toMatch(/(^| )order-2( |$)/);
+    // The action comes straight after the answer, before the holiday check and dates.
+    expect(screen.getByRole('link', { name: 'See the full plan →' }).parentElement!.className).toMatch(/(^| )order-1( |$)/);
+    expect(document.querySelector('[data-holiday-check]')!.className).toMatch(/(^| )order-2( |$)/);
+    expect(document.querySelector('[data-landing-breaks]')!.className).toMatch(/(^| )order-3( |$)/);
   });
 });
 

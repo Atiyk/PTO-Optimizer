@@ -29,7 +29,7 @@ import { todayISO } from './today';
 import { PLANNER_REVISION } from '@daysoff/engine/solver/revision';
 import { publicHolidayFingerprint, type ShareSnapshot } from './shareSnapshot';
 import type { PtoRequest } from '../personal/requestLedger';
-import { committedPlanEntries, planningCommitments, type WorkdaySchedule } from '../personal/workspace';
+import { committedPlanEntries, planningCommitments, planningRole, type WorkdaySchedule } from '../personal/workspace';
 import { usePlannerComputation } from '../planning/usePlannerComputation';
 import { createPinPreviewer } from '../planning/pinPreviewClient';
 import { MAX_PINNED_PLANS, PINNED_PLANS_STORAGE_KEY, usePinnedPlans } from './pinnedPlanStore';
@@ -703,15 +703,26 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
 
   const effectiveOffDays = useMemo(() => effectiveOffDaysFor(holidayEntries, altFridayOffDates), [holidayEntries, altFridayOffDates]);
 
+  // Only requests that hold days (planned, requested, approved, taken) shape the plan. Saving a
+  // break as an idea, or editing a note, must not re-plan: re-planning remounted every break
+  // card, which reset the phone strip to the first card and dropped focus after "Save break".
+  const committingKey = JSON.stringify(requests
+    .filter((request) => { const role = planningRole(request.status); return role === 'booked' || role === 'tentative'; })
+    .map((request) => [request.id, request.status, request.start, request.end, request.ptoDays, request.ptoDates, request.ptoMinutes ?? null, request.partialMinutes ?? null]));
+  const committing = useRef({ key: '', requests: NO_REQUESTS as readonly PtoRequest[] });
+  if (committing.current.key !== committingKey) {
+    committing.current = { key: committingKey, requests: requests.filter((request) => { const role = planningRole(request.status); return role === 'booked' || role === 'tentative'; }) };
+  }
+  const committingRequests = committing.current.requests;
   const commitments = useMemo(
-    () => planningCommitments(requests, { start: rangeStart, end: rangeEnd }, { asOf: balanceAsOf, includesApprovedLeave: !reserveApprovedPto }, workspaceBasis.schedule),
-    [requests, rangeStart, rangeEnd, balanceAsOf, reserveApprovedPto, workspaceBasis.schedule],
+    () => planningCommitments(committingRequests, { start: rangeStart, end: rangeEnd }, { asOf: balanceAsOf, includesApprovedLeave: !reserveApprovedPto }, workspaceBasis.schedule),
+    [committingRequests, rangeStart, rangeEnd, balanceAsOf, reserveApprovedPto, workspaceBasis.schedule],
   );
   const bookedDates = useMemo(() => new Set(applyTrackedRequests ? commitments.unavailableDates : []), [applyTrackedRequests, commitments]);
   // Tracked and approved requests stay visible in the results beside new breaks.
   const committedEntries = useMemo(
-    () => applyTrackedRequests ? committedPlanEntries(requests, { start: rangeStart, end: rangeEnd }) : [],
-    [applyTrackedRequests, requests, rangeStart, rangeEnd],
+    () => applyTrackedRequests ? committedPlanEntries(committingRequests, { start: rangeStart, end: rangeEnd }) : [],
+    [applyTrackedRequests, committingRequests, rangeStart, rangeEnd],
   );
   const mustIncludeDays = useMemo(
     () => mustIncludeDaysFor(forced).filter(date => !bookedDates.has(date)),

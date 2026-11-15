@@ -1,4 +1,3 @@
-import { useEffect, useState, type RefObject } from 'react';
 import type { Scores } from '@daysoff/engine/solver/types';
 import { Button } from './Button';
 import { FigureChange } from './StatNumber';
@@ -124,33 +123,4 @@ export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, 
  * clipped "from 15 PTO · 3 breaks"). */
 export function compactBarDetail(budgetSpent: number, breakCountActual: number): string {
   return `${budgetSpent} PTO ${budgetSpent === 1 ? 'day' : 'days'} · ${breakCountActual} ${breakCountActual === 1 ? 'break' : 'breaks'}`;
-}
-
-/**
- * Phones only: once the result line has scrolled away, a slim bar pinned to the top keeps the
- * figure in view while the person works the sliders and the calendar below. It is a visual
- * echo of the h1 (aria-hidden, inert, no controls), so assistive tech is not told twice; the
- * bottom tab bar stays clear because this sits at the top.
- */
-export function CompactResultBar({ watch, totalDaysOff, budgetSpent, breakCountActual }: { watch: RefObject<HTMLElement | null>; totalDaysOff: number; budgetSpent: number; breakCountActual: number }) {
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const el = watch.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver(([entry]) => setVisible(!entry.isIntersecting && entry.boundingClientRect.top < 0));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [watch]);
-  return (
-    <div
-      aria-hidden="true"
-      inert
-      className={`fixed inset-x-0 top-0 z-30 border-b border-line bg-page/95 backdrop-blur transition-transform duration-150 ease-[var(--ease-out)] lg:hidden [@media(max-height:500px)]:hidden ${visible ? 'translate-y-0' : '-translate-y-full'}`}
-    >
-      <div className="mx-auto flex h-11 max-w-7xl items-center gap-3 px-4 text-sm tabular-nums text-ink sm:px-6">
-        <span className="text-lg font-extrabold type-display"><span className="mark">{totalDaysOff} {totalDaysOff === 1 ? 'day' : 'days'} off</span></span>
-        <span className="text-muted">{compactBarDetail(budgetSpent, breakCountActual)}</span>
-      </div>
-    </div>
-  );
 }

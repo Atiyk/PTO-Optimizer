@@ -5,7 +5,7 @@ import { addDays, rangeISO, mondayIndexedDow } from '@daysoff/engine/solver/date
 import { PartnerPlanner } from './PartnerPlanner';
 import { readPartnerAvailability } from '../planning/partner';
 import { usePersonalWorkspace } from './usePersonalWorkspace';
-import { settleLedgerAction } from '../integration/browserWalletStore';
+import { settleLedgerAction, type LedgerAction } from '../integration/browserWalletStore';
 import { track, trackBreakAction } from './analytics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SiteHeader } from './SiteHeader';
@@ -68,6 +68,7 @@ import { scrollBehavior } from './scrollBehavior';
 
 /** Links that open More options at a section: the work week, and the days someone can't take off. */
 const OPTION_ANCHORS = ['#planning-assumptions', '#unavailable-days'];
+const COMMITTED_WORD: Record<string, string> = { planned: 'planned', requested: 'requested', approved: 'approved', completed: 'taken' };
 
 const dayNumber = new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format;
 /** Day-equivalents keep a singular unit up to one: "0.5 day", "1 day", "1.5 days". */
@@ -123,6 +124,8 @@ export function App() {
   const requestToolsReady = plannable && state.holidaysReady && !state.holidaysDegraded;
   const requestCount = ledger.requests.length;
   const requestsByDates = useMemo(() => new Map(ledger.requests.map(request => [`${request.start}|${request.end}`, request])), [ledger.requests]);
+  const recordedDaysOff = state.committedEntries.reduce((sum, entry) => sum + rangeISO(entry.start, entry.end).length, 0);
+  const requestsById = useMemo(() => new Map(ledger.requests.map(request => [request.id, request])), [ledger.requests]);
   const partnerReceived = useMemo(() => readPartnerAvailability(typeof window === 'undefined' ? '' : readBrowserPlanSearch(window.location.search, window.history.state)), []);
   // Issue 10: a link's all-days-off work week was replaced with Monday to Friday at decode.
   // Say so until the person picks their own working days.
@@ -145,24 +148,43 @@ export function App() {
     return { id: `committed:${entry.id}`, start: entry.start, end: entry.end, days, totalDaysOff: days.length, ptoCost: entry.ptoDays, multiplier: entry.ptoDays ? days.length / entry.ptoDays : days.length, tags: [], meanDemand: 1 };
   }), [state.committedEntries]);
   const partnerBreaks = useMemo(() => [...committedBreaks, ...state.breaks], [committedBreaks, state.breaks]);
-  const recordBreak = (brk: typeof state.breaks[number], ptoDates: string[], action: 'saved' | 'tracked') => {
-    if (!requestToolsReady || ptoDates.length !== brk.ptoCost) {
-      return { ok: false, message: 'Wait for your calendar to update, then try again.' };
-    }
+  const notReady = { ok: false, message: 'Wait for your calendar to update, then try again.' };
+  const saveBreak = (brk: typeof state.breaks[number], ptoDates: string[]) => {
+    if (!requestToolsReady || ptoDates.length !== brk.ptoCost) return notReady;
     // N-P1-2: the request keeps the notice period it was planned with, for My PTO and the homepage.
-    const range = { start: brk.start, end: brk.end, noticePeriodDays: state.noticePeriodDays, noticeUnit: state.noticeUnit };
-    const recorded = action === 'saved'
-      ? ledger.saveBreak({ ...range, ptoDates }, requestCalendar)
-      : ledger.addRequest(range, requestCalendar);
+    const recorded = ledger.saveBreak({ start: brk.start, end: brk.end, ptoDates, noticePeriodDays: state.noticePeriodDays, noticeUnit: state.noticeUnit }, requestCalendar);
     return settleLedgerAction(recorded, result => {
-      if (result.ok && !result.existing) {
-        if (action === 'tracked') track('request_tracking_started');
-        trackBreakAction(action);
-      }
-      // The tracked break moves into the committed entries; keep its confirmation there.
-      if (action === 'tracked' && result.ok && result.id) setJustTracked({ id: result.id, message: result.message });
+      if (result.ok && !result.existing) trackBreakAction('saved');
       return result;
     });
+  };
+  /** Marks a break requested in one write. A record for the same dates (a saved idea, or a
+   * request canceled or declined earlier) is updated rather than duplicated. */
+  const setRequestStatus = (id: string, status: 'requested' | 'approved', expectedUpdatedAt?: string) => {
+    const message = status === 'requested'
+      ? 'Marked requested in this browser. When your manager answers, mark it approved here or in My PTO.'
+      : 'Marked approved in this browser.';
+    return settleLedgerAction(ledger.updateRequest(id, { status }, requestCalendar, expectedUpdatedAt), ok => {
+      if (ok) setJustTracked({ id, message });
+      return ok ? { ok: true, id, message } : { ok: false, message: ledger.message || 'This break could not be updated. Open My PTO to check it.' };
+    });
+  };
+  const markRequested = (brk: typeof state.breaks[number], ptoDates: string[]): LedgerAction<{ ok: boolean; message: string }> => {
+    if (!requestToolsReady || ptoDates.length !== brk.ptoCost) return notReady;
+    const existing = requestsByDates.get(`${brk.start}|${brk.end}`);
+    if (existing) return setRequestStatus(existing.id, 'requested', existing.updatedAt);
+    const recorded = ledger.saveBreak({ start: brk.start, end: brk.end, ptoDates, noticePeriodDays: state.noticePeriodDays, noticeUnit: state.noticeUnit, status: 'requested' }, requestCalendar);
+    // A promise resolving to a promise flattens, so the nested action settles as one.
+    return settleLedgerAction(recorded, (result): LedgerAction<{ ok: boolean; message: string }> => {
+      // Another tab saved the same dates a moment ago: update that record instead.
+      if (result.ok && result.existing && result.id) return setRequestStatus(result.id, 'requested');
+      if (result.ok && result.id) {
+        track('request_tracking_started');
+        trackBreakAction('tracked');
+        setJustTracked({ id: result.id, message: 'Marked requested in this browser. When your manager answers, mark it approved here or in My PTO.' });
+      }
+      return result;
+    }) as LedgerAction<{ ok: boolean; message: string }>;
   };
   // The touch day sheet sets a day's state directly (take / never / let the planner
   // decide); the planner stores it as the same three-step pin cycle a click walks through.
@@ -611,6 +633,14 @@ export function App() {
                 exampleFor={budgetBlank && plannable && !zeroBudget ? state.budget : undefined}
                 showSave={false}
               />
+              {plannable && state.committedEntries.length > 0 && (
+                // The figure above counts new breaks only; say so, and name what is already
+                // recorded, so marking a break requested never reads as losing days.
+                <p data-testid="recorded-breaks-line" className="-mt-2 text-[15px] text-ink">
+                  <span className="font-semibold">Plus {recordedDaysOff} {recordedDaysOff === 1 ? 'day' : 'days'} off already in My PTO</span>
+                  {': '}{state.committedEntries.map((entry) => `${datedRange(entry.start, entry.end)} (${(COMMITTED_WORD[entry.status] ?? entry.status)})`).join(', ')}.
+                </p>
+              )}
               {plannable && !zeroBudget && state.orderedBreaks.length > 0 && (
                 <YearLine
                   rangeStart={state.rangeStart}
@@ -798,12 +828,20 @@ export function App() {
                 {plannable && (state.breaks.length > 0 || state.committedEntries.length > 0) ? (
                   <BreakStrip count={state.committedEntries.length + state.orderedBreaks.length} label="Breaks">
                     {state.committedEntries.map(entry => (
-                      <li key={`committed-${entry.id}`} data-testid="committed-entry" data-committed-start={entry.start} data-committed-end={entry.end} data-committed-status={entry.status} data-break-start={entry.start} data-break-end={entry.end} data-break-pto={entry.ptoDays} className={`rounded-[10px] border border-line bg-surface-alt ${BREAK_STRIP_ITEM}`}>
+                      <li key={`committed-${entry.id}`} data-testid="committed-entry" data-committed-start={entry.start} data-committed-end={entry.end} data-committed-status={entry.status} data-break-start={entry.start} data-break-end={entry.end} data-break-pto={entry.ptoDays} className={`scroll-mt-16 rounded-[14px] border border-line bg-surface ${BREAK_STRIP_ITEM}`}>
                         <CommittedBreakCard
                           entry={entry}
                           message={justTracked?.id === entry.id ? justTracked.message : undefined}
                           focusLink={justTracked?.id === entry.id}
                           onPlanWithPartner={requestToolsReady ? () => openPartnerPlanner(`committed:${entry.id}`) : undefined}
+                          holidayNameFor={state.holidayNameFor}
+                          onMarkRequested={() => setRequestStatus(entry.id, 'requested', requestsById.get(entry.id)?.updatedAt)}
+                          onMarkApproved={() => setRequestStatus(entry.id, 'approved', requestsById.get(entry.id)?.updatedAt)}
+                          today={today}
+                          noticePeriodDays={requestsById.get(entry.id)?.noticePeriodDays ?? state.noticePeriodDays}
+                          noticeUnit={requestsById.get(entry.id)?.noticeUnit ?? state.noticeUnit}
+                          workWeek={state.workWeek}
+                          offDays={state.effectiveOffDays}
                         />
                       </li>
                     ))}
@@ -811,15 +849,15 @@ export function App() {
                       const ptoDates = brk.days.filter(state.isSuggestedPto);
                       const breakReady = requestToolsReady && ptoDates.length === brk.ptoCost;
                       const request = requestsByDates.get(`${brk.start}|${brk.end}`);
-                      const requestState = request ? request.status === 'considering' ? 'saved' : 'tracked' : undefined;
+                      const record = request && (request.status === 'considering' || request.status === 'canceled' || request.status === 'rejected') ? request.status : undefined;
                       const requestDatesChanged = request && (request.ptoDates.length !== ptoDates.length
                         || request.ptoDates.some(date => !ptoDates.includes(date)));
                       return (
                         <li key={brk.id} id={`break-card-${index}`} tabIndex={-1} data-break-start={brk.start} data-break-end={brk.end} data-break-pto={brk.ptoCost} className={`scroll-mt-16 rounded-[14px] border border-line bg-surface ${BREAK_STRIP_ITEM}`}>
                           <BreakCard
-                            onSave={breakReady ? () => recordBreak(brk, ptoDates, 'saved') : undefined}
-                            onTrack={breakReady ? () => recordBreak(brk, ptoDates, 'tracked') : undefined}
-                            requestState={requestState}
+                            onSave={breakReady ? () => saveBreak(brk, ptoDates) : undefined}
+                            onMarkRequested={breakReady ? () => markRequested(brk, ptoDates) : undefined}
+                            record={record}
                             requestDatesChanged={requestDatesChanged}
                             requestToolsReady={breakReady}
                             onPlanWithPartner={breakReady ? () => openPartnerPlanner(brk.id) : undefined}

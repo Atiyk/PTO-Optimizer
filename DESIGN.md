@@ -111,8 +111,33 @@ One family, Archivo variable (self-hosted, wdth 75-100, wght 400-800).
 ## Shape and depth
 
 6px controls, chips and day cells; 10px sheets and callouts; 8px run ends; full pills only for
-the plan-mode switch. Flat at rest: hairlines and tone steps. Shadows only on floating things
-(tooltips, menus, the touch action sheet, dialogs).
+the plan-mode switch and the pinned planner nav. Flat at rest: hairlines and tone steps. Shadows
+only on floating things (tooltips, menus, the touch action sheet, dialogs).
+
+**The one exception: `.plan-card`.** The surface that holds a page's answer and its next action
+(the homepage result, the planner result) is the single raised object on a page: 18px radius
+and the soft two-layer shadow in `src/index.css`. One per page, never nested, never copied onto
+other cards. Break cards, request panels and list surfaces around it stay flat at 12-14px radius
+with a hairline border, so the plan card reads as the answer and everything else as detail.
+
+## Plan visuals
+
+One vocabulary for a plan, used where it helps and not everywhere a date appears:
+- **Break ribbon** (`BreakRibbon`): one break day by day. Solid Signal Blue = PTO day; soft blue
+  run = weekend day it joins; ringed teal = holiday; one 3px rule under the lot. Over 16 days it
+  becomes one bar with its ends named. Always paired with the dates and PTO count in words.
+- **Year line** (`YearLine`): the planning range as one line, each break placed and sized by its
+  real dates. On the planner each break is a link whose hit area is at least 24px wide and never
+  overlaps a neighbour; when the line is too dense for that, it becomes a picture and the break
+  cards are the way to each break. On the homepage it is always a picture.
+- **Request states** use words first, colour second: Saved (a bookmark), Planned, Requested
+  (waiting for an answer), Approved (the person said so), Taken, Canceled, Declined. Only the
+  person can mark a request approved; nothing in the product implies Timebower asked anyone.
+- **Request panel** (`RequestPanel`): the workdays as chips, one ask-by date, then two steps:
+  Copy request (primary), Mark requested (secondary until copied). Other formats and the
+  calendar file sit behind one disclosure.
+- The homepage shows one view of the plan: the list of breaks plus the year line. No second
+  month grid or ribbon list below it.
 
 ## Navigation and information architecture
 

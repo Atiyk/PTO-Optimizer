@@ -1,24 +1,33 @@
-import { useState, useRef, useEffect, useId, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import { FEWER_FLYERS_LABEL, fewerFlyersThanUsual } from '../planning/travelEvidence';
 import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
-import { formatWorkingDaysList, formatManagerEmailShort, formatManagerEmailDetailed, copyText } from './requestText';
+import type { RequestStatus } from '../personal/requestLedger';
+import { formatWorkingDaysList } from './requestText';
 import { formatCardDateRange } from '@daysoff/engine/calendar/dateFormat';
-import { requestByText, isContested, type NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
+import { isContested, type NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
 import { buttonClasses } from './Button';
 import { Chevron } from './Chevron';
-import { settleLedgerAction, type LedgerAction } from '../integration/browserWalletStore';
-import { ActionButton } from './ExportBar';
-import { downloadICS } from './icsExport';
-import { trackBreakAction } from './analytics';
+import { settleLedgerAction } from '../integration/browserWalletStore';
 import { BreakRibbon } from './BreakRibbon';
+import { RequestPanel, type RequestAction } from './RequestPanel';
 
-type RequestAction = () => LedgerAction<{ ok: boolean; message: string }>;
+/** A saved record for this break's exact dates that is not (or no longer) on the calendar:
+ * a saved idea, or a request canceled or declined in My PTO. Requested, planned and approved
+ * breaks are shown by CommittedBreakCard instead. */
+export type BreakRecordStatus = Extract<RequestStatus, 'considering' | 'canceled' | 'rejected'>;
+
+const RECORD_LABEL: Record<BreakRecordStatus, string> = {
+  considering: 'Saved',
+  canceled: 'Canceled in My PTO',
+  rejected: 'Declined in My PTO',
+};
 
 interface BreakCardProps {
   brk: Break;
-  onTrack?: RequestAction;
   onSave?: RequestAction;
-  requestState?: 'saved' | 'tracked';
+  /** Records the break as requested, reusing any saved record for the same dates. */
+  onMarkRequested?: RequestAction;
+  record?: BreakRecordStatus;
   requestDatesChanged?: boolean;
   onPlanWithPartner?: () => void;
   requestToolsReady?: boolean;
@@ -44,140 +53,8 @@ interface BreakCardProps {
   noticeUnit?: NoticeUnit;
   workWeek: WorkWeek;
   offDays?: readonly string[];
-  /** UI density pass: whether the request tools (request-by line + copy dropdown) start
-   * expanded. Only the first rendered card defaults to true, "so the pattern is
-   * discoverable" - every other card starts collapsed to the compact summary row. */
+  /** Whether the request panel starts open. Every card starts closed unless told otherwise. */
   defaultExpanded?: boolean;
-}
-
-interface CopyOption {
-  label: string;
-  text: string;
-}
-
-/**
- * UI density pass: a 10-break plan used to render 30 identical copy buttons (3 per card,
- * always visible). One dropdown trigger per card instead - "Copy request", opening a small
- * menu with the same three options it always had. Closes on an outside click so it never
- * lingers open over the next card's controls.
- */
-function CopyRequestDropdown({ options }: { options: CopyOption[] }) {
-  const [open, setOpen] = useState(false);
-  const [feedback, setFeedback] = useState<'copied' | 'failed' | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const initialFocusIndex = useRef(0);
-  const menuId = useId();
-
-  useEffect(() => {
-    if (!open) return;
-    // A menu is not keyboard-operable until focus enters its items.
-    itemRefs.current[initialFocusIndex.current]?.focus();
-    function onPointerOutside(e: PointerEvent) {
-      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
-    }
-    function onFocusOutside(e: FocusEvent) {
-      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
-    }
-    function onEscape(e: KeyboardEvent) {
-      if (e.key !== 'Escape') return;
-      e.preventDefault();
-      setOpen(false);
-      triggerRef.current?.focus();
-    }
-    document.addEventListener('pointerdown', onPointerOutside);
-    document.addEventListener('focusin', onFocusOutside);
-    document.addEventListener('keydown', onEscape);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerOutside);
-      document.removeEventListener('focusin', onFocusOutside);
-      document.removeEventListener('keydown', onEscape);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!feedback) return;
-    const timeout = window.setTimeout(() => setFeedback(null), 2000);
-    return () => window.clearTimeout(timeout);
-  }, [feedback]);
-
-  function openAt(index: number) {
-    initialFocusIndex.current = index;
-    setOpen(true);
-  }
-
-  function onMenuKeyDown(e: ReactKeyboardEvent<HTMLDivElement>) {
-    if (e.key === 'Tab') {
-      // Let the browser continue normal tab order rather than trapping focus.
-      setOpen(false);
-      return;
-    }
-    const current = itemRefs.current.findIndex((item) => item === document.activeElement);
-    let next: number;
-    switch (e.key) {
-      case 'ArrowDown': next = (current + 1) % options.length; break;
-      case 'ArrowUp': next = (current + options.length - 1) % options.length; break;
-      case 'Home': next = 0; break;
-      case 'End': next = options.length - 1; break;
-      default: return;
-    }
-    e.preventDefault();
-    itemRefs.current[next]?.focus();
-  }
-
-  return (
-    <div ref={containerRef} className="relative inline-block">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => open ? setOpen(false) : openAt(0)}
-        onKeyDown={(e) => {
-          if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-          e.preventDefault();
-          openAt(e.key === 'ArrowDown' ? 0 : options.length - 1);
-        }}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        className={buttonClasses('secondary', 'md', 'min-h-11 px-4')}
-      >
-        {feedback === 'copied' ? 'Copied' : feedback === 'failed' ? 'Copy unavailable' : <>Copy request <Chevron direction={open ? 'up' : 'down'} /></>}
-      </button>
-      {open && (
-        <div
-          id={menuId}
-          role="menu"
-          aria-label="Copy request format"
-          onKeyDown={onMenuKeyDown}
-          className="absolute left-0 z-20 mt-1 min-w-[13rem] max-w-[calc(100vw-2rem)] rounded-[10px] border border-line-strong bg-surface py-1 shadow-lg"
-        >
-          {options.map((option, index) => (
-            <button
-              key={option.label}
-              ref={(element) => { itemRefs.current[index] = element; }}
-              type="button"
-              role="menuitem"
-              onClick={async () => {
-                setOpen(false);
-                triggerRef.current?.focus();
-                const ok = await copyText(option.text);
-                setFeedback(ok ? 'copied' : 'failed');
-              }}
-              className="flex min-h-11 w-full items-center px-3 py-2 text-left text-sm text-ink hover:bg-surface-alt focus-visible:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]"
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      )}
-      {feedback && (
-        <span role="status" className="sr-only">
-          {feedback === 'copied' ? 'Request copied to clipboard.' : 'Copy unavailable. Check clipboard permissions.'}
-        </span>
-      )}
-    </div>
-  );
 }
 
 /* A break at or below 1.0x gains no extra days off; breakReason.ts says so in the card's
@@ -205,55 +82,48 @@ export function BreakCard({
   workWeek,
   offDays,
   defaultExpanded = false,
-  onTrack,
   onSave,
-  requestState,
+  onMarkRequested,
+  record,
   requestDatesChanged,
   onPlanWithPartner,
   requestToolsReady = true,
   anchorId,
 }: BreakCardProps) {
-  const [requestMessage, setRequestMessage] = useState('');
-  const [requestActionPending, setRequestActionPending] = useState(false);
-  const requestLinkRef = useRef<HTMLAnchorElement>(null);
-  const focusRequestLink = useRef(false);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [savePending, setSavePending] = useState(false);
+  const recordLinkRef = useRef<HTMLAnchorElement>(null);
+  const focusRecordLink = useRef(false);
   useEffect(() => {
-    if (focusRequestLink.current && requestState) {
-      focusRequestLink.current = false;
-      requestLinkRef.current?.focus({ preventScroll: true });
+    if (focusRecordLink.current && record) {
+      focusRecordLink.current = false;
+      recordLinkRef.current?.focus({ preventScroll: true });
     }
-  }, [requestMessage, requestState]);
-  const runRequestAction = (action: RequestAction) => {
-    setRequestActionPending(true);
-    void settleLedgerAction(action(), (result) => {
-      focusRequestLink.current = result.ok;
-      setRequestMessage(result.message);
-      setRequestActionPending(false);
+  }, [saveMessage, record]);
+  const save = () => {
+    if (!onSave) return;
+    setSavePending(true);
+    void settleLedgerAction(onSave(), (result) => {
+      focusRecordLink.current = result.ok;
+      setSaveMessage(result.message);
+      setSavePending(false);
     });
   };
   // BUG FOUND: a plain `useState(defaultExpanded)` captures its initial value once, at
   // mount, and never again - but holidays load asynchronously (see useAppState.ts), so the
   // very first render solves without them, producing a different/smaller break set than
-  // the final one. Whichever break happened to be "position 0" in that transient first
-  // render got defaultExpanded=true locked in permanently, even after it moved away from
-  // position 0 once the real holiday-aware plan settled a moment later - while the TRUE
-  // final position-0 break, being a newly-mounted instance, ALSO got defaultExpanded=true,
-  // leaving two cards expanded instead of one. Confirmed empirically: logging each render
-  // pass showed a different break at position 0 on the first pass than on every pass after
-  // holidays finished loading. Fixed by tracking only an EXPLICIT user choice locally
-  // (`userExpanded`, null until they click); absent that, `expanded` mirrors the current
-  // `defaultExpanded` prop every render, so it stays correct as the plan settles instead of
-  // freezing a one-time snapshot.
+  // the final one. Fixed by tracking only an EXPLICIT user choice locally (`userExpanded`,
+  // null until they click); absent that, `expanded` mirrors the current `defaultExpanded`
+  // prop every render, so it stays correct as the plan settles.
   const [userExpanded, setUserExpanded] = useState<boolean | null>(null);
   const expanded = userExpanded ?? defaultExpanded;
   const dayWord = brk.totalDaysOff === 1 ? 'day' : 'days';
   const ptoWord = brk.ptoCost === 1 ? 'day' : 'days';
   const contested = isContested(brk);
-  const requestLine = requestByText(brk.start, noticePeriodDays, workWeek, today, offDays, noticeUnit);
   const startYear = brk.start.slice(0, 4);
   const breakRange = formatCardDateRange(brk.start, brk.end);
   const datedRange = brk.end.startsWith(startYear) ? `${breakRange}, ${startYear}` : breakRange;
-  const requestToolsId = useId();
+  const panelId = useId();
 
   return (
     <div
@@ -282,6 +152,9 @@ export function BreakCard({
           <span>
             <span className="mark font-semibold">{brk.totalDaysOff} {dayWord} off</span> for {brk.ptoCost} PTO {ptoWord}
           </span>
+          {record && (
+            <span data-break-record={record} className="rounded-[6px] bg-surface-alt px-2 py-0.5 text-xs font-semibold text-ink">{RECORD_LABEL[record]}</span>
+          )}
           {brk.tags.filter((tag) => tag !== 'Low travel demand' || fewerFlyersThanUsual(brk.start, brk.end)).map((tag) => (
             <span key={tag} className="rounded-[6px] bg-surface-alt px-2 py-0.5 text-xs font-medium text-ink">
               {travelTagLabels[tag] ?? tag}
@@ -298,7 +171,7 @@ export function BreakCard({
         {/* Every recommendation states its own reasoning, visibly, not in a tooltip. */}
         <p className="text-sm text-muted">{reason}</p>
 
-        {requestToolsReady && (
+        {requestToolsReady && !expanded && (
           <p className="text-sm text-ink">
             <strong className="font-semibold">PTO dates to request</strong>
             <span className="block tabular-nums">{formatWorkingDaysList(brk, isPtoDay)}</span>
@@ -312,60 +185,36 @@ export function BreakCard({
           </p>
         )}
 
-        {requestToolsReady && <div className="mt-1 flex flex-wrap items-center gap-2">
-          {onSave && !requestState && (
-            <button
-              type="button"
-              disabled={requestActionPending}
-              onClick={() => runRequestAction(onSave)}
-              className={buttonClasses('quiet', 'md', 'min-h-11 px-2! text-sm!')}
-            >
+        {requestToolsReady && <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <button type="button" aria-expanded={expanded} aria-controls={panelId} onClick={() => setUserExpanded(!expanded)} className={buttonClasses('secondary', 'md', 'min-h-11 border-accent! px-3.5! text-sm! text-accent-ink! hover:bg-accent-soft!')}>
+            {expanded ? 'Hide request steps' : 'Request this time off'} <Chevron direction={expanded ? 'up' : 'down'} />
+          </button>
+          {onSave && !record && (
+            <button type="button" disabled={savePending} onClick={save} className={buttonClasses('quiet', 'md', 'min-h-11 px-2! text-sm!')}>
               Save break
             </button>
           )}
-          {onTrack && !requestState && (
-            <button type="button" disabled={requestActionPending} onClick={() => runRequestAction(onTrack)} className={buttonClasses('quiet', 'md', 'min-h-11 px-2! text-sm!')}>
-              Track this PTO request
-            </button>
+          {record && (
+            <a ref={recordLinkRef} href="#requests" className="link-mark inline-flex min-h-11 items-center text-sm">See My PTO requests</a>
           )}
-          {requestState && (
-            <p className="flex min-h-11 items-center gap-2 text-sm text-ink">
-              <svg aria-hidden="true" viewBox="0 0 12 12" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 6.2 5 8.5l4.5-5" /></svg>
-              <span className="font-semibold">{requestState === 'saved' ? 'Saved' : 'Tracked'}</span>
-              <a ref={requestLinkRef} href="#requests" className="link-mark inline-flex min-h-11 items-center">See My PTO requests</a>
-            </p>
-          )}
-          <button type="button" aria-expanded={expanded} aria-controls={requestToolsId} onClick={() => setUserExpanded(!expanded)} className={buttonClasses('secondary', 'md', 'order-first min-h-11 border-accent! px-3.5! text-sm! text-accent-ink! hover:bg-accent-soft!')}>
-            {expanded ? 'Hide request tools' : 'Request this time off'} <Chevron direction={expanded ? 'up' : 'down'} />
-          </button>
         </div>}
-        {requestMessage && <p role="status" className="text-sm text-muted">{requestMessage}</p>}
-        {requestToolsReady && requestDatesChanged && <p className="text-sm text-muted">The PTO dates for this break have changed. Review your saved request in My PTO.</p>}
-        <div id={requestToolsId} hidden={!requestToolsReady || !expanded} className="border-t border-line pt-3">
-          {requestToolsReady && expanded && <>
-            <p className="mb-2 text-sm text-muted">{requestLine}</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <CopyRequestDropdown
-                options={[
-                  { label: 'Copy date list', text: formatWorkingDaysList(brk, isPtoDay) },
-                  { label: 'Copy email draft', text: formatManagerEmailShort(brk, isPtoDay) },
-                  { label: 'Copy detailed email draft', text: formatManagerEmailDetailed(brk, isPtoDay, noticePeriodDays, workWeek, offDays, noticeUnit) },
-                ]}
-              />
-              <ActionButton label="Export this break (.ics)" onClick={async () => {
-                try {
-                  downloadICS([brk], isPtoDay, { enabled: true, leadDays: noticePeriodDays, workWeek, offDays, noticeUnit }, `pto-break-${brk.start}.ics`);
-                  trackBreakAction('exported');
-                  return { ok: true, message: 'Downloaded' };
-                } catch {
-                  return { ok: false, message: 'Could not download' };
-                }
-              }} />
-              {onPlanWithPartner && <button type="button" onClick={onPlanWithPartner} className={buttonClasses('quiet', 'md', 'min-h-11')}>
-                Plan this break with a partner
-              </button>}
-            </div>
-          </>}
+        {saveMessage && <p role="status" className="text-sm text-muted">{saveMessage}</p>}
+        {requestToolsReady && requestDatesChanged && <p className="text-sm text-muted">The PTO dates for this break have changed since you saved it. Review it in My PTO.</p>}
+        <div id={panelId} hidden={!requestToolsReady || !expanded}>
+          {requestToolsReady && expanded && (
+            <RequestPanel
+              brk={brk}
+              isPtoDay={isPtoDay}
+              holidayNameFor={holidayNameFor}
+              today={today}
+              noticePeriodDays={noticePeriodDays}
+              noticeUnit={noticeUnit}
+              workWeek={workWeek}
+              offDays={offDays}
+              onMarkRequested={onMarkRequested}
+              onPlanWithPartner={onPlanWithPartner}
+            />
+          )}
         </div>
       </div>
     </div>
