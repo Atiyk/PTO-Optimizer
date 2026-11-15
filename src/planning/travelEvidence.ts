@@ -72,3 +72,40 @@ export function travelEvidenceFor(date: string, country: string): TravelEvidence
     caveat: 'Generic seasonality estimate only. Not based on observed trips in this country, and not a forecast or price.',
   };
 }
+
+/** How far below the yearly mean a window's US index must sit before the planner says it
+ * had fewer flyers than usual: 15%, so ordinary week-to-week noise never earns the label. */
+export const FEWER_FLYERS_THRESHOLD = 0.85;
+export const FEWER_FLYERS_LABEL = `Fewer flyers than usual (${TSA_SOURCE_YEAR} TSA data)`;
+
+let yearlyMean: number | null = null;
+/** Mean of the seasonal US index over every day of the source year. */
+export function usSeasonalYearlyMean(): number {
+  if (yearlyMean !== null) return yearlyMean;
+  let sum = 0;
+  let count = 0;
+  for (let t = Date.UTC(TSA_SOURCE_YEAR, 0, 1); t < Date.UTC(TSA_SOURCE_YEAR + 1, 0, 1); t += 86_400_000) {
+    const value = seasonalUS(new Date(t).toISOString().slice(0, 10));
+    if (value !== null) { sum += value; count += 1; }
+  }
+  yearlyMean = count ? sum / count : 1;
+  return yearlyMean;
+}
+
+/**
+ * True only when the window's average US checkpoint index (same seasonal figure the solver
+ * uses) is at least 15% below the source year's mean. A statement about how many people
+ * flew on these dates in 2025, never about prices or this year's crowds.
+ */
+export function fewerFlyersThanUsual(start: string, end: string): boolean {
+  if (!validCalendarDate(start) || !validCalendarDate(end) || start > end) return false;
+  let sum = 0;
+  let count = 0;
+  for (let t = Date.parse(`${start}T00:00:00Z`); t <= Date.parse(`${end}T00:00:00Z`) && count <= 60; t += 86_400_000) {
+    const value = seasonalUS(new Date(t).toISOString().slice(0, 10));
+    if (value === null) return false;
+    sum += value;
+    count += 1;
+  }
+  return count > 0 && sum / count <= FEWER_FLYERS_THRESHOLD * usSeasonalYearlyMean();
+}

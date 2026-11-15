@@ -59,4 +59,9 @@ describe('departure payout scenario UI', () => {
     expect(screen.getByText(/Unlimited PTO has no banked balance to pay out/)).toBeTruthy();
     expect(screen.queryByText('$2,000.00')).toBeNull();
   });
+  it('says to check state law and the contract, with no default legal rule (issue 11)', () => {
+    render(<DeparturePayoutEstimator policy={policy} />);
+    expect(document.body.textContent).toContain('Check your state law and your contract.');
+    expect((screen.getByRole('combobox', { name: /employer/i }) as HTMLSelectElement).value).toBe('unknown');
+  });
 });

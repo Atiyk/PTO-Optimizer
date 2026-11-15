@@ -165,3 +165,24 @@ describe('generateICS reminders', () => {
     expect(uids.some((u) => u.startsWith('pto-reminder-'))).toBe(true);
   });
 });
+
+describe('generateICS: one event per break (optional layout)', () => {
+  const isPto = (iso: string) => ['2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30'].includes(iso);
+
+  it('writes one all-day event spanning the break with its own stable UID scheme', () => {
+    const ics = generateICS([makeBreak()], isPto, FIXED_NOW, undefined, undefined, 'break');
+    const unfolded = ics.replace(/\r\n /g, '');
+    expect(unfolded.match(/BEGIN:VEVENT/g)).toHaveLength(1);
+    expect(unfolded).toContain('UID:pto-break-20261024-20261101@pto-optimizer.app');
+    expect(unfolded).toContain('DTSTART;VALUE=DATE:20261024');
+    expect(unfolded).toContain('DTEND;VALUE=DATE:20261102');
+    expect(unfolded).toMatch(/DESCRIPTION:5 PTO days -> 9 days off\. PTO days: /);
+    expect(unfolded).not.toMatch(/UID:pto-2026/);
+    expect(generateICS([makeBreak()], isPto, new Date('2027-01-01T00:00:00Z'), undefined, undefined, 'break').match(/UID:[^\r]+/g))
+      .toEqual(ics.match(/UID:[^\r]+/g));
+  });
+
+  it('leaves the default per-day layout byte-identical', () => {
+    expect(generateICS([makeBreak()], isPto, FIXED_NOW)).toBe(generateICS([makeBreak()], isPto, FIXED_NOW, undefined, undefined, 'day'));
+  });
+});

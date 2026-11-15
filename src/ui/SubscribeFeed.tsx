@@ -7,6 +7,9 @@ import { planStateFromSearch } from '../autopilot/planFromSearch';
 import { isValidISODate } from './urlState';
 import { todayISO } from './today';
 import { buildPublicPlanSearch, publicPlanOmissions } from './publicSharePrivacy';
+import type { Break } from '@daysoff/engine/solver/types';
+import { buildPlanFeedV2Search } from '../autopilot/feedV2';
+import { track } from './analytics';
 
 export interface FeedLinks {
   https: string;
@@ -15,7 +18,7 @@ export interface FeedLinks {
   outlook: string;
 }
 
-/** The live feed's URLs for a plan's query string. Formats checked against published
+/** The subscription feed's URLs for a plan's query string. Formats checked against published
  * subscribe links (Nov 2026): Google takes the webcal URL in `cid`; Outlook.com takes the
  * https URL in `url` plus a display `name`. */
 export function feedLinks(origin: string, planSearch: string, path = '/api/feed', calendarName = FEED_CALENDAR_NAME): FeedLinks {
@@ -31,8 +34,10 @@ export function feedLinks(origin: string, planSearch: string, path = '/api/feed'
 }
 
 /**
- * F1: subscribe to a fixed plan snapshot. The feed re-solves its own saved
- * inputs on refresh, independently of later edits in the planner.
+ * F1: subscribe to a snapshot of the plan's dates. Later edits in the planner never reach
+ * it. When the plan's breaks are passed in, the link carries those dates only (format 2,
+ * src/autopilot/feedV2.ts): no PTO budget, balance or policy setting leaves the device and
+ * the server never re-solves. Without them it falls back to the public share format.
  */
 export interface SubscribeFeedProps {
   planSearch: string;
@@ -47,18 +52,38 @@ export interface SubscribeFeedProps {
   caveat?: string;
   /** Unique per page when more than one subscribe block renders. */
   idPrefix?: string;
+  /** The plan on screen. With both, the plan feed link carries only these dates (format 2). */
+  breaks?: readonly Pick<Break, 'start' | 'end' | 'days' | 'ptoCost'>[];
+  isPtoDay?: (iso: string) => boolean;
 }
 
-const PLAN_DESCRIPTION = 'Subscribe to see this plan’s PTO days, holidays and request-by reminders in your calendar app.';
+const PLAN_DESCRIPTION = 'Add this plan’s PTO days, holidays and request-by reminders to your calendar app. Shows the dates as of today; subscribe again after changes.';
 /** F16: the update mechanics sit behind a "How updates work" disclosure, one short block each. */
-const planUpdateNotes = (calendarName: string) => [
-  'The subscription holds a fixed snapshot of this plan’s inputs as they are now. Your calendar app refreshes it and recalculates from the refresh date.',
+const planUpdateNotes = (calendarName: string, datesOnly: boolean) => [
+  datesOnly
+    ? 'The subscription holds this plan’s dates as they are today. It does not change when you edit the plan.'
+    : 'The subscription holds a fixed snapshot of this plan’s shared settings as they are today. It does not change when you edit the plan.',
   'Edits you make after subscribing are not included.',
   `To update, subscribe again, then remove the old “${calendarName}” calendar so days don’t appear twice.`,
   'Each event notes the day the snapshot was made.',
+  datesOnly
+    ? 'The link holds your break dates, country, region, date range and work week. It holds no PTO balance or policy settings.'
+    : 'The link holds the plan settings shown in a shared plan link.',
 ];
 /** Issue 19: nothing is stored server-side, so later edits never reach a subscription. */
-const PLAN_PRIVACY = 'Anyone with the link can see the snapshot.';
+const PLAN_PRIVACY = 'Anyone with the link can see these dates.';
+const DAY_MS = 86_400_000;
+const MAX_FEED_RANGE_DAYS_V2 = 3 * 366;
+
+/** Format 2 has no solver cost; only the plan range is bounded (feedV2.ts). */
+function rangeTooLong(query: string): boolean {
+  const params = new URLSearchParams(query);
+  const start = params.get('s');
+  const end = params.get('e');
+  if (!start || !end) return false;
+  const days = (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / DAY_MS + 1;
+  return !(days >= 1 && days <= MAX_FEED_RANGE_DAYS_V2);
+}
 
 /** Mirrors the /api/feed bound so the page never offers a link the function will refuse. */
 function tooLargeForFeed(query: string): boolean {
@@ -66,7 +91,7 @@ function tooLargeForFeed(query: string): boolean {
   return isValidISODate(state.rangeStart) && isValidISODate(state.rangeEnd) && !feedWorkloadAllowed(state);
 }
 
-export function SubscribeFeed({ planSearch, observedHolidayDates, origin, path = '/api/feed', calendarName = FEED_CALENDAR_NAME, heading = 'Keep this plan in your calendar', description = PLAN_DESCRIPTION, caveat, idPrefix = 'subscribe-feed' }: SubscribeFeedProps) {
+export function SubscribeFeed({ planSearch, observedHolidayDates, origin, path = '/api/feed', calendarName = FEED_CALENDAR_NAME, heading = 'Keep this plan in your calendar', description = PLAN_DESCRIPTION, caveat, idPrefix = 'subscribe-feed', breaks, isPtoDay }: SubscribeFeedProps) {
   // The links name this deployment's origin and the visitor's current plan, neither of
   // which the prerendered HTML knows, and React keeps server attributes on hydration - so
   // they render only after mount, never with a build-time host or plan baked in.
@@ -87,12 +112,16 @@ export function SubscribeFeed({ planSearch, observedHolidayDates, origin, path =
   const sharingAllowed = !requiresChoice || (samePlan && choice.mode !== null);
   const shareObservedDates = samePlan && choice.mode === 'dates';
   // The plan feed records the day this link was made (`fc`), so its events can name it.
-  const query = planFeed
-    ? `${buildPublicPlanSearch(planSearch, shareObservedDates ? observedHolidayDates : undefined)}&fc=${todayISO()}`
-    : planSearch.replace(/^\?/, '');
+  const datesOnly = planFeed && breaks !== undefined && isPtoDay !== undefined;
+  const publicSearch = planFeed ? buildPublicPlanSearch(planSearch, shareObservedDates ? observedHolidayDates : undefined) : '';
+  const query = datesOnly
+    ? buildPlanFeedV2Search({ publicSearch, breaks, isPtoDay, createdOn: todayISO() })
+    : planFeed
+      ? `${publicSearch}&fc=${todayISO()}`
+      : planSearch.replace(/^\?/, '');
   const shownCaveat = caveat ?? (planFeed ? PLAN_PRIVACY : undefined);
   const links = resolvedOrigin && sharingAllowed ? feedLinks(resolvedOrigin, query, path, calendarName) : null;
-  const tooLong = useMemo(() => query.length > MAX_FEED_QUERY_LENGTH || (planFeed && tooLargeForFeed(query)), [query, planFeed]);
+  const tooLong = useMemo(() => query.length > MAX_FEED_QUERY_LENGTH || (datesOnly ? rangeTooLong(query) : planFeed && tooLargeForFeed(query)), [query, planFeed, datesOnly]);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -104,7 +133,9 @@ export function SubscribeFeed({ planSearch, observedHolidayDates, origin, path =
         <p className="max-w-prose text-sm text-muted">This plan is too large for a calendar subscription. Download the .ics file instead.</p>
       ) : !sharingAllowed ? (
         <>
-          <p className="max-w-prose text-sm text-muted">Choose which holidays the subscription uses. Your calendar names, scheduling details and policy settings stay here, so it can differ from your plan.</p>
+          <p className="max-w-prose text-sm text-muted">{datesOnly
+            ? 'Choose which holidays the subscription uses. Your PTO dates come from this plan; holiday names and policy settings stay here.'
+            : 'Choose which holidays the subscription uses. Your calendar names, scheduling details and policy settings stay here, so it can differ from your plan.'}</p>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => setChoice({ mode: 'defaults', source: planSearch, dates: datesKey })}>
               Use public holidays
@@ -132,16 +163,16 @@ export function SubscribeFeed({ planSearch, observedHolidayDates, origin, path =
             <details className="text-sm">
               <summary className="min-h-11 cursor-pointer py-3 font-semibold text-ink">How updates work</summary>
               <div className="flex max-w-prose flex-col gap-2 text-muted">
-                {planUpdateNotes(calendarName).map((note) => <p key={note}>{note}</p>)}
+                {planUpdateNotes(calendarName, datesOnly).map((note) => <p key={note}>{note}</p>)}
               </div>
             </details>
           )}
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" href={links.webcal}>Apple Calendar</Button>
-            <Button variant="secondary" href={links.google} target="_blank" rel="noopener noreferrer">
+            <Button variant="secondary" href={links.webcal} onClick={() => track('feed_subscribed')}>Apple Calendar</Button>
+            <Button variant="secondary" href={links.google} target="_blank" rel="noopener noreferrer" onClick={() => track('feed_subscribed')}>
               Google Calendar<span className="sr-only"> (opens in a new tab)</span>
             </Button>
-            <Button variant="secondary" href={links.outlook} target="_blank" rel="noopener noreferrer">
+            <Button variant="secondary" href={links.outlook} target="_blank" rel="noopener noreferrer" onClick={() => track('feed_subscribed')}>
               Outlook<span className="sr-only"> (opens in a new tab)</span>
             </Button>
           </div>
@@ -160,6 +191,7 @@ export function SubscribeFeed({ planSearch, observedHolidayDates, origin, path =
                 variant="secondary"
                 onClick={async () => {
                   const ok = await copyText(links.https);
+                  if (ok) track('feed_subscribed');
                   setCopyMessage(ok ? 'Link copied' : "Couldn't copy — select the link instead");
                   clearTimeout(timer.current);
                   timer.current = setTimeout(() => setCopyMessage(null), 2500);

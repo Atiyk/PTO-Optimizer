@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
-import { track, trackBreakAction, trackOnceInDocument } from './analytics';
+import { isGenuineReturn, isShareLinkArrival, track, trackReturnOncePerSession, trackBreakAction, trackOnceInDocument, trackSharedLinkOpened, type AnalyticsEvent } from './analytics';
+import analyticsSource from './analytics.ts?raw';
 
 beforeEach(() => {
   window.history.replaceState(null, '', '/pto?b=17&s=2027-06-01&e=2027-12-31&eh=private-calendar#private-plan');
@@ -105,5 +106,85 @@ describe('track', () => {
       throw new Error('blocked by an extension');
     };
     expect(() => track('Image copied')).not.toThrow();
+  });
+});
+
+describe('share-link arrivals and subscriptions', () => {
+  it('counts a visit from a public share link once per document, with only the event name and route', () => {
+    const spy = vi.fn();
+    window.plausible = spy;
+    const shared = '?sv=1&c=US&s=2027-01-01&e=2027-12-31&b=17&er=4&hf=abc';
+    expect(isShareLinkArrival(shared)).toBe(true);
+    trackSharedLinkOpened(shared);
+    trackSharedLinkOpened(shared);
+    expect(spy).toHaveBeenCalledExactlyOnceWith('shared_link_opened', { url: window.location.origin + '/pto' });
+  });
+
+  it('does not count a fresh visit, a saved private link or a partner link as a share-link arrival', () => {
+    for (const search of ['', '?c=US&s=2027-01-01&b=17', '?pp=abc', '?sv=2']) expect(isShareLinkArrival(search)).toBe(false);
+  });
+});
+
+describe('event payload privacy', () => {
+  it('sends no event properties, so a balance or date can never ride along', () => {
+    const spy = vi.fn();
+    window.plausible = spy;
+    const events: AnalyticsEvent[] = ['Solve completed', 'URL shared', 'ICS downloaded', 'returned_with_saved_url', 'holiday_preference_customized', 'shared_link_opened', 'feed_subscribed'];
+    for (const event of events) track(event);
+    expect(spy).toHaveBeenCalledTimes(events.length);
+    for (const [name, options] of spy.mock.calls) {
+      expect(Object.keys(options)).toEqual(['url']);
+      expect(options.url).toBe(window.location.origin + '/pto');
+      expect(`${name} ${JSON.stringify(options)}`).not.toMatch(/b=|17|2027|private/);
+    }
+  });
+
+  it('keeps event names free of digits and the public API free of a props argument', () => {
+    const names = [...analyticsSource.matchAll(/^\s*\| '([^']+)'/gm)].map((match) => match[1]);
+    expect(names).toContain('shared_link_opened');
+    expect(names).toContain('feed_subscribed');
+    for (const name of names) expect(name, name).not.toMatch(/\d/);
+    expect(analyticsSource).toMatch(/export function track\(event: AnalyticsEvent\): void/);
+    expect(analyticsSource).toMatch(/window\.plausible\(event, \{ url \}\)/);
+    // A future `track(event, props)` would have to change these lines and fail here.
+    expect(track.length).toBe(1);
+  });
+});
+
+describe('returned_with_saved_url: genuine returns only (baseline item 15)', () => {
+  afterEach(() => { window.sessionStorage.clear(); });
+
+  it('ignores homepage CTAs, share links, hand-offs and partner links', () => {
+    expect(isGenuineReturn('?c=US&b=15&s=2026-11-14&e=2027-11-13&pv=2&lp=1', false)).toBe(false);
+    expect(isGenuineReturn('?sv=1&c=US&b=15&s=2027-01-01&e=2027-12-31', false)).toBe(false);
+    expect(isGenuineReturn('?c=US&b=15&s=2027-01-01&hx=abc', false)).toBe(false);
+    expect(isGenuineReturn('?pp=xyz&s=2027-01-01&b=3', false)).toBe(false);
+    expect(isGenuineReturn('', false)).toBe(false);
+  });
+
+  it('counts a kept private plan link, or any visit with a saved plan, once per session', () => {
+    expect(isGenuineReturn('?c=US&b=15&s=2027-01-01&e=2027-12-31', false)).toBe(true);
+    expect(isGenuineReturn('', true)).toBe(true);
+    const spy = vi.fn();
+    window.plausible = spy;
+    trackReturnOncePerSession('?c=US&b=15&s=2027-01-01&e=2027-12-31', false);
+    trackReturnOncePerSession('', true);
+    expect(spy).toHaveBeenCalledExactlyOnceWith('returned_with_saved_url', { url: window.location.origin + '/pto' });
+  });
+
+  it('a share-link arrival counts as shared_link_opened and not as a return', () => {
+    const spy = vi.fn();
+    window.plausible = spy;
+    const shared = '?sv=1&c=US&b=15&s=2027-01-01&e=2027-12-31';
+    trackReturnOncePerSession(shared, false);
+    expect(spy).not.toHaveBeenCalled();
+    expect(isShareLinkArrival(shared)).toBe(true); // counted once per document by trackSharedLinkOpened (tested above)
+  });
+
+  it('plan_saved is an event name with no properties', () => {
+    const spy = vi.fn();
+    window.plausible = spy;
+    track('plan_saved');
+    expect(spy).toHaveBeenCalledExactlyOnceWith('plan_saved', { url: window.location.origin + '/pto' });
   });
 });

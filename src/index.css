@@ -94,10 +94,11 @@
   --error: #b93838;
   --error-soft: #fbecec;
   --disabled-text: #9aa6b2;
-  /* F27: a calendar date outside the planning range. Still a date, so 3:1 or more on every
-     surface (3.5:1 on white), and lighter than the muted weekend numerals so it reads as
-     outside the plan rather than as a weekend. */
-  --outside-text: #7d8a96;
+  /* F27: a calendar date outside the planning range (including past days on /pto). It is
+     still text, so WCAG AA 4.5:1 on every surface (5.0:1 on white, 4.5:1 on the alt surface;
+     the old #7d8a96 was 3.5:1 and failed axe). Slightly lighter than the muted weekend
+     numerals; regular weight and no fill keep it apart from a weekend. */
+  --outside-text: #64717d;
 
   --score-track: #dce3ea;
   --score-1: #245da6;

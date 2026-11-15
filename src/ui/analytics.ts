@@ -33,6 +33,12 @@ export type AnalyticsEvent =
   | 'URL shared'
   | 'Overlap link opened'
   | 'returned_with_saved_url'
+  // A visit that arrived through a public plan share link (sv=1) the app wrote. Name only.
+  | 'shared_link_opened'
+  // The person took a calendar-subscription action (opened a calendar app link or copied it).
+  | 'feed_subscribed'
+  // "Save this plan" (pins it in this browser for comparison). Event name only.
+  | 'plan_saved'
   | 'team_days_used'
   // Feature 1 Stage 4E - event names only, plus the sanitized public route.
   // Listed on the privacy page (public/privacy.html) alongside the rest.
@@ -111,6 +117,49 @@ export function trackBreakAction(action: keyof typeof firstBreakEvent): void {
     if (previous.size === 2) send('second_meaningful_break_action');
   } catch {
     // Blocked storage must not break or gate the product action.
+  }
+}
+
+/** True for a /pto query string written by "Copy plan link" (public share format,
+ * src/ui/shareFormat.ts): it carries the version marker `sv=1`. Reads nothing else. */
+export function isShareLinkArrival(search: string): boolean {
+  try {
+    return new URLSearchParams(search).get('sv') === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Fires 'shared_link_opened' once per document for a share-link arrival. No properties:
+ * never the balance, dates, employer data or the link itself. */
+export function trackSharedLinkOpened(search: string): void {
+  if (isShareLinkArrival(search)) trackOnceInDocument('shared_link_opened');
+}
+
+const RETURN_SESSION_KEY = 'timebower.analytics.returned.v1';
+/** Keys that mark an arrival as something other than a person reopening their own plan. */
+const NOT_A_RETURN = ['lp', 'sv', 'hx', 'pp', 'ov', 'od'];
+
+/**
+ * A genuine return: a private /pto link with a plan in it (s and b) that is not a homepage
+ * CTA (lp), a share link (sv), an on-device hand-off (hx) or a partner link; or any visit
+ * while a saved plan exists in this browser.
+ */
+export function isGenuineReturn(search: string, savedPlanPresent: boolean): boolean {
+  let params: URLSearchParams;
+  try { params = new URLSearchParams(search); } catch { return false; }
+  if (NOT_A_RETURN.some((key) => params.has(key))) return false;
+  return (params.has('s') && params.has('b')) || savedPlanPresent;
+}
+
+/** 'returned_with_saved_url' at most once per browser session (sessionStorage flag). */
+export function trackReturnOncePerSession(search: string, savedPlanPresent: boolean): void {
+  if (!isGenuineReturn(search, savedPlanPresent)) return;
+  try {
+    if (window.sessionStorage.getItem(RETURN_SESSION_KEY) === '1') return;
+    if (send('returned_with_saved_url')) window.sessionStorage.setItem(RETURN_SESSION_KEY, '1');
+  } catch {
+    trackOnceInDocument('returned_with_saved_url');
   }
 }
 

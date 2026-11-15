@@ -1,5 +1,6 @@
 /**
- * F1 live plan feed + F2 book-by nudges: the /pto plan as a subscribable calendar.
+ * F1 plan feed (format 1, compat) + F2 book-by nudges: the /pto plan as a subscribable
+ * snapshot calendar. New links use the dates-only format 2 (feedV2.ts).
  *
  * Pure: the same query string, `today` and holiday data always give the same bytes, so a
  * CDN can cache it and tests can pin it. Events are written by the same helpers as the

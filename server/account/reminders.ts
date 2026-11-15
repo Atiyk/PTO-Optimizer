@@ -75,7 +75,7 @@ export function dueItems(ics: string, today: string): DueItem[] {
 export interface DigestLinks { planUrl?: string; policyUrl?: string; unsubscribeUrl: string; accountUrl: string }
 
 export function reminderEmail(items: readonly DueItem[], links: DigestLinks): { subject: string; text: string } {
-  const subject = items.length === 1 ? `Gapless reminder: ${items[0].summary}` : `Gapless: ${items.length} time-off reminders for today`;
+  const subject = items.length === 1 ? `Timebower reminder: ${items[0].summary}` : `Timebower: ${items.length} time-off reminders for today`;
   const body = items.map((item) => `- ${item.summary} (${formatShortWithYear(item.date)})\n  ${item.description.replace(/\n+/g, ' ').trim()}`);
   const open = [
     links.planUrl ? `Open your plan: ${links.planUrl}` : null,
@@ -85,7 +85,7 @@ export function reminderEmail(items: readonly DueItem[], links: DigestLinks): { 
     subject,
     text: [
       'Hi,', '', 'Here is what is due today:', '', ...body, '', ...open, '',
-      'You get this email because you turned on reminder emails in Gapless.',
+      'You get this email because you turned on reminder emails in Timebower.',
       `Stop these emails: ${links.unsubscribeUrl}`,
       `Manage or delete your account: ${links.accountUrl}`,
     ].join('\n'),

@@ -67,7 +67,7 @@ export function policyFromURLState(state: PolicyURLState): TimeOffPolicy {
 
 /** readPolicyStateFromURL fills a missing date with the server clock's today. A feed must
  * be deterministic for its `today`, so those defaults are pinned to `today` first. */
-function pinnedDefaults(search: string, today: ISODate): string {
+export function pinnedDefaults(search: string, today: ISODate): string {
   const params = new URLSearchParams(search);
   const year = today.slice(0, 4);
   const defaults: Record<string, string> = { pda: today, gd: today, as: today, crd: `${year}-12-31`, cub: `${year}-03-31`, bao: today };
@@ -81,7 +81,7 @@ function pinnedDefaults(search: string, today: ISODate): string {
 /** The employer calendar the /policy page builds (useRequestCalendar), from injected data:
  * national plus regional holidays, US state fallbacks, and alternating Fridays. Saved
  * employer holiday edits live in the browser and are not available to a feed. */
-function feedCalendar(state: PolicyURLState, start: ISODate, end: ISODate, holidays: WatchFeedHolidays): { calendar: RequestCalendar & { subdivision?: string }; missingYears: number[] } {
+export function feedCalendar(state: PolicyURLState, start: ISODate, end: ISODate, holidays: WatchFeedHolidays): { calendar: RequestCalendar & { subdivision?: string }; missingYears: number[] } {
   const subdivision = state.subdivision && state.subdivision.startsWith(`${state.country}-`) ? state.subdivision : undefined;
   const offDays = new Set<ISODate>();
   const missingYears: number[] = [];

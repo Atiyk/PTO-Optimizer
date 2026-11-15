@@ -44,6 +44,7 @@ import { getSiteUrl } from './siteUrl.ts';
 import { ENTRIES, type Entry, type ComponentKind } from './routes.ts';
 import { PRODUCT_NAME, PRODUCT_SHORT_NAME } from '../src/brand.ts';
 import { todayISO } from '../src/ui/today.ts';
+import { freshPlanLinks } from './prerenderLinks.ts';
 import { prerenderAppGuard } from './prerenderAppGuard.ts';
 import { lockPrerenderedControls } from './prerenderShell.ts';
 import { preloadScriptFor } from './prerenderPreload.ts';
@@ -295,7 +296,8 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
   installWindow(url, entry.countryPreset);
 
   const renderedDate = todayISO();
-  const html = renderEntry(entry);
+  // No build-day dates in static planner links (crawlers, first paint): see prerenderLinks.ts.
+  const html = freshPlanLinks(renderEntry(entry), renderedDate);
 
   const filePath = resolve(distDir, entry.file);
   if (!existsSync(filePath)) {

@@ -19,7 +19,7 @@ const WRITE_FAILED = 'Browser storage could not be coordinated. Your saved reque
 /** Non-destructive notice when stored requests could not be fully read. */
 export function ledgerStorageNotice(state: Pick<LedgerChange, 'recovery' | 'quarantined'>): string | undefined {
   if (state.quarantined) return 'Some saved requests in this browser could not be read. A copy of them was kept in this browser before your change was saved; nothing was deleted.';
-  if (state.recovery === 'newer-version') return 'Your requests were saved by a newer version of Gapless in another tab. Reload this page to see and edit them; changes here apply to this visit only and never overwrite them.';
+  if (state.recovery === 'newer-version') return 'Your requests were saved by a newer version of Timebower in another tab. Reload this page to see and edit them; changes here apply to this visit only and never overwrite them.';
   if (state.recovery) return 'Some saved requests in this browser could not be read. They stay saved as they are, and a copy is kept in this browser before any change replaces them.';
   return undefined;
 }

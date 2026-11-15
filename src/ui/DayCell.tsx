@@ -331,7 +331,7 @@ export function DayCell({
   const isPtoLike = category === 'suggested-pto' || category === 'pinned' || category === 'unpaid-leave';
   // The numeral's ink and the cell's face are separate layers (see the button below).
   const inkClasses = isOutOfRange
-    ? // F27: outside the planning range. Its own tone (3.5:1 on white, so the numeral still
+    ? // F27: outside the planning range. Its own tone (4.5:1+ on every surface, so the numeral still
       // reads as a date) at regular weight and with no fill, so it never matches a weekday
       // (ink on white), a weekend (muted on grey) or a holiday (teal on soft teal).
       'text-[var(--outside-text)] font-normal'
