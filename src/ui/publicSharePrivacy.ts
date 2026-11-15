@@ -1,4 +1,4 @@
-import { decodeEmployerCalendar } from '../personal/employerCalendar';
+import { decodeEmployerCalendar, employerCalendarCustomized } from '../personal/employerCalendar';
 import { isValidISODate, parseDateList } from './urlState';
 import { isPlanShareKey, PLAN_PRIVATE_KEYS, PUBLIC_SHARE_VERSION } from './shareFormat';
 import { PLANNER_REVISION } from '@daysoff/engine/solver/revision';
@@ -9,7 +9,10 @@ export function employerLabelsWouldBeShared(query: string): boolean {
   const raw = new URLSearchParams(query).get('eh');
   if (!raw) return false;
   const calendar = decodeEmployerCalendar(raw);
-  return !calendar || calendar.custom.length > 0 || calendar.excluded.length > 0;
+  if (!calendar) return true;
+  // A version 2 calendar with a region resolves regional days differently from the
+  // public-holiday default a recipient sees, so it counts as a calendar to choose about.
+  return employerCalendarCustomized(calendar) || (calendar.version === 2 && calendar.subdivision !== undefined && calendar.country === 'US');
 }
 
 // Private scheduling and policy settings, from the shared classification. `eh` is
@@ -17,7 +20,8 @@ export function employerLabelsWouldBeShared(query: string): boolean {
 const PRIVATE_PLAN_FIELDS = PLAN_PRIVATE_KEYS.filter(key => key !== 'eh' && key !== 'hd');
 const NUMBER_FIELDS = { b: 400, w: 100, count: 7, mb: 60, rv: 400 } as const;
 const DATE_FIELDS = ['s', 'e', 'afs'] as const;
-const STYLE_NAMES = ['balanced', 'long-breaks', 'more-breaks', 'custom'];
+const STYLE_NAMES = ['balanced', 'long-breaks', 'more-breaks', 'custom', 'year', 'max', 'season'];
+const SEASON_NAMES = ['spring', 'summer', 'fall', 'winter'];
 
 /** Build the versioned, allowlisted public scenario. The optional dates are a
  * separate, deliberate selection, never extracted from the private query. The planner
@@ -46,6 +50,8 @@ export function buildPublicPlanSearch(planSearch: string, observedHolidayDates?:
   if (source.get('pv') === '2') {
     params.set('pv', '2');
     if (style && STYLE_NAMES.includes(style)) params.set('ps', style);
+    const season = source.get('sn');
+    if (style === 'season' && season && SEASON_NAMES.includes(season)) params.set('sn', season);
   }
   const weekStart = source.get('ws');
   if (weekStart === '0' || weekStart === '1') params.set('ws', weekStart);

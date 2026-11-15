@@ -1,6 +1,6 @@
 import type { SolveInput } from '@daysoff/engine/solver/types';
 import { previewPinnedDay, type PinPreview } from '../ui/pinPreview';
-import type { ConsumerSolveOptions } from './optimizer';
+import type { StyledSolveOptions } from './yearPlan';
 import type { PinPreviewRequest, PinPreviewResponse } from './pinPreview.worker';
 
 export interface PinPreviewer {
@@ -28,7 +28,7 @@ interface Pending { id: number; date: string; resolve: (preview: PinPreview | nu
  * At most one request runs and one waits (the newest); a skipped request resolves null.
  */
 export function createPinPreviewer(
-  input: SolveInput, options: ConsumerSolveOptions, spawn: () => Worker | null = spawnPinPreviewWorker,
+  input: SolveInput, options: StyledSolveOptions, spawn: () => Worker | null = spawnPinPreviewWorker,
 ): PinPreviewer {
   const cache = new Map<string, PinPreview | null>();
   let worker: Worker | null | undefined;

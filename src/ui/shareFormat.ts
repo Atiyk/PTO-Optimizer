@@ -41,6 +41,7 @@ export const PLAN_URL_KEYS: Readonly<Record<string, UrlKeyClass>> = Object.freez
   count: 'public', // number of breaks slider
   pv: 'public', // planning engine version
   ps: 'public', // planning style
+  sn: 'public', // preferred season for ps=season
   mb: 'public', // minimum break length
   ws: 'public', // week start display
   ww: 'public', // workweek

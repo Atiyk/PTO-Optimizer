@@ -41,6 +41,7 @@ describe('/pto with 0 PTO days (F05)', () => {
     expect(within(summary).queryByText(/0 days off/)).toBeNull();
     expect(within(summary).queryByText('Days off per PTO day')).toBeNull();
     expect(within(summary).queryByRole('button', { name: 'Save this plan' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Keep this plan' })).toBeNull();
     expect(document.body.textContent).not.toMatch(/once the plan is solved/);
   });
 });
@@ -54,7 +55,8 @@ describe('/pto with the PTO field blank (F06)', () => {
     fireEvent.change(screen.getByLabelText('PTO days available'), { target: { value: '' } });
     expect(within(summary).getByText('Example for 15 PTO days. Enter yours to see your plan.')).toBeTruthy();
     // R2: an example plan is not the user's own, so it can't be saved.
-    for (const save of screen.queryAllByRole<HTMLButtonElement>('button', { name: 'Save this plan' })) expect(save.disabled).toBe(true);
+    const keep = screen.getAllByRole<HTMLButtonElement>('button', { name: 'Keep this plan' });
+    for (const save of keep) expect(save.disabled).toBe(true);
     fireEvent.change(screen.getByLabelText('PTO days available'), { target: { value: '12' } });
     expect(within(summary).queryByText(/Example for/)).toBeNull();
   });
@@ -95,10 +97,50 @@ describe('/pto first screen (N1, N3, N2, F13)', () => {
     window.history.replaceState(null, '', `${base}&b=3`);
     render(<App />);
     await ready();
-    fireEvent.change(screen.getByLabelText('Planning style'), { target: { value: 'balanced' } });
+    fireEvent.click(screen.getByRole('radio', { name: /One big trip/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'More options' }));
     // R1: one short line naming the style, what it favors and the break count.
-    const helper = screen.getByText(/^Balanced: /);
-    expect(helper.textContent).toBe('Balanced: mostly days off, 3 breaks. Moving a slider switches to Custom.');
-    expect(helper.textContent!.split(/\s+/).length).toBeLessThanOrEqual(12);
+    const helper = screen.getByText(/^One big trip: /);
+    expect(helper.textContent).toBe('One big trip: mostly days off, 1 long break. Sliders switch to Custom.');
+    expect(helper.textContent!.split(/\s+/).length).toBeLessThanOrEqual(14);
+  });
+
+  it('shows an old balanced link as Balanced, and offers the goals as one radio group', async () => {
+    window.history.replaceState(null, '', `${base}&b=3&pv=2&ps=balanced`);
+    render(<App />);
+    await ready();
+    const group = screen.getByRole('group', { name: 'What do you want from your PTO?' });
+    const radios = within(group).getAllByRole('radio');
+    expect(radios.map(radio => radio.closest('label')!.querySelector('.font-semibold')!.textContent)).toEqual([
+      'Spread across the year', 'Most days off', 'One big trip', 'Frequent long weekends', 'Seasonal priority', 'Balanced',
+    ]);
+    expect((within(group).getByRole('radio', { name: /Balanced/ }) as HTMLInputElement).checked).toBe(true);
+    fireEvent.change(within(group).getByLabelText('Season for the big break'), { target: { value: 'winter' } });
+    expect((within(group).getByRole('radio', { name: /Seasonal priority/ }) as HTMLInputElement).checked).toBe(true);
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('sn')).toBe('winter'));
+    expect(new URLSearchParams(window.location.search).get('ps')).toBe('season');
+  });
+});
+
+describe('input notes and older links are visible inside the planner (critic R1 #1)', () => {
+  it('a negative balance shows a note instead of silently changing', async () => {
+    window.history.replaceState(null, '', `${base}&b=-5&pv=2&ps=balanced`);
+    render(<App />);
+    await ready();
+    expect(screen.getByTestId('input-issues').textContent).toMatch(/PTO can't be negative/);
+  });
+
+  it('a balance above a year shows the limit', async () => {
+    window.history.replaceState(null, '', `${base}&b=400&pv=2&ps=balanced`);
+    render(<App />);
+    await ready();
+    expect(screen.getByTestId('input-issues').textContent).toMatch(/365/);
+  });
+
+  it('a link without pv shows the older-version notice', async () => {
+    window.history.replaceState(null, '', `${base}&b=10`);
+    render(<App />);
+    await ready();
+    expect(screen.getByText(/older version of Timebower/)).toBeTruthy();
   });
 });

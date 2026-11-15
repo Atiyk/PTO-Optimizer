@@ -7,6 +7,7 @@ import { isAlternatingFridayOff } from '@daysoff/engine/calendar/calendarMath';
 import { rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { DEFAULT_WORK_WEEK, type WorkWeek } from '@daysoff/engine/solver/types';
 import { readEmployerCalendar } from '../personal/employerCalendar';
+import { resolveHolidayEntries } from '../personal/employerHolidayChoices';
 import type { RequestCalendar } from '../personal/requestLedger';
 import { isValidISODate } from './urlState';
 
@@ -107,12 +108,14 @@ export function useRequestCalendar(options: RequestCalendarOptions): RequestCale
   const { offDays, holidayNames } = useMemo(() => {
     const holidayNames = new Map<string, string>();
     if (!current) return { offDays: [], holidayNames };
-    const excluded = new Set(employer.excluded);
-    for (const holiday of [...current.holidays, ...employer.custom]) {
-      if (isValidISODate(holiday.date) && holiday.date >= rangeStart && holiday.date <= rangeEnd
-        && !excluded.has(`${holiday.date}|${holiday.name}`) && !holidayNames.has(holiday.date)) {
-        holidayNames.set(holiday.date, holiday.name);
-      }
+    // The same resolution as the planner: regional days only when the employer gives them,
+    // employer extras and company days included, US names localized ("Labor Day").
+    const entries = resolveHolidayEntries(
+      current.holidays.filter((holiday) => !holiday.counties), current.holidays.filter((holiday) => holiday.counties),
+      employer, rangeStart, rangeEnd,
+    );
+    for (const entry of entries) {
+      if (entry.checked && isValidISODate(entry.date) && !holidayNames.has(entry.date)) holidayNames.set(entry.date, entry.name);
     }
     const dates = new Set(holidayNames.keys());
     if (altFridayStart) {

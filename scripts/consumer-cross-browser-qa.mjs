@@ -23,6 +23,9 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { chromium, firefox, webkit } from 'playwright';
+// Contexts block service workers: the routes below emulate Vercel clean URLs and stub
+// third parties, and a registered worker (P3 PWA) would take requests out of Playwright
+// routing. scripts/pwa-offline-journey.mjs covers the worker itself.
 
 const base = new URL(process.argv[2] || 'http://127.0.0.1:4173');
 const output = resolve(process.argv[3] || 'qa-evidence/cross-browser');
@@ -54,6 +57,17 @@ const mounted = (page) => page.locator('[data-prerendered-controls]').waitFor({ 
 const settled = async (page) => { await mounted(page); await page.waitForLoadState('networkidle'); };
 
 const noOverflow = (page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1);
+/** Phones keep share, export and subscribe actions in the closed "More" section under the
+ * one primary action; open it before using one of them. */
+async function showMonthDetails(page) {
+  // Phones show the year overview first; the month calendar is one tap away.
+  const toggle = page.getByRole('button', { name: 'Show month details' });
+  if (await toggle.isVisible()) await toggle.click();
+}
+async function openMoreActions(page) {
+  const more = page.locator('details#more-actions');
+  if (await more.count() && !await more.evaluate((element) => element.open)) await more.locator(':scope > summary').click();
+}
 
 for (const name of selected) {
   const engine = engines[name];
@@ -65,7 +79,7 @@ for (const name of selected) {
       headless: true,
       ...(name === 'chromium' && process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {}),
     });
-    const context = await browser.newContext({
+    const context = await browser.newContext({ serviceWorkers: 'block',
       viewport: { width: 375, height: 850 },
       timezoneId: 'America/New_York',
       locale: 'en-US',
@@ -128,6 +142,7 @@ for (const name of selected) {
     await planner.goto(link.href);
     await planner.locator('main[data-plan-ready="true"]').waitFor();
     assert.ok(await planner.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+    await openMoreActions(planner);
     await planner.getByRole('button', { name: 'Copy plan link', exact: true }).click();
     await planner.getByRole('button', { name: /^(?:Link copied|Copied \(calendar omitted\))$/ }).waitFor();
     const copied = new URL(await planner.evaluate(() => window.__timebowerClipboard));
@@ -182,6 +197,7 @@ for (const name of selected) {
     await page.getByRole('heading', { name: 'Your complete plan' }).waitFor();
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     // The planner's own share link carries the full snapshot (sv, er and hf).
+    await openMoreActions(page);
     await page.locator('#shortcut-copy-link').click();
     await page.locator('#shortcut-copy-link').filter({ hasText: /^Link copied$|^Copied/ }).waitFor();
     const plannerCopy = new URL(await page.evaluate(() => window.__timebowerClipboard));
@@ -192,7 +208,7 @@ for (const name of selected) {
     assert.equal(plannerCopy.searchParams.get('e'), '2027-10-20');
 
     // The recipient: a clean profile with no storage, opening the copied link.
-    const recipient = await browser.newContext({ viewport: { width: 375, height: 850 }, timezoneId: 'Europe/London', locale: 'en-GB', reducedMotion: 'reduce' });
+    const recipient = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 375, height: 850 }, timezoneId: 'Europe/London', locale: 'en-GB', reducedMotion: 'reduce' });
     try {
       await isolate(recipient);
       const view = await recipient.newPage();
@@ -246,6 +262,7 @@ for (const name of selected) {
     await importer.getByText('2027-03-10, 2027-03-24, 2027-03-31', { exact: true }).waitFor();
     await importer.getByRole('button', { name: 'Add', exact: true }).click();
     await page.locator('main[data-plan-ready="true"]').waitFor({ state: 'visible' });
+    await showMonthDetails(page);
     for (const day of ['2027-03-10', '2027-03-24', '2027-03-31']) {
       await page.locator(`#day-${day}`).and(page.getByRole('button', { name: /blackout/ })).waitFor();
     }
@@ -282,7 +299,7 @@ for (const name of selected) {
 async function checkPolicyStorage(browser, result) {
   const key = 'gapless.personal.policy.v1';
   const corrupt = '{"version":1,"search":';
-  const context = await browser.newContext({ viewport: { width: 375, height: 850 }, timezoneId: 'America/New_York', locale: 'en-US', reducedMotion: 'reduce' });
+  const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 375, height: 850 }, timezoneId: 'America/New_York', locale: 'en-US', reducedMotion: 'reduce' });
   try {
     await isolate(context);
     const page = await context.newPage();
@@ -318,9 +335,9 @@ async function checkPolicyStorage(browser, result) {
     await page.evaluate(({ key, newer }) => localStorage.setItem(key, newer), { key, newer });
     await settled(page);
     await page.reload();
-    await page.getByText(/saved by a newer version of Gapless/).first().waitFor({ state: 'visible' });
+    await page.getByText(/saved by a newer version of Timebower/).first().waitFor({ state: 'visible' });
     await page.getByRole('button', { name: 'Save policy in this browser' }).click();
-    await page.getByText(/A newer version of Gapless saved your policy. Nothing was overwritten/).waitFor({ state: 'visible' });
+    await page.getByText(/A newer version of Timebower saved your policy. Nothing was overwritten/).waitFor({ state: 'visible' });
     assert.equal(await page.evaluate((key) => localStorage.getItem(key), key), newer, 'a newer-schema record is never downgraded');
     await settled(page);
   } finally {
@@ -332,7 +349,7 @@ async function checkPolicyStorage(browser, result) {
 /** Real touch events (hasTouch) on a calendar day. The app picks its tap behaviour from
  * matchMedia('(hover: hover)') (src/ui/useHasHover.ts); follow the path the engine reports. */
 async function checkTouch(browser, name, result) {
-  const context = await browser.newContext({
+  const context = await browser.newContext({ serviceWorkers: 'block',
     viewport: { width: 375, height: 812 }, hasTouch: true,
     // Firefox gets touch without mobile-viewport emulation, the most conservative setup.
     ...(name === 'firefox' ? {} : { isMobile: true }),
@@ -349,6 +366,7 @@ async function checkTouch(browser, name, result) {
     await page.clock.setFixedTime(new Date('2027-01-01T17:00:00Z'));
     await page.goto(new URL('/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15&rv=0&pv=2', base).href, { waitUntil: 'domcontentloaded' });
     await page.locator('main[data-plan-ready="true"]').waitFor({ state: 'visible' });
+    await showMonthDetails(page);
     const hover = await page.evaluate(() => matchMedia('(hover: hover)').matches);
     const day = page.locator('#day-2027-01-20');
     await day.waitFor({ state: 'visible' });
@@ -375,7 +393,7 @@ async function checkTouch(browser, name, result) {
 
 /** "Today" is the viewer's local date: UTC is still November 10 when Kiritimati (UTC+14) is on the 11th. */
 async function checkLocalDate(browser, result) {
-  const context = await browser.newContext({ viewport: { width: 375, height: 850 }, timezoneId: 'Pacific/Kiritimati', locale: 'en-US', reducedMotion: 'reduce' });
+  const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 375, height: 850 }, timezoneId: 'Pacific/Kiritimati', locale: 'en-US', reducedMotion: 'reduce' });
   try {
     await isolate(context);
     const page = await context.newPage();
@@ -393,7 +411,7 @@ async function checkLocalDate(browser, result) {
 
 /** WCAG 2 A/AA axe rules, per engine. Contrast is measured in Chromium by the Lighthouse step. */
 async function checkAccessibility(browser, result) {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, timezoneId: 'America/New_York', locale: 'en-US', reducedMotion: 'reduce' });
+  const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1280, height: 900 }, timezoneId: 'America/New_York', locale: 'en-US', reducedMotion: 'reduce' });
   const found = [];
   try {
     await isolate(context);

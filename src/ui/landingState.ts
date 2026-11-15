@@ -1,8 +1,8 @@
 import { COUNTRIES } from '@daysoff/engine/data/countries';
 import { isoToSerial } from '@daysoff/engine/solver/dateUtils';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
-import { defaultPlanRangeEnd, solvePlan } from '../autopilot/planFromSearch';
-import { planningStyleSettings } from '../planning/optimizer';
+import { defaultPlanRangeEnd, planStyleOptionsFor, solvePlan } from '../autopilot/planFromSearch';
+import { planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
 import { isValidISODate } from './urlState';
 
 export interface LandingState {
@@ -13,9 +13,14 @@ export interface LandingState {
 }
 
 export const LANDING_MAX_RANGE_DAYS = 730;
-const PREVIEW_STYLE = 'balanced';
+/** The homepage preview and the homepage -> /pto link use the year-round plan. Old
+ * homepage links (ps=balanced) still reproduce their own plan on /pto. */
+export const PREVIEW_STYLE: PlanningStyle = 'year';
 const PREVIEW_VERSION = 2;
 const PREVIEW_MINIMUM = 3;
+/** The /pto planner's state for a preview link: no reserve held back by the person
+ * (rv=0), the default 14-day notice. The year plan adds its own small reserve. */
+const PREVIEW_PLAN_OPTIONS = planStyleOptionsFor({ noticePeriodDays: 14, noticeUnit: 'calendar', reserveDays: 0 });
 
 export function computeLandingPlan(state: LandingState, holidays: readonly { date: string }[]) {
   return solvePlan({
@@ -23,7 +28,7 @@ export function computeLandingPlan(state: LandingState, holidays: readonly { dat
     ...planningStyleSettings(PREVIEW_STYLE),
     offDays: [...new Set(holidays.map(({ date }) => date))],
     workWeek: DEFAULT_WORK_WEEK,
-  }, PREVIEW_VERSION, PREVIEW_MINIMUM, PREVIEW_STYLE);
+  }, PREVIEW_VERSION, PREVIEW_MINIMUM, PREVIEW_STYLE, PREVIEW_PLAN_OPTIONS);
 }
 
 export function validLandingRange(start: string, end: string): boolean {

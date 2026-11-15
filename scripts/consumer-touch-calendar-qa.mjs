@@ -6,6 +6,9 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
+// Contexts block service workers: the routes below emulate Vercel clean URLs and stub
+// third parties, and a registered worker (P3 PWA) would take requests out of Playwright
+// routing. scripts/pwa-offline-journey.mjs covers the worker itself.
 
 const [base = 'http://127.0.0.1:4177', output = 'qa-evidence/touch-calendar'] = process.argv.slice(2);
 const origin = new URL(base).origin;
@@ -16,7 +19,7 @@ const browser = await chromium.launch({ headless: true, ...(process.env.PW_CHROM
 
 try {
   for (const width of report.viewports) {
-    const context = await browser.newContext({
+    const context = await browser.newContext({ serviceWorkers: 'block',
       viewport: { width, height: 812 }, hasTouch: true, isMobile: true,
       locale: 'en-US', timezoneId: 'America/New_York', reducedMotion: 'reduce',
     });
@@ -35,6 +38,9 @@ try {
       await page.goto(new URL('/pto/?c=US&s=2027-01-01&e=2027-12-31&b=15&rv=0&pv=2', origin).href, { waitUntil: 'domcontentloaded' });
       await page.locator('main[data-plan-ready="true"]').waitFor({ state: 'visible' });
       assert.equal(await page.evaluate(() => matchMedia('(hover: hover)').matches), false, 'Browser must simulate a touch-only device');
+      // Phones show the year overview first; the month calendar is one tap away.
+      const monthDetails = page.getByRole('button', { name: 'Show month details' });
+      if (await monthDetails.isVisible()) await monthDetails.tap();
       const day = page.locator('#day-2027-01-20');
       await day.waitFor({ state: 'visible' });
       // F09: every in-range day is a 44px-wide (or wider) touch target, measured in the DOM.

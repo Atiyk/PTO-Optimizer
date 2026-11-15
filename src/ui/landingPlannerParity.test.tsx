@@ -56,7 +56,8 @@ describe('landing preview and planner result', () => {
     const planner = renderHook(() => useAppState());
     expect(planner.result.current.planningPending).toBe(false);
     expect(planner.result.current.breaks).toEqual(expected.primary);
-    expect(planner.result.current.budgetSpent).toBe(15);
+    // The year-round plan keeps 2 of 15 days for surprises.
+    expect(planner.result.current.budgetSpent).toBe(13);
     expect(planner.result.current.effectiveOffDays).not.toContain('2027-02-12');
     const copied = buildPublicPlanLink(window.location.href, planner.result.current.planSearch).url;
     planner.unmount();
@@ -88,7 +89,9 @@ describe('landing preview and planner result', () => {
       expect(state.rangeStart).toBe(landing.rangeStart);
       expect(state.rangeEnd).toBe(landing.rangeEnd);
       expect(state.breaks).toEqual(preview.primary);
-      expect(state.budgetSpent).toBe(15);
+      expect(state.budgetSpent).toBe(13);
+      expect(state.planMeta?.reserveKept).toBe(2);
+      expect(state.planningStyle).toBe('year');
       expect(totalDays(state.breaks)).toBe(31);
     } finally {
       vi.useRealTimers();

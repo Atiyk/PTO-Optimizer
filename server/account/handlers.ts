@@ -29,6 +29,15 @@ const LOGIN_TTL = 60 * 30;
 const UNSUBSCRIBE_TTL = 60 * 60 * 24 * 365;
 export const MAX_LINK_LENGTH = 4096;
 const LOGIN_LINKS_PER_IP_PER_HOUR = 5;
+const LOGIN_LINKS_PER_IP_PER_DAY = 20;
+/** Per recipient address, on top of the two-minute repeat guard (db.takeLoginSlot). */
+export const LOGIN_LINKS_PER_ADDRESS_PER_HOUR = 3;
+export const LOGIN_LINKS_PER_ADDRESS_PER_DAY = 5;
+/** Any one address's share of the site's daily email budget (sign-in links, the reminder
+ * digest and forwarded-approval replies together), so no single address, and no one
+ * person asking for links to it, can use up the budget for everyone else. */
+export const EMAILS_PER_ADDRESS_PER_DAY = 10;
+const DAY_MS = 24 * 60 * 60 * 1000;
 const INBOUND_REPLIES_PER_ACCOUNT_PER_DAY = 5;
 const HOUR_MS = 60 * 60 * 1000;
 const EMAIL = /^[^\s@<>()",;:]{1,64}@[a-z0-9.-]{1,253}\.[a-z]{2,63}$/i;
@@ -45,16 +54,16 @@ const esc = (text: string) => text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 
 function page(status: number, title: string, message: string, origin: string): Response {
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title></head>
-<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem;line-height:1.5"><h1 style="font-size:1.4rem">${esc(title)}</h1><p>${esc(message)}</p><p><a href="${esc(origin)}/">Back to Gapless</a></p></body></html>`;
+<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem;line-height:1.5"><h1 style="font-size:1.4rem">${esc(title)}</h1><p>${esc(message)}</p><p><a href="${esc(origin)}/">Back to Timebower</a></p></body></html>`;
   return new Response(html, { status, headers: { 'content-type': 'text/html; charset=utf-8', ...SECURITY_HEADERS } });
 }
 
 /** The sign-in link opens this page, and only its button signs in, so visiting a link someone
  * else sent you (or a mail scanner prefetching it) never signs your browser into their account. */
 function confirmSignInPage(origin: string): Response {
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sign in to Gapless</title></head>
-<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem;line-height:1.5"><h1 style="font-size:1.4rem">Sign in to Gapless</h1><p>Only continue if you asked for this link yourself.</p>
-<form method="post"><button type="submit" style="font:inherit;padding:.6rem 1.2rem;cursor:pointer">Sign in</button></form><p><a href="${esc(origin)}/">Back to Gapless</a></p></body></html>`;
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sign in to Timebower</title></head>
+<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem;line-height:1.5"><h1 style="font-size:1.4rem">Sign in to Timebower</h1><p>Only continue if you asked for this link yourself.</p>
+<form method="post"><button type="submit" style="font:inherit;padding:.6rem 1.2rem;cursor:pointer">Sign in</button></form><p><a href="${esc(origin)}/">Back to Timebower</a></p></body></html>`;
   return new Response(html, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8', ...SECURITY_HEADERS } });
 }
 
@@ -142,10 +151,16 @@ function isSameOriginJson(request: Request): boolean {
   return origin === null || origin === new URL(request.url).origin;
 }
 
-async function sendBudgeted(deps: AccountDeps, mail: Parameters<SendMail>[0]): Promise<boolean> {
-  if (!(await deps.store().takeEmailBudget(today(deps), deps.config.dailyEmailCap))) return false;
+type SendOutcome = 'sent' | 'address-limit' | 'site-limit';
+
+/** Counts the recipient's share first, then the site's daily cap, then sends. Rate keys are
+ * hashed by the store, so no address is kept for this. */
+async function sendBudgeted(deps: AccountDeps, mail: Parameters<SendMail>[0]): Promise<SendOutcome> {
+  const nowMs = (deps.now?.() ?? new Date()).getTime();
+  if (!(await deps.store().takeRateSlot(`mail-to:${mail.to.toLowerCase()}`, EMAILS_PER_ADDRESS_PER_DAY, DAY_MS, nowMs))) return 'address-limit';
+  if (!(await deps.store().takeEmailBudget(today(deps), deps.config.dailyEmailCap))) return 'site-limit';
   await deps.send()(mail);
-  return true;
+  return 'sent';
 }
 
 /** /api/account: status (GET), sign-in link landing (?verify=), unsubscribe (?unsubscribe=), actions (POST). */
@@ -166,7 +181,7 @@ export async function handleAccount(request: Request, deps: AccountDeps): Promis
   if (unsubscribe !== null) {
     const id = verifyToken(secret, 'unsubscribe', unsubscribe, nowMs);
     if (request.method !== 'GET' && request.method !== 'POST') return json(405, { error: 'Method not allowed.' });
-    if (!id) return page(400, 'This link has expired', 'Sign in to Gapless to turn reminder emails off.', origin);
+    if (!id) return page(400, 'This link has expired', 'Sign in to Timebower to turn reminder emails off.', origin);
     await deps.store().save(id, { reminders: false });
     return request.method === 'POST' ? json(200, { ok: true }) : page(200, 'Reminder emails are off', 'You will not get any more reminder emails. Your saved plan stays in your account until you delete it.', origin);
   }
@@ -209,20 +224,28 @@ export async function handleAccount(request: Request, deps: AccountDeps): Promis
   if (body.action === 'login') {
     const email = normalizeEmail(body.email);
     if (!email) return json(400, { error: 'Enter a valid email address.' });
-    if (!(await deps.store().takeRateSlot(`login-ip:${clientIp(request)}`, LOGIN_LINKS_PER_IP_PER_HOUR, HOUR_MS, nowMs))) {
-      return json(429, { error: 'Too many sign-in links were asked for from here. Try again in an hour.' });
+    const ip = clientIp(request);
+    if (!(await deps.store().takeRateSlot(`login-ip:${ip}`, LOGIN_LINKS_PER_IP_PER_HOUR, HOUR_MS, nowMs))
+      || !(await deps.store().takeRateSlot(`login-ip-day:${ip}`, LOGIN_LINKS_PER_IP_PER_DAY, DAY_MS, nowMs))) {
+      return json(429, { error: 'Too many sign-in links were asked for from here. Try again later.' });
     }
     // The answer is the same whether or not a link was sent, so it says nothing about who has an account.
+    // The limits per address apply to every address alike, with or without an account.
     if (await deps.store().takeLoginSlot(email, nowMs)) {
+      if (!(await deps.store().takeRateSlot(`login-email-hour:${email}`, LOGIN_LINKS_PER_ADDRESS_PER_HOUR, HOUR_MS, nowMs))
+        || !(await deps.store().takeRateSlot(`login-email-day:${email}`, LOGIN_LINKS_PER_ADDRESS_PER_DAY, DAY_MS, nowMs))) {
+        return json(429, { error: 'Several sign-in links were already sent to this address. Use the newest one in your inbox (check spam too), or try again later.' });
+      }
       const next = normalizeLink(body.returnTo, false);
       const link = `${origin}/api/account?verify=${encodeURIComponent(signToken(secret, 'login', email, LOGIN_TTL, nowMs))}${next ? `&next=${encodeURIComponent(next)}` : ''}`;
       const sent = await sendBudgeted(deps, {
         to: email,
-        subject: 'Your Gapless sign-in link',
-        text: ['Hi,', '', 'Use this link to sign in to Gapless. It works for 30 minutes.', '', link, '',
+        subject: 'Your Timebower sign-in link',
+        text: ['Hi,', '', 'Use this link to sign in to Timebower. It works for 30 minutes.', '', link, '',
           'If you did not ask for this, ignore this email. No account is created unless the link is used.'].join('\n'),
       });
-      if (!sent) return json(503, { error: 'Gapless has sent its email limit for today. Try again tomorrow.' });
+      if (sent === 'address-limit') return json(429, { error: 'This address has had several emails from Timebower today. Use the newest sign-in link in your inbox, or try again tomorrow.' });
+      if (sent === 'site-limit') return json(503, { error: 'Timebower has sent its email limit for today. Try again tomorrow.' });
     }
     return json(200, { ok: true });
   }
@@ -234,7 +257,7 @@ export async function handleAccount(request: Request, deps: AccountDeps): Promis
     const planLink = normalizeLink(body.planLink);
     const policyLink = normalizeLink(body.policyLink);
     if ((body.planLink !== undefined && planLink === undefined) || (body.policyLink !== undefined && policyLink === undefined)) {
-      return json(400, { error: 'That link is not a Gapless plan or policy link.' });
+      return json(400, { error: 'That link is not a Timebower plan or policy link.' });
     }
     if (body.reminders !== undefined && typeof body.reminders !== 'boolean') return json(400, { error: 'Bad request.' });
     const saved = await deps.store().save(row.id, { planLink, policyLink, reminders: body.reminders as boolean | undefined });
@@ -281,8 +304,9 @@ export async function handleRemind(request: Request, deps: AccountDeps): Promise
         unsubscribeUrl, accountUrl: `${origin}${row.plan_link ?? row.policy_link}#account`,
       });
       try {
-        if (!(await sendBudgeted(deps, { to: row.email, ...mail, unsubscribeUrl }))) { capped = true; break; }
-        sent += 1;
+        const outcome = await sendBudgeted(deps, { to: row.email, ...mail, unsubscribeUrl });
+        if (outcome === 'site-limit') { capped = true; break; }
+        if (outcome === 'sent') sent += 1;
       } catch {
         failed += 1;
         continue; // Not marked, so the next run tries again.
@@ -382,17 +406,17 @@ export async function handleInbound(request: Request, deps: AccountDeps): Promis
   const decision = parsed.decision === 'approved' ? 'an approval' : parsed.decision === 'rejected' ? 'a denial' : null;
   const lines = ['Hi,', ''];
   if (!decision || !range) {
-    lines.push("Gapless couldn't tell whether the email you forwarded approves or denies time off, or for which dates.",
-      `Open Gapless and paste the reply into the approval assistant to check it by hand: ${origin}/policy`);
+    lines.push("Timebower couldn't tell whether the email you forwarded approves or denies time off, or for which dates.",
+      `Open Timebower and paste the reply into the approval assistant to check it by hand: ${origin}/policy`);
   } else {
     const when = range.start === range.end ? longDate(range.start) : `${longDate(range.start)} to ${longDate(range.end)}`;
     lines.push(`This reads as ${decision} for ${when}${parsed.confidence === 'high' ? '' : ' (please double-check the dates)'}.`);
     if (parsed.decision === 'approved') {
-      lines.push('', 'Mark the request approved in Gapless so your balance stays right:', `${origin}/policy`, '',
+      lines.push('', 'Mark the request approved in Timebower so your balance stays right:', `${origin}/policy`, '',
         'An out-of-office message you can copy (edit the parts in brackets):', '', '---',
         outOfOfficeMessage(range, { workWeek: DEFAULT_WORK_WEEK, offDays: [] }), '---');
     } else {
-      lines.push('', `Gapless can suggest other dates: ${origin}/`);
+      lines.push('', `Timebower can suggest other dates: ${origin}/`);
     }
   }
   lines.push('', 'The email you forwarded was read once to write this reply and was not stored.');

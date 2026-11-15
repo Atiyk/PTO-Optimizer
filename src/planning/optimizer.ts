@@ -3,10 +3,28 @@ import { mondayIndexedDow, monthsElapsed, rangeISO } from '@daysoff/engine/solve
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import type { SolveInput, SolveResult } from '@daysoff/engine/solver/types';
 
-export type PlanningStyle = 'balanced' | 'long-breaks' | 'more-breaks' | 'custom';
+/** `balanced`, `long-breaks`, `more-breaks` and `custom` are frozen: old `pv=2` links must
+ * keep reproducing the same plan. Year-round styles are additive (see yearPlan.ts):
+ * - `year`: spread across the seasons, small reserve, nothing in the first weeks.
+ * - `max`: the most days off the budget can buy (may bunch breaks together).
+ * - `season`: one big break in a preferred season (`sn`), the rest spread. */
+export type PlanningStyle = 'balanced' | 'long-breaks' | 'more-breaks' | 'custom' | 'year' | 'max' | 'season';
 
-/** Presets remain visible/editable through the existing manual controls. */
+export const PLANNING_STYLES: readonly PlanningStyle[] = ['balanced', 'long-breaks', 'more-breaks', 'custom', 'year', 'max', 'season'];
+
+/** True for the windowed year-round styles that yearPlan.ts solves. */
+export function isYearRoundStyle(style: PlanningStyle | undefined): style is 'year' | 'season' {
+  return style === 'year' || style === 'season';
+}
+
+/** Presets remain visible/editable through the existing manual controls. For `year` and
+ * `season` these are the slider positions shown; the plan itself is solved per season
+ * window (yearPlan.ts). `max` uses w=0 with no break-count target: the engine's DP ranks
+ * spend first, then calendar length only at w=0, so no other slider setting can give more
+ * days off for the same inputs (verified in yearPlan.test.ts). */
 export function planningStyleSettings(style: PlanningStyle): { w: number; breakCount: number } | undefined {
+  if (style === 'year' || style === 'season') return { w: 30, breakCount: 0 };
+  if (style === 'max') return { w: 0, breakCount: 0 };
   if (style === 'balanced') return { w: 30, breakCount: 3 };
   if (style === 'long-breaks') return { w: 20, breakCount: 1 };
   if (style === 'more-breaks') return { w: 30, breakCount: 7 };

@@ -89,7 +89,7 @@ export function DataSources() {
                 Planning runs on your device and needs no account. Saved policies, employer holidays, tracked requests and saved plans are kept in this browser and are not synced to other devices.
               </p>
               <p className="mt-3 max-w-[62ch] text-base leading-7 text-ink">
-                {SHARE_LINK_SENTENCE} Calendar subscriptions and optional email reminders send your plan link to {PRODUCT_NAME}’s server. If you sign in for reminders, the server keeps your email address and the links you choose to save. The <a href="/privacy.html" className={`link-mark ${FOCUS}`}>privacy page</a> has the details.
+                {SHARE_LINK_SENTENCE} Calendar subscriptions send your chosen dates, not your balance, to {PRODUCT_NAME}’s server. Optional email reminders send your plan link. If you sign in for reminders, the server keeps your email address and the links you choose to save. The <a href="/privacy.html" className={`link-mark ${FOCUS}`}>privacy page</a> has the details.
               </p>
             </section>
           </div>

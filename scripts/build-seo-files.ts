@@ -28,6 +28,10 @@ function buildSitemap(): string {
     // it's a real crawlable route and was in the sitemap before this rewrite - kept here
     // explicitly rather than silently dropped.
     { loc: `${SITE_URL}/docs`, changefreq: 'monthly', priority: 0.5 },
+    // Static public/ pages with their own canonical tags (rewritten below). vercel.json has
+    // cleanUrls, so /privacy.html is served at /privacy.
+    { loc: `${SITE_URL}/privacy`, changefreq: 'monthly', priority: 0.3 },
+    { loc: `${SITE_URL}/terms`, changefreq: 'monthly', priority: 0.3 },
   ];
   const body = urlEntries
     .map((u) => `  <url>\n    <loc>${u.loc}</loc>\n    <changefreq>${u.changefreq}</changefreq>\n    <priority>${u.priority.toFixed(1)}</priority>\n  </url>`)
@@ -47,11 +51,19 @@ function rewriteDataSources(): void {
   writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, 'utf-8');
 }
 
-function rewriteDocsPage(): void {
-  const filePath = resolve(distDir, 'docs', 'index.html');
-  if (!existsSync(filePath)) throw new Error(`Expected ${filePath} to exist - did vite build copy public/docs first?`);
+/** public/ pages name the placeholder origin https://pto-optimizer.app in their canonical
+ * tags and examples; the build writes the real site URL, as for every other page. */
+function rewriteStaticPage(...segments: string[]): void {
+  const filePath = resolve(distDir, ...segments);
+  if (!existsSync(filePath)) throw new Error(`Expected ${filePath} to exist - did vite build copy public/ first?`);
   const html = readFileSync(filePath, 'utf-8');
   writeFileSync(filePath, html.replaceAll('https://pto-optimizer.app', SITE_URL), 'utf-8');
+}
+
+function rewriteDocsPage(): void {
+  rewriteStaticPage('docs', 'index.html');
+  rewriteStaticPage('privacy.html');
+  rewriteStaticPage('terms.html');
 }
 
 function main(): void {
@@ -59,7 +71,7 @@ function main(): void {
   writeFileSync(resolve(distDir, 'robots.txt'), buildRobots(), 'utf-8');
   rewriteDataSources();
   rewriteDocsPage();
-  console.log(`SEO files built for ${SITE_URL}: sitemap.xml, robots.txt, data-sources.json, docs/index.html`);
+  console.log(`SEO files built for ${SITE_URL}: sitemap.xml, robots.txt, data-sources.json, docs/index.html, privacy.html, terms.html`);
 }
 
 main();

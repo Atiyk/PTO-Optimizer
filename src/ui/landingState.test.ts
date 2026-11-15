@@ -11,7 +11,7 @@ describe('homepage planning state', () => {
 
   it('preserves the exact live preview inputs when opening the full planner', () => {
     const params = new URL(landingPlanHref(state, '2027-04-12'), 'https://example.test').searchParams;
-    expect(Object.fromEntries(params)).toEqual({ c: 'GB', b: '17', s: '2027-02-01', e: '2028-02-29', rv: '0', pv: '2', ps: 'balanced', mb: '3', lp: '1', w: '30', count: '3', p: '2027-04-12' });
+    expect(Object.fromEntries(params)).toEqual({ c: 'GB', b: '17', s: '2027-02-01', e: '2028-02-29', rv: '0', pv: '2', ps: 'year', mb: '3', lp: '1', w: '30', count: '0', p: '2027-04-12' });
     expect(params.has('home')).toBe(false);
   });
 

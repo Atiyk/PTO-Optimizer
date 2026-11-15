@@ -1,4 +1,5 @@
 import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
+import { holidayDisplayNames } from '../personal/holidayDisplayNames';
 import { parseISO, addDays } from '@daysoff/engine/solver/dateUtils';
 import { formatDateRange, formatCardDateRange, formatShort } from '@daysoff/engine/calendar/dateFormat';
 import { noticePhrase, requestByDate, type NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
@@ -76,7 +77,7 @@ export interface ReminderOptions {
  * only, unchanged. */
 const DEFAULT_REMINDER_OPTIONS: ReminderOptions = { enabled: false, leadDays: 14 };
 
-/** The per-PTO-day VEVENTs, shared by the downloaded .ics and the live feed (F1) so a
+/** The per-PTO-day VEVENTs, shared by the downloaded .ics and the subscription feed (F1) so a
  * subscribed calendar and a downloaded one carry byte-identical events for the same day. */
 export function ptoDayEventLines(breaks: Break[], isPtoDay: (iso: string) => boolean, dtstamp: string, note?: string): string[] {
   const lines: string[] = [];
@@ -96,6 +97,39 @@ export function ptoDayEventLines(breaks: Break[], isPtoDay: (iso: string) => boo
       lines.push('TRANSP:TRANSPARENT');
       lines.push('END:VEVENT');
     }
+  }
+  return lines;
+}
+
+/** How a downloaded plan lays out its PTO: one event per PTO day (the default, and the only
+ * layout the subscription feed uses) or one event spanning each whole break. */
+export type ICSLayout = 'day' | 'break';
+
+/**
+ * One all-day VEVENT per break, from its first to its last day off (DTEND exclusive).
+ * Its own UID scheme under the same domain, `pto-break-<start>-<end>@pto-optimizer.app`,
+ * so it never collides with the per-day `pto-<date>` events and stays stable for the same
+ * break across downloads.
+ */
+export function breakEventLines(breaks: Break[], isPtoDay: (iso: string) => boolean, dtstamp: string, note?: string): string[] {
+  const lines: string[] = [];
+  for (const brk of breaks) {
+    const ptoDays = brk.days.filter((day) => isPtoDay(day));
+    if (ptoDays.length === 0) continue;
+    const dateStart = isoToICSDate(brk.start);
+    const dateEnd = addOneDayICS(isoToICSDate(brk.end));
+    const ptoWord = ptoDays.length === 1 ? 'day' : 'days';
+    const offWord = brk.totalDaysOff === 1 ? 'day' : 'days';
+    const description = `${ptoDays.length} PTO ${ptoWord} -> ${brk.totalDaysOff} ${offWord} off. PTO days: ${ptoDays.map((day) => formatShort(day)).join(', ')}.${note ? ` ${note}` : ''}`;
+    lines.push('BEGIN:VEVENT');
+    lines.push(foldLine(`UID:pto-break-${dateStart}-${isoToICSDate(brk.end)}@pto-optimizer.app`));
+    lines.push(`DTSTAMP:${dtstamp}`);
+    lines.push(`DTSTART;VALUE=DATE:${dateStart}`);
+    lines.push(`DTEND;VALUE=DATE:${dateEnd}`);
+    lines.push(foldLine(`SUMMARY:${escapeText(`Time off (${formatDateRange(brk.start, brk.end)})`)}`));
+    lines.push(foldLine(`DESCRIPTION:${escapeText(description)}`));
+    lines.push('TRANSP:TRANSPARENT');
+    lines.push('END:VEVENT');
   }
   return lines;
 }
@@ -182,6 +216,7 @@ export function generateICS(
   reminderOptions: ReminderOptions = DEFAULT_REMINDER_OPTIONS,
   /** Optional per-event note; the download passes none. Tests use it to compare with the feed. */
   note?: string,
+  layout: ICSLayout = 'day',
 ): string {
   const lines: string[] = [];
   lines.push('BEGIN:VCALENDAR');
@@ -191,7 +226,7 @@ export function generateICS(
   lines.push(foldLine(`X-WR-CALNAME:${PRODUCT_NAME} - PTO plan`));
 
   const dtstamp = dtstampNow(now);
-  lines.push(...ptoDayEventLines(breaks, isPtoDay, dtstamp, note));
+  lines.push(...(layout === 'break' ? breakEventLines(breaks, isPtoDay, dtstamp, note) : ptoDayEventLines(breaks, isPtoDay, dtstamp, note)));
   // The download runs in the browser, so "today" is the viewer's local date, matching the plan
   // on screen; the server feed passes its own day to bookByEventLines.
   if (reminderOptions.enabled) {
@@ -207,8 +242,9 @@ export function downloadICS(
   isPtoDay: (iso: string) => boolean,
   reminderOptions: ReminderOptions = DEFAULT_REMINDER_OPTIONS,
   filename = 'pto-plan.ics',
+  layout: ICSLayout = 'day',
 ): void {
-  const content = generateICS(breaks, isPtoDay, new Date(), reminderOptions);
+  const content = generateICS(breaks, isPtoDay, new Date(), reminderOptions, undefined, layout);
   downloadICSContent(content, filename);
 }
 
@@ -236,7 +272,7 @@ export function generateHolidaysICS(holidays: Holiday[], now: Date = new Date())
     lines.push(`DTSTAMP:${dtstamp}`);
     lines.push(`DTSTART;VALUE=DATE:${dateStart}`);
     lines.push(`DTEND;VALUE=DATE:${dateEnd}`);
-    lines.push(foldLine(`SUMMARY:${escapeText(holiday.name)}`));
+    lines.push(foldLine(`SUMMARY:${escapeText(holidayDisplayNames(holiday.name, holiday.countryCode))}`));
     lines.push('TRANSP:TRANSPARENT');
     lines.push('END:VEVENT');
   }

@@ -94,8 +94,8 @@ describe('Family planner', () => {
     go('c=US&s=2026-11-02&d=test-district-2026-27&pto=10');
     render(<Family />);
     expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/\d+ days with your kids/);
-    expect(screen.getByText('Winter recess', { selector: 'p' })).toBeTruthy();
-    expect(screen.getByText('Midwinter recess', { selector: 'p' })).toBeTruthy();
+    expect(screen.getByText('Winter recess', { selector: 'li label span' })).toBeTruthy();
+    expect(screen.getByText('Midwinter recess', { selector: 'li label span' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Official calendar' }).getAttribute('href')).toBe('https://example.org/calendar');
     expect(screen.getAllByText(/not a directory of every district/i).length).toBeGreaterThan(0);
     expect(screen.getByRole('heading', { name: 'Uncovered school days' })).toBeTruthy();

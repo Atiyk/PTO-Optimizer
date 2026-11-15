@@ -222,33 +222,49 @@ try {
           await numberInput.fill(selected);
         }
         if (route.name === 'pto') {
-          // The two live planning sliders must be directly visible without opening
-          // More options, including on a 320px viewport.
+          // The goal picker is directly visible; the two fine-tune sliders live under
+          // More options and must be reachable, visible and keyboard-operable once it
+          // is opened, including on a 320px viewport.
+          result.goalPickerVisible = await page.getByRole('group', { name: 'What do you want from your PTO?' }).isVisible();
+          const moreOptions = page.getByRole('button', { name: /More options/ });
+          if (await moreOptions.isVisible()) await moreOptions.click();
           const weighting = page.getByRole('slider', { name: 'What matters more?' });
           const breakCount = page.getByRole('slider', { name: 'How many breaks' });
+          await weighting.waitFor({ state: 'visible', timeout: 15000 });
           result.slidersVisible = await weighting.isVisible() && await breakCount.isVisible();
-          result.slidersOutsideAdvanced = await weighting.evaluate((element) => !element.closest('#planning-options'))
-            && await breakCount.evaluate((element) => !element.closest('#planning-options'));
+          result.slidersInsideOptions = await weighting.evaluate((element) => Boolean(element.closest('#planning-options')))
+            && await breakCount.evaluate((element) => Boolean(element.closest('#planning-options')));
           const previousWeight = Number(await weighting.inputValue());
           await weighting.focus();
           await page.keyboard.press(previousWeight >= 100 ? 'ArrowLeft' : 'ArrowRight');
           const nextWeight = Number(await weighting.inputValue());
           result.weightingKeyboardResponsive = nextWeight !== previousWeight;
+          // Close More options again so the reading-order and explanation checks below
+          // measure the default layout.
+          const hideOptions = page.getByRole('button', { name: /Hide options/ });
+          if (await hideOptions.isVisible()) await hideOptions.click();
           result.plannerResponsiveHeadings = await page.getByRole('heading', { name: 'Your time off' }).isVisible()
             && await page.getByRole('heading', { name: 'Shape your plan' }).isVisible();
           if (label === 'after' && width <= 375) {
             result.mobileRequestCardsBeforeCalendar = await page.evaluate(() => {
-              // Phones read: result, the core inputs (PTO days, country, dates), the request
-              // cards, the two sliders, then the calendar, in both layout and DOM order.
+              // Phones read: result, its one primary action, the request cards, the core
+              // inputs (PTO days, country, dates), the goal picker ("Shape your plan"), then
+              // the calendar, in both layout and DOM order.
               const summary = document.querySelector('main h1');
-              const inputs = document.querySelector('#plan-controls');
+              const action = document.querySelector('#plan-actions');
               const request = document.querySelector('#breaks-heading');
-              const sliders = document.querySelector('#plan-shape');
+              const inputs = document.querySelector('#plan-controls');
+              const goals = document.querySelector('#plan-shape');
               const calendar = document.querySelector('#complete-plan-heading');
-              const order = [summary, inputs, request, sliders, calendar];
+              const order = [summary, action, request, inputs, goals, calendar];
               return order.every((element, index) => element && (!index
                 || order[index - 1].getBoundingClientRect().top < element.getBoundingClientRect().top
                 && (order[index - 1].compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING)));
+            });
+            // The primary action is reachable on the first screen without scrolling.
+            result.mobilePrimaryActionFirstScreen = await page.evaluate(() => {
+              const primary = document.querySelector('#plan-actions [data-primary-action]');
+              return Boolean(primary) && primary.getBoundingClientRect().bottom + window.scrollY <= window.innerHeight;
             });
           }
           // Check that the local-only explanation uses actual recommended dates,
@@ -304,8 +320,9 @@ try {
           || result.unnamedButtons.length || result.loadingDidNotSettle || result.formSubmitControls
           || !result.correctRoute || result.guideContentVisible === false || result.guideExampleVisible === false || result.guideQuestionsVisible === false
           || result.destinationsReachable === false || result.menuOpenedWithKeyboard === false || result.menuClosedWithEscape === false
-          || result.menuFocusReturned === false || result.slidersVisible === false || result.slidersOutsideAdvanced === false
-          || result.weightingKeyboardResponsive === false || result.plannerResponsiveHeadings === false || result.mobileRequestCardsBeforeCalendar === false
+          || result.menuFocusReturned === false || result.slidersVisible === false || result.slidersInsideOptions === false
+          || result.goalPickerVisible === false
+          || result.weightingKeyboardResponsive === false || result.plannerResponsiveHeadings === false || result.mobileRequestCardsBeforeCalendar === false || result.mobilePrimaryActionFirstScreen === false
           || result.searchEmptyState === false || result.searchHidesUnrelatedPaths === false
           || result.searchFindsTerm === false || result.searchClearRestoresPaths === false
           || result.searchFocusReturned === false || result.searchHorizontalOverflow === true

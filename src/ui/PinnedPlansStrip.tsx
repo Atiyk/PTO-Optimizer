@@ -3,6 +3,8 @@ export interface PinnedPlanSummary {
   totalDaysOff: number;
   breakCountActual: number;
   travelPercentile: number | null;
+  /** Made with a different employer holiday calendar than the plan uses now. */
+  differentHolidays?: boolean;
 }
 
 interface PinnedPlansStripProps {
@@ -18,7 +20,8 @@ function summaryText(s: PinnedPlanSummary): string {
   return `${s.budgetSpent} PTO ${dayWord} → ${s.totalDaysOff} ${offWord} off · ${s.breakCountActual} ${breakWord}`;
 }
 
-/** Up to two saved scenarios, with their original settings available to restore. */
+/** Up to two saved scenarios. "Open saved plan" (P3; formerly "Restore") puts back every
+ * setting the plan was saved with, exactly as before. */
 export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlansStripProps) {
   if (summaries.length === 0) return null;
   return (
@@ -29,13 +32,17 @@ export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlans
           className="flex min-h-11 items-center gap-1 rounded-[6px] border border-line bg-surface pl-3 text-sm tabular-nums text-ink"
         >
           <span aria-hidden="true" className="mr-1 inline-block h-2.5 w-2.5 shrink-0 rounded-[2px] bg-accent" />
-          <span>{summaryText(s)}</span>
+          <span>
+            {summaryText(s)}
+            {s.differentHolidays && <span className="block text-xs text-muted">Made with different company holidays</span>}
+          </span>
           <button
             type="button"
             onClick={() => onRestore(i)}
+            aria-label={summaries.length > 1 ? `Open saved plan ${i + 1}` : undefined}
             className="flex min-h-11 items-center px-2 font-semibold underline underline-offset-[0.22em] hover:bg-surface-alt"
           >
-            Restore
+            Open saved plan
           </button>
           <button
             type="button"

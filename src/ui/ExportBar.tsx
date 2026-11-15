@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
 import type { DayCategory } from './types';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import type { NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
-import { downloadICS } from './icsExport';
+import { downloadICS, type ICSLayout } from './icsExport';
 import { copyShareImage, buildShareImageMonths } from './imageExport';
 import { copyText } from './requestText';
 import { track } from './analytics';
@@ -114,6 +114,9 @@ export function ExportBar(props: ExportBarProps) {
   // disabled (see icsExport.ts) so every other caller is unaffected. The lead time itself
   // is no longer a local default: it's always props.noticePeriodDays (see the prop comment).
   const [remindersEnabled, setRemindersEnabled] = useState(true);
+  // Per-day events stay the default (and the feed's only layout); per-break is a choice.
+  const [icsLayout, setIcsLayout] = useState<ICSLayout>('day');
+  const layoutName = `ics-layout-${useId()}`;
 
   const isOutOfRange = (iso: string) => iso < props.rangeStart || iso > props.rangeEnd;
   const planSearch = props.planSearch;
@@ -135,14 +138,14 @@ export function ExportBar(props: ExportBarProps) {
       <div className="flex flex-wrap items-center gap-2">
         <ActionButton
           id="shortcut-download-ics"
-          label="Download calendar file (.ics)"
+          label="Download once (.ics)"
           variant="primary"
           onClick={async () => {
             const reminderOptions = {
               enabled: remindersEnabled, leadDays: props.noticePeriodDays,
               workWeek: props.workWeek, offDays: props.offDays, noticeUnit: props.noticeUnit,
             };
-            downloadICS(props.breaks, props.isSuggestedPto, reminderOptions);
+            downloadICS(props.breaks, props.isSuggestedPto, reminderOptions, undefined, icsLayout);
             track('ICS downloaded');
             return { ok: true, message: 'Downloaded' };
           }}
@@ -198,6 +201,19 @@ export function ExportBar(props: ExportBarProps) {
           </span>
         )}
       </label>
+      <fieldset className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-sm text-ink">
+        <legend className="sr-only">Calendar file layout</legend>
+        <span aria-hidden="true" className="text-muted">In the .ics file:</span>
+        <label className="flex min-h-11 cursor-pointer items-center gap-2">
+          <input type="radio" name={layoutName} value="day" checked={icsLayout === 'day'} onChange={() => setIcsLayout('day')} />
+          One event per PTO day
+        </label>
+        <label className="flex min-h-11 cursor-pointer items-center gap-2">
+          <input type="radio" name={layoutName} value="break" checked={icsLayout === 'break'} onChange={() => setIcsLayout('break')} />
+          One event per break
+        </label>
+      </fieldset>
+      <p className="text-xs text-muted">A download is a one-time copy. It does not change when you edit the plan.</p>
       {planSearch !== undefined && (
         <p className="text-xs text-muted">{SHARE_LINK_SENTENCE}</p>
       )}
@@ -211,7 +227,7 @@ export function ExportBar(props: ExportBarProps) {
           <ActionButton label="Copy link with holiday dates" onClick={() => copyPlan(observedDates)} />
         </details>
       )}
-      {planSearch !== undefined && <SubscribeFeed planSearch={planSearch} observedHolidayDates={observedDates} />}
+      {planSearch !== undefined && <SubscribeFeed planSearch={planSearch} observedHolidayDates={observedDates} breaks={props.breaks} isPtoDay={props.isSuggestedPto} />}
       {planSearch !== undefined && <EmailReminders kind="plan" search={buildPublicPlanSearch(planSearch)} />}
     </div>
   );

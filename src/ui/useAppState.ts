@@ -1,8 +1,12 @@
 import { getConsumerHolidaysWithStatus as getHolidaysWithStatus, getConsumerSubdivisionCandidates as getSubdivisionCandidates, readPreloadedConsumerHolidays } from '../personal/consumerHolidays';
 import { SUBDIVISION_NAMES } from '@daysoff/engine/data/countries';
 import { planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
+import { DEFAULT_SEASON, type Season } from '../planning/yearPlan';
+import { planInputIssues, type InputIssue } from '../planning/inputIssues';
 import type { PinPreview } from './pinPreview';
-import { defaultEmployerCalendar, readEmployerCalendar, writeEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
+import { defaultEmployerCalendar, readEmployerCalendar, writeEmployerCalendar, deleteEmployerCalendar, employerScope, validCalendarDate, encodeEmployerCalendar, employerCalendarCustomized, hasStoredEmployerCalendar, freshEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
+import { holidayChoices as holidayChoicesFor, toggleHolidayChoice as toggleChoiceIn, toggleHolidayEntry, entryKey, type HolidayChoice } from '../personal/employerHolidayChoices';
+import { employerPlaceLabel } from '../personal/holidayDisplayNames';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { computeMarginalValues } from '@daysoff/engine/solver/marginalValue';
 import type { Alternative, Break, SolveInput, WorkWeek } from '@daysoff/engine/solver/types';
@@ -18,9 +22,9 @@ import { FRESH_VISIT_RESERVE_DAYS, readBrowserPlanSearch, readBrowserFullState, 
 import type { DayCategory, ForcedState } from './types';
 import { classifyDay } from './dayCategory';
 import { alternativeForDate as alternativeForDateImpl } from './alternativeForDate';
-import { track } from './analytics';
+import { track, trackReturnOncePerSession, trackSharedLinkOpened } from './analytics';
 import { validateInputs, isSupportedPlanningRange } from './validation';
-import { defaultRangeEnd, defaultPlanRangeEnd, holidayEntriesFor, stateHolidayCandidatesFor, altFridayOffDatesFor, effectiveOffDaysFor, mustIncludeDaysFor, effectiveBlackoutsFor, effectiveBudgetFor, policyAccrualFieldsFor, buildSolveInput, isSuggestedPtoDay, type HolidayEntry } from '../autopilot/planFromSearch';
+import { defaultRangeEnd, defaultPlanRangeEnd, planStyleOptionsFor, holidayEntriesFor, stateHolidayCandidatesFor, altFridayOffDatesFor, effectiveOffDaysFor, mustIncludeDaysFor, effectiveBlackoutsFor, effectiveBudgetFor, policyAccrualFieldsFor, buildSolveInput, isSuggestedPtoDay, type HolidayEntry } from '../autopilot/planFromSearch';
 import { todayISO } from './today';
 import { PLANNER_REVISION } from '@daysoff/engine/solver/revision';
 import { publicHolidayFingerprint, type ShareSnapshot } from './shareSnapshot';
@@ -28,7 +32,7 @@ import type { PtoRequest } from '../personal/requestLedger';
 import { committedPlanEntries, planningCommitments, type WorkdaySchedule } from '../personal/workspace';
 import { usePlannerComputation } from '../planning/usePlannerComputation';
 import { createPinPreviewer } from '../planning/pinPreviewClient';
-import { MAX_PINNED_PLANS, usePinnedPlans } from './pinnedPlanStore';
+import { MAX_PINNED_PLANS, PINNED_PLANS_STORAGE_KEY, usePinnedPlans } from './pinnedPlanStore';
 
 export { defaultRangeEnd };
 export type { HolidayEntry };
@@ -65,6 +69,8 @@ export function discoverSubdivisions(holidays: Holiday[]): string[] {
 export interface PlanSnapshot {
   planningVersion?: 2;
   planningStyle: PlanningStyle;
+  /** Preferred season for `ps=season`; older snapshots have none (summer). */
+  season?: Season;
   minimumBreakDays: number;
   employerCalendar: EmployerCalendar;
   country: string;
@@ -103,7 +109,21 @@ export interface PlanSnapshot {
     totalDaysOff: number;
     breakCountActual: number;
     travelPercentile: number | null;
+    /** Display only, never stored: this pin counts different holiday dates than the plan now. */
+    differentHolidays?: boolean;
   };
+  /** P3: the plan's breaks as they were when saved, for the homepage's "Next break". Older
+   * saved plans have none; readers then fall back to the summary. Never read to restore. */
+  breaks?: SavedPlanBreak[];
+}
+
+export interface SavedPlanBreak {
+  start: string;
+  end: string;
+  totalDaysOff: number;
+  ptoCost: number;
+  /** The working days this break charges, as the planner priced them. */
+  ptoDates: string[];
 }
 
 const NO_REQUESTS: readonly PtoRequest[] = [];
@@ -140,7 +160,9 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       return {
         employerCalendar: undefined as EmployerCalendar | undefined,
         planningVersion: 2 as const,
-        planningStyle: 'balanced' as PlanningStyle,
+        // A fresh visit (and the prerendered shell) starts on the year-round plan.
+        planningStyle: 'year' as PlanningStyle,
+        season: DEFAULT_SEASON,
         minimumBreakDays: 3,
         country: defaults.country,
         subdivision: undefined,
@@ -148,7 +170,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
         rangeEnd: defaults.rangeEnd,
         budget: defaults.budget,
         w: 30,
-        breakCount: 3,
+        breakCount: 0,
         weekStartOverride: 'auto' as const,
         accrualEnabled: false,
         accrualPerMonth: 1.25,
@@ -175,20 +197,22 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     return readBrowserFullState(window.location.search, window.history.state, defaults);
   }, []);
 
-  // 'returned_with_saved_url' (Phase 3 item 9): fired once, only when the page was loaded
-  // with a full plan already in the query string - evidence someone kept/reopened a
-  // previously-shared link, as opposed to a fresh visit with no state to read. Captured
-  // from the RAW incoming search string, at mount, before this component's own URL-sync
-  // effect (below) rewrites the address bar with a full set of params regardless of how
-  // the visitor arrived - checking `window.location.search` again after that effect runs
-  // would always read "true" and defeat the whole signal.
-  const arrivedWithSavedUrl = useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    const params = new URLSearchParams(window.location.search);
-    return params.has('s') && params.has('b');
-  }, []);
+  // 'returned_with_saved_url' (Phase 3 item 9, narrowed in baseline item 15): a genuine
+  // return only - a private plan link the person kept (not a homepage CTA, a share link, a
+  // partner link or an on-device hand-off), or any visit while a saved plan is in this
+  // browser - and at most once per browser session (analytics.ts trackReturnOncePerSession).
+  // Read from the RAW arrival string, before the URL sync below rewrites the address bar.
+  // A share-link arrival is 'shared_link_opened' instead, never both.
+  const arrivalSearch = useMemo(() => (typeof window === 'undefined' ? '' : window.location.search), []);
   useEffect(() => {
-    if (arrivedWithSavedUrl) track('returned_with_saved_url');
+    let savedPlanPresent = false;
+    try {
+      const raw = window.localStorage.getItem(PINNED_PLANS_STORAGE_KEY);
+      const parsed: unknown = raw ? JSON.parse(raw) : null;
+      savedPlanPresent = Array.isArray(parsed) ? parsed.length > 0 : Array.isArray((parsed as { plans?: unknown })?.plans) && ((parsed as { plans: unknown[] }).plans.length > 0);
+    } catch { /* blocked storage: no saved plan signal */ }
+    trackReturnOncePerSession(arrivalSearch, savedPlanPresent);
+    trackSharedLinkOpened(arrivalSearch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -249,6 +273,8 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
 
   const [planningVersion, setPlanningVersion] = useState<2 | undefined>(initial.planningVersion);
   const [planningStyle, setPlanningStyleRaw] = useState<PlanningStyle>(initial.planningStyle ?? 'custom');
+  const [season, setSeasonRaw] = useState<Season>(initial.season ?? DEFAULT_SEASON);
+
   const [minimumBreakDays, setMinimumBreakDaysRaw] = useState(initial.minimumBreakDays ?? 0);
   const [w, setWRaw] = useState(initial.w);
   // breakCount 0 from the URL ("Any", now spelled "let the solver decide") maps to the
@@ -264,6 +290,8 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     const preset = planningStyleSettings(style);
     if (preset) { setWRaw(preset.w); setLetSolverDecideRaw(preset.breakCount === 0); if (preset.breakCount) setManualBreakCountRaw(preset.breakCount); }
   }, []);
+  /** Choosing a season also selects the seasonal-priority style. */
+  const setSeason = useCallback((value: Season) => { setPlanningVersion(2); setPlanningStyleRaw('season'); setSeasonRaw(value); }, []);
   const setMinimumBreakDays = useCallback((days: number) => { setPlanningVersion(2); setMinimumBreakDaysRaw(days); }, []);
   const setW = useCallback((value: number) => { setPlanningVersion(2); setPlanningStyleRaw('custom'); setWRaw(value); }, []);
   const setLetSolverDecide = useCallback((value: boolean) => { setPlanningVersion(2); setPlanningStyleRaw('custom'); setLetSolverDecideRaw(value); }, []);
@@ -345,8 +373,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     [sharedObservedHolidays, sharedPublicCalendar, country, subdivision]);
   const hasSavedCalendarOffForSharedPlan = useMemo(() => {
     if (!sharedPublicCalendar && sharedObservedHolidays === undefined) return false;
-    const saved = readEmployerCalendar(country, subdivision);
-    return saved.custom.length > 0 || saved.excluded.length > 0;
+    return hasStoredEmployerCalendar(country, subdivision) && employerCalendarCustomized(readEmployerCalendar(country, subdivision));
   }, [sharedPublicCalendar, sharedObservedHolidays, country, subdivision]);
   const [employerCalendars, setEmployerCalendars] = useState<Record<string, EmployerCalendar>>(() => ({
     [currentEmployerScope]: initial.employerCalendar ?? calendarForScope(),
@@ -355,9 +382,24 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   const restoreMyEmployerCalendar = useCallback(() => {
     setUseSharedHolidaySnapshot(false);
     setUseSharedPublicCalendar(false);
+    protectedEmployerScopes.current.delete(currentEmployerScope);
     setEmployerCalendars(previous => ({ ...previous, [currentEmployerScope]: readEmployerCalendar(country, subdivision) }));
   }, [currentEmployerScope, country, subdivision]);
-  const [employerCalendarMessage, setEmployerCalendarMessage] = useState('');
+  const employerPlace = employerPlaceLabel(country, subdivision);
+  const [employerCalendarMessage, setEmployerCalendarMessage] = useState(() =>
+    hasStoredEmployerCalendar(country, subdivision) ? `Saved for ${employerPlaceLabel(country, subdivision)}.` : '');
+  // Edits auto-save (debounced, this browser only) to the profile for this country and
+  // region. A scope opened from a public link while a different calendar is saved stays
+  // protected: its edits apply to this tab and never replace the saved calendar.
+  const pendingEmployerSave = useRef<string | null>(null);
+  // A link that carried its own calendar (`eh`) different from the one saved here is shown
+  // as sent; editing it does not replace the saved calendar (Reset starts fresh).
+  const [linkCalendarScope] = useState(() => initial.employerCalendar
+    && encodeEmployerCalendar(initial.employerCalendar) !== encodeEmployerCalendar(readEmployerCalendar(country, subdivision))
+    ? currentEmployerScope : undefined);
+  const protectedEmployerScopes = useRef(new Set<string>(linkCalendarScope ? [linkCalendarScope] : []));
+  const employerUndo = useRef<{ scope: string; calendar: EmployerCalendar } | null>(null);
+  const [canUndoEmployerHolidays, setCanUndoEmployerHolidays] = useState(false);
   const updateEmployerCalendar = useCallback((update: (current: EmployerCalendar) => EmployerCalendar) => {
     setUseSharedHolidaySnapshot(false);
     setUseSharedPublicCalendar(false);
@@ -367,39 +409,76 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       return { ...previous, [currentEmployerScope]: next };
     });
   }, [currentEmployerScope, calendarForScope]);
-  const toggleHoliday = useCallback((date: string, name: string) => {
-    updateEmployerCalendar(current => {
-      const key = `${date}|${name}`;
-      return { ...current, excluded: current.excluded.includes(key) ? current.excluded.filter(item => item !== key) : [...current.excluded, key] };
-    });
-    setEmployerCalendarMessage('Calendar updated for this plan. Save to use it on future visits.');
+  /** A user edit: remembered for undo, then auto-saved. */
+  const editEmployerCalendar = useCallback((update: (current: EmployerCalendar) => EmployerCalendar) => {
+    if (sharedPublicCalendar && hasSavedCalendarOffForSharedPlan) protectedEmployerScopes.current.add(currentEmployerScope);
+    employerUndo.current = { scope: currentEmployerScope, calendar: employerCalendar };
+    setCanUndoEmployerHolidays(true);
+    pendingEmployerSave.current = currentEmployerScope;
+    updateEmployerCalendar(update);
     track('holiday_preference_customized');
-  }, [updateEmployerCalendar]);
-  const saveEmployerHolidays = useCallback(() => {
-    if (sharedObservedHolidays !== undefined) return;
-    // Saving the shared plan's public-only calendar would silently replace the saved one.
-    if (sharedPublicCalendar && hasSavedCalendarOffForSharedPlan) {
-      setEmployerCalendarMessage('Your saved calendar was not changed. This shared plan uses public holidays only. Choose "Use my saved calendar" to edit yours.');
+  }, [sharedPublicCalendar, hasSavedCalendarOffForSharedPlan, currentEmployerScope, employerCalendar, updateEmployerCalendar]);
+  const latestEmployerCalendar = useRef(employerCalendar);
+  latestEmployerCalendar.current = employerCalendar;
+  const flushEmployerSave = useCallback(() => {
+    const scope = pendingEmployerSave.current;
+    const calendar = latestEmployerCalendar.current;
+    if (scope === null || employerScope(calendar.country, calendar.subdivision) !== scope) return;
+    pendingEmployerSave.current = null;
+    if (protectedEmployerScopes.current.has(scope)) {
+      setEmployerCalendarMessage(scope === linkCalendarScope
+        ? 'Your saved calendar was not changed. This link brought its own company holidays; choose Reset to start your own.'
+        : 'Your saved calendar was not changed. This shared plan uses public holidays only. Choose "Use my saved calendar" to edit yours.');
       return;
     }
-    const saved = writeEmployerCalendar(employerCalendar);
-    setEmployerCalendarMessage(saved === 'saved' ? 'Employer calendar saved in this browser.'
-      : saved === 'stale' ? 'Another tab saved a different employer calendar after this page loaded it. Nothing was overwritten. Save again to replace it with this plan\'s calendar.'
-        : 'Browser storage is unavailable. Your changes still apply to this tab.');
-  }, [employerCalendar, sharedObservedHolidays, sharedPublicCalendar, hasSavedCalendarOffForSharedPlan]);
+    const saved = writeEmployerCalendar(calendar);
+    setEmployerCalendarMessage(saved === 'saved' ? `Saved for ${employerPlaceLabel(calendar.country, calendar.subdivision)}.`
+      : saved === 'stale' ? 'Another tab changed these holidays after this page loaded them. Nothing was overwritten; your next change here will save.'
+        : saved === 'newer-version' ? 'Not saved: a newer version of Timebower saved these holidays. Reload to use them.'
+          : 'Browser storage is unavailable. Your choices apply to this tab only.');
+  }, [linkCalendarScope]);
+  // Debounced: a run of chip taps is one write. Flushed when the page is hidden or left.
+  useEffect(() => {
+    if (pendingEmployerSave.current !== currentEmployerScope || sharedObservedHolidays !== undefined) return;
+    const timer = window.setTimeout(flushEmployerSave, 400);
+    return () => window.clearTimeout(timer);
+  }, [employerCalendar, currentEmployerScope, sharedObservedHolidays, flushEmployerSave]);
+  useEffect(() => {
+    const flush = () => flushEmployerSave();
+    window.addEventListener('pagehide', flush);
+    return () => { window.removeEventListener('pagehide', flush); flush(); };
+  }, [flushEmployerSave]);
+  /** Kept for callers of the old explicit save: saves now. */
+  const saveEmployerHolidays = useCallback(() => {
+    if (sharedObservedHolidays !== undefined) return;
+    if (sharedPublicCalendar && hasSavedCalendarOffForSharedPlan) protectedEmployerScopes.current.add(currentEmployerScope);
+    pendingEmployerSave.current = currentEmployerScope;
+    flushEmployerSave();
+  }, [sharedObservedHolidays, currentEmployerScope, flushEmployerSave, sharedPublicCalendar, hasSavedCalendarOffForSharedPlan]);
   const resetEmployerHolidays = useCallback(() => {
     if (sharedObservedHolidays !== undefined) return;
-    const removed = deleteEmployerCalendar(country, subdivision);
-    updateEmployerCalendar(() => defaultEmployerCalendar(country, subdivision));
-    setEmployerCalendarMessage(removed ? 'Public-holiday defaults restored. Saved customization deleted.' : 'Public-holiday defaults restored for this plan. Browser storage is unavailable.');
-  }, [country, subdivision, sharedObservedHolidays, updateEmployerCalendar]);
+    employerUndo.current = { scope: currentEmployerScope, calendar: employerCalendar };
+    setCanUndoEmployerHolidays(true);
+    pendingEmployerSave.current = null;
+    const removed = protectedEmployerScopes.current.has(currentEmployerScope) && currentEmployerScope !== linkCalendarScope
+      ? false : deleteEmployerCalendar(country, subdivision);
+    if (currentEmployerScope === linkCalendarScope) protectedEmployerScopes.current.delete(currentEmployerScope);
+    updateEmployerCalendar(() => freshEmployerCalendar(country, subdivision));
+    setEmployerCalendarMessage(removed ? `Reset to public holidays for ${employerPlace}.` : 'Public holidays restored for this plan.');
+  }, [country, subdivision, sharedObservedHolidays, updateEmployerCalendar, currentEmployerScope, employerCalendar, employerPlace, linkCalendarScope]);
+  const undoEmployerHolidays = useCallback(() => {
+    const previous = employerUndo.current;
+    if (!previous || previous.scope !== currentEmployerScope) return;
+    employerUndo.current = null;
+    setCanUndoEmployerHolidays(false);
+    pendingEmployerSave.current = currentEmployerScope;
+    updateEmployerCalendar(() => previous.calendar);
+  }, [currentEmployerScope, updateEmployerCalendar]);
   const addCustomHoliday = useCallback((date: string, name: string) => {
     if (!validCalendarDate(date)) { setEmployerCalendarMessage('Choose a valid company holiday date.'); return; }
     const cleanName = name.trim().replace(/[\u0000-\u001f]/g, '').slice(0, 160) || 'Company holiday';
-    updateEmployerCalendar(current => ({ ...current, custom: [...current.custom.filter(item => item.date !== date || item.name !== cleanName), { date, name: cleanName }], excluded: current.excluded.filter(key => key !== `${date}|${cleanName}`) }));
-    setEmployerCalendarMessage('Company holiday added to this plan. Save to keep it in this browser.');
-    track('holiday_preference_customized');
-  }, [updateEmployerCalendar]);
+    editEmployerCalendar(current => ({ ...current, custom: [...current.custom.filter(item => item.date !== date || item.name !== cleanName), { date, name: cleanName }], excluded: current.excluded.filter(key => key !== `${date}|${cleanName}`) }));
+  }, [editEmployerCalendar]);
 
   const [forced, setForced] = useState<Record<string, ForcedState>>(() => {
     const init: Record<string, ForcedState> = {};
@@ -420,6 +499,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       holidayFocusDate,
       planningVersion,
       planningStyle,
+      season,
       minimumBreakDays,
       rangeStart,
       rangeEnd,
@@ -457,6 +537,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     holidayFocusDate,
     planningVersion,
     planningStyle,
+    season,
     minimumBreakDays,
     rangeStart,
     rangeEnd,
@@ -593,6 +674,25 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     () => holidayEntriesFor(nationalHolidays ?? NO_HOLIDAYS, regionalHolidays ?? NO_HOLIDAYS, employerCalendar, rangeStart, rangeEnd, sharedObservedHolidays),
     [nationalHolidays, regionalHolidays, employerCalendar, rangeStart, rangeEnd, sharedObservedHolidays],
   );
+  /** One chip per holiday for "Which of these holidays does your company give you off?". */
+  const holidayChoices: HolidayChoice[] = useMemo(
+    () => sharedObservedHolidays !== undefined || !holidaysReady ? [] : holidayChoicesFor(holidayEntries, country, { start: rangeStart, end: rangeEnd }),
+    [holidayEntries, country, sharedObservedHolidays, holidaysReady, rangeStart, rangeEnd],
+  );
+  const toggleHolidayChoice = useCallback((id: string) => {
+    const choice = holidayChoices.find(item => item.id === id);
+    if (!choice) return;
+    editEmployerCalendar(current => toggleChoiceIn(current, choice, holidayEntries));
+  }, [holidayChoices, holidayEntries, editEmployerCalendar]);
+  /** One dated row in the detailed list; `name` is the source name (entryKey's half). */
+  const toggleHoliday = useCallback((date: string, name: string) => {
+    const entry = holidayEntries.find(item => entryKey(item) === `${date}|${name}`);
+    if (entry) editEmployerCalendar(current => toggleHolidayEntry(current, entry, holidayEntries));
+    else editEmployerCalendar(current => {
+      const key = `${date}|${name}`;
+      return { ...current, excluded: current.excluded.includes(key) ? current.excluded.filter(item => item !== key) : [...current.excluded, key] };
+    });
+  }, [holidayEntries, editEmployerCalendar]);
 
   // Alternating Fridays are calendar days off. Pins pass separately so a pinned
   // working day still costs PTO and a pinned holiday keeps its existing zero cost.
@@ -703,8 +803,25 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
 
   // Wait for the current scope if the embedded calendar does not cover it.
   const waitingForCalendar = isValidInput && !holidaysReady;
+  // Notice, the reserve already held back and the season only shape the year-round styles.
+  const planOptions = useMemo(
+    () => planStyleOptionsFor({ noticePeriodDays, noticeUnit, reserveDays, season }),
+    [noticePeriodDays, noticeUnit, reserveDays, season],
+  );
+  // Non-blocking notes: a link value that was adjusted (kept until that field changes),
+  // an unknown country, a range longer than a year, more PTO than working days.
+  const inputIssues = useMemo((): InputIssue[] => {
+    const fromLink = (initial.inputIssues ?? []).filter((issue) => issue.field !== 'budget' || budget === initial.budget);
+    const offSet = new Set(solveInput.offDays);
+    const workingDaysInRange = isValidInput
+      ? rangeISO(rangeStart, rangeEnd).filter((d) => workWeek[mondayIndexedDow(d)] && !offSet.has(d)).length
+      : undefined;
+    const live = planInputIssues({ country, rangeStart, rangeEnd, budget, workingDaysInRange });
+    return [...fromLink, ...live.filter((issue) => !fromLink.some((link) => link.field === issue.field))];
+  }, [initial.inputIssues, initial.budget, budget, country, rangeStart, rangeEnd, workWeek, solveInput.offDays, isValidInput]);
+
   const { solved, scores, pending: computationPending } = usePlannerComputation(
-    solveInput, isValidInput && !waitingForCalendar, planningVersion, minimumBreakDays, planningStyle,
+    solveInput, isValidInput && !waitingForCalendar, planningVersion, minimumBreakDays, planningStyle, planOptions,
   );
   const planningPending = waitingForCalendar || computationPending;
   const solveResult = solved.result;
@@ -714,9 +831,9 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   // worker (see pinPreviewClient.ts): a 1-2 year plan took up to 0.6 s per hover here.
   const pinPreviewer = useMemo(
     () => isValidInput && !planningPending && planningVersion === 2
-      ? createPinPreviewer(solveInput, { minimumBreakDays, style: planningStyle })
+      ? createPinPreviewer(solveInput, { minimumBreakDays, style: planningStyle, plan: planOptions })
       : null,
-    [solveInput, isValidInput, planningPending, planningVersion, minimumBreakDays, planningStyle],
+    [solveInput, isValidInput, planningPending, planningVersion, minimumBreakDays, planningStyle, planOptions],
   );
   // A newer input supersedes this previewer: stop its in-flight solve.
   useEffect(() => () => pinPreviewer?.dispose(), [pinPreviewer]);
@@ -915,6 +1032,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       employerCalendar,
       planningVersion,
       planningStyle,
+      season,
       minimumBreakDays,
       rangeStart,
       rangeEnd,
@@ -950,14 +1068,31 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
         breakCountActual,
         travelPercentile: scores?.travel.percentile ?? null,
       },
+      breaks: breaks.map((brk) => ({
+        start: brk.start, end: brk.end, totalDaysOff: brk.totalDaysOff, ptoCost: brk.ptoCost, ptoDates: brk.days.filter(isSuggestedPto),
+      })),
     });
+    track('plan_saved');
   }, [
-    country, subdivision, employerCalendar, planningVersion, planningStyle, minimumBreakDays, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
+    country, subdivision, employerCalendar, planningVersion, planningStyle, season, minimumBreakDays, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
     weekStartOverride, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap,
     overlapDays, blackouts, workWeek, forced, altFridayEnabled, altFridayStart,
     addPinnedPlan, canPin, reserveDays, applyTrackedRequests, reserveApprovedPto, unlimitedPto, noticePeriodDays, noticeUnit, peakCapEnabled, peakCapStart, peakCapEnd, peakCapMaxDays,
-    budgetSpent, totalDaysOff, breakCountActual, scores,
+    budgetSpent, totalDaysOff, breakCountActual, scores, breaks, isSuggestedPto,
   ]);
+
+  // A pin keeps its own employer calendar (snapshots are never rewritten). When it counts
+  // different holiday dates than the current calendar for the same place and dates, say so.
+  const pinnedPlansForDisplay = useMemo(() => pinnedPlans.map((snap) => {
+    if (snap.country !== country || snap.subdivision !== subdivision || snap.rangeStart !== rangeStart
+      || snap.rangeEnd !== rangeEnd || !holidaysReady || sharedObservedHolidays !== undefined) return snap;
+    const datesFor = (calendar: EmployerCalendar) => holidayEntriesFor(nationalHolidays ?? NO_HOLIDAYS, regionalHolidays ?? NO_HOLIDAYS, calendar, rangeStart, rangeEnd)
+      .filter((entry) => entry.checked).map((entry) => entry.date);
+    const pinned = new Set(datesFor(snap.employerCalendar));
+    const current = new Set(datesFor(employerCalendar));
+    const differentHolidays = pinned.size !== current.size || [...pinned].some((date) => !current.has(date));
+    return differentHolidays ? { ...snap, summary: { ...snap.summary, differentHolidays } } : snap;
+  }), [pinnedPlans, country, subdivision, rangeStart, rangeEnd, holidaysReady, sharedObservedHolidays, nationalHolidays, regionalHolidays, employerCalendar]);
 
   // Restores every input the snapshot carries - the raw setters (not `changeCountry`, which
   // also clears subdivision) so a pinned plan's subdivision comes back too.
@@ -974,6 +1109,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
       setBudget(snap.budget);
       setPlanningVersion(snap.planningVersion);
       setPlanningStyleRaw(snap.planningStyle);
+      setSeasonRaw(snap.season ?? DEFAULT_SEASON);
       setMinimumBreakDaysRaw(snap.minimumBreakDays);
       setWRaw(snap.w);
       setLetSolverDecideRaw(snap.letSolverDecide);
@@ -1040,12 +1176,17 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     solverIssue: solved.issue,
     planningPending,
     relaxedMinimum: solved.relaxedMinimum,
+    /** Year-round styles: reserve kept, lead window, seasons, and any note. */
+    planMeta: solved.meta,
+    inputIssues,
     previewPin,
     solveInput,
     planSearch,
     planningVersion,
     planningStyle,
     setPlanningStyle,
+    season,
+    setSeason,
     minimumBreakDays,
     setMinimumBreakDays,
     holidaysDegraded,
@@ -1151,7 +1292,12 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     resetEmployerHolidays,
     toggleHoliday,
     effectiveOffDays,
-    removeHoliday: (date: string, name: string) => updateEmployerCalendar(current => ({ ...current, custom: current.custom.filter(item => item.date !== date || item.name !== name), excluded: [...new Set([...current.excluded, `${date}|${name}`])] })),
+    holidayChoices,
+    toggleHolidayChoice,
+    undoEmployerHolidays,
+    canUndoEmployerHolidays,
+    employerPlace,
+    removeHoliday: (date: string, name: string) => editEmployerCalendar(current => ({ ...current, custom: current.custom.filter(item => item.date !== date || item.name !== name), excluded: [...new Set([...current.excluded, `${date}|${name}`])] })),
     toggleStateHoliday: toggleHoliday,
     addCustomHoliday,
     breaks,
@@ -1176,7 +1322,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     toggleDay,
     clearForcedDays,
     forced,
-    pinnedPlans,
+    pinnedPlans: pinnedPlansForDisplay,
     pinMessage,
     canPin,
     pinPlan,

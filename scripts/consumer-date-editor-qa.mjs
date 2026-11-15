@@ -6,6 +6,9 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
+// Contexts block service workers: the routes below emulate Vercel clean URLs and stub
+// third parties, and a registered worker (P3 PWA) would take requests out of Playwright
+// routing. scripts/pwa-offline-journey.mjs covers the worker itself.
 
 const [base = 'http://127.0.0.1:4177', output = 'qa-evidence/date-editor'] = process.argv.slice(2);
 const origin = new URL(base).origin;
@@ -17,7 +20,7 @@ let browser;
 try {
   browser = await chromium.launch({ headless: true });
   for (const width of report.widths) {
-    const context = await browser.newContext({
+    const context = await browser.newContext({ serviceWorkers: 'block',
       viewport: { width, height: 900 }, locale: 'en-US', timezoneId: 'America/New_York',
       colorScheme: 'light', reducedMotion: 'reduce',
     });

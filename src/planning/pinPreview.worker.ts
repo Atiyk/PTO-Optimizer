@@ -1,8 +1,8 @@
 import type { SolveInput } from '@daysoff/engine/solver/types';
 import { previewPinnedDay, type PinPreview } from '../ui/pinPreview';
-import type { ConsumerSolveOptions } from './optimizer';
+import type { StyledSolveOptions } from './yearPlan';
 
-export interface PinPreviewRequest { id: number; input: SolveInput; options: ConsumerSolveOptions; date: string }
+export interface PinPreviewRequest { id: number; input: SolveInput; options: StyledSolveOptions; date: string }
 export interface PinPreviewResponse { id: number; preview: PinPreview | null }
 
 self.addEventListener('message', (event: MessageEvent<PinPreviewRequest>) => {

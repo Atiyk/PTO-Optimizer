@@ -179,7 +179,7 @@ describe('employer calendar save with another tab open', () => {
     expect(result.current.employerCalendarMessage).toMatch(/Nothing was overwritten/);
     expect(localStorage.getItem('gapless.employer.v1:US:')).toBe(otherTab);
     act(() => result.current.saveEmployerHolidays());
-    expect(result.current.employerCalendarMessage).toBe('Employer calendar saved in this browser.');
+    expect(result.current.employerCalendarMessage).toBe('Saved for United States.');
     unmount();
     localStorage.clear();
   });

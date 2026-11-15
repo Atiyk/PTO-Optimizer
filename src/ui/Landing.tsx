@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { COUNTRIES } from '@daysoff/engine/data/countries';
 import { addDays, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import type { Break } from '@daysoff/engine/solver/types';
@@ -15,7 +15,8 @@ import { bridgeLinkPhrase, bridgeSentence, findBridges, holidayDisplayName, holi
 import { downloadHolidaysICS } from './icsExport';
 import { track } from './analytics';
 import { computeLandingPlan, landingHolidayHref, landingPlanHref, landingSearch, readLandingState, validLandingRange } from './landingState';
-import { readEmployerCalendar } from '../personal/employerCalendar';
+import { employerCalendarCustomized } from '../personal/employerCalendar';
+import { useEmployerHolidayProfile } from './useEmployerHolidayProfile';
 import { landingObservedHolidays, useLandingHolidays } from './landingCalendar';
 import { weekStartForCountry } from './locale';
 import { HOLIDAY_DOT } from './colorScheme';
@@ -23,11 +24,18 @@ import { useWholeDayDraft } from './useWholeDayDraft';
 import { daysOffSplit } from './Headline';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
 import { SHARE_LINK_SENTENCE } from './shareLinkCopy';
-import { readRequestLedger } from '../personal/requestLedger';
 import { usePinnedPlans } from './pinnedPlanStore';
-import { nextReturnItem, type ReturnItem } from './returnVisit';
-import { handOffOnClick } from './planHandoff';
-import { noticePhrase } from '@daysoff/engine/calendar/requestDeadline';
+import { REQUEST_STORAGE_KEY } from '../personal/requestLedger';
+import { HomeHolidayQuestion } from './CompanyHolidayChips';
+
+// The returning-visitor dashboard (and the request, backup and wallet code behind it) loads
+// only when this browser has a saved plan or request; a first visit never downloads it.
+const ReturningDashboard = lazy(() => import('./ReturningDashboard').then((m) => ({ default: m.ReturningDashboard })));
+
+/** Whether this browser holds tracked requests, read without loading the request ledger. */
+function hasStoredRequests(): boolean {
+  try { return typeof localStorage !== 'undefined' && localStorage.getItem(REQUEST_STORAGE_KEY) !== null; } catch { return false; }
+}
 
 /** A control set inside the sentence: it takes the sentence's own size and weight. */
 const INLINE_FIELD = 'h-[1.45em] min-h-11 rounded-[6px] border border-line-strong bg-surface px-[0.3em] align-baseline font-bold text-ink hover:border-ink';
@@ -132,44 +140,16 @@ function PlanYear({ breaks, best, rangeStart, rangeEnd, holidayName, weekStart }
 /** The holidays list starts with this many rows; the rest sit behind one disclosure. */
 const HOLIDAYS_SHOWN = 3;
 
-/**
- * Research rec 10: one compact row for a returning visitor, from what this browser saved.
- * N-P2-3: on phones it follows the call to action, so the action stays above the tab bar.
- * N-P1-2: the submit-by date uses the tracker's rule and wording, with the notice period
- * the break was planned with when it was saved from the planner.
- */
-function WelcomeBack({ item, today }: { item: ReturnItem; today: string }) {
-  const submitBy = item.kind === 'request' ? item.submitBy : undefined;
-  const notice = submitBy ? `${noticePhrase(submitBy.noticePeriodDays, submitBy.noticeUnit)} notice` : '';
-  const body = item.kind === 'request' ? <>
-    <p className="font-semibold text-ink">Welcome back. Next up: <span className="tabular-nums">{breakDates(item.request)}</span></p>
-    <p className="text-muted">{item.status} · {plural(item.request.ptoDays, 'PTO day')}{submitBy?.date
-      ? submitBy.date < today
-        ? <> · <strong className="font-semibold text-ink">Submit now</strong>: the {notice} window opened {formatShort(submitBy.date)}</>
-        : <> · <strong className="font-semibold text-ink">Submit by {formatShort(submitBy.date)}</strong> · {notice}</>
-      : ''}</p>
-  </> : <>
-    <p className="font-semibold text-ink">Welcome back. Your saved plan: {item.plan.summary.totalDaysOff} days off for {plural(item.plan.summary.budgetSpent, 'PTO day')}</p>
-    <p className="text-muted tabular-nums">{plural(item.plan.summary.breakCountActual, 'break')} between {breakDates({ start: item.plan.rangeStart, end: item.plan.rangeEnd })}</p>
-  </>;
-  return <section aria-label="Welcome back" data-testid="welcome-back" className="order-1 mt-4 flex flex-wrap items-center justify-between gap-x-4 rounded-[10px] border border-line bg-surface px-4 py-1.5 text-[15px] leading-6 sm:order-none sm:mt-0 sm:mb-4 sm:py-2">
-    <div className="min-w-0 py-1">{body}</div>
-    {item.kind === 'request'
-      ? <a href="/policy#requests" className={LINK}>Open in My PTO →</a>
-      : <a href={item.href} onClick={handOffOnClick(item.href, item.privateSearch)} className={LINK}>Open saved plan →</a>}
-  </section>;
-}
-
 /** One live engine calculation drives the preview and full-plan handoff. */
 function ToolGroup({ title, rows }: { title: string; rows: { href: string; title: string; body: string }[] }) {
   return <div className="min-w-0">
     <h3 className="mb-3 text-sm font-semibold text-muted">{title}</h3>
     <ul className="divide-y divide-line overflow-hidden rounded-[10px] border border-line bg-surface">
       {rows.map((row) => <li key={row.title}>
-        <a href={row.href} className="group flex min-h-16 items-center gap-4 px-4 py-4 transition-colors duration-150 hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:px-5">
+        <a href={row.href} className="group flex min-h-14 items-center gap-4 px-4 py-3 transition-colors duration-150 hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:px-5">
           <span className="min-w-0 flex-1">
             <span className="block text-lg font-semibold text-ink">{row.title}</span>
-            <span className="mt-0.5 block text-[15px] leading-6 text-muted">{row.body}</span>
+            <span className="mt-0.5 block text-[15px] leading-6 text-muted max-sm:sr-only">{row.body}</span>
           </span>
           <span aria-hidden="true" className="text-xl text-muted transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-accent">→</span>
         </a>
@@ -182,12 +162,17 @@ export function Landing() {
   const today = todayISO();
   const [allHolidays, setAllHolidays] = useState(false);
   const { pinnedPlans } = usePinnedPlans();
-  // Read once: the landing page only shows what this browser already saved.
-  const [savedRequests] = useState(() => typeof window === 'undefined' ? [] : readRequestLedger().requests);
+  const [storedRequests, setStoredRequests] = useState(hasStoredRequests);
+  // A request tracked in another tab shows the dashboard here too, as before.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => { if (event.key === null || event.key === REQUEST_STORAGE_KEY) setStoredRequests(hasStoredRequests()); };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
   const [state, setState] = useState(() => readLandingState(typeof window === 'undefined' ? '' : window.location.search, today, geolocateCountry()));
   const { country, budget, rangeStart, rangeEnd } = state;
-  const employer = useMemo(() => readEmployerCalendar(country), [country]);
-  const customizedHolidays = employer.excluded.length > 0 || employer.custom.length > 0;
+  const holidayProfile = useEmployerHolidayProfile(country); const employer = holidayProfile.calendar;
+  const customizedHolidays = employerCalendarCustomized(employer);
   const validRange = validLandingRange(rangeStart, rangeEnd);
   const calendar = useLandingHolidays(country, rangeStart, rangeEnd, validRange);
   const engaged = useRef(false);
@@ -239,7 +224,7 @@ export function Landing() {
   const budgetBlank = budgetDraft.empty;
   // R2: a blank field has no number to carry, so the planner opens on its own defaults.
   const href = validRange ? landingPlanHref(state, undefined, budgetBlank) : '/pto';
-  const returnItem = useMemo(() => nextReturnItem(savedRequests, pinnedPlans, today, holidays.map((holiday) => holiday.date)), [savedRequests, pinnedPlans, today, holidays]);
+  const holidayDates = useMemo(() => holidays.map((holiday) => holiday.date), [holidays]);
   const shownHolidays = allHolidays ? upcoming : upcoming.slice(0, HOLIDAYS_SHOWN);
   const countryName = COUNTRIES.find((entry) => entry.code === country)?.name ?? country;
   const showGuess = guessing && budget === 15 && !budgetBlank;
@@ -255,8 +240,12 @@ export function Landing() {
     <main id="main-content" tabIndex={-1}>
       {/* First screen: what this is, the sentence that drives it, the answer, the schedule. */}
       <Container className="px-4 pt-5 sm:px-6 sm:pt-12 lg:pt-14">
+        {/* P3: someone who saved a plan or a request here sees it first; the planner follows. */}
+        {(pinnedPlans.length > 0 || storedRequests) && (
+          <Suspense fallback={null}><ReturningDashboard pinnedPlans={pinnedPlans} today={today} offDays={holidayDates} /></Suspense>
+        )}
         <section aria-labelledby="landing-heading">
-          <h1 id="landing-heading" className="max-w-[17ch] text-[clamp(2rem,0.95rem+5vw,4.75rem)] leading-[1.04] type-display text-ink">More days off from the same PTO.</h1>
+          <h1 id="landing-heading" className="scroll-mt-16 max-w-[17ch] text-[clamp(2rem,0.95rem+5vw,4.75rem)] leading-[1.04] type-display text-ink">More days off from the same PTO.</h1>
 
           <div className="mt-4 grid min-w-0 gap-x-14 gap-y-4 sm:mt-10 sm:gap-y-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
             <div className="min-w-0 lg:col-start-1 lg:row-start-1">
@@ -275,7 +264,6 @@ export function Landing() {
             </div>
 
             <section aria-labelledby="landing-result" data-plan-result={!validRange ? 'unavailable' : loading ? 'pending' : 'ready'} className="flex min-w-0 flex-col lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-1">
-              {returnItem && <WelcomeBack item={returnItem} today={today} />}
               {/* N-P1-1: the blank state reserves the plan's height, so the call to action
                   stays where it was when the field empties. */}
               <div className={budgetBlank ? 'min-h-[9.375rem] sm:min-h-[9.5rem] lg:min-h-[11.75rem]' : undefined}>
@@ -337,6 +325,7 @@ export function Landing() {
               <a href={`${href}#planning-assumptions`} className={`${LINK} text-sm`}>Customize workweek and employer holidays →</a>
             </div>
             {calendar.degraded && <p className="mt-2 text-sm font-semibold text-ink" role="status">Some holiday data is unavailable. This preview may miss public holidays.</p>}
+            {validRange && !loading && <HomeHolidayQuestion profile={holidayProfile} publicHolidays={calendar.holidays} rangeStart={rangeStart} rangeEnd={rangeEnd} />}
           </div>
         </section>
       </Container>
@@ -387,7 +376,7 @@ export function Landing() {
                 <p className="text-h2 font-bold type-condensed text-ink tabular-nums">{formatShort(entry.holiday.date)}</p>
                 <div className="min-w-0">
                   <p className="text-lg font-semibold text-ink">{entry.holiday.name}</p>
-                  <p className="text-sm text-muted">{entry.weekday}, {formatLong(entry.holiday.date)}{entry.isObserved ? ' · observed' : ''} · {entry.runLength >= 3 ? <span className="mark text-ink">{holidayRunPhrase(entry.runLength, entry.clipped)}</span> : holidayRunPhrase(entry.runLength, entry.clipped)}</p>
+                  <p className="text-sm text-muted">{entry.weekday}<span className="max-sm:sr-only">, {formatLong(entry.holiday.date)}</span>{entry.isObserved ? ' · observed' : ''} · {entry.runLength >= 3 ? <span className="mark text-ink">{holidayRunPhrase(entry.runLength, entry.clipped)}</span> : holidayRunPhrase(entry.runLength, entry.clipped)}</p>
                 </div>
                 <a href={landingHolidayHref(state, entry.holiday.date, bridge?.bridgeDate)} className={`${LINK} col-start-2 text-sm sm:col-start-3 sm:justify-self-end`}>{bridge
                   ? <>{bridgeLinkPhrase(bridge)}<span className="sr-only"> around {entry.holiday.name}</span></>
@@ -406,7 +395,7 @@ export function Landing() {
       {/* How it works: a plain statement, then two facts with their sources. It is the last
           section, so it sits on the page itself rather than a band that would stop short of
           the footer. */}
-      <section aria-labelledby="landing-how" className="mt-20 lg:mt-28">
+      <section aria-labelledby="landing-how" className="mt-14 sm:mt-20 lg:mt-28">
         <Container className="grid gap-x-16 gap-y-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <div className="min-w-0">
             <h2 id="landing-how" className="max-w-[12ch] text-display-sm type-display text-ink">Same inputs, same plan.</h2>

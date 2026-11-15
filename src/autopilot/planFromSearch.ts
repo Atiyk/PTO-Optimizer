@@ -22,12 +22,14 @@ import { isAlternatingFridayOff } from '@daysoff/engine/calendar/calendarMath';
 import type { NoticeUnit } from '@daysoff/engine/calendar/requestDeadline';
 import { isoToSerial, mondayIndexedDow, rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { solveLegacyConsumer, type PlanningStyle } from '../planning/optimizer';
+import { DEFAULT_SEASON, type PlanStyleOptions, type Season } from '../planning/yearPlan';
 import { solveWithPinFallback, type PlannerOutcome } from '../ui/pinPreview';
 import { readFullStateFromURL, readOverlapPayloadFromURL, isValidISODate } from '../ui/urlState';
 import { validateInputs, isSupportedPlanningRange } from '../ui/validation';
 import { policyFromLegacyPtoState, toLegacySolverFields } from '../policy/model';
-import { defaultEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
-import { consumerHolidayLookupEnd, observedEntries, validScope } from '../personal/consumerHolidays';
+import { defaultEmployerCalendar, freshEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
+import { resolveHolidayEntries, type HolidayEntry } from '../personal/employerHolidayChoices';
+import { consumerHolidayLookupEnd, normalizeNationwide, observedEntries, validScope } from '../personal/consumerHolidays';
 import type { ForcedState } from '../ui/types';
 
 /** Below this many days remaining in the current year, the default range rolls forward to
@@ -64,12 +66,7 @@ export function yearsBetween(rangeStart: string, rangeEnd: string): number[] {
   return years;
 }
 
-export interface HolidayEntry {
-  date: string;
-  name: string;
-  source: 'public' | 'custom' | 'state';
-  checked: boolean;
-}
+export type { HolidayEntry };
 
 /** US state holidays: the live data's subdivision-specific entries plus the static
  * supplementary table for the years in range (US only - see usStateHolidays.ts). */
@@ -90,26 +87,13 @@ export function stateHolidayCandidatesFor(withSubdivision: Holiday[], country: s
   return stateOnly;
 }
 
+/** Shared with the hook, the feed and the homepage: see personal/employerHolidayChoices. */
 export function holidayEntriesFor(nationalHolidays: Holiday[], stateHolidayCandidates: Holiday[], employerCalendar: EmployerCalendar, rangeStart: string, rangeEnd: string, sharedObservedHolidays?: readonly string[]): HolidayEntry[] {
   if (sharedObservedHolidays !== undefined) {
     return sharedObservedHolidays.filter(date => date >= rangeStart && date <= rangeEnd)
       .map(date => ({ date, name: 'Shared observed holiday', source: 'custom', checked: true }));
   }
-  const excluded = new Set(employerCalendar.excluded);
-  const entries = new Map<string, HolidayEntry>();
-  for (const h of nationalHolidays) {
-    const key = `${h.date}|${h.name}`;
-    entries.set(key, { date: h.date, name: h.name, source: 'public', checked: !excluded.has(key) });
-  }
-  for (const h of stateHolidayCandidates) {
-    const key = `${h.date}|${h.name}`;
-    if (!entries.has(key)) entries.set(key, { date: h.date, name: h.name, source: 'state', checked: !excluded.has(key) });
-  }
-  for (const h of employerCalendar.custom) {
-    const key = `${h.date}|${h.name}`;
-    if (!entries.has(key) && h.date >= rangeStart && h.date <= rangeEnd) entries.set(key, { ...h, source: 'custom', checked: !excluded.has(key) });
-  }
-  return [...entries.values()].sort((a, b) => `${a.date}|${a.name}`.localeCompare(`${b.date}|${b.name}`));
+  return resolveHolidayEntries(nationalHolidays, stateHolidayCandidates, employerCalendar, rangeStart, rangeEnd);
 }
 
 export function altFridayOffDatesFor(altFridayEnabled: boolean, altFridayStart: string, rangeStart: string, rangeEnd: string): string[] {
@@ -192,11 +176,25 @@ export function buildSolveInput(f: SolveInputFields, policyAccrualFields = polic
   };
 }
 
-/** The planner's solve call: may throw, the caller decides what an exception means. */
-export function solvePlan(solveInput: SolveInput, planningVersion: 2 | undefined, minimumBreakDays: number, planningStyle: PlanningStyle): PlannerOutcome {
+/** The planner's solve call: may throw, the caller decides what an exception means.
+ * `plan` only affects the year-round styles (year, season); legacy styles ignore it. */
+export function solvePlan(solveInput: SolveInput, planningVersion: 2 | undefined, minimumBreakDays: number, planningStyle: PlanningStyle, plan?: PlanStyleOptions): PlannerOutcome {
   // Pinned days that cannot sit inside the minimum break no longer collapse the whole
   // plan: the minimum is set aside for that plan and App says so (see pinPreview.ts).
-  return planningVersion === 2 ? solveWithPinFallback(solveInput, { minimumBreakDays, style: planningStyle }) : solveLegacyConsumer(solveInput);
+  if (planningVersion !== 2) return solveLegacyConsumer(solveInput);
+  return solveWithPinFallback(solveInput, plan ? { minimumBreakDays, style: planningStyle, plan } : { minimumBreakDays, style: planningStyle });
+}
+
+/** What the year-round styles need beyond the SolveInput: the notice period (as calendar
+ * days), the reserve the person already holds back (so the auto reserve never doubles it)
+ * and the preferred season. Working-day notice is converted at 7 calendar days per 5. */
+export function planStyleOptionsFor(state: { noticePeriodDays: number; noticeUnit?: NoticeUnit; reserveDays: number; season?: Season }): PlanStyleOptions {
+  const notice = Number.isFinite(state.noticePeriodDays) ? Math.max(0, state.noticePeriodDays) : 14;
+  return {
+    noticeDays: state.noticeUnit === 'working' ? Math.ceil((notice * 7) / 5) : notice,
+    heldReserveDays: Number.isFinite(state.reserveDays) ? Math.max(0, state.reserveDays) : 0,
+    season: state.season ?? DEFAULT_SEASON,
+  };
 }
 
 export interface PtoDayContext {
@@ -252,7 +250,7 @@ export function consumerHolidaysFromSource(source: HolidaySource, country: strin
       const data = source(country, year);
       if (Array.isArray(data)) raw.push(...data);
     }
-    const holidays = rawHolidaysToHolidays(raw as Parameters<typeof rawHolidaysToHolidays>[0]);
+    const holidays = normalizeNationwide(rawHolidaysToHolidays(raw as Parameters<typeof rawHolidaysToHolidays>[0]));
     return observedEntries(filterAndSort(holidays, rangeStart, lookupEnd, subdivision), country, rangeStart, rangeEnd);
   } catch {
     return [];
@@ -271,6 +269,8 @@ export interface PlanState {
   sharedObservedHolidays?: string[];
   planningVersion: 2 | undefined;
   planningStyle: PlanningStyle;
+  /** Preferred season for `ps=season` (`sn`). */
+  season: Season;
   minimumBreakDays: number;
   rangeStart: string;
   rangeEnd: string;
@@ -310,10 +310,15 @@ export function planStateFromSearch(search: string, today: string, defaultCountr
   return {
     country,
     subdivision: initial.subdivision,
-    employerCalendar: initial.employerCalendar ?? defaultEmployerCalendar(country, initial.subdivision),
+    // Mirrors the hook: a public link (sv=1) without a calendar uses the legacy public
+    // default (regional days on), as it always has; any other link without one starts from
+    // a new visitor's calendar (public holidays on, regional and employer-only days opt-in).
+    employerCalendar: initial.employerCalendar ?? (initial.publicShareVersion === 1
+      ? defaultEmployerCalendar(country, initial.subdivision) : freshEmployerCalendar(country, initial.subdivision)),
     sharedObservedHolidays: initial.sharedObservedHolidays,
     planningVersion: initial.planningVersion,
     planningStyle: initial.planningStyle ?? 'custom',
+    season: initial.season ?? DEFAULT_SEASON,
     minimumBreakDays: initial.minimumBreakDays ?? 0,
     rangeStart: initial.rangeStart,
     rangeEnd: initial.rangeEnd,
@@ -380,7 +385,7 @@ export function planFromSearch(search: string, today: string, holidays: HolidayS
 
   let outcome: PlannerOutcome;
   try {
-    outcome = solvePlan(solveInput, state.planningVersion, state.minimumBreakDays, state.planningStyle);
+    outcome = solvePlan(solveInput, state.planningVersion, state.minimumBreakDays, state.planningStyle, planStyleOptionsFor(state));
   } catch {
     return { ok: false, issues: ['This combination could not be calculated. Check your dates and settings.'] };
   }

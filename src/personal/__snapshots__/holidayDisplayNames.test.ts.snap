@@ -1,0 +1,28 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`US holiday display names > snapshot: every US name the planner can show (national, state, employer extras) 1`] = `
+{
+  "Admission Day": "Admission Day",
+  "Cesar Chavez Day": "Cesar Chavez Day",
+  "Christmas Day": "Christmas Day",
+  "Christmas Eve": "Christmas Eve",
+  "Columbus Day": "Columbus Day",
+  "Day after Thanksgiving": "Day after Thanksgiving",
+  "Good Friday": "Good Friday",
+  "Independence Day": "Independence Day",
+  "Indigenous Peoples' Day": "Indigenous Peoples' Day",
+  "Juneteenth National Independence Day": "Juneteenth National Independence Day",
+  "Labour Day": "Labor Day",
+  "Lincoln's Birthday": "Lincoln's Birthday",
+  "Martin Luther King, Jr. Day": "Martin Luther King, Jr. Day",
+  "Memorial Day": "Memorial Day",
+  "New Year's Day": "New Year's Day",
+  "New Year's Eve": "New Year's Eve",
+  "Patriots' Day": "Patriots' Day",
+  "Presidents Day": "Presidents Day",
+  "Pulaski Day": "Pulaski Day",
+  "Thanksgiving Day": "Thanksgiving Day",
+  "Truman Day": "Truman Day",
+  "Veterans Day": "Veterans Day",
+}
+`;

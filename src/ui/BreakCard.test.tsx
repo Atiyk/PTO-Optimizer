@@ -286,3 +286,17 @@ describe('BreakCard copy-request menu keyboard and touch access', () => {
     }
   });
 });
+
+describe('BreakCard: "Fewer flyers than usual" travel tag', () => {
+  it('names 2025 TSA data for a window at least 15% below the yearly mean', () => {
+    const html = render(makeBreak({ id: '2026-01-27|2026-01-31', start: '2026-01-27', end: '2026-01-31', tags: ['Low travel demand'] }));
+    expect(html).toContain('Fewer flyers than usual (2025 TSA data)');
+    expect(html).not.toContain('Quieter');
+  });
+
+  it('shows no quiet-travel tag when the window is not meaningfully below average', () => {
+    const html = render(makeBreak({ id: '2026-07-01|2026-07-05', start: '2026-07-01', end: '2026-07-05', tags: ['Low travel demand'] }));
+    expect(html).not.toContain('Fewer flyers');
+    expect(html).not.toContain('Low travel demand');
+  });
+});

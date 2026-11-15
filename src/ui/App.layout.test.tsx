@@ -60,36 +60,71 @@ describe('planner layout order (F02, F03)', () => {
     const rail = screen.getByRole('complementary', { name: 'Plan settings' });
     const pto = within(rail).getByLabelText('PTO days available');
     expect(precedes(pto, firstCard)).toBe(true);
+    const goals = within(rail).getByRole('group', { name: 'What do you want from your PTO?' });
+    expect(precedes(goals, firstCard)).toBe(true);
+    const more = within(rail).getByRole('button', { name: 'More options' });
+    expect(precedes(more, firstCard)).toBe(true);
+    // The two fine-tuning sliders live under More options, still in the rail.
+    fireEvent.click(more);
     const sliders = within(rail).getAllByRole('slider');
-    expect(sliders.length).toBeGreaterThanOrEqual(3);
+    expect(sliders.length).toBeGreaterThanOrEqual(2);
     for (const slider of sliders) expect(precedes(slider, firstCard)).toBe(true);
-    expect(precedes(within(rail).getByRole('button', { name: 'More options' }), firstCard)).toBe(true);
-    // Desktop keeps one save button (the headline's) and jumps to the rail.
-    expect(screen.getAllByRole('button', { name: 'Save this plan' })).toHaveLength(1);
+    // Desktop keeps one save button (the visual primary beside the jump links) and jumps to the rail.
+    expect(screen.getAllByRole('button', { name: 'Keep this plan' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Save this plan' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Keep this plan' }).className).toMatch(/bg-accent/);
     expect(screen.getByRole('link', { name: 'Adjust plan' }).getAttribute('href')).toBe('#plan-controls');
+    // Export keeps its own section on a desktop, with every action.
+    expect(screen.getByRole('heading', { name: 'Take it with you' })).toBeTruthy();
   });
 
-  it('on a phone keeps the inputs before the cards, the sliders after them, and save/export with the result', async () => {
+  it('on a phone reads result, one primary action, breaks, PTO dates, then the adjustments', async () => {
     setViewport(375);
     const { summary, firstCard, requests } = await renderReady();
+    const dates = screen.getByRole('region', { name: 'PTO dates to request' });
+    const actions = screen.getByRole('region', { name: 'Use this plan' });
     const pto = screen.getByLabelText('PTO days available');
-    expect(precedes(summary, pto)).toBe(true);
-    expect(precedes(pto, firstCard)).toBe(true);
+    // The primary action sits right under the headline, inside the first screen.
+    expect(precedes(screen.getByRole('heading', { level: 1 }), actions)).toBe(true);
+    expect(precedes(actions, firstCard)).toBe(true);
+    expect(precedes(firstCard, dates)).toBe(true);
+    expect(precedes(dates, pto)).toBe(true);
     const shape = document.getElementById('plan-shape')!;
-    expect(within(shape).getByRole('slider', { name: /What matters more/ })).toBeTruthy();
+    expect(within(shape).getByRole('group', { name: 'What do you want from your PTO?' })).toBeTruthy();
     expect(precedes(requests, shape)).toBe(true);
-    const jump = within(summary).getByRole('navigation', { name: 'On this page' });
-    expect(within(jump).getByRole('link', { name: 'Adjust plan' }).getAttribute('href')).toBe('#plan-shape');
-    expect(within(jump).getByRole('link', { name: 'Export and share' })).toBeTruthy();
-    const save = within(jump).getByRole<HTMLButtonElement>('button', { name: 'Save this plan' });
-    expect(save.disabled).toBe(false);
-    fireEvent.click(save);
+    // One primary action, not four equal buttons; everything else sits in "More".
+    expect(within(summary).queryByRole('navigation', { name: 'On this page' })).toBeNull();
+    const primary = within(actions).getAllByRole<HTMLButtonElement>('button').filter((b) => b.hasAttribute('data-primary-action'));
+    expect(primary).toHaveLength(1);
+    expect(primary[0].textContent).toBe('Keep this plan');
+    const more = actions.querySelector('details#more-actions')!;
+    expect(more.hasAttribute('open')).toBe(false);
+    for (const name of ['Download once (.ics)', 'Copy plan as image', 'Copy plan link', 'Plan with a partner']) {
+      expect(within(more as HTMLElement).getByRole('button', { name })).toBeTruthy();
+    }
+    expect(primary[0].disabled).toBe(false);
+    fireEvent.click(primary[0]);
     expect(await screen.findByRole('list', { name: 'Saved plans' })).toBeTruthy();
+    // Kept: the save confirmation (Add to calendar, Back up) takes the button's place.
+    expect(within(actions).getByTestId('save-confirmation')).toBeTruthy();
+    expect(within(actions).getByRole('button', { name: 'Add to calendar' })).toBeTruthy();
+    expect(actions.querySelector('[data-primary-action]')).toBeNull();
   });
 
-  it('without a known width (the prerender) still puts the PTO input before the first break card', async () => {
+  it('without a known width (the prerender) uses the phone order: the primary action, then breaks, then the inputs', async () => {
     const { firstCard } = await renderReady();
-    expect(precedes(screen.getByLabelText('PTO days available'), firstCard)).toBe(true);
+    const actions = screen.getByRole('region', { name: 'Use this plan' });
+    expect(precedes(actions, firstCard)).toBe(true);
+    expect(precedes(firstCard, screen.getByLabelText('PTO days available'))).toBe(true);
+  });
+
+  it('on a phone opens "More" for someone arriving with a partner link, so the joint dates show', async () => {
+    setViewport(375);
+    window.history.replaceState(null, '', `${scenario}&pp=1:c:20270215~20270219:-`);
+    await renderReady();
+    const more = document.querySelector('details#more-actions')!;
+    await waitFor(() => expect(more.hasAttribute('open')).toBe(true));
+    expect(within(more as HTMLElement).getByRole('region', { name: 'Partner vacation planner' })).toBeTruthy();
   });
 });
 
@@ -109,6 +144,9 @@ describe('phone calendar keeps the months the person changed (F11)', () => {
     setViewport(375);
     window.history.replaceState(null, '', `${scenario}&bo=2027-03-10`);
     await renderReady();
+    // Phones build the month grids only once they are opened.
+    expect(document.getElementById('day-2027-03-10')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show month details' }));
     await waitFor(() => expect(document.getElementById('day-2027-03-10')).toBeTruthy());
     expect(document.getElementById('day-2027-03-10')!.closest('[data-collapsed-month="true"]')).toBeNull();
     expect(screen.getByRole('button', { name: /Show all \d+ months/ })).toBeTruthy();

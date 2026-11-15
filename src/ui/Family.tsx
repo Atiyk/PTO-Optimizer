@@ -641,16 +641,20 @@ function BreakRow({ brk, plan, onToggle }: { brk: SchoolBreak; plan: FamilyBreak
   );
   else outcome = <span className="text-muted">No PTO planned. Taking the whole break off would use {plural(work, 'PTO day')}.{plan.togetherDays ? ` ${plural(plan.togetherDays, 'day')} together anyway.` : ''}</span>;
 
+  // The whole row is the switch's label, so a tap anywhere on it toggles the break (a
+  // 44px-plus target on a phone); the switch keeps its own short accessible name.
   return (
-    <li className={`grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 rounded-[10px] border bg-surface p-3 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] sm:items-center sm:p-4 ${included ? 'border-line' : 'border-dashed border-line-strong'}`}>
-      <div className="min-w-0">
-        <p className={`text-base font-bold ${included ? 'text-ink' : 'text-muted'}`}>{title}</p>
-        <p className="text-sm text-muted">{range} · {plural(brk.schoolOffWeekdays.length, 'school day')} off, you work {work}</p>
-      </div>
-      <p className="col-span-2 row-start-2 min-w-0 text-sm text-ink sm:col-span-1 sm:col-start-2 sm:row-start-1">{outcome}</p>
-      <label className="col-start-2 row-start-1 flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold text-ink sm:col-start-3">
-        <input type="checkbox" role="switch" className="h-4 w-4" checked={included} onChange={(e) => onToggle(e.target.checked)} aria-label={`Include ${title}, ${range}`} />
-        <span aria-hidden="true">Include</span>
+    <li className="min-w-0">
+      <label className={`grid min-w-0 cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 rounded-[10px] border bg-surface p-3 transition-colors duration-150 hover:border-line-strong has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--focus-ring)] sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] sm:items-center sm:p-4 ${included ? 'border-line' : 'border-dashed border-line-strong'}`}>
+        <span className="block min-w-0">
+          <span className={`block text-base font-bold ${included ? 'text-ink' : 'text-muted'}`}>{title}</span>
+          <span className="block text-sm text-muted">{range} · {plural(brk.schoolOffWeekdays.length, 'school day')} off, you work {work}</span>
+        </span>
+        <span className="col-span-2 row-start-2 block min-w-0 text-sm text-ink sm:col-span-1 sm:col-start-2 sm:row-start-1">{outcome}</span>
+        <span className="col-start-2 row-start-1 flex min-h-11 items-center gap-2 text-sm font-semibold text-ink sm:col-start-3">
+          <input type="checkbox" role="switch" className="h-5 w-5" checked={included} onChange={(e) => onToggle(e.target.checked)} aria-label={`Include ${title}, ${range}`} />
+          <span aria-hidden="true">Include</span>
+        </span>
       </label>
     </li>
   );

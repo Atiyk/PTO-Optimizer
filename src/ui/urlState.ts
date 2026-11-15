@@ -1,4 +1,6 @@
-import { planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
+import { PLANNING_STYLES, planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
+import { DEFAULT_SEASON, SEASONS, type Season } from '../planning/yearPlan';
+import { parseBudgetParam, type InputIssue } from '../planning/inputIssues';
 import { decodeEmployerCalendar, encodeEmployerCalendar, employerScope, type EmployerCalendar } from '../personal/employerCalendar';
 import type { WorkWeek } from '@daysoff/engine/solver/types';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
@@ -125,7 +127,11 @@ function encodeWorkWeek(ww: WorkWeek): string {
 export interface FullURLState {
   planningVersion?: 2;
   planningStyle?: PlanningStyle;
+  /** Preferred season for `ps=season` (`sn`); present only for new-style plans. */
+  season?: Season;
   minimumBreakDays?: number;
+  /** Values in the link that were adjusted rather than used as written (e.g. `b=-5`). */
+  inputIssues?: InputIssue[];
   employerCalendar?: EmployerCalendar;
   publicShareVersion?: 1;
   /** What the sender's planner recorded in a public link (planner revision, public
@@ -192,8 +198,14 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
   const params = new URLSearchParams(search);
   const slider = readSliderStateFromURL(search);
   const isNewPlan = params.get('pv') === '2' || !['s', 'e', 'b', 'w', 'count', 'objective', 'shape'].some(key => params.has(key));
-  const styles: PlanningStyle[] = ['balanced', 'long-breaks', 'more-breaks', 'custom'];
-  const planningStyle: PlanningStyle = styles.includes(params.get('ps') as PlanningStyle) ? params.get('ps') as PlanningStyle : 'balanced';
+  // A fresh visit (no planning params at all: bare /pto, /uk) starts on the year-round
+  // plan. Any link with a plan keeps its old meaning: a missing or unknown `ps` is still
+  // 'balanced', exactly as before.
+  const requestedStyle = params.get('ps') as PlanningStyle;
+  const planningStyle: PlanningStyle = PLANNING_STYLES.includes(requestedStyle)
+    ? requestedStyle : hasPlanningParams(params) ? 'balanced' : 'year';
+  const requestedSeason = params.get('sn') as Season;
+  const season: Season = SEASONS.includes(requestedSeason) ? requestedSeason : DEFAULT_SEASON;
   const rawMinimum = params.get('mb');
   const minimum = rawMinimum === null ? 3 : Number(rawMinimum);
   const minimumBreakDays = Number.isInteger(minimum) && minimum >= 0 && minimum <= 60 ? minimum : 3;
@@ -205,9 +217,10 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
   let rangeEnd = e && isValidISODate(e) ? e : defaults.rangeEnd;
   if (rangeEnd < rangeStart) rangeEnd = rangeStart;
 
-  const budgetRaw = params.get('b');
-  const budgetParsed = budgetRaw !== null ? Number(budgetRaw) : NaN;
-  const budget = Number.isFinite(budgetParsed) && budgetParsed >= 0 ? Math.min(400, budgetParsed) : defaults.budget;
+  // Never silently swap an invalid balance for the default: negative shows 0 and an
+  // impossible balance is capped, each with a note the planner shows.
+  const { budget, issue: budgetIssue } = parseBudgetParam(params.get('b'), defaults.budget);
+  const inputIssues: InputIssue[] = budgetIssue ? [budgetIssue] : [];
 
   const country = params.get('c') || defaults.country;
   const subdivision = params.get('sd') || undefined;
@@ -286,7 +299,8 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
     rangeStart,
     rangeEnd,
     budget,
-    ...(isNewPlan ? { planningVersion: 2 as const, planningStyle, minimumBreakDays } : {}),
+    ...(isNewPlan ? { planningVersion: 2 as const, planningStyle, season, minimumBreakDays } : {}),
+    ...(inputIssues.length ? { inputIssues } : {}),
     w: preset?.w ?? slider.w,
     breakCount: preset?.breakCount ?? slider.breakCount,
     weekStartOverride,
@@ -316,6 +330,7 @@ export function readFullStateFromURL(search: string, defaults: FullURLDefaults):
 export interface WriteStateInput {
   planningVersion?: 2;
   planningStyle?: PlanningStyle;
+  season?: Season;
   minimumBreakDays?: number;
   employerCalendar?: EmployerCalendar;
   publicShareVersion?: 1;
@@ -363,7 +378,9 @@ export function writeFullStateToURL(params: URLSearchParams, state: WriteStateIn
     params.set('pv', '2');
     params.set('ps', state.planningStyle ?? 'custom');
     params.set('mb', String(state.minimumBreakDays ?? 3));
-  } else { params.delete('pv'); params.delete('ps'); params.delete('mb'); }
+    if (state.planningStyle === 'season') params.set('sn', state.season ?? DEFAULT_SEASON);
+    else params.delete('sn');
+  } else { params.delete('pv'); params.delete('ps'); params.delete('mb'); params.delete('sn'); }
   const calendar = state.employerCalendar ? encodeEmployerCalendar(state.employerCalendar) : '';
   if (calendar) params.set('eh', calendar);
   else params.delete('eh');

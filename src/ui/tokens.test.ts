@@ -45,14 +45,15 @@ describe('design tokens (src/index.css)', () => {
     expect(contrastRatio(t('accent-ink'), t('accent-soft'))).toBeGreaterThanOrEqual(4.5);
   });
 
-  // F27: an out-of-range calendar numeral is still informative text, so 3:1 at least on
-  // every surface it can sit on, while staying clearly lighter than the muted weekend tone.
-  it('outside-range numerals reach 3:1 on every surface and stay lighter than muted text', () => {
+  // F27: an out-of-range calendar numeral (past days on /pto included) is informative text,
+  // so WCAG AA 4.5:1 on every surface it can sit on (axe flagged the old 3.5:1 tone), while
+  // staying a step lighter than the muted weekend tone.
+  it('outside-range numerals reach 4.5:1 on every surface and stay lighter than muted text', () => {
     for (const bg of [...BACKGROUNDS, 'weekend-bg']) {
-      expect(contrastRatio(t('outside-text'), t(bg)), `outside text on ${bg}`).toBeGreaterThanOrEqual(3);
+      expect(contrastRatio(t('outside-text'), t(bg)), `outside text on ${bg}`).toBeGreaterThanOrEqual(4.5);
     }
     expect(relativeLuminance(t('outside-text'))).toBeGreaterThan(relativeLuminance(t('text-muted')));
-    expect(contrastRatio(t('outside-text'), t('text-muted'))).toBeGreaterThanOrEqual(1.5);
+    expect(contrastRatio(t('outside-text'), t('text-muted'))).toBeGreaterThanOrEqual(1.15);
   });
 
   it('UI boundaries reach 3:1: focus ring, control borders, the holiday dot, a suggested-PTO cell', () => {

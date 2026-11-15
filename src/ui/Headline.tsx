@@ -14,6 +14,8 @@ interface HeadlineProps {
   reserveDays: number;
   canPin: boolean;
   onPin: () => void;
+  /** The planner shows its own primary action (PlanActions); other uses keep this button. */
+  showSave?: boolean;
   pinnedCount: number;
   pending?: boolean;
   unavailable?: boolean;
@@ -78,7 +80,7 @@ export function balanceLine(budgetSpent: number, budget: number, reserveDays: nu
  * splits into beside it ("12 PTO days + 15 weekend and holiday days"). This is the page's single h1 and sits inside a polite
  * live region, so a screen reader hears the new result as the sliders move.
  */
-export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, reserveDays, canPin, onPin, pinnedCount, pending, unavailable, unlimitedPto = false, trackedReservedDays = 0, noPtoMessage, exampleFor }: HeadlineProps) {
+export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, reserveDays, canPin, onPin, showSave = true, pinnedCount, pending, unavailable, unlimitedPto = false, trackedReservedDays = 0, noPtoMessage, exampleFor }: HeadlineProps) {
   if (pending || unavailable) {
     return <div className="min-w-0">
       <h1 className="text-h2 font-bold text-ink type-condensed">Your PTO plan</h1>
@@ -109,9 +111,9 @@ export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, 
             {daysOffSplit(budgetSpent, totalDaysOff, unlimitedPto ? 'target' : 'PTO')}
           </span>
         </h1>
-        <Button variant="secondary" size="md" onClick={onPin} disabled={!canPin} title={saveTitle} className="mt-1 shrink-0 px-3! text-sm! max-lg:hidden">
+        {showSave && <Button variant="secondary" size="md" onClick={onPin} disabled={!canPin} title={saveTitle} className="mt-1 shrink-0 px-3! text-sm! max-lg:hidden">
           Save this plan
-        </Button>
+        </Button>}
       </div>
       <p className="mt-3 text-sm tabular-nums text-muted">{balanceLine(budgetSpent, budget, reserveDays, breakCountActual, unlimitedPto, trackedReservedDays)}</p>
     </div>

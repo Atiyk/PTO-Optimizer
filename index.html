@@ -6,6 +6,8 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-title" content="%PRODUCT_NAME%" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#f8fafc" />
     <link rel="preload" href="/fonts/archivo-latin-var.woff2" as="font" type="font/woff2" crossorigin />
@@ -40,9 +42,12 @@
 
     <!-- Historic optimizer links at the root keep their destination and exact query.
          New homepage previews use an explicit home=1 marker; no legacy param is renamed.
-         The pathname guard prevents redirect loops on static-host fallback responses. -->
+         The pathname guard prevents redirect loops on static-host fallback responses.
+         "?source=pwa" is the installed app's start_url (public/manifest.webmanifest): it opens
+         the homepage, never a historic optimizer link. -->
     <script>
       if (window.location.pathname === '/' && window.location.search &&
+          window.location.search !== '?source=pwa' &&
           new URLSearchParams(window.location.search).get('home') !== '1') {
         window.location.replace('/pto' + window.location.search + window.location.hash);
       }

@@ -6,6 +6,7 @@ import {
   type PlannerComputationJob, type PlannerComputationResult, type PlannerWorkerMessage,
 } from './plannerComputation';
 import type { PlanningStyle } from './optimizer';
+import type { PlanStyleOptions } from './yearPlan';
 
 const ASYNC_RANGE_DAYS = 120;
 const INPUT_SETTLE_MS = 90;
@@ -13,12 +14,14 @@ const MAX_CACHED_PLANS = 4;
 
 export function usePlannerComputation(
   input: SolveInput, valid: boolean, planningVersion: 2 | undefined,
-  minimumBreakDays: number, style: PlanningStyle,
+  minimumBreakDays: number, style: PlanningStyle, plan?: PlanStyleOptions,
 ) {
+  // Callers may rebuild `plan` each render; compare it by value.
+  const planKey = plan ? JSON.stringify(plan) : '';
   const cache = useRef(new Map<string, PlannerComputationResult>());
   const [initialJob] = useState<PlannerComputationJob | null>(() => {
     if (!valid) return null;
-    const request = { input, planningVersion, minimumBreakDays, style };
+    const request = { input, planningVersion, minimumBreakDays, style, ...(plan ? { plan } : {}) };
     return { request, existingOutcome: computePlannerOutcome(request) };
   });
   const [completed, setCompleted] = useState<{
@@ -33,12 +36,13 @@ export function usePlannerComputation(
     if (!valid) return null;
     const initial = initialJob?.request;
     if (initial && initial.input === input && initial.planningVersion === planningVersion
-      && initial.minimumBreakDays === minimumBreakDays && initial.style === style) return initialJob;
-    const request = { input, planningVersion, minimumBreakDays, style };
+      && initial.minimumBreakDays === minimumBreakDays && initial.style === style
+      && (initial.plan ? JSON.stringify(initial.plan) : '') === planKey) return initialJob;
+    const request = { input, planningVersion, minimumBreakDays, style, ...(planKey ? { plan: JSON.parse(planKey) as PlanStyleOptions } : {}) };
     const rangeDays = isoToSerial(input.rangeEnd) - isoToSerial(input.rangeStart) + 1;
     const solveOffThread = workerAvailable && rangeDays > ASYNC_RANGE_DAYS;
     return { request, existingOutcome: solveOffThread ? null : computePlannerOutcome(request) };
-  }, [initialJob, input, valid, planningVersion, minimumBreakDays, style, workerAvailable]);
+  }, [initialJob, input, valid, planningVersion, minimumBreakDays, style, planKey, workerAvailable]);
 
   // Vite's prerender consumes the plan synchronously. Match production's planner
   // arithmetic while keeping browser score sweeps outside the first render.
