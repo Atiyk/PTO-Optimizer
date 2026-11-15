@@ -395,9 +395,9 @@ export function MoreOptions(props: MoreOptionsProps) {
                 </button>}
               </div>
             ))}
-            {props.holidayEntries.some((h) => h.source === 'state') && (
+            {props.holidayEntries.some((h) => h.source === 'state' && !h.checked) && (
               <p className={NOTE}>
-                Regional (state) holidays are off unless your company gives them. Tick any it does.
+                Unticked regional holidays are state-government days most private employers don&apos;t give. Tick any your company does.
               </p>
             )}
             {props.holidayEntries.length === 0 && <span className="py-2 text-sm text-muted">None loaded yet.</span>}

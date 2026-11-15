@@ -9,8 +9,9 @@ import { guardedWrite, recordRevision, type GuardedWriteResult } from './storage
  * Version 2 keeps both fields with the same meaning and separates three kinds of day:
  * - public (national) holidays: on unless their name is in `skipped` (every year) or a
  *   single `date|name` is in `excluded`;
- * - regional (state/province) holidays: OFF unless their name is in `regional`, so picking
- *   a state never turns its government holidays into employer days off by default;
+ * - regional (state/province) holidays: in the US, OFF unless their name is in `regional`,
+ *   so picking a state never turns its government holidays into employer days off by
+ *   default; elsewhere on unless skipped (see regionalHolidaysOptIn);
  * - employer-observed days: named extras the company gives (`extras`, e.g. Christmas Eve)
  *   and `custom` company days.
  * A version 1 calendar is never rewritten on read; it is upgraded only when the user edits

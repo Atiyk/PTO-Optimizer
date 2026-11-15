@@ -178,6 +178,23 @@ describe('scenarios through the full plan (planFromSearch)', () => {
     for (const date of employerDays) expect(ptoDays(plan)).not.toContain(date);
   });
 
+  it('GB: a bank holiday in every nation counts with no region chosen, and Boxing Day is named so', () => {
+    const plan = solved('?c=GB&s=2026-11-15&e=2027-12-31&b=15&rv=0');
+    expect(plan.solveInput.offDays).toContain('2027-01-01'); // New Year's Day, listed per nation by Nager
+    expect(plan.isPtoDay('2027-01-01')).toBe(false);
+    expect(plan.holidayEntries.find((e) => e.date === '2027-01-01')).toMatchObject({ source: 'public', checked: true });
+    expect(plan.holidayEntries.find((e) => e.date === '2027-12-28')?.name).toBe('Boxing Day');
+    expect(plan.solveInput.offDays).not.toContain('2027-03-29'); // Easter Monday: not Scotland, needs a nation
+  });
+
+  it('outside the US a chosen region keeps its public holidays on by default', () => {
+    const plan = solved(`?c=GB&sd=GB-SCT&s=2026-11-15&e=2027-12-31&b=15&eh=${encodeURIComponent(encodeEmployerCalendar(freshEmployerCalendar('GB', 'GB-SCT')))}`);
+    expect(plan.holidayEntries.find((e) => e.date === '2026-11-30')).toMatchObject({ source: 'state', checked: true }); // St Andrew's Day
+    expect(plan.holidayEntries.find((e) => e.date === '2027-01-01' && e.name === "New Year's Day")).toMatchObject({ source: 'public', checked: true });
+    const de = solved(`?c=DE&sd=DE-BY&s=2027-01-01&e=2027-12-31&b=15&eh=${encodeURIComponent(encodeEmployerCalendar(freshEmployerCalendar('DE', 'DE-BY')))}`);
+    expect(de.holidayEntries.filter((e) => e.source === 'state').every((e) => e.checked)).toBe(true);
+  });
+
   it('an old v1 eh= link with a state reproduces the legacy holidays exactly', () => {
     const raw = '1.["US","US-CA",["2027-03-31|Cesar Chavez Day"],[["2027-08-13","Summer Friday"]]]';
     expect(encodeEmployerCalendar(decodeEmployerCalendar(raw)!)).toBe(raw);

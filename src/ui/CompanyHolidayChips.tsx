@@ -65,7 +65,7 @@ export function CompanyHolidayChips(props: CompanyHolidayChipsProps) {
       {props.country === 'US' && <p className="max-w-prose text-sm text-muted">{US_HELPER}</p>}
       <ul className="flex min-w-0 flex-wrap gap-2" aria-label="Holidays">
         {visible.map((choice) => {
-          const hint = KIND_HINT[choice.kind];
+          const hint = choice.kind === 'regional' && props.country !== 'US' ? 'regional' : KIND_HINT[choice.kind];
           const on = choice.pressed;
           return (
             <li key={choice.id} className="min-w-0 max-w-full">

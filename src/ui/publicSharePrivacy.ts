@@ -12,7 +12,7 @@ export function employerLabelsWouldBeShared(query: string): boolean {
   if (!calendar) return true;
   // A version 2 calendar with a region resolves regional days differently from the
   // public-holiday default a recipient sees, so it counts as a calendar to choose about.
-  return employerCalendarCustomized(calendar) || (calendar.version === 2 && calendar.subdivision !== undefined);
+  return employerCalendarCustomized(calendar) || (calendar.version === 2 && calendar.subdivision !== undefined && calendar.country === 'US');
 }
 
 // Private scheduling and policy settings, from the shared classification. `eh` is

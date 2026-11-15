@@ -28,7 +28,7 @@ import { validateInputs, isSupportedPlanningRange } from '../ui/validation';
 import { policyFromLegacyPtoState, toLegacySolverFields } from '../policy/model';
 import { defaultEmployerCalendar, freshEmployerCalendar, type EmployerCalendar } from '../personal/employerCalendar';
 import { resolveHolidayEntries, type HolidayEntry } from '../personal/employerHolidayChoices';
-import { consumerHolidayLookupEnd, observedEntries, validScope } from '../personal/consumerHolidays';
+import { consumerHolidayLookupEnd, normalizeNationwide, observedEntries, validScope } from '../personal/consumerHolidays';
 import type { ForcedState } from '../ui/types';
 
 /** Below this many days remaining in the current year, the default range rolls forward to
@@ -235,7 +235,7 @@ export function consumerHolidaysFromSource(source: HolidaySource, country: strin
       const data = source(country, year);
       if (Array.isArray(data)) raw.push(...data);
     }
-    const holidays = rawHolidaysToHolidays(raw as Parameters<typeof rawHolidaysToHolidays>[0]);
+    const holidays = normalizeNationwide(rawHolidaysToHolidays(raw as Parameters<typeof rawHolidaysToHolidays>[0]));
     return observedEntries(filterAndSort(holidays, rangeStart, lookupEnd, subdivision), country, rangeStart, rangeEnd);
   } catch {
     return [];

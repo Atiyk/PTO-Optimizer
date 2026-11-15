@@ -91,6 +91,16 @@ export function employerExtraDates(rule: EmployerExtraRule, rangeStart: string, 
   return dates;
 }
 
+/**
+ * US state holidays are mostly state-government office days that private employers rarely
+ * give, so in the US they are opt-in. Elsewhere a region's holidays are public holidays
+ * for everyone working there (German state holidays, Scottish bank holidays), so they stay
+ * on unless the employer skips them, like national ones.
+ */
+export function regionalHolidaysOptIn(country: string): boolean {
+  return country === 'US';
+}
+
 // ---------------------------------------------------------------------------------------
 // Resolution: holiday data + employer calendar -> entries.
 // ---------------------------------------------------------------------------------------
@@ -122,7 +132,10 @@ export function resolveHolidayEntries(
     });
   };
   for (const h of nationalHolidays) add(h.date, h.name, 'public', !skipped.has(h.name));
-  for (const h of stateHolidayCandidates) add(h.date, h.name, 'state', regional === null || regional.has(h.name));
+  const optIn = regionalHolidaysOptIn(country);
+  for (const h of stateHolidayCandidates) {
+    add(h.date, h.name, 'state', regional === null || (optIn ? regional.has(h.name) : !skipped.has(h.name)));
+  }
   // Only the extras the employer gives become entries; the rest are offered as chips.
   for (const rule of employerExtraRules(country)) {
     if (!extrasOn.has(rule.id)) continue;
@@ -237,7 +250,7 @@ export function toggleHolidayChoice(
     };
   }
   const v2 = upgradeEmployerCalendar(calendar, regionalNames(entries));
-  if (choice.kind === 'public') {
+  if (choice.kind === 'public' || (choice.kind === 'regional' && !regionalHolidaysOptIn(calendar.country))) {
     return turnOff
       ? { ...v2, skipped: withValue(v2.skipped, name) }
       : { ...v2, skipped: without(v2.skipped, name), excluded: clearExclusions(v2, name) };
@@ -267,7 +280,8 @@ export function toggleHolidayEntry(
   const name = id.slice(id.indexOf(':') + 1);
   const nameLevelOff = calendar.version === 2 && (
     (kind === 'public' && (calendar.skipped ?? []).includes(name))
-    || (kind === 'regional' && !(calendar.regional ?? []).includes(name))
+    || (kind === 'regional' && (regionalHolidaysOptIn(calendar.country)
+      ? !(calendar.regional ?? []).includes(name) : (calendar.skipped ?? []).includes(name)))
     || (kind === 'extra' && !(calendar.extras ?? []).includes(name)));
   if (!nameLevelOff) return cleared;
   const siblings = entries.filter((other) => entryKey(other) !== key && choiceIdFor(other).id === id && !other.checked).map(entryKey);
