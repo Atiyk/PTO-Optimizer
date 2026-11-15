@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type FocusEvent, type ReactNode } from 'react';
 import { useMinWidth } from './useMinWidth';
+import { scrollBehavior } from './scrollBehavior';
 
 /** Classes each card's <li> adds so it sits in the phone strip; stacked from 768px up. */
 export const BREAK_STRIP_ITEM = 'max-md:w-[86%] max-md:shrink-0 max-md:snap-start';
@@ -29,8 +30,15 @@ export function BreakStrip({ count, label, children }: { count: number; label: s
     const list = listRef.current;
     const target = list?.children[Math.max(0, Math.min(count - 1, current + delta))] as HTMLElement | undefined;
     if (!list || !target) return;
-    const reduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    target.scrollIntoView?.({ inline: 'start', block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+    target.scrollIntoView?.({ inline: 'start', block: 'nearest', behavior: scrollBehavior() });
+  };
+  // Tabbing to a button or link inside a card that sits off to the side brings that card
+  // into view, so keyboard focus is never hidden in the strip.
+  const revealFocusedCard = (event: FocusEvent<HTMLUListElement>) => {
+    const list = listRef.current;
+    if (stacked || !list || event.target === list) return;
+    const card = [...list.children].find((child) => child.contains(event.target as Node)) as HTMLElement | undefined;
+    card?.scrollIntoView?.({ inline: 'nearest', block: 'nearest', behavior: scrollBehavior() });
   };
   const nav = 'inline-flex h-11 w-11 items-center justify-center rounded-[6px] border border-line-strong bg-surface text-ink hover:border-ink disabled:border-line disabled:text-[var(--disabled-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]';
   return (
@@ -53,6 +61,7 @@ export function BreakStrip({ count, label, children }: { count: number; label: s
         aria-label={label}
         tabIndex={count > 1 && !stacked ? 0 : undefined}
         onScroll={indexFromScroll}
+        onFocus={revealFocusedCard}
         className="relative m-0 mt-3 flex list-none gap-3 p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] max-md:-mx-4 max-md:snap-x max-md:snap-mandatory max-md:items-stretch max-md:overflow-x-auto max-md:scroll-px-4 max-md:px-4 max-md:pb-1 md:flex-col"
       >
         {children}

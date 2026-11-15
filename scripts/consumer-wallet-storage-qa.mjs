@@ -1,6 +1,9 @@
 /** Local two-tab verification for the real wallet import and request tracker. */
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
+// Contexts block service workers: the routes below emulate Vercel clean URLs and stub
+// third parties, and a registered worker (P3 PWA) would take requests out of Playwright
+// routing. scripts/pwa-offline-journey.mjs covers the worker itself.
 
 const base = new URL(process.argv[2] || 'http://127.0.0.1:4173');
 const storageKey = 'gapless.personal.requests.v1';
@@ -24,7 +27,7 @@ const backup = {
 };
 const browser = await chromium.launch({ headless: true, ...(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {}) });
 try {
-  const context = await browser.newContext({ viewport: { width: 375, height: 900 }, timezoneId: 'America/New_York' });
+  const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 375, height: 900 }, timezoneId: 'America/New_York' });
   await context.route('**/*', (route) => new URL(route.request().url()).origin === base.origin ? route.continue() : route.abort());
   await context.addInitScript(({ key, fixture }) => {
     if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({ version: 1, requests: [fixture] }));

@@ -62,6 +62,7 @@ import { useHasHover } from './useHasHover';
 import { useMinWidth } from './useMinWidth';
 import { noBreaksMessage } from './noBreaksMessage';
 import { PlannerHolidayQuestion } from './CompanyHolidayChips';
+import { scrollBehavior } from './scrollBehavior';
 
 /** Links that open More options at a section: the work week, and the days someone can't take off. */
 const OPTION_ANCHORS = ['#planning-assumptions', '#unavailable-days'];
@@ -77,7 +78,10 @@ export function App() {
   const [allMonthsShown, setAllMonthsShown] = useState(false);
   // Phones: the "More" disclosure under the primary action, and the month grids behind the
   // year overview. Both start closed; nothing in them is removed from the page.
-  const [moreOpen, setMoreOpen] = useState(false);
+  // Someone opening a partner link came to see the dates they can both take off: on a phone
+  // the partner planner sits inside "More", so it starts open rather than hide the link's point.
+  const [moreOpen, setMoreOpen] = useState(() => typeof window !== 'undefined'
+    && readPartnerAvailability(readBrowserPlanSearch(window.location.search, window.history.state)).availability !== null);
   const [monthDetails, setMonthDetails] = useState(false);
   const resultRef = useRef<HTMLElement>(null);
   const workspace = usePersonalWorkspace();
@@ -187,14 +191,14 @@ export function App() {
   const toggleOptions = () => {
     const next = !optionsOpen;
     setOptionsOpen(next);
-    if (next && !OPTION_ANCHORS.includes(window.location.hash)) requestAnimationFrame(() => optionsRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }));
+    if (next && !OPTION_ANCHORS.includes(window.location.hash)) requestAnimationFrame(() => optionsRef.current?.scrollIntoView?.({ block: 'nearest', behavior: scrollBehavior() }));
   };
   const [partnerOpen, setPartnerOpen] = useState<{ key: number; breakId?: string }>({ key: 0 });
   const openPartnerPlanner = (breakId?: string) => {
     // On a phone the partner planner sits inside "More"; open it so the scroll lands.
     setMoreOpen(true);
     setPartnerOpen((previous) => ({ key: previous.key + 1, breakId }));
-    requestAnimationFrame(() => document.getElementById('partner-planner')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }));
+    requestAnimationFrame(() => document.getElementById('partner-planner')?.scrollIntoView?.({ block: 'start', behavior: scrollBehavior() }));
   };
   const hasHover = useHasHover();
   // At 1024px and up the sliders live in the sticky left rail with the inputs; narrower, they
@@ -593,8 +597,7 @@ export function App() {
                 </p>
               )}
               </HoldHeightWhile>
-              {/* Desktop: one primary action (chosen by state) beside the page's jump links.
-                  Phones and tablets get the same action under the break cards instead. */}
+              {/* Desktop: one primary action (chosen by state) beside the page's jump links. */}
               {wide === true && (
                 <PlanActions
                   layout="wide"
@@ -618,12 +621,29 @@ export function App() {
                   </nav>
                 </PlanActions>
               )}
+              {/* Phones and tablets: the same one primary action sits right under the result
+                  headline, inside the first screen, with the closed "More" section under it. */}
+              {wide !== true && (
+                <PlanActions
+                  layout="narrow"
+                  kind={showPrimary ? primaryKind : null}
+                  disabled={primaryDisabled}
+                  disabledTitle={state.pinnedPlans.length >= MAX_PINNED_PLANS ? 'Remove a saved plan to make room for another.' : undefined}
+                  onKeep={state.pinPlan}
+                  request={primaryRequest}
+                  pinMessage={state.pinMessage}
+                  justKept={justKept}
+                  moreOpen={moreOpen}
+                  onMoreOpenChange={setMoreOpen}
+                >
+                  {takeItWithYou}
+                </PlanActions>
+              )}
             </section>
 
             {/* DOM order is reading order at every width. Desktop: the rail (inputs, sliders,
                 options) is the left column, so it comes before the break cards. Narrower: the
-                inputs sit right under the result, the way the landing page pairs its answer
-                with "I have 15 PTO days", and the sliders follow the break cards. */}
+                result and its primary action, then the break cards, then the inputs and goals. */}
 {wide === true && settingsAside}
 
             <div className="flex min-w-0 flex-col gap-5 lg:col-start-2 lg:row-span-2 lg:row-start-2">
@@ -772,22 +792,6 @@ export function App() {
                   </ul>
                 </section>
               )}
-              {wide !== true && (
-                <PlanActions
-                  layout="narrow"
-                  kind={showPrimary ? primaryKind : null}
-                  disabled={primaryDisabled}
-                  disabledTitle={state.pinnedPlans.length >= MAX_PINNED_PLANS ? 'Remove a saved plan to make room for another.' : undefined}
-                  onKeep={state.pinPlan}
-                  request={primaryRequest}
-                  pinMessage={state.pinMessage}
-                  justKept={justKept}
-                  moreOpen={moreOpen}
-                  onMoreOpenChange={setMoreOpen}
-                >
-                  {takeItWithYou}
-                </PlanActions>
-              )}
               {plannable && (
                 <p className="flex flex-wrap gap-x-5 text-sm">
                   <a href="#unavailable-days" className="link-mark inline-flex min-h-11 items-center font-semibold">Can&apos;t do some dates?</a>
@@ -808,8 +812,8 @@ export function App() {
               )}
             </div>
 
-            {/* Phones and tablets: the inputs follow the result, its breaks and the primary
-                action, so the first screens answer "what should I request?" first. */}
+            {/* Phones and tablets: the inputs follow the result, its primary action and its
+                breaks, so the first screens answer "what should I request?" first. */}
             {wide !== true && settingsAside}
 
             {!railHoldsShape && (

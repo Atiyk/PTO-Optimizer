@@ -78,16 +78,17 @@ describe('planner layout order (F02, F03)', () => {
     expect(screen.getByRole('heading', { name: 'Take it with you' })).toBeTruthy();
   });
 
-  it('on a phone reads result, breaks, PTO dates, one primary action, then the adjustments', async () => {
+  it('on a phone reads result, one primary action, breaks, PTO dates, then the adjustments', async () => {
     setViewport(375);
     const { summary, firstCard, requests } = await renderReady();
     const dates = screen.getByRole('region', { name: 'PTO dates to request' });
     const actions = screen.getByRole('region', { name: 'Use this plan' });
     const pto = screen.getByLabelText('PTO days available');
-    expect(precedes(summary, firstCard)).toBe(true);
+    // The primary action sits right under the headline, inside the first screen.
+    expect(precedes(screen.getByRole('heading', { level: 1 }), actions)).toBe(true);
+    expect(precedes(actions, firstCard)).toBe(true);
     expect(precedes(firstCard, dates)).toBe(true);
-    expect(precedes(dates, actions)).toBe(true);
-    expect(precedes(actions, pto)).toBe(true);
+    expect(precedes(dates, pto)).toBe(true);
     const shape = document.getElementById('plan-shape')!;
     expect(within(shape).getByRole('group', { name: 'What do you want from your PTO?' })).toBeTruthy();
     expect(precedes(requests, shape)).toBe(true);
@@ -110,11 +111,20 @@ describe('planner layout order (F02, F03)', () => {
     expect(actions.querySelector('[data-primary-action]')).toBeNull();
   });
 
-  it('without a known width (the prerender) uses the phone order: breaks, then the primary action, then the inputs', async () => {
+  it('without a known width (the prerender) uses the phone order: the primary action, then breaks, then the inputs', async () => {
     const { firstCard } = await renderReady();
     const actions = screen.getByRole('region', { name: 'Use this plan' });
-    expect(precedes(firstCard, actions)).toBe(true);
-    expect(precedes(actions, screen.getByLabelText('PTO days available'))).toBe(true);
+    expect(precedes(actions, firstCard)).toBe(true);
+    expect(precedes(firstCard, screen.getByLabelText('PTO days available'))).toBe(true);
+  });
+
+  it('on a phone opens "More" for someone arriving with a partner link, so the joint dates show', async () => {
+    setViewport(375);
+    window.history.replaceState(null, '', `${scenario}&pp=1:c:20270215~20270219:-`);
+    await renderReady();
+    const more = document.querySelector('details#more-actions')!;
+    await waitFor(() => expect(more.hasAttribute('open')).toBe(true));
+    expect(within(more as HTMLElement).getByRole('region', { name: 'Partner vacation planner' })).toBeTruthy();
   });
 });
 

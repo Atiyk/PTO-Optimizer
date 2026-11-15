@@ -5,6 +5,7 @@ import { rangeISO } from '@daysoff/engine/solver/dateUtils';
 import { BreakStrip } from './BreakStrip';
 import { YearOverview } from './YearOverview';
 import { PlanStyleCompare } from './PlanStyleCompare';
+import { scrollBehavior } from './scrollBehavior';
 import { PlanActions } from './PlanActions';
 import { ReserveControls } from './PrimaryControls';
 import type { PlanComparisonEntry } from '../planning/planComparison';
@@ -24,6 +25,30 @@ describe('BreakStrip', () => {
     expect(list.tabIndex).toBe(0);
     expect(screen.getByRole('button', { name: 'Previous break' })).toHaveProperty('disabled', true);
     expect(screen.getByRole('button', { name: 'Next break' })).toHaveProperty('disabled', false);
+  });
+  it('scrolls a card into view when something inside it takes keyboard focus', () => {
+    const scrollIntoView = vi.fn();
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    try {
+      render(<BreakStrip count={2} label="Breaks"><li>One</li><li><button type="button">Track two</button></li></BreakStrip>);
+      screen.getByRole('button', { name: 'Track two' }).focus();
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView.mock.contexts[0]).toBe(screen.getAllByRole('listitem')[1]);
+      expect(scrollIntoView).toHaveBeenCalledWith({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original;
+    }
+  });
+});
+
+describe('scrollBehavior', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('jumps instead of animating under prefers-reduced-motion', () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(prefers-reduced-motion: reduce)' }));
+    expect(scrollBehavior()).toBe('auto');
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    expect(scrollBehavior()).toBe('smooth');
   });
 });
 
@@ -53,6 +78,14 @@ describe('PlanStyleCompare', () => {
     fireEvent.click(radios[1]);
     expect(onChangeStyle).toHaveBeenCalledWith('max');
     expect(screen.queryByRole('button', { name: /submit|generate|apply/i })).toBeNull();
+  });
+  it('calls days a style kept back on purpose a reserve, not unplanned', () => {
+    const unplanned = { ...entry('max', 'Most days off', 40), reserveKept: 0, remainingPto: 3 };
+    const mixed = { ...entry('season', 'Seasonal priority', 30), remainingPto: 5 };
+    render(<PlanStyleCompare layout="wide" style="year" onChangeStyle={() => {}} entries={[entry('year', 'Spread across the year', 31), unplanned, mixed]} />);
+    // Only the plan whose leftover days are all its own reserve says so.
+    expect(screen.getAllByText('Kept in reserve')).toHaveLength(1);
+    expect(screen.getAllByText('Left unplanned')).toHaveLength(2);
   });
 });
 

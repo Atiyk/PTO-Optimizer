@@ -3,6 +3,9 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+// Contexts block service workers: the routes below emulate Vercel clean URLs and stub
+// third parties, and a registered worker (P3 PWA) would take requests out of Playwright
+// routing. scripts/pwa-offline-journey.mjs covers the worker itself.
 
 const [base = 'http://127.0.0.1:4177', output = 'qa-evidence/plan-parity'] = process.argv.slice(2);
 const origin = new URL(base).origin;
@@ -19,7 +22,7 @@ function breaks(selector) {
 }
 
 async function context() {
-  const session = await browser.newContext({ viewport: { width: 375, height: 812 }, locale: 'en-US', timezoneId: 'America/New_York', reducedMotion: 'reduce', permissions: ['clipboard-read', 'clipboard-write'] });
+  const session = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 375, height: 812 }, locale: 'en-US', timezoneId: 'America/New_York', reducedMotion: 'reduce', permissions: ['clipboard-read', 'clipboard-write'] });
   await session.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -64,6 +67,12 @@ async function context() {
   return session;
 }
 
+/** Phones keep share, export and subscribe actions in the closed "More" section. */
+async function openMoreActions(page) {
+  const more = page.locator('details#more-actions');
+  if (await more.count() && !await more.evaluate((element) => element.open)) await more.locator(':scope > summary').click();
+}
+
 async function assertPlanner(page, expected, step) {
   await page.locator(plannerReady).waitFor({ state: 'visible' });
   const states = await page.evaluate(() => window.__qaPlanSnapshots ?? []);
@@ -86,14 +95,17 @@ try {
   const landingBreaks = `ol[aria-label="Breaks in this plan"] > li${breakData}`;
   await page.locator(landingBreaks).first().waitFor({ state: 'visible' });
   const landing = await page.evaluate(breaks, landingBreaks);
-  assert.equal(landing.length, 3);
-  const expected = { total: 31, cost: 15, breaks: landing };
+  // The homepage preview is the year-round plan (ps=year): four breaks for this fixed day.
+  assert.equal(landing.length, 4);
+  // It spends 13 of the 15 days and keeps 2 in reserve; both pages must show the same split.
+  const expected = { total: 31, cost: 13, breaks: landing };
   assert.equal(landing.reduce((total, entry) => total + entry[2], 0), expected.cost);
   await page.screenshot({ path: resolve(directory, '01-home-375.png') });
   await page.getByRole('link', { name: /See the full plan/ }).first().click();
   await assertPlanner(page, expected, 'slow homepage handoff');
   await page.screenshot({ path: resolve(directory, '02-planner-375.png') });
   const href = page.url();
+  await openMoreActions(page);
   await page.getByRole('button', { name: 'Copy plan link', exact: true }).click();
   await page.getByRole('button', { name: /^(?:Link copied|Copied \(calendar omitted\))$/ }).waitFor();
   const publicHref = await page.evaluate(() => navigator.clipboard.readText());

@@ -6,6 +6,9 @@ import type { PlanStyleOptions, Season } from '../planning/yearPlan';
 
 const SEASON_LABEL: Record<Season, string> = { spring: 'Spring', summer: 'Summer', fall: 'Fall', winter: 'Winter' };
 const days = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`;
+/** Days the style kept back on purpose are a reserve, not days someone forgot to plan. */
+const remainingLabel = (entry: Pick<PlanComparisonEntry, 'reserveKept' | 'remainingPto'>) =>
+  entry.reserveKept > 0 && entry.remainingPto <= entry.reserveKept ? 'Kept in reserve' : 'Left unplanned';
 
 /**
  * comparePlanStyles() for the current inputs, worked out just after the plan itself so it
@@ -88,7 +91,7 @@ export function PlanStyleCompare({ entries, style, onChangeStyle, layout }: Plan
                 <dt className="text-muted">Longest break</dt><dd className="m-0 text-right">{days(entry.longestBreak)}</dd>
                 <dt className="text-muted">Breaks</dt><dd className="m-0 text-right">{entry.breakCount}</dd>
                 <dt className="text-muted">Seasons</dt><dd className="m-0 text-right">{entry.seasonsTouched.map((s) => SEASON_LABEL[s]).join(', ') || 'None'}</dd>
-                <dt className="text-muted">Left unplanned</dt><dd className="m-0 text-right">{days(entry.remainingPto)}</dd>
+                <dt className="text-muted">{remainingLabel(entry)}</dt><dd className="m-0 text-right">{days(entry.remainingPto)}</dd>
               </dl>
               <span id={`${id}-tradeoff`} className="text-muted">{entry.tradeOff}</span>
             </label>

@@ -9,6 +9,9 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { setTimeout as pause } from 'node:timers/promises';
 import { chromium } from 'playwright';
+// Contexts block service workers: the routes below emulate Vercel clean URLs and stub
+// third parties, and a registered worker (P3 PWA) would take requests out of Playwright
+// routing. scripts/pwa-offline-journey.mjs covers the worker itself.
 
 const [base = 'http://127.0.0.1:4177', output = 'qa-evidence/journey'] = process.argv.slice(2);
 const origin = new URL(base).origin;
@@ -59,7 +62,7 @@ async function check(name, action) {
 }
 
 async function mobileContext() {
-  const context = await browser.newContext({ viewport: report.viewport, locale: 'en-US', timezoneId: 'America/New_York',
+  const context = await browser.newContext({ serviceWorkers: 'block', viewport: report.viewport, locale: 'en-US', timezoneId: 'America/New_York',
     reducedMotion: 'reduce', colorScheme: 'light', acceptDownloads: true, permissions: ['clipboard-read', 'clipboard-write'] });
   contexts.push(context);
   await context.addInitScript(() => {
@@ -123,6 +126,13 @@ async function noOverflow(page) {
 async function moreOptions(page) {
   const button = page.getByRole('button', { name: /More options|Hide options/ });
   if (await button.getAttribute('aria-expanded') !== 'true') await button.click();
+}
+
+/** Phones keep share, export and subscribe actions in the closed "More" section under the
+ * one primary action; open it before using one of them. */
+async function openMoreActions(page) {
+  const more = page.locator('details#more-actions');
+  if (await more.count() && !await more.evaluate((element) => element.open)) await more.locator(':scope > summary').click();
 }
 
 function holidaySection(page) {
@@ -198,7 +208,7 @@ async function verifyAnalyticsTransport() {
     fixture: 'Route-backed HTTPS origin; actual unmodified hosted SDKs; mobile user agent and webdriver=false opt into SDK transport; all analytics POSTs fulfilled locally.' };
   const sensitive = ['139.25', 'qa-sdk-private-note-2027', 'qa-sdk-private-fragment', '2027-01-15', '2027-01-24', '2027-01-01'];
   for (const unsafe of [false, true]) {
-    const context = await browser.newContext({ viewport: report.viewport, locale: 'en-US', timezoneId: 'America/New_York',
+    const context = await browser.newContext({ serviceWorkers: 'block', viewport: report.viewport, locale: 'en-US', timezoneId: 'America/New_York',
       userAgent: `Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${browser.version()} Mobile Safari/537.36` });
     contexts.push(context);
     await context.addInitScript(() => {
@@ -308,7 +318,8 @@ try {
     await waitForPlanner(page);
     // F05: a real 0-day balance has nothing to save; the page says so and stays shareable.
     await page.getByRole('heading', { level: 1, name: 'No PTO days to spend', exact: true }).waitFor();
-    assert.equal(await page.getByRole('button', { name: 'Save this plan', exact: true }).count(), 0, 'A zero-budget plan offers no Save.');
+    assert.equal(await page.getByRole('button', { name: /^(?:Keep|Save) this plan$/ }).count(), 0, 'A zero-budget plan offers no Keep.');
+    await openMoreActions(page);
     assert.equal(await page.getByRole('button', { name: 'Copy plan link', exact: true }).isEnabled(), true, 'A valid zero-budget scenario remains shareable.');
     await noOverflow(page);
     await screenshot(page, '06-pinned-recovery-after-320.png');
@@ -322,15 +333,15 @@ try {
     assert.ok(start);
     await card.getByRole('button', { name: 'Save break', exact: true }).click();
     await card.getByText('Saved', { exact: true }).waitFor();
-    await page.getByRole('button', { name: 'Save this plan', exact: true }).click();
+    await page.getByRole('button', { name: 'Keep this plan', exact: true }).click();
     const savedPlans = page.getByRole('list', { name: 'Saved plans', exact: true });
-    await savedPlans.getByRole('button', { name: 'Restore', exact: true }).waitFor();
+    await savedPlans.getByRole('button', { name: 'Open saved plan', exact: true }).waitFor();
     await page.reload({ waitUntil: 'domcontentloaded' });
     await waitForPlanner(page);
     await card.getByText('Saved', { exact: true }).waitFor();
     await page.getByLabel('PTO days available', { exact: true }).fill('2');
     await eventually(() => assert.equal(new URL(page.url()).searchParams.get('b'), '2'), 'The active scenario should change');
-    await savedPlans.getByRole('button', { name: 'Restore', exact: true }).click();
+    await savedPlans.getByRole('button', { name: 'Open saved plan', exact: true }).click();
     await eventually(() => assert.equal(new URL(page.url()).searchParams.get('b'), '3'), 'Restore should reinstate the saved scenario');
     const myPto = await open(context, '/policy/#requests');
     const tracked = myPto.getByRole('region', { name: 'My PTO requests', exact: true });
@@ -429,14 +440,19 @@ try {
     await moreOptions(recipient);
     const holidays = holidaySection(recipient);
     await holidays.getByRole('checkbox', { name: /2027-12-24.*Christmas Day/ }).uncheck();
-    await holidays.getByRole('button', { name: 'Save employer calendar', exact: true }).click();
-    await eventually(async () => assert.match(await holidays.getByRole('status').innerText(), /saved in this browser/), 'Calendar save should report success');
+    // Employer calendars save automatically (no Save button): the change is reported in the
+    // section and announced by the live status under the plan, and is stored at once.
+    await eventually(async () => {
+      assert.match(await holidays.innerText(), /Saved for United States\./);
+      assert.ok(await recipient.getByRole('status').filter({ hasText: /^Saved for United States\.$/ }).count() > 0);
+    }, 'Calendar auto-save should report success');
     const saved = await recipient.evaluate(() => localStorage.getItem('gapless.employer.v1:US:'));
     assert.ok(saved?.includes('Christmas Day'));
     await recipient.goto(new URL(holidayPath, origin).href, { waitUntil: 'domcontentloaded' });
     await waitForPlanner(recipient);
     await eventually(async () => assert.doesNotMatch(await recipient.locator('#day-2027-12-24').getAttribute('aria-label'), /public holiday/), 'Saved exclusions should survive a fresh URL');
     const sender = await open(await mobileContext(), holidayPath);
+    await openMoreActions(sender);
     await sender.getByRole('button', { name: 'Copy plan link', exact: true }).click();
     const sharedDefault = await clipboardText(sender);
     assert.equal(new URL(sharedDefault).searchParams.has('eh'), false, 'Copied public plans must not expose employer calendar overrides.');
@@ -459,12 +475,13 @@ try {
     await holidaySection(recipient).getByLabel('Company holiday name', { exact: true }).fill('QA company closure 2027');
     await holidaySection(recipient).getByRole('button', { name: 'Add', exact: true }).click();
     await holidaySection(recipient).getByRole('checkbox', { name: /2027-12-30.*QA company closure 2027/ }).waitFor();
-    await holidaySection(recipient).getByRole('button', { name: 'Save employer calendar', exact: true }).click();
+    await eventually(async () => assert.ok((await recipient.evaluate(() => localStorage.getItem('gapless.employer.v1:US:')))?.includes('QA company closure 2027')),
+      'A new company holiday should save automatically');
     await recipient.goto(new URL(holidayPath, origin).href, { waitUntil: 'domcontentloaded' });
     await waitForPlanner(recipient);
     await eventually(async () => assert.match(await recipient.locator('#day-2027-12-30').getAttribute('aria-label'), /QA company closure 2027/), 'Company holidays must persist');
     await moreOptions(recipient);
-    await holidaySection(recipient).getByRole('button', { name: 'Restore public holidays', exact: true }).click();
+    await holidaySection(recipient).getByRole('button', { name: 'Reset to public holidays', exact: true }).click();
     await recipient.goto(new URL(holidayPath, origin).href, { waitUntil: 'domcontentloaded' });
     await waitForPlanner(recipient);
     await eventually(async () => {
@@ -492,11 +509,15 @@ try {
     await moreOptions(page);
     await holidaySection(page).getByRole('checkbox', { name: /PRIVATE_EMPLOYER_POLICY_TITLE/ }).waitFor();
     assert.equal(new URL(page.url()).searchParams.has('eh'), false, 'A same-tab refresh should keep the private draft outside the address.');
+    // Open "More" first so these absence checks look at rendered controls, not a closed section.
+    await openMoreActions(page);
+    await page.getByRole('heading', { name: 'Keep this plan in your calendar', exact: true }).waitFor();
     const subscriptions = page.getByRole('heading', { name: 'Keep this plan in your calendar', exact: true }).locator('..');
     assert.equal(await subscriptions.getByRole('link', { name: /Google Calendar/ }).count(), 0, 'No pre-consent Google URL may contain private names.');
     assert.equal(await subscriptions.getByRole('link', { name: /Outlook/ }).count(), 0, 'No pre-consent Outlook URL may contain private names.');
     assert.equal(await subscriptions.getByRole('link', { name: /Apple Calendar/ }).count(), 0, 'No pre-consent webcal URL may contain private names.');
     assert.equal(await subscriptions.getByLabel(/Or paste this link into any calendar app/).count(), 0, 'No private feed URL may be selectable before consent.');
+    await openMoreActions(page);
     await page.getByRole('button', { name: 'Copy plan link', exact: true }).click();
     const shared = await clipboardText(page);
     const sharedParams = new URL(shared).searchParams;
@@ -638,6 +659,7 @@ try {
 
   await check('Portrait preview is 1080×1350, hides balance by default, and copies through the real download fallback', async () => {
     assert.ok(main && !main.isClosed(), 'The consumer planner must remain available.');
+    await openMoreActions(main);
     await main.getByRole('button', { name: 'Preview portrait share card', exact: true }).click();
     const portrait = main.getByRole('region', { name: 'Portrait share card', exact: true });
     const privacy = portrait.getByRole('checkbox', { name: 'Include my PTO balance.', exact: true });
