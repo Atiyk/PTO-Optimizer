@@ -32,6 +32,7 @@ import { CommittedBreakCard } from './CommittedBreakCard';
 import { PinnedPlansStrip } from './PinnedPlansStrip';
 import { SaveConfirmation } from './SaveConfirmation';
 import { SharedPlanNotice } from './SharedPlanNotice';
+import { LegacyPlanNotice } from './LegacyPlanNotice';
 import { ExportBar } from './ExportBar';
 import { PartnerOverlapBanner } from './PartnerOverlapBanner';
 import { FAQ } from './FAQ';
@@ -538,6 +539,7 @@ export function App() {
                   {partnerReceived.invalid && <p role="alert" className="rounded-[10px] border border-error bg-error-soft p-4 text-sm text-ink">This partner availability link is invalid or too large. Ask for a new link with fewer dates.</p>}
                   {partnerReceived.availability && <p role="status" className="rounded-[10px] bg-surface-alt p-4 text-sm text-ink">Someone shared {partnerReceived.availability.days.length} {partnerReceived.availability.status} available dates. Your own PTO budget and calendar apply. <a className="link-mark font-semibold" href="#partner-planner">See dates you can both take off</a></p>}
                   {workWeekNotice && <p role="status" className="rounded-[10px] bg-surface-alt p-4 text-sm text-ink">{workWeekNotice}</p>}
+                  <LegacyPlanNotice />
                   {state.sharedPlanDifferences && (
                     <SharedPlanNotice
                       differences={state.sharedPlanDifferences}

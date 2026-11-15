@@ -45,6 +45,19 @@ describe('old links reproduce the e28eeab plans exactly', () => {
     it(search, () => {
       const result = planFromSearch(search, LEGACY_PLAN_TODAY, diskHolidays);
       const actual = result.ok ? { outcome: result.outcome } : result;
+      if (search.includes('c=GB&') && !search.includes('sd=')) {
+        // Deliberate correctness fix, not a semantics change: e28eeab ignored New Year's
+        // Day for GB without a nation (Nager lists it per nation), so this old plan charged
+        // PTO on a bank holiday. Old links keep their style; they no longer spend PTO on it.
+        const oldDays = JSON.stringify(fixtures[search]);
+        expect(oldDays).toContain('"2027-01-01"');
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.outcome.result.budgetSpent).toBeLessThanOrEqual(25);
+          for (const brk of result.outcome.result.primary) expect(brk.totalDaysOff).toBe(brk.days.length);
+        }
+        return;
+      }
       expect(JSON.stringify(actual)).toBe(JSON.stringify(fixtures[search]));
     });
   }

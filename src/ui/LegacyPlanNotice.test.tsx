@@ -24,7 +24,7 @@ describe('LegacyPlanNotice', () => {
     expect(href.pathname).toBe('/pto');
     expect(Object.fromEntries(href.searchParams)).toEqual({
       c: 'GB', sd: 'GB-SCT', b: '18', s: '2027-01-01', e: '2027-12-31',
-      rv: String(FRESH_VISIT_RESERVE_DAYS), pv: '2', ps: 'balanced', mb: '3', w: '30', count: '3',
+      rv: String(FRESH_VISIT_RESERVE_DAYS), pv: '2', ps: 'year', mb: '3', w: '30', count: '0',
     });
     expect(todaysPlanHref('?b=5', 'javascript:alert(1)')).toMatch(/^\/pto\?/);
   });
@@ -34,7 +34,7 @@ describe('LegacyPlanNotice', () => {
     render(<LegacyPlanNotice />);
     expect(screen.getByTestId('legacy-plan-notice').textContent).toBe('This plan was made with an older version of Timebower. See today’s recommended plan');
     const link = screen.getByRole('link', { name: 'See today’s recommended plan' });
-    expect(link.getAttribute('href')).toMatch(/^\/uk\?c=GB&sd=GB-SCT&b=18&s=2027-01-01&e=2027-12-31&rv=\d+&pv=2&ps=balanced/);
+    expect(link.getAttribute('href')).toMatch(/^\/uk\?c=GB&sd=GB-SCT&b=18&s=2027-01-01&e=2027-12-31&rv=\d+&pv=2&ps=year/);
     expect(document.querySelector('button, form')).toBeNull();
   });
 

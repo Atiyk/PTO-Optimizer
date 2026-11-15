@@ -83,6 +83,6 @@ export default defineConfig({
     css: { include: [/index\.css/] },
     globals: false,
     // apps/* run their own test suites (npm run test:all); the root run is Days Off + engine.
-    exclude: [...configDefaults.exclude, 'apps/**'],
+    exclude: [...configDefaults.exclude, 'apps/**', '.claude/**'],
   },
 })

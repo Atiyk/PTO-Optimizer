@@ -19,7 +19,7 @@ export function isLegacyPlanSearch(search: string): boolean {
   return params.has('b') || params.has('s') || params.has('e');
 }
 
-/** The same scenario with the fresh-visit planner defaults (pv=2, balanced style). */
+/** The same scenario with the fresh-visit planner defaults (pv=2, spread-across-the-year style). */
 export function todaysPlanHref(search: string, pathname = '/pto'): string {
   const source = new URLSearchParams(search.replace(/^\?/, ''));
   const params = new URLSearchParams();
@@ -35,10 +35,10 @@ export function todaysPlanHref(search: string, pathname = '/pto'): string {
   }
   params.set('rv', String(FRESH_VISIT_RESERVE_DAYS));
   params.set('pv', '2');
-  params.set('ps', 'balanced');
+  params.set('ps', 'year');
   params.set('mb', '3');
   params.set('w', '30');
-  params.set('count', '3');
+  params.set('count', '0');
   const path = /^\/[a-z-]*\/?$/i.test(pathname) ? pathname : '/pto';
   return `${path}?${params.toString()}`;
 }
