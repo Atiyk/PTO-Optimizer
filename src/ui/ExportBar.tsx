@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { Break, WorkWeek } from '@daysoff/engine/solver/types';
 import type { DayCategory } from './types';
 import type { WeekStart } from '@daysoff/engine/calendar/calendarMath';
@@ -76,6 +76,11 @@ export function ActionButton({
 }) {
   const [message, setMessage] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
+  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (feedbackTimer.current !== null) clearTimeout(feedbackTimer.current);
+  }, []);
 
   return (
     <>
@@ -84,6 +89,13 @@ export function ActionButton({
       id={id}
       disabled={working}
       onClick={async () => {
+        // A retry owns its own feedback lifetime. An older click must not
+        // clear a newer success/error message while it is still visible.
+        if (feedbackTimer.current !== null) {
+          clearTimeout(feedbackTimer.current);
+          feedbackTimer.current = null;
+        }
+        setMessage(null);
         setWorking(true);
         try {
           const result = await onClick();
@@ -94,7 +106,10 @@ export function ActionButton({
           setMessage('Action failed — try again');
         } finally {
           setWorking(false);
-          setTimeout(() => setMessage(null), 2500);
+          feedbackTimer.current = setTimeout(() => {
+            feedbackTimer.current = null;
+            setMessage(null);
+          }, 2500);
         }
       }}
       className={buttonClasses(variant, 'md', 'disabled:cursor-wait')}
