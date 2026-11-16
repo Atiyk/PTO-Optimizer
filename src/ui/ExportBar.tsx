@@ -85,10 +85,17 @@ export function ActionButton({
       disabled={working}
       onClick={async () => {
         setWorking(true);
-        const result = await onClick();
-        setWorking(false);
-        setMessage(result.message);
-        setTimeout(() => setMessage(null), 2500);
+        try {
+          const result = await onClick();
+          setMessage(result.message);
+        } catch {
+          // A failed clipboard, image, or calendar action must never strand the
+          // button in its disabled state or imply that the action succeeded.
+          setMessage('Action failed — try again');
+        } finally {
+          setWorking(false);
+          setTimeout(() => setMessage(null), 2500);
+        }
       }}
       className={buttonClasses(variant, 'md', 'disabled:cursor-wait')}
     >
