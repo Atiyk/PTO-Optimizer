@@ -18,15 +18,15 @@ describe('ActionButton async failures', () => {
 
     fireEvent.click(button);
     await waitFor(() => {
-      expect(button).not.toBeDisabled();
-      expect(button).toHaveTextContent('Action failed — try again');
+      expect((button as HTMLButtonElement).disabled).toBe(false);
+      expect(button.textContent).toBe('Action failed — try again');
     });
-    expect(screen.getByRole('status')).toHaveTextContent('Action failed — try again');
+    expect(screen.getByRole('status').textContent).toBe('Action failed — try again');
 
     fireEvent.click(button);
     await waitFor(() => {
-      expect(button).not.toBeDisabled();
-      expect(button).toHaveTextContent('Link copied');
+      expect((button as HTMLButtonElement).disabled).toBe(false);
+      expect(button.textContent).toBe('Link copied');
     });
     expect(onClick).toHaveBeenCalledTimes(2);
   });
@@ -41,8 +41,8 @@ describe('ActionButton async failures', () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(button).not.toBeDisabled();
-      expect(button).toHaveTextContent("Couldn't copy — try again");
+      expect((button as HTMLButtonElement).disabled).toBe(false);
+      expect(button.textContent).toBe("Couldn't copy — try again");
     });
     expect(onClick).toHaveBeenCalledOnce();
   });
