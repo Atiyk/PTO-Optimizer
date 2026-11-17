@@ -156,6 +156,18 @@ describe('live homepage planner', () => {
     expect((screen.getByRole('spinbutton', { name: 'PTO days available' }) as HTMLInputElement).value).toBe('15');
   });
 
+  it('offers backup restore to a first-time visitor with no browser data', async () => {
+    await act(async () => { render(<Landing />); });
+    const trigger = screen.getByRole('button', { name: 'Restore a Timebower backup' });
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    await act(async () => { fireEvent.click(trigger); });
+    expect(screen.getByRole('button', { name: 'Hide backup recovery' }).getAttribute('aria-expanded')).toBe('true');
+    expect(await screen.findByLabelText('Choose a Timebower backup (.json)')).toBeTruthy();
+    const details = screen.getByTestId('saved-data-controls') as HTMLDetailsElement;
+    expect(details.open).toBe(true);
+    expect(localStorage.length).toBe(0);
+  });
+
   it('shows explicit empty and invalid-date states while preserving the basic controls', async () => {
     await act(async () => { render(<Landing />); });
     await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '0' } }); });

@@ -11,7 +11,7 @@ import { updateRetentionStatus } from '../personal/retentionStatus';
  * remote request: the chosen JSON is read only by this browser. Restoring is a separate
  * explicit action and the storage layer never overwrites existing conflicting entries.
  */
-export function SavedDataControls() {
+export function SavedDataControls({ initiallyOpen = false }: { initiallyOpen?: boolean } = {}) {
   const fileId = useId();
   const [candidate, setCandidate] = useState<SavedDataBackup | null>(null);
   const [message, setMessage] = useState('');
@@ -82,7 +82,7 @@ export function SavedDataControls() {
   };
 
   return (
-    <details data-testid="saved-data-controls" className="mt-3 border-t border-line text-sm text-muted">
+    <details data-testid="saved-data-controls" open={initiallyOpen} className="mt-3 border-t border-line text-sm text-muted">
       <summary className="flex min-h-11 cursor-pointer items-center font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]">
         Saved on this device · backup or restore
       </summary>

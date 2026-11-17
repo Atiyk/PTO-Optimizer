@@ -28,6 +28,7 @@ import { Chevron } from './Chevron';
 // The returning-visitor dashboard (and the request, backup and wallet code behind it) loads
 // only when this browser has a saved plan or request; a first visit never downloads it.
 const ReturningDashboard = lazy(() => import('./ReturningDashboard').then((m) => ({ default: m.ReturningDashboard })));
+const SavedDataControls = lazy(() => import('./SavedDataControls').then((m) => ({ default: m.SavedDataControls })));
 
 /** Whether this browser holds tracked requests, read without loading the request ledger. */
 function hasStoredRequests(): boolean {
@@ -163,6 +164,9 @@ export function Landing() {
   const zeroBudget = budget === 0 && validRange && !loading;
   const orderedPlan = useMemo(() => plan?.result.primary.slice().sort((a, b) => a.start.localeCompare(b.start)) ?? [], [plan]);
   const [holidayCheckOpen, setHolidayCheckOpen] = useState(false);
+  // Recovery must work in a fresh browser too, with no saved plan to trigger Welcome back.
+  // Load the backup tools only when explicitly requested: keep the first visit lightweight.
+  const [restoreBackupOpen, setRestoreBackupOpen] = useState(false);
   const emptyMessage = !validRange ? 'Your preview will appear once the planning dates are valid.'
     : loading ? 'Updating your holiday calendar…'
       : plan?.issue ?? 'No break of 3 days or more fits these dates and PTO days. Try a longer date range or more PTO days.';
@@ -363,6 +367,17 @@ export function Landing() {
               <h3 className="text-h2 font-bold type-condensed text-ink">What stays in your browser.</h3>
               <p className="mt-2 text-base text-ink">Employer settings and request notes save in this browser only. {SHARE_LINK_SENTENCE}</p>
               <a className={LINK} href="/privacy.html">Privacy details →</a>
+              <div className="mt-2">
+                <button type="button" aria-expanded={restoreBackupOpen} aria-controls="landing-backup-recovery"
+                  className={LINK} onClick={() => setRestoreBackupOpen((open) => !open)}>
+                  {restoreBackupOpen ? 'Hide backup recovery' : 'Restore a Timebower backup'}
+                </button>
+                <div id="landing-backup-recovery">
+                  {restoreBackupOpen && <Suspense fallback={<p role="status" className="text-sm text-muted">Opening local backup tools…</p>}>
+                    <SavedDataControls initiallyOpen />
+                  </Suspense>}
+                </div>
+              </div>
             </div>
           </div>
         </Container>

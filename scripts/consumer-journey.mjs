@@ -368,6 +368,30 @@ try {
     await page.close();
   });
 
+  await check('A clean browser can restore a local backup without overwriting other data', async () => {
+    const sender = await open(await mobileContext(), ptoPath.replace('b=2', 'b=3'));
+    await sender.getByRole('button', { name: 'Keep this plan', exact: true }).click();
+    await sender.getByText('1 of 2 plans saved on this device.').waitFor();
+    const raw = await sender.evaluate(() => localStorage.getItem('gapless.personal.pinned-plans.v1'));
+    assert.ok(raw, 'Sender must have a saved plan before creating the backup.');
+    const backup = JSON.stringify({ format: 'timebower-saved-data', version: 1,
+      exportedAt: '2027-01-01T00:00:00.000Z',
+      items: { 'gapless.personal.pinned-plans.v1': raw } });
+    const receiver = await open(await mobileContext(), '/');
+    assert.equal(await receiver.getByRole('region', { name: 'Welcome back' }).count(), 0, 'Fresh receiver starts without saved PTO data.');
+    await receiver.getByRole('button', { name: 'Restore a Timebower backup' }).click();
+    const file = receiver.getByLabel('Choose a Timebower backup (.json)');
+    await file.setInputFiles({ name: 'timebower-saved-data.json', mimeType: 'application/json', buffer: Buffer.from(backup) });
+    await receiver.getByRole('button', { name: 'Restore missing data' }).click();
+    assert.match(await receiver.getByRole('status').last().innerText(), /restored/);
+    await receiver.getByRole('button', { name: 'Reload to show restored data' }).click();
+    await receiver.getByRole('region', { name: 'Welcome back' }).waitFor();
+    assert.equal(await receiver.evaluate(() => localStorage.getItem('gapless.personal.pinned-plans.v1')), raw, 'The backed-up plan survives reload unchanged.');
+    await noOverflow(receiver);
+    await receiver.close();
+    await sender.close();
+  });
+
   await check('A saved break and a saved scenario both resume from local storage', async () => {
     const context = await mobileContext();
     const page = await open(context, ptoPath.replace('b=2', 'b=3'));
