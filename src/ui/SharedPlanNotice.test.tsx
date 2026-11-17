@@ -16,6 +16,7 @@ describe('shared plan notice (issue 9)', () => {
     const onUse = vi.fn();
     const view = render(<SharedPlanNotice differences={{ planner: false, holidays: false }} savedCalendarOff={false} onUseSavedCalendar={onUse} />);
     expect(screen.getByTestId('shared-plan-notice').textContent).toMatch(/Anything the sender kept private, such as company holidays or time off they already booked, isn.t included\./);
+    expect(screen.getByTestId('shared-plan-notice').textContent).toMatch(/Check the holidays your own employer gives you/);
     expect(screen.queryByTestId('shared-plan-recalculated')).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
     view.rerender(<SharedPlanNotice differences={{ planner: false, holidays: true }} savedCalendarOff onUseSavedCalendar={onUse} />);

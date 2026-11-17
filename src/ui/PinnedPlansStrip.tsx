@@ -52,9 +52,9 @@ export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlans
             type="button"
             onClick={() => onRemove(i)}
             aria-label={`Remove saved plan ${i + 1}`}
-            className="flex h-11 w-11 items-center justify-center text-lg text-muted hover:bg-surface-alt hover:text-ink"
+            className="inline-flex min-h-11 items-center justify-center rounded-[6px] px-3 text-sm font-semibold text-muted hover:bg-surface-alt hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
           >
-            &times;
+            Remove
           </button>
           </li>
         ))}

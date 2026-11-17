@@ -21,6 +21,8 @@ describe('PinnedPlansStrip (UI density pass: chips only - the Pin button/hint mo
     expect(html).toContain('5 breaks');
     expect(html).not.toContain('Travel 70th');
     expect(html).toContain('Open saved plan');
+    expect(html).toContain('Remove');
+    expect(html).toContain('1 of 2 plans saved on this device.');
     expect(html).not.toContain('Restore');
   });
 

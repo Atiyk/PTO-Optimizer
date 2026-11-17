@@ -28,6 +28,7 @@ import { Chevron } from './Chevron';
 // The returning-visitor dashboard (and the request, backup and wallet code behind it) loads
 // only when this browser has a saved plan or request; a first visit never downloads it.
 const ReturningDashboard = lazy(() => import('./ReturningDashboard').then((m) => ({ default: m.ReturningDashboard })));
+const SavedDataControls = lazy(() => import('./SavedDataControls').then((m) => ({ default: m.SavedDataControls })));
 
 /** Whether this browser holds tracked requests, read without loading the request ledger. */
 function hasStoredRequests(): boolean {
@@ -61,6 +62,9 @@ function HolidayCheck({ id, summary, open, onToggle, className = '', children }:
         {open ? 'Done' : 'Check company holidays'} <Chevron direction={open ? 'up' : 'down'} />
       </button>
     </div>
+    {!open && <p data-testid="holiday-policy-warning" className="pb-2 text-xs leading-5 text-muted">
+      Public holidays are not necessarily paid days off at your workplace. Check before requesting leave.
+    </p>}
     <div id={id} hidden={!open} className="flex flex-col gap-2 pb-3 [&_[data-holiday-chips]]:mt-0 [&>div:first-child]:mt-0 [&>div:first-child]:border-t-0 [&>div:first-child]:pt-0">{open && children}</div>
   </div>;
 }
@@ -160,6 +164,9 @@ export function Landing() {
   const zeroBudget = budget === 0 && validRange && !loading;
   const orderedPlan = useMemo(() => plan?.result.primary.slice().sort((a, b) => a.start.localeCompare(b.start)) ?? [], [plan]);
   const [holidayCheckOpen, setHolidayCheckOpen] = useState(false);
+  // Recovery must work in a fresh browser too, with no saved plan to trigger Welcome back.
+  // Load the backup tools only when explicitly requested: keep the first visit lightweight.
+  const [restoreBackupOpen, setRestoreBackupOpen] = useState(false);
   const emptyMessage = !validRange ? 'Your preview will appear once the planning dates are valid.'
     : loading ? 'Updating your holiday calendar…'
       : plan?.issue ?? 'No break of 3 days or more fits these dates and PTO days. Try a longer date range or more PTO days.';
@@ -204,6 +211,9 @@ export function Landing() {
                   <span className="sr-only">Your plan: </span><span className="mark">{planDaysOff} days off</span>
                 </h2>
                 <p className="mt-2 text-xl font-semibold tabular-nums text-ink sm:mt-3">{daysOffSplit(used, planDaysOff)}, across {plural(breakCount, 'break')}</p>
+                <p data-testid="landing-calendar-days-explainer" className="mt-1 text-sm leading-5 text-muted">
+                  Calendar days within these breaks, not extra PTO days to request.
+                </p>
               </> : zeroBudget ? <>
                 <h2 id="landing-result" className="text-h2 font-bold type-condensed text-ink">No PTO days to spend</h2>
                 <p className="mt-2 text-base text-ink" role="status">{longWeekends.length > 0
@@ -357,6 +367,17 @@ export function Landing() {
               <h3 className="text-h2 font-bold type-condensed text-ink">What stays in your browser.</h3>
               <p className="mt-2 text-base text-ink">Employer settings and request notes save in this browser only. {SHARE_LINK_SENTENCE}</p>
               <a className={LINK} href="/privacy.html">Privacy details →</a>
+              <div className="mt-2">
+                <button type="button" aria-expanded={restoreBackupOpen} aria-controls="landing-backup-recovery"
+                  className={LINK} onClick={() => setRestoreBackupOpen((open) => !open)}>
+                  {restoreBackupOpen ? 'Hide backup recovery' : 'Restore a Timebower backup'}
+                </button>
+                <div id="landing-backup-recovery">
+                  {restoreBackupOpen && <Suspense fallback={<p role="status" className="text-sm text-muted">Opening local backup tools…</p>}>
+                    <SavedDataControls initiallyOpen />
+                  </Suspense>}
+                </div>
+              </div>
             </div>
           </div>
         </Container>
