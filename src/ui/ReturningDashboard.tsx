@@ -11,6 +11,7 @@ import { Button } from './Button';
 import type { PlanSnapshot } from './useAppState';
 import { backupReminderDue, noteFirstSave, readRetentionStatus, updateRetentionStatus } from '../personal/retentionStatus';
 import { browserEnumerableStorage, downloadSavedDataBackup, summarizeSavedData } from '../personal/savedDataBackup';
+import { SavedDataControls } from './SavedDataControls';
 
 /**
  * P3 returning-user dashboard. Grows the "Welcome back" row (research rec 10) into the top
@@ -178,6 +179,7 @@ export function ReturningDashboard({ pinnedPlans, today, offDays }: {
       {status && <p role="status" className="mt-2 text-sm text-muted">{status}</p>}
       {model.reminder && <p data-testid="dashboard-reminder" className="mt-3 border-t border-line pt-3 text-ink">{reminderText(model.reminder)}</p>}
       <BackupReminder />
+      <SavedDataControls />
       <p className="mt-3 border-t border-line pt-2">
         <a href="#landing-heading" className={LINK}>Plan something new ↓</a>
       </p>

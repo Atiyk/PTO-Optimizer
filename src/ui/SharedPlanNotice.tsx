@@ -12,6 +12,7 @@ export function SharedPlanNotice({ differences, savedCalendarOff, onUseSavedCale
     <div role="status" data-testid="shared-plan-notice" className="space-y-1 rounded-[10px] bg-surface-alt p-4 text-sm text-ink">
       {change && <p data-testid="shared-plan-recalculated" className="font-semibold">{change}</p>}
       <p>This is a shared plan, built from the settings in the link. Anything the sender kept private, such as company holidays or time off they already booked, isn&rsquo;t included.</p>
+      <p>Check the holidays your own employer gives you before requesting these dates.</p>
       {savedCalendarOff && (
         <p>
           Your saved company calendar isn&rsquo;t applied, so you see the plan as shared.{' '}

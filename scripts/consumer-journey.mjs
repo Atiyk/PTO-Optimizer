@@ -340,6 +340,34 @@ try {
     await screenshot(page, '06-pinned-recovery-after-320.png');
     await page.close();
   });
+  await check('Two-plan limit stays recoverable after a third scenario on mobile', async () => {
+    const context = await mobileContext();
+    const page = await open(context, ptoPath.replace('b=2', 'b=3'));
+    const save = page.getByRole('button', { name: 'Keep this plan', exact: true });
+    await save.click();
+    await page.getByText('1 of 2 plans saved on this device.').waitFor();
+    const balance = page.getByLabel('PTO days available', { exact: true });
+    await balance.fill('4');
+    await eventually(async () => assert.equal(await save.count(), 1), 'New input is not incorrectly considered saved');
+    await save.click();
+    await page.getByText('2 of 2 plans saved on this device.').waitFor();
+    await balance.fill('5');
+    const manage = page.getByRole('button', { name: 'Manage saved plans', exact: true });
+    await manage.waitFor();
+    assert.equal(await page.getByText('Two plans saved. Remove one before keeping this plan.').isVisible(), true);
+    await manage.click();
+    const remove = page.getByRole('button', { name: 'Remove saved plan 1' });
+    assert.equal(await remove.evaluate((element) => element === document.activeElement), true, 'Manage focuses an accessible removal control.');
+    await remove.click();
+    await page.getByText('1 of 2 plans saved on this device.').waitFor();
+    await save.waitFor();
+    await noOverflow(page);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitForPlanner(page);
+    assert.equal(await page.getByText('1 of 2 plans saved on this device.').isVisible(), true);
+    await page.close();
+  });
+
   await check('A saved break and a saved scenario both resume from local storage', async () => {
     const context = await mobileContext();
     const page = await open(context, ptoPath.replace('b=2', 'b=3'));

@@ -48,6 +48,8 @@ describe('ReturningDashboard (P3)', () => {
     expect(region.textContent).toContain('In your saved plan · 16 days off · 9 PTO days · Submit by Mar 8 · 14-day notice');
     expect(screen.getByTestId('pto-line').textContent).toBe('15 PTO days in your plan · 9 planned · 6 not yet planned');
     expect(within(region).getAllByRole('button').map((b) => b.textContent)).toEqual(['Copy request']);
+    expect(within(region).getByText('Saved on this device · backup or restore')).toBeTruthy();
+    expect(within(region).queryByRole('button', { name: 'Download backup' })).toBeNull();
     expect(within(region).getByRole('link', { name: 'Plan something new ↓' }).getAttribute('href')).toBe('#landing-heading');
     expect(within(region).getByRole('link', { name: 'Open saved plan →' }).getAttribute('href')).toMatch(/^\/pto\?/);
     // Calm: no streaks, badges or urgency words.

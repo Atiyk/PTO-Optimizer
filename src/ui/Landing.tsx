@@ -61,6 +61,9 @@ function HolidayCheck({ id, summary, open, onToggle, className = '', children }:
         {open ? 'Done' : 'Check company holidays'} <Chevron direction={open ? 'up' : 'down'} />
       </button>
     </div>
+    {!open && <p data-testid="holiday-policy-warning" className="pb-2 text-xs leading-5 text-muted">
+      Public holidays are not necessarily paid days off at your workplace. Check before requesting leave.
+    </p>}
     <div id={id} hidden={!open} className="flex flex-col gap-2 pb-3 [&_[data-holiday-chips]]:mt-0 [&>div:first-child]:mt-0 [&>div:first-child]:border-t-0 [&>div:first-child]:pt-0">{open && children}</div>
   </div>;
 }
@@ -204,6 +207,9 @@ export function Landing() {
                   <span className="sr-only">Your plan: </span><span className="mark">{planDaysOff} days off</span>
                 </h2>
                 <p className="mt-2 text-xl font-semibold tabular-nums text-ink sm:mt-3">{daysOffSplit(used, planDaysOff)}, across {plural(breakCount, 'break')}</p>
+                <p data-testid="landing-calendar-days-explainer" className="mt-1 text-sm leading-5 text-muted">
+                  Calendar days within these breaks, not extra PTO days to request.
+                </p>
               </> : zeroBudget ? <>
                 <h2 id="landing-result" className="text-h2 font-bold type-condensed text-ink">No PTO days to spend</h2>
                 <p className="mt-2 text-base text-ink" role="status">{longWeekends.length > 0

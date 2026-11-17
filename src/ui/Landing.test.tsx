@@ -70,6 +70,7 @@ describe('live homepage planner', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Time off that fits your year.');
     expect(screen.getByRole('spinbutton', { name: 'PTO days available' }).getAttribute('value')).toBe('15');
     expect(screen.getByText(/^13 PTO days \+ \d+ weekend and holiday days, across/)).toBeTruthy();
+    expect(screen.getByTestId('landing-calendar-days-explainer').textContent).toMatch(/Calendar days within these breaks, not extra PTO days/);
     await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '5' } }); });
     expect(screen.getByText(/^5 PTO days \+ \d+ weekend and holiday days, across/)).toBeTruthy();
     const link = screen.getAllByRole('link', { name: 'See the full plan →' })[0] as HTMLAnchorElement;
@@ -124,6 +125,7 @@ describe('live homepage planner', () => {
     const card = document.querySelector('[data-plan-result]')!;
     const check = card.querySelector('[data-holiday-check]')!;
     expect(check.textContent).toMatch(/^Assumes you get all \d+ US public holidays off in these dates\./);
+    expect(screen.getByTestId('holiday-policy-warning').textContent).toMatch(/not necessarily paid days off at your workplace/);
     const toggle = within(check as HTMLElement).getByRole('button', { name: /Check company holidays/ });
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     await act(async () => { fireEvent.click(toggle); });

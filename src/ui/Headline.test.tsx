@@ -44,6 +44,8 @@ describe('Headline render', () => {
     expect(html).toContain('aria-live="polite"');
     expect(html).toContain('<span class="mark">26 days off</span>');
     expect(html).toContain('12 PTO days + 14 weekend and holiday days');
+    expect(html).toContain('Total calendar days across the recommended breaks');
+    expect(html).toContain('Not extra PTO days to request.');
     // The figure comes before how it splits.
     expect(html.indexOf('26 days off')).toBeLessThan(html.indexOf('12 PTO days + 14'));
   });

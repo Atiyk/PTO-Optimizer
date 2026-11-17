@@ -114,6 +114,9 @@ export function Headline({ budgetSpent, totalDaysOff, breakCountActual, budget, 
           Save this plan
         </Button>}
       </div>
+      <p data-testid="planner-calendar-days-explainer" className="mt-2 max-w-prose text-sm leading-5 text-muted">
+        Total calendar days across the recommended breaks, including weekends and holidays. Not extra PTO days to request.
+      </p>
       <p className="mt-3 text-sm tabular-nums text-muted">{balanceLine(budgetSpent, budget, reserveDays, breakCountActual, unlimitedPto, trackedReservedDays)}</p>
     </div>
   );
