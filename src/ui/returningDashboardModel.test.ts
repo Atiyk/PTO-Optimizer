@@ -120,6 +120,59 @@ describe('returning dashboard model (P3)', () => {
     expect(buildDashboard({ requests: [], plans: [{ ...LATER_PLAN, unlimitedPto: true }], today: TODAY })!.pto).toBeUndefined();
   });
 
+  it('keeps out-of-plan requests out of both status totals when their status changes', () => {
+    const future = req('2027-12-06', '2027-12-10', 'requested', 'outside');
+    const expected = { available: 15, planned: 12, unplanned: 3 };
+    expect(buildDashboard({ requests: [future], plans: [PLAN], today: TODAY })!.pto).toEqual(expected);
+    expect(buildDashboard({
+      requests: [{ ...future, status: 'approved' }], plans: [PLAN], today: TODAY,
+    })!.pto).toEqual(expected);
+    expect(buildDashboard({
+      requests: [{ ...future, status: 'completed' }], plans: [PLAN], today: TODAY,
+    })!.pto).toEqual(expected);
+  });
+
+  it('counts only PTO workdays inside a saved plan for a boundary-crossing request', () => {
+    // Thu Nov 11 and Fri Nov 12 are in the saved plan; Mon Nov 15 and
+    // Tue Nov 16 are outside, though the request overlaps the plan range.
+    const boundary = req('2027-11-11', '2027-11-16', 'requested', 'boundary');
+    expect(boundary.ptoDays).toBe(4);
+    const requested = buildDashboard({ requests: [boundary], plans: [PLAN], today: TODAY })!;
+    expect(requested.pto).toEqual({ available: 15, planned: 12, requested: 2, unplanned: 3 });
+    const approved = buildDashboard({
+      requests: [{ ...boundary, status: 'approved' }], plans: [PLAN], today: TODAY,
+    })!;
+    expect(approved.pto).toEqual({ available: 15, planned: 12, approved: 2, unplanned: 3 });
+  });
+
+  it('counts upcoming workdays rather than past dates when no saved plan exists', () => {
+    const spanningToday = req('2026-11-11', '2026-11-18', 'requested', 'spans-today');
+    expect(spanningToday.ptoDays).toBe(6);
+    expect(buildDashboard({ requests: [spanningToday], plans: [], today: TODAY })!.pto)
+      .toEqual({ requested: 3 }); // Nov 16–18, after today (Sat Nov 14).
+  });
+
+  it('deduplicates overlapping requests and gives approved dates priority over requested', () => {
+    const approved = req('2027-03-22', '2027-03-26', 'approved', 'a');
+    const duplicateApproved = req('2027-03-24', '2027-03-26', 'completed', 'b');
+    const requested = req('2027-03-24', '2027-03-30', 'requested', 'c');
+    expect(buildDashboard({
+      requests: [approved, duplicateApproved, requested], plans: [PLAN], today: TODAY,
+    })!.pto).toEqual({ available: 15, planned: 12, requested: 2, approved: 5, unplanned: 3 });
+  });
+
+  it('uses a saved partial-day shift ratio when available instead of claiming a full day', () => {
+    const halfDay = {
+      ...req('2027-04-05', '2027-04-05', 'approved', 'half'),
+      partialMinutes: 240, partialShiftMinutes: 480,
+    };
+    expect(buildDashboard({ requests: [halfDay], plans: [PLAN], today: TODAY })!.pto)
+      .toEqual({ available: 15, planned: 12, approved: 0.5, unplanned: 3 });
+    const anotherHalf = { ...halfDay, id: 'another-half' };
+    expect(buildDashboard({ requests: [halfDay, anotherHalf], plans: [PLAN], today: TODAY })!.pto)
+      .toEqual({ available: 15, planned: 12, approved: 1, unplanned: 3 });
+  });
+
   it('writes request text without claiming a quieter travel period', () => {
     const model = buildDashboard({ requests: [], plans: [LATER_PLAN], today: TODAY })!;
     const brk = breakForRequestText(model.next!);
