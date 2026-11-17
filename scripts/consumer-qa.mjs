@@ -57,7 +57,7 @@ const routes = [
 ];
 
 try {
-  for (const width of [1440, 768, 375, 320]) {
+  for (const width of [1440, 1024, 768, 390, 375, 320]) {
     for (const route of routes) {
       // At 320 px cover each route affected by this batch and the learning routes.
       if (width === 320 && !['home', 'pto', 'policy', 'family', 'sabbatical', 'understand', 'guide-accrual', 'guide-carryover', 'guide-holidays', 'guide-payout'].includes(route.name)) continue;

@@ -17,7 +17,7 @@ const browser = await chromium.launch({
 });
 let failure;
 try {
-  for (const width of [1440, 768, 375, 320]) {
+  for (const width of [1440, 1024, 768, 390, 375, 320]) {
     const context = await browser.newContext({
       viewport: { width, height: 900 },
       reducedMotion: 'reduce',
@@ -137,5 +137,5 @@ if (failure) {
   console.error('Consumer header browser QA failed:', failure);
   process.exitCode = 1;
 } else {
-  console.log('Consumer header browser QA passed at 1440, 768, 375, and 320px');
+  console.log('Consumer header browser QA passed at 1440, 1024, 768, 390, 375, and 320px');
 }
