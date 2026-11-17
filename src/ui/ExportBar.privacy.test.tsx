@@ -30,7 +30,7 @@ describe('actual Copy link action protects private employer details', () => {
     const copiedURL = new URL(copied);
     expect(copiedURL.searchParams.get('b')).toBe('12');
     expect(copied).not.toMatch(/PRIVATE_|[?&](eh|bo|od|ho)=|#/);
-    expect(screen.getByRole('button', { name: /Copied \(calendar omitted\)/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Copied \(holidays and settings omitted\)/i })).toBeTruthy();
     fireEvent.click(screen.getByText('Send your holiday dates with the link', { selector: 'summary' }));
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy link with holiday dates' })); });
     expect(writeText).toHaveBeenCalledTimes(2);
@@ -58,6 +58,7 @@ describe('actual Copy link action protects private employer details', () => {
     const allowed = new Set<string>(PLAN_SHARE_KEYS);
     expect([...copied.searchParams.keys()].filter(key => !allowed.has(key))).toEqual([]);
     expect(copied.searchParams.get('p')).toBe('2027-02-02');
+    expect(screen.getByRole('button', { name: /Copied \(private settings omitted\)/i })).toBeTruthy();
     expect(copied.href).not.toMatch(/PRIVATE|2027-03-0[345]|2027-02-09|2027-05-01|2027-04-/);
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Use public holidays' })); });
     const feedHrefs = screen.getAllByRole('link').map(link => link.getAttribute('href') ?? '').filter(href => href.includes('api%2Ffeed') || href.includes('/api/feed'));

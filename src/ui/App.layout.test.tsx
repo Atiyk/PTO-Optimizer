@@ -111,6 +111,26 @@ describe('planner layout order (F02, F03)', () => {
     expect(actions.querySelector('[data-primary-action]')).toBeNull();
   });
 
+  it('when both saved-plan slots are full, guides users to removal instead of silently downloading', async () => {
+    setViewport(375);
+    await renderReady();
+    fireEvent.click(screen.getByRole('button', { name: 'Keep this plan' }));
+    await waitFor(() => expect(screen.getByText('1 of 2 plans saved on this device.')).toBeTruthy());
+    const balance = screen.getByLabelText('PTO days available');
+    fireEvent.change(balance, { target: { value: '3' } });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Keep this plan' })).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Keep this plan' }));
+    await waitFor(() => expect(screen.getByText('2 of 2 plans saved on this device.')).toBeTruthy());
+    fireEvent.change(balance, { target: { value: '4' } });
+    const manage = await screen.findByRole('button', { name: 'Manage saved plans' });
+    expect(screen.getByText('Two plans saved. Remove one before keeping this plan.')).toBeTruthy();
+    fireEvent.click(manage);
+    const remove = screen.getByRole('button', { name: 'Remove saved plan 1' });
+    expect(document.activeElement).toBe(remove);
+    fireEvent.click(remove);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Keep this plan' })).toBeTruthy());
+  });
+
   it('without a known width (the prerender) uses the phone order: the primary action, then breaks, then the inputs', async () => {
     const { firstCard } = await renderReady();
     const actions = screen.getByRole('region', { name: 'Use this plan' });

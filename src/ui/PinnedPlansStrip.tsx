@@ -1,3 +1,5 @@
+import { MAX_PINNED_PLANS } from './pinnedPlanStore';
+
 export interface PinnedPlanSummary {
   budgetSpent: number;
   totalDaysOff: number;
@@ -25,9 +27,11 @@ function summaryText(s: PinnedPlanSummary): string {
 export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlansStripProps) {
   if (summaries.length === 0) return null;
   return (
-    <ul aria-label="Saved plans" className="m-0 flex list-none flex-wrap items-center gap-2 p-0">
-      {summaries.map((s, i) => (
-        <li
+    <div id="saved-plan-list" className="space-y-1">
+      <p className="text-xs text-muted">{summaries.length} of {MAX_PINNED_PLANS} plans saved on this device.</p>
+      <ul aria-label="Saved plans" className="m-0 flex list-none flex-wrap items-center gap-2 p-0">
+        {summaries.map((s, i) => (
+          <li
           key={i}
           className="flex min-h-11 items-center gap-1 rounded-[6px] border border-line bg-surface pl-3 text-sm tabular-nums text-ink"
         >
@@ -52,8 +56,9 @@ export function PinnedPlansStrip({ summaries, onRestore, onRemove }: PinnedPlans
           >
             &times;
           </button>
-        </li>
-      ))}
-    </ul>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

@@ -102,7 +102,7 @@ describe('PlanStyleCompare', () => {
 
 describe('PlanActions', () => {
   it('shows one primary action and keeps everything else in More', () => {
-    render(<PlanActions layout="narrow" kind="calendar" onKeep={() => {}} pinMessage="" justKept={false}><button type="button">Copy plan link</button></PlanActions>);
+    render(<PlanActions layout="narrow" kind="calendar" onKeep={() => {}} onManage={() => {}} pinMessage="" justKept={false}><button type="button">Copy plan link</button></PlanActions>);
     const region = screen.getByRole('region', { name: 'Use this plan' });
     expect(region.querySelectorAll('[data-primary-action]')).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Add to calendar' }).getAttribute('data-primary-action')).toBe('calendar');
@@ -111,7 +111,7 @@ describe('PlanActions', () => {
   it('copies the request email for the next break', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
-    render(<PlanActions layout="narrow" kind="copy-request" request={{ text: 'Hi, I would like to request…', range: 'Jan 16 – 24, 2027' }} onKeep={() => {}} pinMessage="" justKept={false} />);
+    render(<PlanActions layout="narrow" kind="copy-request" request={{ text: 'Hi, I would like to request…', range: 'Jan 16 – 24, 2027' }} onKeep={() => {}} onManage={() => {}} pinMessage="" justKept={false} />);
     expect(screen.getByText('An email draft for your next break, Jan 16 – 24, 2027.')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Copy request' }));
     expect(await screen.findByRole('button', { name: 'Request copied' })).toBeTruthy();

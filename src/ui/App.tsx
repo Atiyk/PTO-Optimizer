@@ -241,11 +241,7 @@ export function App() {
   const railHoldsShape = wide === true;
 
   // One primary action under the plan, chosen by state (see primaryAction.ts).
-  const keptBreaks = useMemo(
-    () => state.breaks.map((brk) => ({ start: brk.start, end: brk.end, ptoDates: brk.days.filter(state.isSuggestedPto) })),
-    [state.breaks, state.isSuggestedPto],
-  );
-  const planKept = isPlanKept(state.pinnedPlans, { country: state.country, rangeStart: state.rangeStart, rangeEnd: state.rangeEnd, breaks: keptBreaks });
+  const planKept = isPlanKept(state.pinnedPlans, state.currentPlanSnapshot);
   const nextToRequest = state.orderedBreaks.find(({ brk }) => !requestsByDates.has(`${brk.start}|${brk.end}`));
   const trackedRequestCount = ledger.requests.filter((request) => request.status !== 'considering').length;
   const primaryKind = choosePrimaryAction({
@@ -255,13 +251,18 @@ export function App() {
     hasUnrequestedBreak: nextToRequest !== undefined,
   });
   const showPrimary = (plannable || state.planningPending) && !zeroBudget;
-  const primaryDisabled = primaryKind === 'keep'
+  const primaryDisabled = primaryKind === 'manage' ? false : primaryKind === 'keep'
     ? !(state.canPin && requestToolsReady) || budgetBlank
     : !requestToolsReady;
   const primaryRequest = nextToRequest && requestToolsReady
     ? { text: formatManagerEmailShort(nextToRequest.brk, state.isSuggestedPto), range: datedRange(nextToRequest.brk.start, nextToRequest.brk.end) }
     : undefined;
   const justKept = state.pinMessage === PLAN_SAVED_MESSAGE && planKept;
+  const manageSavedPlans = () => {
+    const remove = document.querySelector<HTMLButtonElement>('#saved-plan-list button[aria-label^="Remove saved plan"]');
+    remove?.scrollIntoView?.({ block: 'center', behavior: scrollBehavior() });
+    remove?.focus({ preventScroll: true });
+  };
 
   // Plan styles side by side, next to the goal picker. A few full solves on the main thread,
   // so they are worked out only once the goal picker nears the screen (on a phone it sits well
@@ -685,6 +686,7 @@ export function App() {
                   disabled={primaryDisabled}
                   disabledTitle={state.pinnedPlans.length >= MAX_PINNED_PLANS ? 'Remove a saved plan to make room for another.' : undefined}
                   onKeep={state.pinPlan}
+                  onManage={manageSavedPlans}
                   request={primaryRequest}
                   pinMessage={state.pinMessage}
                   justKept={justKept}
@@ -710,6 +712,7 @@ export function App() {
                   disabled={primaryDisabled}
                   disabledTitle={state.pinnedPlans.length >= MAX_PINNED_PLANS ? 'Remove a saved plan to make room for another.' : undefined}
                   onKeep={state.pinPlan}
+                  onManage={manageSavedPlans}
                   request={primaryRequest}
                   pinMessage={state.pinMessage}
                   justKept={justKept}

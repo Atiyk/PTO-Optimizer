@@ -1035,62 +1035,34 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   const { pinnedPlans, addPinnedPlan, removePinnedPlan, pinMessage } = usePinnedPlans();
   const canPin = pinnedPlans.length < MAX_PINNED_PLANS && !planningPending && !holidaysDegraded && sharedObservedHolidays === undefined;
 
-  const pinPlan = useCallback(() => {
-    if (!canPin) return;
-    addPinnedPlan({
-      country,
-      subdivision,
-      employerCalendar,
-      planningVersion,
-      planningStyle,
-      season,
-      minimumBreakDays,
-      rangeStart,
-      rangeEnd,
-      budget,
-      w,
-      letSolverDecide,
-      manualBreakCount,
-      weekStartOverride,
-      accrualEnabled,
-      accrualPerMonth,
-      expiryEnabled,
-      expiryDate,
-      carryoverCap,
-      overlapDays,
-      blackouts,
-      workWeek,
-      forced,
-      altFridayEnabled,
-      altFridayStart,
-      reserveDays,
-      applyTrackedRequests,
-      reserveApprovedPto,
-      unlimitedPto,
-      noticePeriodDays,
-      noticeUnit,
-      peakCapEnabled,
-      peakCapStart,
-      peakCapEnd,
-      peakCapMaxDays,
-      summary: {
-        budgetSpent,
-        totalDaysOff,
-        breakCountActual,
-        travelPercentile: scores?.travel.percentile ?? null,
-      },
-      breaks: breaks.map((brk) => ({
-        start: brk.start, end: brk.end, totalDaysOff: brk.totalDaysOff, ptoCost: brk.ptoCost, ptoDates: brk.days.filter(isSuggestedPto),
-      })),
-    });
-    track('plan_saved');
-  }, [
-    country, subdivision, employerCalendar, planningVersion, planningStyle, season, minimumBreakDays, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
-    weekStartOverride, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap,
+  // The canonical snapshot both defines what gets saved and whether it is still current.
+  const currentPlanSnapshot = useMemo<PlanSnapshot>(() => ({
+    country, subdivision, employerCalendar, planningVersion, planningStyle, season,
+    minimumBreakDays, rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount,
+    weekStartOverride, accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate,
+    carryoverCap, overlapDays, blackouts, workWeek, forced, altFridayEnabled,
+    altFridayStart, reserveDays, applyTrackedRequests, reserveApprovedPto, unlimitedPto,
+    noticePeriodDays, noticeUnit, peakCapEnabled, peakCapStart, peakCapEnd, peakCapMaxDays,
+    summary: { budgetSpent, totalDaysOff, breakCountActual, travelPercentile: scores?.travel.percentile ?? null },
+    breaks: breaks.map((brk) => ({
+      start: brk.start, end: brk.end, totalDaysOff: brk.totalDaysOff,
+      ptoCost: brk.ptoCost, ptoDates: brk.days.filter(isSuggestedPto),
+    })),
+  }), [
+    country, subdivision, employerCalendar, planningVersion, planningStyle, season, minimumBreakDays,
+    rangeStart, rangeEnd, budget, w, letSolverDecide, manualBreakCount, weekStartOverride,
+    accrualEnabled, accrualPerMonth, expiryEnabled, expiryDate, carryoverCap,
     overlapDays, blackouts, workWeek, forced, altFridayEnabled, altFridayStart,
-    addPinnedPlan, canPin, reserveDays, applyTrackedRequests, reserveApprovedPto, unlimitedPto, noticePeriodDays, noticeUnit, peakCapEnabled, peakCapStart, peakCapEnd, peakCapMaxDays,
+    reserveDays, applyTrackedRequests, reserveApprovedPto, unlimitedPto, noticePeriodDays,
+    noticeUnit, peakCapEnabled, peakCapStart, peakCapEnd, peakCapMaxDays,
     budgetSpent, totalDaysOff, breakCountActual, scores, breaks, isSuggestedPto,
   ]);
+
+  const pinPlan = useCallback(() => {
+    if (!canPin) return;
+    addPinnedPlan(currentPlanSnapshot);
+    track('plan_saved');
+  }, [canPin, addPinnedPlan, currentPlanSnapshot]);
 
   // A pin keeps its own employer calendar (snapshots are never rewritten). When it counts
   // different holiday dates than the current calendar for the same place and dates, say so.
@@ -1334,6 +1306,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     clearForcedDays,
     forced,
     pinnedPlans: pinnedPlansForDisplay,
+    currentPlanSnapshot,
     pinMessage,
     canPin,
     pinPlan,
