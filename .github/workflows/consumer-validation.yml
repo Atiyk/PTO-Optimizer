@@ -88,7 +88,7 @@ jobs:
       - name: Install Chromium, WebKit, and Firefox
         working-directory: current
         run: npx playwright install --with-deps chromium webkit firefox
-      - name: Capture consumer routes, header, and responsive QA at 1440, 768, 375, 320 pixels
+      - name: Capture consumer routes, header, and responsive QA at 1440, 1024, 768, 390, 375, 320 pixels
         env:
           HAS_BASELINE: ${{ github.event_name == 'pull_request' }}
         run: |

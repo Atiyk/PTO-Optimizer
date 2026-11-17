@@ -8,7 +8,7 @@ await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ headless: true, ...(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {}) });
 const records = [];
 try {
-  for (const width of [1440, 768, 375, 320]) {
+  for (const width of [1440, 1024, 768, 390, 375, 320]) {
     const context = await browser.newContext({ viewport: { width, height: 900 }, locale: 'en-US', reducedMotion: 'reduce' });
     const page = await context.newPage();
     const errors = [];

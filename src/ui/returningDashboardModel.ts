@@ -41,9 +41,10 @@ export interface PtoLine {
   available?: number;
   /** PTO days the saved plan uses. */
   planned?: number;
-  /** PTO days in breaks marked requested and still ahead. */
+  /** Distinct requested PTO date equivalents in the saved plan's range, or upcoming without a plan.
+   * Approved dates take priority when overlapping requests carry different statuses. */
   requested?: number;
-  /** PTO days in approved breaks within the plan's dates (or ahead, without a plan). */
+  /** Distinct approved/completed PTO date equivalents in that same scope. */
   approved?: number;
   /** available − planned, when both are known. */
   unplanned?: number;
@@ -73,10 +74,41 @@ function pickPlan(plans: readonly PlanSnapshot[], today: ISODate): { plan: PlanS
 }
 
 function ptoLine(plan: PlanSnapshot | undefined, requests: readonly PtoRequest[], today: ISODate): PtoLine | undefined {
-  const sum = (list: readonly PtoRequest[]) => list.reduce((total, request) => total + request.ptoDays, 0);
-  const inScope = (request: PtoRequest) => plan ? request.end >= plan.rangeStart && request.start <= plan.rangeEnd : request.end >= today;
-  const approvedList = requests.filter((request) => (request.status === 'approved' || request.status === 'completed') && inScope(request));
-  const requestedList = requests.filter((request) => request.status === 'requested' && request.end >= today);
+  // Count the PTO dates, not an entire request that merely overlaps the saved plan.
+  // Without a saved plan, this line describes upcoming PTO dates only.
+  const inScope = (date: ISODate) => plan
+    ? date >= plan.rangeStart && date <= plan.rangeEnd
+    : date >= today;
+  const dayEquivalent = (request: PtoRequest, date: ISODate): number => {
+    // A one-day partial request retains its shift length; otherwise the ledger
+    // stores whole PTO dates. Never infer a shift from a different calendar.
+    if (date === request.start && request.partialMinutes !== undefined
+      && request.partialShiftMinutes !== undefined && request.partialShiftMinutes > 0) {
+      return Math.min(1, Math.max(0, request.partialMinutes / request.partialShiftMinutes));
+    }
+    return 1;
+  };
+  const costs = (statuses: readonly RequestStatus[]): Map<ISODate, number> => {
+    const byDate = new Map<ISODate, number>();
+    for (const request of requests) {
+      if (!statuses.includes(request.status)) continue;
+      for (const date of request.ptoDates) {
+        if (!inScope(date)) continue;
+        // Distinct days cannot exceed one full PTO day even if records overlap.
+        byDate.set(date, Math.min(1, (byDate.get(date) ?? 0) + dayEquivalent(request, date)));
+      }
+    }
+    return byDate;
+  };
+  const approvedDates = costs(['approved', 'completed']);
+  const requestedDates = costs(['requested']);
+  const sumDays = (byDate: ReadonlyMap<ISODate, number>) =>
+    [...byDate.values()].reduce((total, value) => total + value, 0);
+  // A day recorded both requested and approved is not counted twice.
+  const approved = Math.round(sumDays(approvedDates) * 100) / 100;
+  const requested = Math.round([...requestedDates].reduce(
+    (total, [date, value]) => total + Math.max(0, value - (approvedDates.get(date) ?? 0)), 0,
+  ) * 100) / 100;
   const line: PtoLine = {};
   if (plan && !plan.unlimitedPto) {
     line.planned = plan.summary.budgetSpent;
@@ -85,8 +117,8 @@ function ptoLine(plan: PlanSnapshot | undefined, requests: readonly PtoRequest[]
       line.unplanned = Math.max(0, plan.budget - plan.summary.budgetSpent);
     }
   }
-  if (requestedList.length) line.requested = sum(requestedList);
-  if (approvedList.length) line.approved = sum(approvedList);
+  if (requested > 0) line.requested = requested;
+  if (approved > 0) line.approved = approved;
   return Object.keys(line).length ? line : undefined;
 }
 
