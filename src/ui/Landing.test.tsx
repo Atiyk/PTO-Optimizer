@@ -157,6 +157,9 @@ describe('live homepage planner', () => {
   });
 
   it('offers backup restore to a first-time visitor with no browser data', async () => {
+    // React.lazy resolves on real microtasks; fake timers in the other homepage tests
+    // deliberately pin the calendar, but must not stall this dynamic-import test.
+    vi.useRealTimers();
     await act(async () => { render(<Landing />); });
     const trigger = screen.getByRole('button', { name: 'Restore a Timebower backup' });
     expect(trigger.getAttribute('aria-expanded')).toBe('false');

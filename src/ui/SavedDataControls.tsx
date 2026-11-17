@@ -13,6 +13,7 @@ import { updateRetentionStatus } from '../personal/retentionStatus';
  */
 export function SavedDataControls({ initiallyOpen = false }: { initiallyOpen?: boolean } = {}) {
   const fileId = useId();
+  const [expanded, setExpanded] = useState(initiallyOpen);
   const [candidate, setCandidate] = useState<SavedDataBackup | null>(null);
   const [message, setMessage] = useState('');
   const [needsReload, setNeedsReload] = useState(false);
@@ -101,11 +102,12 @@ export function SavedDataControls({ initiallyOpen = false }: { initiallyOpen?: b
   };
 
   return (
-    <details data-testid="saved-data-controls" open={initiallyOpen} className="mt-3 border-t border-line text-sm text-muted">
-      <summary className="flex min-h-11 cursor-pointer items-center font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]">
+    <details data-testid="saved-data-controls" open={expanded} className="mt-3 border-t border-line text-sm text-muted">
+      <summary onClick={(event) => { event.preventDefault(); setExpanded((value) => !value); }}
+        className="flex min-h-11 cursor-pointer items-center font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]">
         Saved on this device · backup or restore
       </summary>
-      <div className="space-y-3 pb-2">
+      {expanded && <div className="space-y-3 pb-2">
         <p>Saved plans and PTO requests live in this browser, not an account. Clearing site data removes them. A backup file lets you move them to another browser.</p>
         <p>Backup files contain personal PTO and employer details. Store them privately. They are never uploaded to Timebower.</p>
         <div className="flex flex-wrap items-center gap-3">
@@ -120,7 +122,7 @@ export function SavedDataControls({ initiallyOpen = false }: { initiallyOpen?: b
         </div>}
         {needsReload && <Button variant="secondary" onClick={() => window.location.reload()}>Reload to show restored data</Button>}
         {message && <p role="status" className="text-ink">{message}</p>}
-      </div>
+      </div>}
     </details>
   );
 }

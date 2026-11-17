@@ -27,9 +27,13 @@ describe('SavedDataControls', () => {
     render(<SavedDataControls />);
     const details = screen.getByTestId('saved-data-controls') as HTMLDetailsElement;
     expect(details.open).toBe(false);
-    expect(details.textContent).toContain('never uploaded to Timebower');
+    expect(details.textContent).not.toContain('never uploaded to Timebower');
     expect(screen.queryByRole('button', { name: 'Restore missing data' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Download backup' })).toBeNull();
+    fireEvent.click(within(details).getByText('Saved on this device · backup or restore'));
+    expect(details.open).toBe(true);
+    expect(details.textContent).toContain('never uploaded to Timebower');
+    expect(screen.getByRole('button', { name: 'Download backup' })).toBeTruthy();
   });
 
   it('downloads a file only on request and records the backup date', () => {
