@@ -35,10 +35,10 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      # The root Vitest configuration excludes apps/**. Do not call test:all or
-      # workspace-recursive typecheck/build commands: this job is consumer-only.
-      - run: npm test
-      - run: npx tsc --noEmit -p tsconfig.app.json
+      # Full release verification covers the consumer app and apps/teams. The
+      # root Vitest configuration alone excludes apps/**, so use test:all.
+      - run: npm run test:all
+      - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
 
