@@ -150,8 +150,11 @@ export function ExportBar(props: ExportBarProps) {
     const share = buildPublicPlanLink(window.location.href, planSearch, dates, props.shareSnapshot);
     const ok = await copyText(share.url);
     if (ok) track('URL shared');
+    const omittedMessage = share.omittedPrivateCalendar
+      ? (omissions?.settings ? 'Copied (holidays and settings omitted)' : 'Copied (calendar omitted)')
+      : (omissions?.settings ? 'Copied (private settings omitted)' : 'Link copied');
     return ok
-      ? { ok: true, message: share.omittedPrivateCalendar ? 'Copied (calendar omitted)' : 'Link copied' }
+      ? { ok: true, message: omittedMessage }
       : { ok: false, message: "Couldn't copy — try again" };
   };
 

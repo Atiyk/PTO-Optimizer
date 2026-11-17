@@ -15,6 +15,7 @@ interface PlanActionsProps {
   disabled?: boolean;
   disabledTitle?: string;
   onKeep: () => void;
+  onManage: () => void;
   /** The email draft for the next break still to ask for (kind "copy-request"). */
   request?: { text: string; range: string };
   pinMessage: string;
@@ -39,7 +40,7 @@ function addToCalendar(openMore?: () => void): boolean {
   return false;
 }
 
-export function PlanActions({ layout, kind, disabled = false, disabledTitle, onKeep, request, pinMessage, justKept, moreOpen = false, onMoreOpenChange, children }: PlanActionsProps) {
+export function PlanActions({ layout, kind, disabled = false, disabledTitle, onKeep, onManage, request, pinMessage, justKept, moreOpen = false, onMoreOpenChange, children }: PlanActionsProps) {
   // Feedback belongs to the action that produced it: a new primary action (the plan changed,
   // or was just kept) never shows the old one's message.
   const [result, setResult] = useState<{ kind: PrimaryActionKind | null; text: string } | null>(null);
@@ -53,13 +54,15 @@ export function PlanActions({ layout, kind, disabled = false, disabledTitle, onK
 
   const onPrimary = async () => {
     if (kind === 'keep') { onKeep(); return; }
+    if (kind === 'manage') { onManage(); return; }
     if (kind === 'calendar') { setFeedback(addToCalendar(() => onMoreOpenChange?.(true)) ? 'Downloaded' : null); return; }
     if (request) setFeedback(await copyText(request.text) ? 'Request copied' : 'Couldn’t copy. Try again');
   };
   const label = feedback ?? (kind ? PRIMARY_ACTION_LABEL[kind] : '');
   const hint = kind === 'copy-request' && request ? `An email draft for your next break, ${request.range}.`
     : kind === 'calendar' ? 'A calendar file of your PTO days, with a reminder to request them.'
-    : kind === 'keep' ? 'Saved in this browser. No account needed.' : undefined;
+    : kind === 'keep' ? 'Saves on this device, not in an account.'
+    : kind === 'manage' ? 'Two plans saved. Remove one before keeping this plan.' : undefined;
   const otherMessage = pinMessage && pinMessage !== PLAN_SAVED_MESSAGE ? pinMessage : '';
 
   const primary = kind && (

@@ -12,7 +12,7 @@ describe('choosePrimaryAction', () => {
   });
   it('offers Add to calendar once the plan is kept, or when there is no room to keep another', () => {
     expect(choosePrimaryAction({ kept: true, roomToKeep: true, trackedRequests: 0, hasUnrequestedBreak: true })).toBe('calendar');
-    expect(choosePrimaryAction({ kept: false, roomToKeep: false, trackedRequests: 0, hasUnrequestedBreak: true })).toBe('calendar');
+    expect(choosePrimaryAction({ kept: false, roomToKeep: false, trackedRequests: 0, hasUnrequestedBreak: true })).toBe('manage');
   });
   it('offers Copy request after a tracked request while a break is still to ask for', () => {
     expect(choosePrimaryAction({ kept: true, roomToKeep: true, trackedRequests: 1, hasUnrequestedBreak: true })).toBe('copy-request');
@@ -27,5 +27,17 @@ describe('isPlanKept', () => {
     expect(isPlanKept([{ ...current, breaks: [{ ...current.breaks[0], ptoDates: ['2027-01-19'] }] }], current)).toBe(false);
     expect(isPlanKept([{ ...current, breaks: undefined }], current)).toBe(false);
     expect(isPlanKept([], current)).toBe(false);
+    expect(isPlanKept([{ ...current, breaks: [{ start: current.breaks[0].start, end: current.breaks[0].end }] }], current)).toBe(false);
+  });
+  it('does not confuse identical breaks with different policy or PTO inputs', () => {
+    const previous = { ...current, budget: 10, planningStyle: 'year' as const,
+      employerCalendar: { version: 1 as const, country: 'US', excluded: [], custom: [] } };
+    expect(isPlanKept([previous], previous)).toBe(true);
+    expect(isPlanKept([previous], { ...previous, budget: 15 })).toBe(false);
+    expect(isPlanKept([previous], { ...previous, planningStyle: 'balanced' })).toBe(false);
+    expect(isPlanKept([previous], { ...previous, employerCalendar: {
+      ...previous.employerCalendar, custom: [{ date: '2027-01-18', name: 'Company day off' }],
+    } })).toBe(false);
+    expect(isPlanKept([previous], { ...previous, reserveDays: 2 })).toBe(false);
   });
 });
