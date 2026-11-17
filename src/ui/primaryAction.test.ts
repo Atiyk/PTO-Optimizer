@@ -39,5 +39,13 @@ describe('isPlanKept', () => {
       ...previous.employerCalendar, custom: [{ date: '2027-01-18', name: 'Company day off' }],
     } })).toBe(false);
     expect(isPlanKept([previous], { ...previous, reserveDays: 2 })).toBe(false);
+    const withTwoRules = { ...previous, employerCalendar: {
+      ...previous.employerCalendar,
+      excluded: ['2027-01-19|Second holiday', '2027-01-18|First holiday'],
+    } };
+    const reversed = { ...withTwoRules, employerCalendar: {
+      ...withTwoRules.employerCalendar, excluded: [...withTwoRules.employerCalendar.excluded].reverse(),
+    } };
+    expect(isPlanKept([withTwoRules], reversed)).toBe(true);
   });
 });

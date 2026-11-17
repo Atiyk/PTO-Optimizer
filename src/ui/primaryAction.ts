@@ -1,4 +1,5 @@
 import type { PlanSnapshot } from './useAppState';
+import { encodeEmployerCalendar } from '../personal/employerCalendar';
 
 /** Source inputs, not derived summary figures; identical breaks can hide changed policies. */
 const INPUT_KEYS = [
@@ -23,7 +24,18 @@ export function isPlanKept(saved: readonly SavedPlanLike[], current: CurrentPlan
   if (!breaks?.length) return false;
   return saved.some((plan) => plan.country === current.country
     && plan.rangeStart === current.rangeStart && plan.rangeEnd === current.rangeEnd
-    && INPUT_KEYS.every(key => JSON.stringify(plan[key]) === JSON.stringify(current[key]))
+    && INPUT_KEYS.every(key => {
+      // Stored calendars are validated and sorted when saved. Normalize live edits too:
+      // identical holiday rules must not appear unsaved only because array order differs.
+      if (key === 'employerCalendar' && plan.employerCalendar && current.employerCalendar) {
+        return encodeEmployerCalendar(plan.employerCalendar) === encodeEmployerCalendar(current.employerCalendar);
+      }
+      if (key === 'forced') {
+        const sorted = (value: typeof plan.forced) => JSON.stringify(Object.entries(value ?? {}).sort(([a], [b]) => a.localeCompare(b)));
+        return sorted(plan.forced) === sorted(current.forced);
+      }
+      return JSON.stringify(plan[key]) === JSON.stringify(current[key]);
+    })
     && plan.breaks !== undefined && plan.breaks.length === breaks.length
     && plan.breaks.every((brk, i) => {
       const now = breaks[i];

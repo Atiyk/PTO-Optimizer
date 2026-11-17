@@ -259,7 +259,7 @@ export function App() {
     : undefined;
   const justKept = state.pinMessage === PLAN_SAVED_MESSAGE && planKept;
   const manageSavedPlans = () => {
-    const remove = document.querySelector<HTMLButtonElement>('#saved-plans button[aria-label^="Remove saved plan"]');
+    const remove = document.querySelector<HTMLButtonElement>('#saved-plan-list button[aria-label^="Remove saved plan"]');
     remove?.scrollIntoView?.({ block: 'center', behavior: scrollBehavior() });
     remove?.focus({ preventScroll: true });
   };
