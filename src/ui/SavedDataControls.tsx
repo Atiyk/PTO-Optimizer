@@ -1,7 +1,7 @@
-import { useId, useState, type ChangeEvent } from 'react';
+import { useId, useRef, useState, type ChangeEvent } from 'react';
 import { Button } from './Button';
 import {
-  MAX_SAVED_DATA_BACKUP_LENGTH, browserEnumerableStorage, downloadSavedDataBackup,
+  MAX_SAVED_DATA_BACKUP_LENGTH, browserEnumerableStorage, buildSavedDataBackup, downloadSavedDataBackup,
   parseSavedDataBackup, restoreSavedDataBackup, type SavedDataBackup,
 } from '../personal/savedDataBackup';
 import { updateRetentionStatus } from '../personal/retentionStatus';
@@ -16,10 +16,25 @@ export function SavedDataControls({ initiallyOpen = false }: { initiallyOpen?: b
   const [candidate, setCandidate] = useState<SavedDataBackup | null>(null);
   const [message, setMessage] = useState('');
   const [needsReload, setNeedsReload] = useState(false);
+  const selectedFileId = useRef(0);
 
   const download = () => {
     const now = new Date();
-    if (downloadSavedDataBackup(browserEnumerableStorage(), now)) {
+    const storage = browserEnumerableStorage();
+    if (!storage) {
+      setMessage('Browser storage is unavailable. No backup was made.');
+      return;
+    }
+    try {
+      if (Object.keys(buildSavedDataBackup(storage, now).items).length === 0) {
+        setMessage('No saved PTO data to back up yet.');
+        return;
+      }
+    } catch {
+      setMessage('Browser storage could not be read. No backup was made.');
+      return;
+    }
+    if (downloadSavedDataBackup(storage, now)) {
       updateRetentionStatus({ lastBackupAt: now.toISOString() });
       setMessage('Backup downloaded. Keep this personal file in a safe place outside the browser.');
     } else {
@@ -29,10 +44,10 @@ export function SavedDataControls({ initiallyOpen = false }: { initiallyOpen?: b
 
   const chooseFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
+    const selection = ++selectedFileId.current;
     // Selecting the same file again must still fire change after an invalid attempt.
     event.currentTarget.value = '';
     setCandidate(null);
-    setNeedsReload(false);
     if (!file) return;
     if (file.size > MAX_SAVED_DATA_BACKUP_LENGTH) {
       setMessage('This file is too large to be a Timebower saved-data backup.');
@@ -40,6 +55,8 @@ export function SavedDataControls({ initiallyOpen = false }: { initiallyOpen?: b
     }
     try {
       const result = parseSavedDataBackup(await file.text());
+      // A slower earlier file may finish reading after the user selected another one.
+      if (selection !== selectedFileId.current) return;
       if (!result.ok) {
         setMessage(result.reason === 'newer-version'
           ? 'This backup is from a newer Timebower version. Use an updated version to restore it.'
@@ -56,7 +73,9 @@ export function SavedDataControls({ initiallyOpen = false }: { initiallyOpen?: b
       setCandidate(result.backup);
       setMessage(`${count} saved ${count === 1 ? 'entry' : 'entries'} found. Review before restoring; your existing data will not be overwritten.`);
     } catch {
-      setMessage('Could not read this file. No stored data was changed.');
+      if (selection === selectedFileId.current) {
+        setMessage('Could not read this file. No stored data was changed.');
+      }
     }
   };
 
@@ -72,7 +91,7 @@ export function SavedDataControls({ initiallyOpen = false }: { initiallyOpen?: b
     const changed = result.added.length + result.merged.length;
     const conflicts = result.kept.length;
     const failures = result.failed.length;
-    setNeedsReload(changed > 0);
+    setNeedsReload((previous) => previous || changed > 0);
     setMessage(
       `${changed} saved ${changed === 1 ? 'entry' : 'entries'} restored. ` +
       `${conflicts} existing ${conflicts === 1 ? 'entry was' : 'entries were'} kept unchanged. ` +

@@ -44,6 +44,16 @@ describe('SavedDataControls', () => {
     expect(readRetentionStatus().lastBackupAt).toBeTruthy();
   });
 
+  it('does not create an empty backup when there is no saved data', () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    render(<SavedDataControls />);
+    open();
+    fireEvent.click(screen.getByRole('button', { name: 'Download backup' }));
+    expect(screen.getByRole('status').textContent).toContain('No saved PTO data to back up yet.');
+    expect(click).not.toHaveBeenCalled();
+    expect(readRetentionStatus().lastBackupAt).toBeUndefined();
+  });
+
   it('reviews the file before restoring missing entries; never replaces conflicting entries', async () => {
     localStorage.setItem('gapless.personal.keep.v1', 'current browser wins');
     render(<SavedDataControls />);
