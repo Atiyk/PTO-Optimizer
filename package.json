@@ -14,9 +14,6 @@
     "build:demand-index": "tsx scripts/build-demand-index.ts",
     "build:countries": "tsx scripts/build-countries.ts",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && npm run typecheck --workspaces --if-present",
-    "test:all": "npm test && npm run test -w apps/teams --if-present",
-    "build:all": "npm run build && npm run build --workspaces --if-present",
-    "lint:all": "oxlint",
     "verify:dist": "bash scripts/verify-days-off-dist.sh"
   },
   "dependencies": {
@@ -49,7 +46,6 @@
     "vitest": "^4.1.12"
   },
   "workspaces": [
-    "packages/*",
-    "apps/*"
+    "packages/*"
   ]
 }

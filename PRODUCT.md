@@ -3,7 +3,7 @@
 <!-- impeccable:product-schema 1 -->
 
 > Scope: the consumer Gapless PTO Optimizer at the repo root (`src/`, `index.html`, country
-> folders). Not `apps/teams` (B2B Gapless), which has its own product truth.
+> folders). The B2B app that used to live in `apps/teams` was removed in November 2026.
 >
 > Provenance: written 2026-11-04 during the autonomous consumer redesign. The owner's brief
 > told the run not to ask design or product questions, so every fact below is inferred from

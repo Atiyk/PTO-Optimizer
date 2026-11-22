@@ -5,7 +5,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
  * working day also a day off for a long span) must never start an unbounded day-by-day
  * search. A synchronous infinite loop cannot be stopped by a test timeout, so every day
  * step goes through a counting addDays that throws once a search has clearly run away.
- * Before the fix, planShape below spun forever and the guard is what failed the test.
+ * Before the fix, the team planner's shape search spun forever and the guard is what failed the test.
  */
 const guard = vi.hoisted(() => ({ calls: 0, limit: 50_000 }));
 vi.mock('../solver/dateUtils', async (original) => {
@@ -20,7 +20,6 @@ vi.mock('../solver/dateUtils', async (original) => {
   };
 });
 
-import { planShape, type PlannerMember } from '../leave/teamPlan';
 import { nearestPrecedingWorkday, requestByDate } from './requestDeadline';
 import { MAX_WORKDAY_SEARCH_DAYS, searchWorkday } from './workdaySearch';
 import { rangeISO, mondayIndexedDow } from '../solver/dateUtils';
@@ -48,15 +47,6 @@ describe('searchWorkday: the one bounded working-day search', () => {
 });
 
 describe('no user-controlled schedule starts an unbounded search', () => {
-  it('planShape terminates for a member with no working days', () => {
-    const member: PlannerMember = { id: 'a', teamId: 't', tags: [], workWeek: NO_WORKDAYS, out: new Set(), need: 1, deadline: '2026-12-31' };
-    const shape = planShape(member, ['2026-11-12']);
-    expect(shape.blocks).toHaveLength(1);
-    expect(shape.blocks[0]!.leaveDays).toBe(1);
-    expect(shape.blocks[0]!.daysOff).toBeLessThanOrEqual(2 * MAX_WORKDAY_SEARCH_DAYS + 1);
-    expect(guard.calls).toBeLessThan(10 * MAX_WORKDAY_SEARCH_DAYS);
-  });
-
   it('a request deadline is a bounded search even when every working day for decades is a day off', () => {
     // Monday-only week, and every Monday for 30 years is a holiday.
     const offDays = rangeISO('2000-01-03', '2030-12-30').filter((d) => mondayIndexedDow(d) === 0);

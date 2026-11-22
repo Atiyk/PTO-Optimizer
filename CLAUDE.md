@@ -2,13 +2,13 @@
 
 This repo is an npm-workspaces monorepo:
 - **Gapless PTO Optimizer (formerly Days Off)** (the live free site): the Vite app at the
-  repo root (`src/`, `index.html`, the country folders). Every rule below applies to Days Off ONLY.
-- **packages/engine** (`@daysoff/engine`): the pure planning engine shared by both apps. No
-  React, DOM or DB imports. Any change must keep Days Off's `npm run build` output unchanged
-  unless the change is deliberately a Days Off change.
-- **apps/teams** ("Days Off for Teams", the SMB product): has a backend, accounts and a
-  database by design. Its rules are in `apps/teams/CLAUDE.md`; the "no backend, no accounts"
-  rule below does not apply to it.
+  repo root (`src/`, `index.html`, the country folders). Every rule below applies to it.
+- **packages/engine** (`@daysoff/engine`): the pure planning engine (solver, dates, holidays,
+  calendar math). No React, DOM or DB imports. Any change must keep the site's `npm run build`
+  output unchanged unless the change is deliberately a site change.
+
+The B2B "Days Off for Teams" app (`apps/teams`) and its engine modules were removed in
+November 2026. Its last full version is tagged `teams-archive` if it ever needs to come back.
 
 # Workflow — every change, no exceptions
 
@@ -39,8 +39,7 @@ submit-style verbs before calling a phase done.
 Accounts are optional. Every planning result works signed-out and reproduces from a URL.
 Sign-in only adds saving, sync, reminders and sharing with people. Personal data is stored
 server-side only after sign-in, only the minimum listed in docs/personal/DATA.md, and is
-deletable by the user in one action. This product never links to or shares data with the
-apps/teams product; it only shares backend infrastructure. (Days Off only.)
+deletable by the user in one action.
 
 Pushing and merging: use the Terminal panel (`run_in_terminal`), not the sandboxed Bash
 tool — `gh`/git credentials only exist in the user's real terminal shell, authenticated
