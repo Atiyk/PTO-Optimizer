@@ -1,15 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ENTRIES } from '../../scripts/routes';
 import glossaryTemplate from '../../scripts/generate-glossary-html.ts?raw';
+import guideTemplate from '../../scripts/generate-guide-html.ts?raw';
 import { analyticsBeforeSend, isSafeAnalyticsReferrer, sanitizeAnalyticsUrl } from './analyticsPrivacy';
 
 const htmlSources: Record<string, string> = import.meta.glob([
   '../../index.html',
   '../../{pto,sabbatical,family,faq,data-sources,policy,uk,canada,australia,germany,ireland,india}/index.html',
   '../../glossary/**/index.html',
+  '../../guides/**/index.html',
 ], { query: '?raw', import: 'default', eager: true });
 const entrySources: Record<string, string> = import.meta.glob(
-  '../{main,landing-main,policy-main,sabbatical-main,family-main,faq-main,data-sources-main,glossary-main,glossary-term-main}.tsx',
+  '../{main,landing-main,policy-main,sabbatical-main,family-main,faq-main,data-sources-main,glossary-main,glossary-term-main,guides-main,guide-main}.tsx',
   { query: '?raw', import: 'default', eager: true },
 );
 
@@ -79,7 +81,9 @@ describe('consumer route privacy configuration', () => {
   it('keeps the glossary generator and all consumer mounts behind the same boundary', () => {
     expect(glossaryTemplate).toContain('src="https://plausible.io/js/script.manual.js"');
     expect(glossaryTemplate).toContain('<meta name="referrer" content="no-referrer" />');
-    for (const entry of ['main', 'landing-main', 'policy-main', 'sabbatical-main', 'family-main', 'faq-main', 'data-sources-main', 'glossary-main', 'glossary-term-main']) {
+    expect(guideTemplate).toContain('src="https://plausible.io/js/script.manual.js"');
+    expect(guideTemplate).toContain('<meta name="referrer" content="no-referrer" />');
+    for (const entry of ['main', 'landing-main', 'policy-main', 'sabbatical-main', 'family-main', 'faq-main', 'data-sources-main', 'glossary-main', 'glossary-term-main', 'guides-main', 'guide-main']) {
       const source = entrySources[`../${entry}.tsx`];
       expect(source, entry).toContain('<PrivacyAnalytics />');
       expect(source, entry).not.toContain("from '@vercel/analytics/react'");

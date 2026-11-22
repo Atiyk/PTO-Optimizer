@@ -10,6 +10,7 @@
 - [Sabbatical planner](https://pto-optimizer-seven.vercel.app/sabbatical) — explore extended leave.
 
 ## Understand
+- [PTO guides](https://pto-optimizer-seven.vercel.app/guides) — 2027 US holiday dates and the PTO days to book around them, PTO accrual, expiring PTO and how to ask for time off.
 - [PTO guide and glossary](https://pto-optimizer-seven.vercel.app/glossary) — start with learning paths about PTO basics, accrual, expiration and requests.
 - [Frequently asked questions](https://pto-optimizer-seven.vercel.app/faq) — how calculations work.
 - [Data sources](https://pto-optimizer-seven.vercel.app/data-sources) — public sources and caveats.
