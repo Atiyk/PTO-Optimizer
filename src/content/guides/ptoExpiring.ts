@@ -14,7 +14,7 @@ export const PTO_EXPIRING: Guide = {
   country: 'US',
   group: 'basics',
   body: `
-## Check whether your days are really at risk
+## Check whether your days are at risk
 
 A policy where unused PTO is forfeited at the reset date is often called “use it or lose it.” Before you rush to book, look in your handbook or HR portal for four things.
 
