@@ -21,6 +21,23 @@ beforeEach(() => window.localStorage.clear());
 afterEach(() => { cleanup(); window.localStorage.clear(); });
 
 describe('browser pinned plans', () => {
+  it('keeps the year-round reserve with a saved plan, and drops a stored plan whose reserve is invalid', () => {
+    const withReserve = { ...snapshot, summary: { ...snapshot.summary, reserveKept: 2 } };
+    const saver = renderHook(() => usePinnedPlans());
+    act(() => saver.result.current.addPinnedPlan(withReserve));
+    saver.unmount();
+    expect(renderHook(() => usePinnedPlans()).result.current.pinnedPlans).toEqual([withReserve]);
+    cleanup();
+    const stored = JSON.parse(window.localStorage.getItem(PINNED_PLANS_STORAGE_KEY)!);
+    const entries = Array.isArray(stored) ? stored : stored.plans;
+    const entry = entries[0].snapshot ?? entries[0];
+    entry.summary.reserveKept = -1;
+    window.localStorage.setItem(PINNED_PLANS_STORAGE_KEY, JSON.stringify(stored));
+    expect(renderHook(() => usePinnedPlans()).result.current.pinnedPlans).toEqual([]);
+    // The invalid value is left in storage untouched rather than overwritten.
+    expect(window.localStorage.getItem(PINNED_PLANS_STORAGE_KEY)).toBe(JSON.stringify(stored));
+  });
+
   it('resumes all inputs after remount, shares changes with mounted readers, and retains the two-pin cap', () => {
     const first = renderHook(() => usePinnedPlans());
     const reader = renderHook(() => usePinnedPlans());
