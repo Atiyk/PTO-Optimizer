@@ -8,7 +8,7 @@ This repo is an npm-workspaces monorepo:
   output unchanged unless the change is deliberately a site change.
 
 The B2B "Days Off for Teams" app (`apps/teams`) and its engine modules were removed in
-November 2026. Its last full version is tagged `teams-archive` if it ever needs to come back.
+November 2026. Its last full version is kept on the `archive/teams` branch if it ever needs to come back.
 
 # Workflow — every change, no exceptions
 
