@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
 import { createPtoRequest, type PtoRequest } from '../personal/requestLedger';
@@ -182,5 +182,26 @@ describe('employer calendar save with another tab open', () => {
     expect(result.current.employerCalendarMessage).toBe('Saved for United States.');
     unmount();
     localStorage.clear();
+  });
+});
+
+describe('meaningful_plan_interaction (initial planner engagement)', () => {
+  it('fires once per document on the first change to a core planner input, never on mount', () => {
+    window.history.replaceState(null, '', '/pto');
+    const plausible = vi.fn();
+    window.plausible = plausible;
+    try {
+      const view = renderHook(() => useAppState());
+      const engaged = () => plausible.mock.calls.filter(([name]) => name === 'meaningful_plan_interaction');
+      expect(engaged()).toHaveLength(0);
+      act(() => { view.result.current.setBudget(21); });
+      act(() => { view.result.current.setBudget(22); });
+      act(() => { view.result.current.setPlanningStyle('balanced'); });
+      expect(engaged()).toEqual([['meaningful_plan_interaction', { url: window.location.origin + '/pto' }]]);
+      view.unmount();
+    } finally {
+      delete window.plausible;
+      window.history.replaceState(null, '', '/');
+    }
   });
 });
