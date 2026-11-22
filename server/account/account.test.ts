@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { featureFlags, readAccountConfig } from './config';
 import type { AccountRow, AccountStore } from './db';
-import { handleAccount, handleInbound, handleRemind, normalizeLink, readInbound, type AccountDeps } from './handlers';
+import { dailyCapFor, handleAccount, handleInbound, handleRemind, normalizeLink, readInbound, type AccountDeps } from './handlers';
 import type { OutgoingMail } from './mailer';
 import { alarmDate, dueItems } from './reminders';
 import { signToken, verifyToken } from './tokens';
@@ -41,7 +41,8 @@ function memoryStore() {
     async remove(id) { rows.delete(id); },
     async dueForReminders(today) { return [...rows.values()].filter((row) => row.reminders && row.last_reminded_on !== today); },
     async markReminded(id, today) { rows.get(id)!.last_reminded_on = today; },
-    async takeEmailBudget(_today, cap) { return ++budget <= cap; },
+    // Like the SQL: a refused send does not count against the day.
+    async takeEmailBudget(_today, cap) { if (budget >= cap) return false; budget += 1; return true; },
     rates: new Map<string, { start: number; used: number }>(),
     async takeRateSlot(key, limit, windowMs, nowMs) {
       const rates = (this as unknown as { rates: Map<string, { start: number; used: number }> }).rates;
@@ -268,6 +269,33 @@ describe('reminder emails', () => {
     expect(alarmDate('2026-12-10', '-P6DT15H')).toBe('2026-12-03');
     expect(alarmDate('2026-12-10', 'PT9H')).toBe('2026-12-10');
     expect(alarmDate('2026-12-10', 'PT0S')).toBe('2026-12-10');
+  });
+
+  it('keeps a share of the daily email cap for reminders, so sign-in links cannot use it all', async () => {
+    expect(dailyCapFor('reminder', 400)).toBe(400);
+    expect(dailyCapFor('on-demand', 400)).toBe(300);
+    expect(dailyCapFor('on-demand', 3)).toBe(3);
+    expect(dailyCapFor('on-demand', 1)).toBe(1);
+
+    // Cap 4: on-demand mail may use 3, the reminder run the 4th.
+    const ctx = setup({ ...ENV, DAILY_EMAIL_CAP: '4' });
+    const ics = await (await handleWatch(new Request(`https://x.test/api/watch?${POLICY}`), NOW)).text();
+    const start = ics.split('BEGIN:VEVENT').find((e) => e.includes('VALARM'))!.match(/DTSTART;VALUE=DATE:(\d{8})/)![1];
+    const due = `${start.slice(0, 4)}-${start.slice(4, 6)}-${start.slice(6)}`;
+    const dueNow = new Date(`${due}T09:00:00Z`);
+    ctx.deps.now = () => dueNow;
+    const cookie = await signIn(ctx); // 1 email
+    await handleAccount(post({ action: 'save', policyLink: `/policy?${POLICY}`, reminders: true }, { cookie }), ctx.deps);
+    for (const n of [1, 2]) {
+      expect((await handleAccount(post({ action: 'login', email: `u${n}@example.com` }, { 'x-real-ip': `192.0.2.${n}` }), ctx.deps)).status).toBe(200);
+    }
+    const capped = await handleAccount(post({ action: 'login', email: 'u3@example.com' }, { 'x-real-ip': '192.0.2.3' }), ctx.deps);
+    expect(capped.status).toBe(503);
+    ctx.deps.feeds.watch = async (q) => (await handleWatch(new Request(`https://x.test/api/watch?${q}`), NOW)).text();
+    const before = ctx.sent.length;
+    const run = await handleRemind(new Request('https://gapless.example/api/remind', { headers: { authorization: 'Bearer cron-secret' } }), ctx.deps);
+    expect(await run.json()).toMatchObject({ checked: 1, sent: 1, capped: false });
+    expect(ctx.sent.slice(before).map((mail) => mail.to)).toEqual(['me@example.com']);
   });
 
   it('emails what the watch feed reminds about today, once a day, with one-click unsubscribe', async () => {
