@@ -52,6 +52,11 @@ export function Footer({ onShowShortcuts }: FooterProps) {
         </Column>
         <Column title="Resources">
           <li>
+            <a href="/guides" className={LINK_CLASS}>
+              Guides
+            </a>
+          </li>
+          <li>
             <a href="/faq" className={LINK_CLASS}>
               FAQ
             </a>

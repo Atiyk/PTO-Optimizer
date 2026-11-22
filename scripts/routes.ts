@@ -1,11 +1,12 @@
 import { GLOSSARY_TERMS } from '../src/content/glossary/terms.ts';
+import { GUIDES } from '../src/content/guides/index.ts';
 
 /**
  * The one list of every real route this site builds, shared (no side effects - safe to
  * import from anywhere) between scripts/prerender.ts and scripts/build-seo-files.ts, so a
  * route can't exist in the sitemap but not be prerendered, or vice versa.
  */
-export type ComponentKind = 'landing' | 'app' | 'sabbatical' | 'family' | 'faq' | 'dataSources' | 'policy' | 'glossary' | 'glossary-term';
+export type ComponentKind = 'landing' | 'app' | 'sabbatical' | 'family' | 'faq' | 'dataSources' | 'policy' | 'glossary' | 'glossary-term' | 'guides' | 'guide';
 
 export interface Entry {
   /** Path relative to dist/ of the built HTML file to inject into. */
@@ -22,6 +23,10 @@ export interface Entry {
   countryName?: string;
   /** Only for component === 'glossary-term': which glossary term this page renders. */
   termId?: string;
+  /** Only for component === 'guide': which guide this page renders. */
+  guideId?: string;
+  /** sitemap.xml <lastmod> (ISO date), for pages with a real last-edited date. */
+  lastmod?: string;
   /** sitemap.xml priority (scripts/build-seo-files.ts) - kept on the same entry as every
    * other per-route fact so the sitemap can never list a route this file doesn't know
    * about, or vice versa. */
@@ -56,6 +61,20 @@ export const ENTRIES: Entry[] = [
       component: 'glossary-term',
       termId: t.id,
       sitemapPriority: 0.4,
+    }),
+  ),
+  {
+    file: 'guides/index.html', path: '/guides', component: 'guides', sitemapPriority: 0.7,
+    lastmod: GUIDES.map((g) => g.updated).sort().at(-1),
+  },
+  ...GUIDES.map(
+    (g): Entry => ({
+      file: `guides/${g.id}/index.html`,
+      path: `/guides/${g.id}`,
+      component: 'guide',
+      guideId: g.id,
+      lastmod: g.updated,
+      sitemapPriority: 0.7,
     }),
   ),
 ];
