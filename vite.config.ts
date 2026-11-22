@@ -82,7 +82,7 @@ export default defineConfig({
     // contrast against the real stylesheet; vitest blanks CSS unless it's included here.
     css: { include: [/index\.css/] },
     globals: false,
-    // apps/* run their own test suites (npm run test:all); the root run is Days Off + engine.
-    exclude: [...configDefaults.exclude, 'apps/**', '.claude/**'],
+    // The root run covers the site and the shared engine.
+    exclude: [...configDefaults.exclude, '.claude/**'],
   },
 })
