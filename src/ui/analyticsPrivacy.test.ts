@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ENTRIES } from '../../scripts/routes';
 import glossaryTemplate from '../../scripts/generate-glossary-html.ts?raw';
-import { analyticsBeforeSend, isSafeAnalyticsReferrer, sanitizeAnalyticsUrl } from './analyticsPrivacy';
+import { analyticsBeforeSend, isSafeAnalyticsReferrer, sanitizeAnalyticsUrl, sanitizeCampaignPageviewUrl } from './analyticsPrivacy';
 
 const htmlSources: Record<string, string> = import.meta.glob([
   '../../index.html',
@@ -61,6 +61,94 @@ describe('analytics URL boundary', () => {
   it('cancels malformed Vercel event URLs', () => {
     vi.spyOn(document, 'referrer', 'get').mockReturnValue('');
     expect(analyticsBeforeSend({ type: 'pageview', url: 'malformed' })).toBeNull();
+  });
+});
+
+describe('campaign attribution boundary (Plausible pageviews only)', () => {
+  const base = 'https://timebower.example/2027/uk-bank-holidays';
+
+  it('keeps only utm_source, utm_medium and utm_campaign, in a fixed order, lowercased', () => {
+    expect(sanitizeCampaignPageviewUrl(`${base}?utm_campaign=Spring_Launch&b=15&utm_medium=Social&utm_source=Reddit#private`))
+      .toBe(`${base}?utm_source=reddit&utm_medium=social&utm_campaign=spring_launch`);
+    expect(sanitizeCampaignPageviewUrl(`${base}?utm_source=newsletter`)).toBe(`${base}?utm_source=newsletter`);
+    expect(sanitizeCampaignPageviewUrl(`${base}?utm_source=hn&utm_medium=post-2027`)).toBe(`${base}?utm_source=hn&utm_medium=post-2027`);
+  });
+
+  it('returns the plain route when there is nothing safe to keep', () => {
+    expect(sanitizeCampaignPageviewUrl(`${base}`)).toBe(base);
+    expect(sanitizeCampaignPageviewUrl(`${base}?b=15&s=2027-06-01&e=2027-12-31&eh=private`)).toBe(base);
+    expect(sanitizeCampaignPageviewUrl('https://timebower.example/pto?sv=1&b=15&utm_x=1')).toBe('https://timebower.example/pto');
+  });
+
+  it.each([
+    ['utm_term', 'utm_term=pto+balance'],
+    ['utm_content', 'utm_content=button'],
+    ['ref', 'ref=producthunt'],
+    ['source', 'source=newsletter'],
+    ['gclid', 'gclid=abc123'],
+    ['fbclid', 'fbclid=IwAR0abc'],
+    ['upper-case key', 'UTM_SOURCE=reddit'],
+    ['mixed-case key', 'Utm_Source=reddit'],
+    ['bracketed key', 'utm_source[]=reddit'],
+    ['padded key', 'utm_source%20=reddit'],
+  ])('drops parameters outside the allowlist: %s', (_label, query) => {
+    expect(sanitizeCampaignPageviewUrl(`${base}?${query}`)).toBe(base);
+  });
+
+  it.each([
+    ['an email address', 'person@example.com'],
+    ['an encoded email address', 'person%40example.com'],
+    ['an ISO date', '2027-06-01'],
+    ['a date with a letter prefix', 'x2027-06-01'],
+    ['a compact date', 'leave20270601'],
+    ['a balance', '15'],
+    ['a decimal balance', '17.5'],
+    ['a long number', 'id1234567'],
+    ['a phone number', '5551234567'],
+    ['a value with spaces', 'my plan'],
+    ['an empty value', ''],
+    ['a leading separator', '-reddit'],
+    ['a leading underscore', '_reddit'],
+    ['base64 padding', 'am9obkBleGFtcGxlLmNvbQ=='],
+    ['a URL', 'https://evil.example/?b=15'],
+    ['a nested query', 'reddit&b=15'.replace('&', '%26')],
+    ['a fragment', 'reddit%23private'],
+    ['unicode', 'r%C3%A9ddit'],
+    ['a percent-encoded control char', 'reddit%00'],
+    ['an overlong value', 'a'.repeat(41)],
+  ])('drops a value that is not a short plain label: %s', (_label, value) => {
+    expect(sanitizeCampaignPageviewUrl(`${base}?utm_source=${value}`)).toBe(base);
+    expect(sanitizeCampaignPageviewUrl(`${base}?utm_source=reddit&utm_campaign=${value}`)).toBe(`${base}?utm_source=reddit`);
+  });
+
+  it('accepts a 40-character label and decodes harmless percent-encoding before checking', () => {
+    expect(sanitizeCampaignPageviewUrl(`${base}?utm_campaign=${'a'.repeat(40)}`)).toBe(`${base}?utm_campaign=${'a'.repeat(40)}`);
+    expect(sanitizeCampaignPageviewUrl(`${base}?utm_source=%72eddit`)).toBe(`${base}?utm_source=reddit`);
+  });
+
+  it('matches the naming examples in docs/growth/METRICS.md', () => {
+    expect(sanitizeCampaignPageviewUrl(`${base}?utm_source=reddit&utm_medium=social&utm_campaign=pto_2027_guide`))
+      .toBe(`${base}?utm_source=reddit&utm_medium=social&utm_campaign=pto_2027_guide`);
+    expect(sanitizeCampaignPageviewUrl(`${base}?utm_campaign=guide-2027-01`)).toBe(base);
+  });
+
+  it('drops a key that appears more than once rather than guess which value is meant', () => {
+    expect(sanitizeCampaignPageviewUrl(`${base}?utm_source=reddit&utm_source=hn&utm_medium=social`)).toBe(`${base}?utm_medium=social`);
+    expect(sanitizeCampaignPageviewUrl(`${base}?utm_source=reddit&utm_source=reddit`)).toBe(base);
+  });
+
+  it.each(['not a URL', '/pto?utm_source=reddit', 'javascript:alert(1)?utm_source=x', 'https://secret:password@timebower.example/?utm_source=reddit'])('fails closed like the plain sanitizer: %s', (url) => {
+    expect(sanitizeCampaignPageviewUrl(url)).toBeNull();
+  });
+
+  it('never adds campaign parameters to the Vercel payload', () => {
+    vi.spyOn(document, 'referrer', 'get').mockReturnValue('');
+    expect(analyticsBeforeSend({ type: 'pageview', url: `${base}?utm_source=reddit&utm_medium=social` }))
+      .toStrictEqual({ type: 'pageview', url: base });
+  });
+
+  it('keeps the plain sanitizer origin+path only, even with campaign parameters', () => {
+    expect(sanitizeAnalyticsUrl(`${base}?utm_source=reddit`)).toBe(base);
   });
 });
 
