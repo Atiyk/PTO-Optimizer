@@ -109,6 +109,9 @@ export interface PlanSnapshot {
     totalDaysOff: number;
     breakCountActual: number;
     travelPercentile: number | null;
+    /** PTO the year-round style held back on its own (planMeta.reserveKept). Older saved
+     * plans have none; the dashboard then counts only the reserve the person set. */
+    reserveKept?: number;
     /** Display only, never stored: this pin counts different holiday dates than the plan now. */
     differentHolidays?: boolean;
   };
@@ -858,6 +861,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
   const breakCountRequested = solveResult.breakCountRequested;
   const breakCountActual = solveResult.breakCountActual;
   const budgetSpent = solveResult.budgetSpent;
+  const reserveKept = solved.meta?.reserveKept ?? 0;
 
   // Summary strip: total days off/PTO spent plus the indexed Efficiency/Travel scores.
   const totalDaysOff = useMemo(() => totalDaysOffOf(breaks), [breaks]);
@@ -1043,7 +1047,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     carryoverCap, overlapDays, blackouts, workWeek, forced, altFridayEnabled,
     altFridayStart, reserveDays, applyTrackedRequests, reserveApprovedPto, unlimitedPto,
     noticePeriodDays, noticeUnit, peakCapEnabled, peakCapStart, peakCapEnd, peakCapMaxDays,
-    summary: { budgetSpent, totalDaysOff, breakCountActual, travelPercentile: scores?.travel.percentile ?? null },
+    summary: { budgetSpent, totalDaysOff, breakCountActual, travelPercentile: scores?.travel.percentile ?? null, ...(reserveKept ? { reserveKept } : {}) },
     breaks: breaks.map((brk) => ({
       start: brk.start, end: brk.end, totalDaysOff: brk.totalDaysOff,
       ptoCost: brk.ptoCost, ptoDates: brk.days.filter(isSuggestedPto),
@@ -1055,7 +1059,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     overlapDays, blackouts, workWeek, forced, altFridayEnabled, altFridayStart,
     reserveDays, applyTrackedRequests, reserveApprovedPto, unlimitedPto, noticePeriodDays,
     noticeUnit, peakCapEnabled, peakCapStart, peakCapEnd, peakCapMaxDays,
-    budgetSpent, totalDaysOff, breakCountActual, scores, breaks, isSuggestedPto,
+    budgetSpent, totalDaysOff, breakCountActual, scores, breaks, isSuggestedPto, reserveKept,
   ]);
 
   const pinPlan = useCallback(() => {

@@ -35,6 +35,19 @@ describe('returning dashboard model (P3)', () => {
     expect(buildDashboard({ requests: [req('2026-10-01', '2026-10-02', 'approved', 'past'), req('2026-12-01', '2026-12-01', 'rejected', 'no')], plans: [], today: TODAY })).toBeNull();
   });
 
+  it('counts days the plan keeps back on purpose as a reserve, not as unplanned', () => {
+    const kept = (reserveDays: number, reserveKept?: number) => buildDashboard({ requests: [], today: TODAY,
+      plans: [{ ...LATER_PLAN, reserveDays, summary: { ...LATER_PLAN.summary, ...(reserveKept !== undefined ? { reserveKept } : {}) } }] })!.pto;
+    // Year-round style kept 2 of the 3 remaining days for surprises.
+    expect(kept(0, 2)).toEqual({ available: 15, planned: 12, reserved: 2, unplanned: 1 });
+    // The person's own reserve plus the style's: all 3 remaining days, so no "0 not yet planned".
+    expect(kept(1, 2)).toEqual({ available: 15, planned: 12, reserved: 3 });
+    // A reserve larger than what is left never exceeds it.
+    expect(kept(5)).toEqual({ available: 15, planned: 12, reserved: 3 });
+    // Older saved plans without reserveKept read as before.
+    expect(kept(0)).toEqual({ available: 15, planned: 12, unplanned: 3 });
+  });
+
   it('plan with no requests: next break from the plan, its request-by date, copy the request first', () => {
     const model = buildDashboard({ requests: [], plans: [LATER_PLAN], today: TODAY })!;
     expect(model.state).toBe('next-break');

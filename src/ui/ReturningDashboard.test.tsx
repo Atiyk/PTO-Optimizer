@@ -36,6 +36,11 @@ afterEach(() => { cleanup(); vi.useRealTimers(); localStorage.clear(); });
 const renderDashboard = (plans: PlanSnapshot[] = [PLAN]) => render(<ReturningDashboard pinnedPlans={plans} today={TODAY} offDays={[]} />);
 
 describe('ReturningDashboard (P3)', () => {
+  it('names days kept for surprises as a reserve', () => {
+    renderDashboard([{ ...PLAN, summary: { ...PLAN.summary, reserveKept: 2 } }]);
+    expect(screen.getByTestId('pto-line').textContent).toBe('15 PTO days in your plan · 9 planned · 2 kept in reserve · 4 not yet planned');
+  });
+
   it('renders nothing without saved data', () => {
     const { container } = renderDashboard([]);
     expect(container.innerHTML).toBe('');

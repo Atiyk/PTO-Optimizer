@@ -39,6 +39,7 @@ export function ptoLineText(pto: PtoLine): string {
   if (pto.planned !== undefined) parts.push(`${pto.planned} planned`);
   if (pto.requested !== undefined) parts.push(`${pto.requested} requested`);
   if (pto.approved !== undefined) parts.push(`${pto.approved} approved`);
+  if (pto.reserved !== undefined) parts.push(`${pto.reserved} kept in reserve`);
   if (pto.unplanned !== undefined) parts.push(`${pto.unplanned} not yet planned`);
   // Without a plan the first figure carries the unit.
   if (pto.available === undefined && parts.length) parts[0] = `PTO days: ${parts[0]}`;

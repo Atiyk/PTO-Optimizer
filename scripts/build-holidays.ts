@@ -183,8 +183,18 @@ async function main(): Promise<void> {
   // depend on a live fetch, and a year with no data is reported to the user as uncovered.
   const candidateYears = Array.from({ length: years.length + 4 }, (_, i) => currentYear - 2 + i);
   const bundledYears = candidateYears.filter((year) => countries.every((c) => (readExisting(c.code, year)?.length ?? 0) > 0));
-  writeFileSync(coveragePath, `${JSON.stringify({ countriesWithData, bundledYears, asOf: new Date().toISOString().slice(0, 10) }, null, 2)}\n`, 'utf-8');
-  console.log(`  ${countriesWithData} countries have real holiday data (packages/engine/src/data/holidayCoverage.json updated).`);
+  // `asOf` is the "last checked" date /data-sources shows, so a deploy (Vercel sets VERCEL=1,
+  // on a throwaway checkout) always stamps today. Local and CI builds leave the committed file
+  // byte-for-byte alone unless the counts themselves changed, so a build never dirties git.
+  const previous = (() => { try { return JSON.parse(readFileSync(coveragePath, 'utf-8')) as { countriesWithData?: number; bundledYears?: number[]; asOf?: string }; } catch { return null; } })();
+  const countsChanged = !previous || previous.countriesWithData !== countriesWithData
+    || JSON.stringify(previous.bundledYears) !== JSON.stringify(bundledYears);
+  if (process.env.VERCEL || countsChanged) {
+    writeFileSync(coveragePath, `${JSON.stringify({ countriesWithData, bundledYears, asOf: new Date().toISOString().slice(0, 10) }, null, 2)}\n`, 'utf-8');
+    console.log(`  ${countriesWithData} countries have real holiday data (packages/engine/src/data/holidayCoverage.json updated).`);
+  } else {
+    console.log(`  ${countriesWithData} countries have real holiday data (holidayCoverage.json unchanged; dated on deploy).`);
+  }
 
   // Never fail the build over this - a stale or absent static snapshot degrades to a live
   // fetch at runtime (packages/engine/src/data/holidays.ts), not a broken deploy.
