@@ -19,9 +19,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Vercel deploy hook
+        # The hook URL is a credential: pass it through the environment, never interpolate
+        # it into the script text.
+        env:
+          DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
         run: |
-          if [ -z "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}" ]; then
-            echo "VERCEL_DEPLOY_HOOK_URL secret is not set - skipping (see PROGRESS.md)." >&2
+          if [ -z "$DEPLOY_HOOK" ]; then
+            # Not a failure (no red X on main), but it must not look like a deploy happened:
+            # this run used to report plain success while deploying nothing for days.
+            msg="No deploy triggered: the VERCEL_DEPLOY_HOOK_URL secret is not set. Production is NOT being refreshed. See docs/growth/LAUNCH-READINESS.md."
+            echo "::warning title=Daily redeploy skipped::$msg"
+            echo "### Daily redeploy skipped" >> "$GITHUB_STEP_SUMMARY"
+            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          curl -fsS -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}"
+          curl -fsS -X POST "$DEPLOY_HOOK" > /dev/null
+          echo "Deploy hook accepted. This only queues a build: check the Vercel dashboard (or the deployment status on the main commit) to confirm production actually updated." >> "$GITHUB_STEP_SUMMARY"
