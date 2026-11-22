@@ -50,7 +50,7 @@ describe('brand', () => {
     expect(privacy).toContain('What happens when you share a plan');
     expect(privacy).toContain('Vercel Web Analytics');
     expect(privacy).toContain('Plausible');
-    expect(privacy).toContain('mailto:gaplessreminders@gmail.com?subject=Gapless%20Contact');
+    expect(privacy).toContain('mailto:gaplessreminders@gmail.com?subject=Timebower%20Contact');
     expect(privacy).toContain('id="main-content"');
   });
 
@@ -59,7 +59,7 @@ describe('brand', () => {
     expect(terms).toContain('<h1>Terms of use</h1>');
     expect(terms).toContain('Timebower does not provide legal, tax, financial, HR or employment advice.');
     expect(terms).toContain('href="/privacy.html"');
-    expect(terms).toContain('mailto:gaplessreminders@gmail.com?subject=Gapless%20Contact');
+    expect(terms).toContain('mailto:gaplessreminders@gmail.com?subject=Timebower%20Contact');
     expect(SOURCES['../public/privacy.html']).toContain('href="/terms.html"');
   });
 
