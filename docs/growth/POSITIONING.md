@@ -85,7 +85,7 @@ Every December, people get next year's holiday calendar and a fresh PTO balance 
 
 ## Channels
 
-Measurement gap first: `BASELINE.md` notes that analytics strips UTM and all query parameters, so acquisition source is not recorded. Before any channel push, the owner needs at least referrer data in Plausible (see `MARKETING-KIT.md` launch checklist). Without it, every channel below is unmeasurable.
+Measurement first: this release keeps `utm_source`, `utm_medium` and `utm_campaign` on Plausible pageviews (strict allowlist; see `METRICS.md`), so tag every link you post. Before this release, UTM was stripped and acquisition source was not recorded. Before any channel push, the owner needs at least referrer data in Plausible (see `MARKETING-KIT.md` launch checklist). Without it, every channel below is unmeasurable.
 
 | Channel | Use? | Why | Why not / risk | Signal it worked |
 | --- | --- | --- | --- | --- |

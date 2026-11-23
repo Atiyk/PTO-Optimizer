@@ -248,7 +248,7 @@ export function GuidePage({ path }: { path: string }) {
             <h1 id="guide-heading" className="text-display-sm text-ink type-display">{guide.h1}</h1>
             <p className="mt-5 border-t border-ink pt-5 text-[19px] leading-8 text-ink">{guide.answer(f)}</p>
             <p className="mt-3 text-sm text-muted">
-              Last checked {formatLongDate(guide.lastChecked, style)}. Holiday dates: {guide.sources.filter((s) => s !== 'nager').map((s) => SOURCES[s].label.split(',')[0]).join(', ')}, and Nager.Date.
+              Last checked {formatLongDate(guide.lastChecked, style)}. Holiday dates: {[...new Set(guide.sources.filter((s) => s !== 'nager').map((s) => SOURCES[s].label.split(',')[0]))].join(', ')}, and Nager.Date.
             </p>
 
             <PlanBlock config={first} plan={f.plans[0]} f={f} primary />

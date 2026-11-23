@@ -23,7 +23,7 @@ a file, test or check that can be rerun. Verified baseline: [BASELINE.md](BASELI
 
 | Task | Priority | Owner | Status | Evidence | Remaining blocker |
 | --- | --- | --- | --- | --- | --- |
-| Six 2027 guide pages (`/2027`, `/10-pto-days`, `/15-pto-days`, `/long-weekends`, `/four-day-week`, `/uk-annual-leave`) | P1 | Agent B | Verified | `src/content/guides/*.test.ts`: 16 plans match /pto; holiday dates checked against OPM and gov.uk; axe 0 at 375/1440; screenshots in `docs/screenshots/growth-seo/` | Deploy; submit the sitemap in Search Console |
+| Six 2027 guide pages (`/2027`, `/10-pto-days`, `/15-pto-days`, `/long-weekends`, `/four-day-week`, `/uk-annual-leave`) | P1 | Agent B | Verified | `src/content/guides/*.test.ts`: 15 guide plans match /pto (tests, and the critic's independent browser check); holiday dates checked against OPM and gov.uk; axe 0 at 375/1440; screenshots in `docs/screenshots/growth-seo/` | Deploy; submit the sitemap in Search Console |
 | Plans on federal holidays and on a six-holiday employer list, both reproducible by link | P1 | Agent B | Verified | `guidePlannerParity.test.tsx` (`eh` param) | None |
 | Data-driven guide workflow for new years and countries | P2 | Agent B | Verified | `guides2027.ts`, plus a test that fails when a year has no holiday data | Before 2028: add the config, then verify the dates |
 | Internal links (footer, homepage, llms.txt, sitemap with lastmod) | P2 | Agent B and orchestrator | Verified | `Footer.tsx`, `Landing.tsx` "2027 guides" group, `public/llms.txt` | None |

@@ -266,7 +266,7 @@ Before Dec 1:
 - [ ] [OWNER] Contact email under the Timebower name; replace `gaplessreminders@gmail.com` everywhere (see `BRAND-AUDIT.md`).
 - [ ] [OWNER] Resolve the Vercel deploy quota so production matches `main` (`BASELINE.md`); confirm the live SHA.
 - [ ] [OWNER] Verify Google Search Console; submit `sitemap.xml`.
-- [ ] [OWNER] Confirm Plausible account ownership and that referrer data is visible; decide how to see acquisition source, since UTM is stripped today.
+- [ ] [OWNER] Confirm Plausible account ownership and that referrer data is visible; tag every posted link with `utm_source`/`utm_medium`/`utm_campaign` (plain lowercase words; see `METRICS.md`).
 - [ ] [OWNER] Decide on a custom domain before press (changing it later breaks links in coverage). `scripts/siteUrl.ts` notes `pto-optimizer.app` does not resolve.
 - [ ] [OWNER] Create social handles. [OWNER: set up handles; check availability of "timebower" on each platform]
 - [ ] Ship homepage H1/subhead and meta (`HOMEPAGE-COPY.md`).

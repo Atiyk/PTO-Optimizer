@@ -127,7 +127,7 @@ const HUB: Guide = {
       `Monday and Friday holidays already give a three-day weekend; one PTO day makes it four. Veterans Day and Thanksgiving are Thursdays, so take the Friday after.`,
       'March, April and August have no federal holiday, so a week off there costs five PTO days for nine days off.',
     ];
-    if (gap) lines.push(`The best value of the year is between Christmas and New Year. Christmas is observed on ${day(f, gap.holidays[0])} and New Year's Day 2028 on ${day(f, gap.holidays[1])}, so ${plural(gap.ptoDays.length, 'PTO day')} (${range(f, gap.ptoDays[0], gap.ptoDays.at(-1)!)}) give ${gap.run.length} days off in a row, ${formatRange(gap.run.start, gap.run.end, 'US')}.`);
+    if (gap) lines.push(`Christmas is observed on ${day(f, gap.holidays[0])} and New Year's Day 2028 on ${day(f, gap.holidays[1])}. If you get both Fridays off, ${plural(gap.ptoDays.length, 'PTO day')} (${range(f, gap.ptoDays[0], gap.ptoDays.at(-1)!)}) give ${gap.run.length} days off in a row, ${formatRange(gap.run.start, gap.run.end, 'US')}. The plan above stops on December 31, so it leaves this out.`);
     return lines;
   },
   assumptions: US_ASSUMPTIONS,
@@ -241,7 +241,7 @@ const FIFTEEN: Guide = {
     {
       id: 'most-days-off', style: 'max', holidays: ALL_PUBLIC_HOLIDAYS,
       title: (p) => `The biggest total: ${p.daysOff} days off for ${p.ptoUsed} PTO days`,
-      note: (p) => `Spends every day on single Fridays and Mondays. ${plural(p.breaks.filter((b) => b.totalDaysOff < 4).length, 'break is', 'breaks are')} only a normal weekend plus one day.`,
+      note: (p) => `Spends each PTO day on its own, next to a weekend or a holiday. ${plural(p.breaks.filter((b) => b.totalDaysOff < 4).length, 'break is', 'breaks are')} only a normal weekend plus one day.`,
     },
   ],
   answer: (f) => {
@@ -256,7 +256,7 @@ const FIFTEEN: Guide = {
       'The cheapest days go first: the Friday before Presidents Day and Memorial Day, and the Thursday before Juneteenth (observed Friday, June 18). Each costs one PTO day for four days off.',
     ];
     if (labor) lines.push(`Labor Day is the other end of a week off. ${plural(labor.ptoCost, 'PTO day')} after it give ${labor.totalDaysOff} days off, ${range(f, labor.start, labor.end)}.`);
-    lines.push(`Christmas is observed on ${day(f, '2027-12-24')}, so PTO in the days before it joins the holiday weekend. The planner stops at December 31; four more PTO days, December 27 to 30, would run the break to January 2, 2028.`);
+    lines.push(`Christmas is observed on ${day(f, '2027-12-24')}, so PTO in the days before it joins the holiday weekend. The planner stops at December 31. If you have four PTO days left over, December 27 to 30 would run the break to January 2, 2028.`);
     return lines;
   },
   assumptions: US_ASSUMPTIONS,
