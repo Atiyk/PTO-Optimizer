@@ -7,6 +7,7 @@ import { settleLedgerAction } from '../integration/browserWalletStore';
 import { buildDashboard, breakForRequestText, type DashboardModel, type DashboardReminder, type NextBreak, type PtoLine } from './returningDashboardModel';
 import { copyText, formatManagerEmailDetailed, formatManagerEmailShort } from './requestText';
 import { handOffOnClick } from './planHandoff';
+import { track, trackReturnOncePerSession } from './analytics';
 import { Button } from './Button';
 import type { PlanSnapshot } from './useAppState';
 import { backupReminderDue, noteFirstSave, readRetentionStatus, updateRetentionStatus } from '../personal/retentionStatus';
@@ -85,6 +86,8 @@ export function ReturningDashboard({ pinnedPlans, today, offDays }: {
   const [copiedFor, setCopiedFor] = useState('');
   const [status, setStatus] = useState('');
   const [pending, setPending] = useState(false);
+  // A return through the homepage counts like one through a saved /pto link (once per tab session).
+  useEffect(() => { trackReturnOncePerSession('', true); }, []);
   const draft = useMemo(() => buildDashboard({ requests: ledger.requests, plans: pinnedPlans, today, offDays }), [ledger.requests, pinnedPlans, today, offDays]);
   const nextKey = draft?.next ? `${draft.next.start}|${draft.next.end}` : '';
   const model = useMemo(() => copiedFor && copiedFor === nextKey
@@ -103,6 +106,7 @@ export function ReturningDashboard({ pinnedPlans, today, offDays }: {
       ? formatManagerEmailDetailed(brk, isPto, next.noticePeriodDays, calendar.workWeek, offDays, next.noticeUnit ?? 'calendar')
       : formatManagerEmailShort(brk, isPto);
     if (await copyText(text)) {
+      track('request_text_copied');
       setCopiedFor(nextKey);
       setStatus('Request text copied. Paste it into an email or your HR tool, then mark it requested here.');
     } else {

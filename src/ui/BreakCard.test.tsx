@@ -229,9 +229,13 @@ describe('BreakCard request panel (one place to ask: workdays, ask-by date, copy
     const previous = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
     try {
+      const event = vi.fn();
+      window.plausible = event;
       mountInteractive({ brk: june, isPtoDay: isPto, today: '2027-05-01', onMarkRequested });
       open();
       await act(async () => { button('Copy request')!.click(); await Promise.resolve(); });
+      expect(event).toHaveBeenCalledWith('request_text_copied', { url: window.location.origin + '/' });
+      delete window.plausible;
       expect(writeText).toHaveBeenCalledOnce();
       expect(writeText.mock.calls[0][0]).toContain("I'd like to request time off covering Jun 12 – 20, 2027");
       expect(writeText.mock.calls[0][0]).toContain('Mon Jun 14, Tue Jun 15, Wed Jun 16, Thu Jun 17');

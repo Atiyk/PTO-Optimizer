@@ -11,8 +11,8 @@ import { geolocateCountry } from './geo';
 import { todayISO } from './today';
 import { bridgeLinkPhrase, bridgeSentence, findBridges, holidayDisplayName, holidayLongWeekends, holidayRunPhrase, nextHoliday, remainingHolidays } from './landingData';
 import { downloadHolidaysICS } from './icsExport';
-import { track } from './analytics';
-import { computeLandingPlan, landingHolidayHref, landingPlanHref, landingSearch, readLandingState, validLandingRange } from './landingState';
+import { track, trackOnceInDocument } from './analytics';
+import { computeLandingPlan, landingHolidayHref, landingNextRequest, landingPlanHref, landingPtoAccounting, landingSearch, PREVIEW_NOTICE_DAYS, readLandingState, reserveSentence, validLandingRange } from './landingState';
 import { employerCalendarCustomized } from '../personal/employerCalendar';
 import { useEmployerHolidayProfile } from './useEmployerHolidayProfile';
 import { landingObservedHolidays, useLandingHolidays } from './landingCalendar';
@@ -144,7 +144,9 @@ export function Landing() {
   const holidaySet = useMemo(() => new Set(holidays.map((holiday) => holiday.date)), [holidays]);
   const plan = useMemo(() => validRange && !loading ? computeLandingPlan(state, holidays) : null, [state, validRange, loading, holidays]);
   const bestBreak = useMemo(() => plan?.result.primary.slice().sort((a, b) => b.totalDaysOff - a.totalDaysOff || b.multiplier - a.multiplier || a.start.localeCompare(b.start))[0], [plan]);
-  const used = plan?.result.primary.reduce((total, brk) => total + brk.ptoCost, 0) ?? 0;
+  const accounting = useMemo(() => plan ? landingPtoAccounting(plan, budget) : undefined, [plan, budget]);
+  const used = accounting?.used ?? 0;
+  const reserveText = accounting ? reserveSentence(accounting) : undefined;
   const breakCount = plan?.result.primary.length ?? 0;
   const planDaysOff = plan?.result.primary.reduce((total, brk) => total + brk.totalDaysOff, 0) ?? 0;
   const periodStart = rangeStart > today ? addDays(rangeStart, -1) : today;
@@ -156,6 +158,7 @@ export function Landing() {
   // R2: a blank field has no number to carry, so the planner opens on its own defaults.
   const href = validRange ? landingPlanHref(state, undefined, budgetBlank) : '/pto';
   const holidayDates = useMemo(() => holidays.map((holiday) => holiday.date), [holidays]);
+  const nextRequest = useMemo(() => plan ? landingNextRequest(plan.result.primary, today, holidayDates) : undefined, [plan, today, holidayDates]);
   const shownHolidays = allHolidays ? upcoming : upcoming.slice(0, HOLIDAYS_SHOWN);
   const countryName = COUNTRIES.find((entry) => entry.code === country)?.name ?? country;
   const showGuess = guessing && budget === 15 && !budgetBlank;
@@ -181,7 +184,8 @@ export function Landing() {
           <Suspense fallback={null}><ReturningDashboard pinnedPlans={pinnedPlans} today={today} offDays={holidayDates} /></Suspense>
         )}
         <section aria-labelledby="landing-heading">
-          <h1 id="landing-heading" className="scroll-mt-16 max-w-[17ch] text-[clamp(2rem,0.95rem+5vw,4.75rem)] leading-[1.04] type-display text-ink">Time off that fits your year.</h1>
+          <h1 id="landing-heading" className="scroll-mt-16 max-w-[17ch] text-[clamp(2rem,0.95rem+5vw,4.75rem)] leading-[1.04] type-display text-ink">Find your best days off.</h1>
+          <p data-testid="landing-subhead" className="mt-3 max-w-[46ch] text-base leading-6 text-muted max-sm:[@media(max-height:739px)]:hidden sm:mt-4 sm:text-lg sm:leading-7">Put in your PTO days. Timebower lines them up with weekends and public holidays, shows exactly which days to request, and writes the note to your manager.</p>
 
           <div className="mt-4 grid min-w-0 gap-x-14 gap-y-4 sm:mt-10 sm:gap-y-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:grid-rows-[auto_1fr]">
             <div className="min-w-0 lg:col-start-1 lg:row-start-1">
@@ -234,13 +238,22 @@ export function Landing() {
                 </ol>
                 <YearLine className="order-3 mt-4" rangeStart={rangeStart} rangeEnd={rangeEnd} breaks={orderedPlan} holidayDates={holidayDates} />
               </>}
+              {/* Under the action, not above it: on a 320x568 phone the action must stay clear of
+                  the tab bar, and these explain the plan rather than gate it. */}
+              {!budgetBlank && bestBreak && reserveText && <p data-testid="landing-reserve" className="order-2 mt-3 text-sm leading-5 text-ink">
+                {reserveText} <a href={`${href}#planning-assumptions`} className="link-mark font-semibold">Change this in the planner</a>
+              </p>}
+              {!budgetBlank && bestBreak && nextRequest?.deadline.date && <p data-testid="landing-next-request" className="order-2 mt-3 text-[15px] leading-6 text-ink">
+                <span className="text-muted">Next step: </span><strong className="font-semibold tabular-nums">{nextRequest.deadline.lead}</strong>{' '}
+                to take <span className="whitespace-nowrap tabular-nums">{breakDates(nextRequest.brk)}</span> off, if your employer wants {PREVIEW_NOTICE_DAYS} days’ notice.
+              </p>}
               {validRange && !loading && !budgetBlank && <HolidayCheck
                 id="landing-holiday-check"
                 summary={customizedHolidays
                   ? `Uses your company’s holidays: ${plural(holidays.length, 'day')} off in these dates${employer.custom.length > 0 ? ', including company days' : ''}.`
                   : `Assumes you get all ${plural(holidays.length, countryName === 'United States' ? 'US public holiday' : 'public holiday')} off in these dates.`}
                 open={holidayCheckOpen}
-                onToggle={() => setHolidayCheckOpen((value) => !value)}
+                onToggle={() => { if (!holidayCheckOpen) trackOnceInDocument('holiday_check_opened'); setHolidayCheckOpen((value) => !value); }}
                 className="order-2"
               >
                 <HomeHolidayQuestion profile={holidayProfile} publicHolidays={calendar.holidays} rangeStart={rangeStart} rangeEnd={rangeEnd} />
@@ -250,7 +263,7 @@ export function Landing() {
                   bar on a 320x568 phone and the fold at 1440x900; the holiday check and the dates
                   follow it. */}
               <div className="order-1 mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 sm:mt-5">
-                <Button href={href}>{budgetBlank ? 'Open the planner →' : 'See the full plan →'}</Button>
+                <Button href={href} onClick={() => track('landing_plan_opened')}>{budgetBlank ? 'Open the planner →' : 'See the full plan →'}</Button>
                 <span className="text-sm text-muted">{budgetBlank ? 'It starts at 15 PTO days. Change them there.' : 'Free, no account needed.'}</span>
               </div>
               <p className="order-4 mt-4 text-[15px] text-muted">

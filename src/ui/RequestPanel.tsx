@@ -7,7 +7,7 @@ import { requestDeadline } from './requestDeadlineText';
 import { copyText, formatManagerEmailDetailed, formatManagerEmailShort, formatWorkingDaysList } from './requestText';
 import { buttonClasses } from './Button';
 import { downloadICS } from './icsExport';
-import { trackBreakAction } from './analytics';
+import { track, trackBreakAction } from './analytics';
 import { settleLedgerAction } from '../integration/browserWalletStore';
 import type { RequestAction } from './requestDeadlineText';
 
@@ -61,6 +61,7 @@ export function RequestPanel({ brk, isPtoDay, holidayNameFor, today, noticePerio
       : kind === 'detailed' ? formatManagerEmailDetailed(brk, isPtoDay, noticePeriodDays, workWeek, offDays, noticeUnit)
         : formatManagerEmailShort(brk, isPtoDay);
     const ok = await copyText(text);
+    if (ok) track('request_text_copied');
     setCopied(ok ? kind : 'failed');
   };
 
@@ -132,6 +133,7 @@ export function RequestPanel({ brk, isPtoDay, holidayNameFor, today, noticePerio
             try {
               downloadICS([brk], isPtoDay, { enabled: true, leadDays: noticePeriodDays, workWeek, offDays, noticeUnit }, `pto-break-${brk.start}.ics`);
               trackBreakAction('exported');
+              track('ICS downloaded');
               setFileMessage('Calendar file downloaded. It’s a snapshot of these dates; it won’t change if your plan does.');
             } catch {
               setFileMessage('The calendar file could not be downloaded.');

@@ -46,7 +46,7 @@ export function formatWorkingDaysList(brk: Break, isPtoDay: (iso: string) => boo
 function coverageSentence(brk: Break, ptoCount: number): string {
   const dayWord = ptoCount === 1 ? 'day' : 'days';
   const totalWord = brk.totalDaysOff === 1 ? 'day' : 'days';
-  return `I'd like to request time off covering ${datedSpan(brk.start, brk.end)} — ${brk.totalDaysOff} ${totalWord} away from work in total, using ${ptoCount} PTO ${dayWord}.`;
+  return `I'd like to request time off covering ${datedSpan(brk.start, brk.end)} — ${brk.totalDaysOff} ${totalWord} off in total, using ${ptoCount} PTO ${dayWord}.`;
 }
 
 /** "Oct 24 – Nov 1, 2026": a request can be read months later, so the span carries its year. */
