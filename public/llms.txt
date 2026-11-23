@@ -10,19 +10,19 @@
 - [Sabbatical planner](https://pto-optimizer-seven.vercel.app/sabbatical) — explore extended leave.
 
 ## Understand
+- [PTO guides](https://pto-optimizer-seven.vercel.app/guides) — 2027 US holiday dates and the PTO days to book around them, PTO accrual, expiring PTO and how to ask for time off.
 - [PTO guide and glossary](https://pto-optimizer-seven.vercel.app/glossary) — start with learning paths about PTO basics, accrual, expiration and requests.
 - [Frequently asked questions](https://pto-optimizer-seven.vercel.app/faq) — how calculations work.
 - [Data sources](https://pto-optimizer-seven.vercel.app/data-sources) — public sources and caveats.
 - [Sitemap](https://pto-optimizer-seven.vercel.app/sitemap.xml) — canonical published routes.
 
-## 2027 planning guides
+## 2027 worked plans (in the PTO guides)
 Worked plans computed by the planner from the committed holiday data; each links to the same plan on /pto.
-- [Best days to take off in 2027 (US)](https://pto-optimizer-seven.vercel.app/2027) — 2027 federal holidays by weekday, long weekends, and a 15-PTO-day plan.
-- [How to maximize 10 PTO days in 2027](https://pto-optimizer-seven.vercel.app/2027/10-pto-days)
-- [How to maximize 15 PTO days in 2027](https://pto-optimizer-seven.vercel.app/2027/15-pto-days)
-- [2027 long weekends](https://pto-optimizer-seven.vercel.app/2027/long-weekends) — every US federal holiday weekend and the one PTO day that extends it.
-- [PTO on a four-day work week in 2027](https://pto-optimizer-seven.vercel.app/2027/four-day-week)
-- [25 days of leave in England and Wales, 2027](https://pto-optimizer-seven.vercel.app/2027/uk-annual-leave) — the 8 bank holidays and a plan around them.
+- [How to maximize 10 PTO days in 2027](https://pto-optimizer-seven.vercel.app/guides/10-pto-days-2027)
+- [How to maximize 15 PTO days in 2027](https://pto-optimizer-seven.vercel.app/guides/15-pto-days-2027)
+- [2027 long weekends](https://pto-optimizer-seven.vercel.app/guides/long-weekends-2027) — every US federal holiday weekend and the one PTO day that extends it.
+- [PTO on a four-day work week in 2027](https://pto-optimizer-seven.vercel.app/guides/four-day-week-2027)
+- [25 days of leave in England and Wales, 2027](https://pto-optimizer-seven.vercel.app/guides/uk-annual-leave-2027) — the 8 bank holidays and a plan around them.
 
 ## Responsible interpretation
 - Public holidays are a default assumption, not a guarantee that an employer gives the day off.

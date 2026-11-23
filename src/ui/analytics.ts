@@ -48,7 +48,7 @@ export const ANALYTICS_EVENTS = [
   'paragraph_decoded',
   'policy_questions_copied',
   // Funnel events (docs/growth/METRICS.md). Event names only, like every other entry.
-  // A /2027/* guide page's call to action into the planner was used.
+  // A guide page's link into the planner or policy tool (/guides/*). Event name only.
   'guide_plan_opened',
   // The company-holiday check (which public holidays you actually get off) was opened.
   'holiday_check_opened',

@@ -46,7 +46,11 @@ export interface PtoLine {
   requested?: number;
   /** Distinct approved/completed PTO date equivalents in that same scope. */
   approved?: number;
-  /** available − planned, when both are known. */
+  /** Of available − planned: days the plan holds back on purpose (the person's own reserve
+   * plus what a year-round style keeps for surprises). Only when above zero. */
+  reserved?: number;
+  /** available − planned − reserved, when both are known. Left out when the reserve
+   * accounts for every remaining day, so the line never reads "0 not yet planned". */
   unplanned?: number;
 }
 
@@ -114,7 +118,10 @@ function ptoLine(plan: PlanSnapshot | undefined, requests: readonly PtoRequest[]
     line.planned = plan.summary.budgetSpent;
     if (!plan.accrualEnabled) {
       line.available = plan.budget;
-      line.unplanned = Math.max(0, plan.budget - plan.summary.budgetSpent);
+      const remaining = Math.max(0, plan.budget - plan.summary.budgetSpent);
+      const reserved = Math.min(remaining, (plan.reserveDays ?? 0) + (plan.summary.reserveKept ?? 0));
+      if (reserved > 0) line.reserved = reserved;
+      if (reserved === 0 || remaining > reserved) line.unplanned = remaining - reserved;
     }
   }
   if (requested > 0) line.requested = requested;

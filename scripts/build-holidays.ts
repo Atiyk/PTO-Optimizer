@@ -183,8 +183,19 @@ async function main(): Promise<void> {
   // depend on a live fetch, and a year with no data is reported to the user as uncovered.
   const candidateYears = Array.from({ length: years.length + 4 }, (_, i) => currentYear - 2 + i);
   const bundledYears = candidateYears.filter((year) => countries.every((c) => (readExisting(c.code, year)?.length ?? 0) > 0));
-  writeFileSync(coveragePath, `${JSON.stringify({ countriesWithData, bundledYears, asOf: new Date().toISOString().slice(0, 10) }, null, 2)}\n`, 'utf-8');
-  console.log(`  ${countriesWithData} countries have real holiday data (packages/engine/src/data/holidayCoverage.json updated).`);
+  // `asOf` is the "last checked" date /data-sources shows, so it moves only when this build
+  // actually refreshed data from Nager (as deploys do) or the counts changed. A build whose
+  // refresh failed, such as an offline or sandboxed one, keeps the committed file
+  // byte-for-byte, so it neither dirties git nor claims a check that did not happen.
+  const previous = (() => { try { return JSON.parse(readFileSync(coveragePath, 'utf-8')) as { countriesWithData?: number; bundledYears?: number[]; asOf?: string }; } catch { return null; } })();
+  const countsChanged = !previous || previous.countriesWithData !== countriesWithData
+    || JSON.stringify(previous.bundledYears) !== JSON.stringify(bundledYears);
+  if (written > 0 || countsChanged) {
+    writeFileSync(coveragePath, `${JSON.stringify({ countriesWithData, bundledYears, asOf: new Date().toISOString().slice(0, 10) }, null, 2)}\n`, 'utf-8');
+    console.log(`  ${countriesWithData} countries have real holiday data (packages/engine/src/data/holidayCoverage.json updated).`);
+  } else {
+    console.log(`  ${countriesWithData} countries have real holiday data (holidayCoverage.json unchanged: no refresh succeeded).`);
+  }
 
   // Never fail the build over this - a stale or absent static snapshot degrades to a live
   // fetch at runtime (packages/engine/src/data/holidays.ts), not a broken deploy.

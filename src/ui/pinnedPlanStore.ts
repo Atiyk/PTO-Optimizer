@@ -69,6 +69,7 @@ function parseSnapshot(value: unknown): PlanSnapshot | null {
     || !record(value.summary)
     || ![value.summary.budgetSpent, value.summary.totalDaysOff, value.summary.breakCountActual].every(amount)
     || !(value.summary.travelPercentile === null || (amount(value.summary.travelPercentile) && value.summary.travelPercentile <= 100))
+    || (value.summary.reserveKept !== undefined && !amount(value.summary.reserveKept))
     || !record(value.employerCalendar)) return null;
 
   const snapshot = value as unknown as PlanSnapshot;

@@ -1,8 +1,7 @@
 @import 'tailwindcss';
-/* Tailwind scans every text file in the repo. Keep the monorepo's other apps, the shared
-   engine package, its docs (docs/teams/...) and the root notes (PROGRESS.md and friends) out
-   of this site's CSS, so changes there can never change this site's build output. */
-@source not '../apps';
+/* Tailwind scans every text file in the repo. Keep the shared engine package, the docs and
+   the root notes (PROGRESS.md and friends) out of this site's CSS, so changes there can never
+   change this site's build output. */
 @source not '../docs';
 @source not '../packages';
 @source not '../*.md';
@@ -482,4 +481,15 @@
   textarea {
     font-size: max(16px, 1em);
   }
+}
+
+/* /guides tables: below 640px each row becomes a short block, every cell led by its column
+   name (data-label), so a phone never scrolls a table sideways. */
+@media (max-width: 639.98px) {
+  .guide-table { min-width: 0; }
+  .guide-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .guide-table tbody, .guide-table tr, .guide-table td { display: block; width: 100%; }
+  .guide-table tr { border-bottom: 1px solid var(--border-default); padding: 0.625rem 0; }
+  .guide-table td { border: 0; padding: 0.125rem 0; }
+  .guide-table td::before { content: attr(data-label) ": "; font-weight: 600; color: var(--text-muted); }
 }

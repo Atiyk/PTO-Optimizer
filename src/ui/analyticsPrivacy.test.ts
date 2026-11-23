@@ -1,16 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ENTRIES } from '../../scripts/routes';
 import glossaryTemplate from '../../scripts/generate-glossary-html.ts?raw';
+import guideTemplate from '../../scripts/generate-guide-html.ts?raw';
+import planGuideTemplate from '../content/planGuides/planGuideHead.ts?raw';
 import { analyticsBeforeSend, isSafeAnalyticsReferrer, sanitizeAnalyticsUrl, sanitizeCampaignPageviewUrl } from './analyticsPrivacy';
 
 const htmlSources: Record<string, string> = import.meta.glob([
   '../../index.html',
   '../../{pto,sabbatical,family,faq,data-sources,policy,uk,canada,australia,germany,ireland,india}/index.html',
   '../../glossary/**/index.html',
-  '../../2027/**/index.html',
+  '../../guides/**/index.html',
 ], { query: '?raw', import: 'default', eager: true });
 const entrySources: Record<string, string> = import.meta.glob(
-  '../{main,landing-main,policy-main,sabbatical-main,family-main,faq-main,data-sources-main,glossary-main,glossary-term-main,guide-main}.tsx',
+  '../{main,landing-main,policy-main,sabbatical-main,family-main,faq-main,data-sources-main,glossary-main,glossary-term-main,guides-main,guide-main,plan-guide-main}.tsx',
   { query: '?raw', import: 'default', eager: true },
 );
 
@@ -66,7 +68,7 @@ describe('analytics URL boundary', () => {
 });
 
 describe('campaign attribution boundary (Plausible pageviews only)', () => {
-  const base = 'https://timebower.example/2027/uk-bank-holidays';
+  const base = 'https://timebower.example/guides/uk-annual-leave-2027';
 
   it('keeps only utm_source, utm_medium and utm_campaign, in a fixed order, lowercased', () => {
     expect(sanitizeCampaignPageviewUrl(`${base}?utm_campaign=Spring_Launch&b=15&utm_medium=Social&utm_source=Reddit#private`))
@@ -168,7 +170,11 @@ describe('consumer route privacy configuration', () => {
   it('keeps the glossary generator and all consumer mounts behind the same boundary', () => {
     expect(glossaryTemplate).toContain('src="https://plausible.io/js/script.manual.js"');
     expect(glossaryTemplate).toContain('<meta name="referrer" content="no-referrer" />');
-    for (const entry of ['main', 'landing-main', 'policy-main', 'sabbatical-main', 'family-main', 'faq-main', 'data-sources-main', 'glossary-main', 'glossary-term-main', 'guide-main']) {
+    for (const template of [guideTemplate, planGuideTemplate]) {
+      expect(template).toContain('src="https://plausible.io/js/script.manual.js"');
+      expect(template).toContain('<meta name="referrer" content="no-referrer" />');
+    }
+    for (const entry of ['main', 'landing-main', 'policy-main', 'sabbatical-main', 'family-main', 'faq-main', 'data-sources-main', 'glossary-main', 'glossary-term-main', 'guides-main', 'guide-main', 'plan-guide-main']) {
       const source = entrySources[`../${entry}.tsx`];
       expect(source, entry).toContain('<PrivacyAnalytics />');
       expect(source, entry).not.toContain("from '@vercel/analytics/react'");

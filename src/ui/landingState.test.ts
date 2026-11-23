@@ -93,9 +93,9 @@ describe('homepage plan facts: reserve and the next request', () => {
   });
 
   it('words the reserve and any unplaced days in PTO-day terms', () => {
-    expect(reserveSentence({ used: 13, reserveKept: 2, unplaced: 0 })).toBe('2 PTO days left unplanned, kept for sick days or last-minute plans.');
-    expect(reserveSentence({ used: 7, reserveKept: 1, unplaced: 0 })).toBe('1 PTO day left unplanned, kept for sick days or last-minute plans.');
-    expect(reserveSentence({ used: 4, reserveKept: 1, unplaced: 3 })).toBe('4 PTO days left unplanned: 1 kept for sick days or last-minute plans, 3 that don’t fit a break in these dates.');
+    expect(reserveSentence({ used: 13, reserveKept: 2, unplaced: 0 })).toBe('2 PTO days kept in reserve for sick days or last-minute plans.');
+    expect(reserveSentence({ used: 7, reserveKept: 1, unplaced: 0 })).toBe('1 PTO day kept in reserve for sick days or last-minute plans.');
+    expect(reserveSentence({ used: 4, reserveKept: 1, unplaced: 3 })).toBe('4 PTO days left unplanned: 1 kept in reserve for sick days or last-minute plans, 3 that don’t fit a break in these dates.');
     expect(reserveSentence({ used: 4, reserveKept: 0, unplaced: 2 })).toBe('2 PTO days left unplanned: they don’t fit a break in these dates.');
     expect(reserveSentence({ used: 15, reserveKept: 0, unplaced: 0 })).toBeUndefined();
   });

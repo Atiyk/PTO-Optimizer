@@ -77,7 +77,7 @@ Columns: where it fires, how often it can fire, and what it reveals beyond its n
 | --- | --- | --- | --- |
 | `quick_plan_engaged` | Landing: first edit of the quick-plan sentence | Once per page mount (ref) | Personalize |
 | `landing_plan_opened` | **Not yet wired**: Landing "See the full plan" | Planned: once per click | Receive plan |
-| `guide_plan_opened` | **Not yet wired**: `/2027/*` guide CTA | Planned: once per click | Receive plan |
+| `guide_plan_opened` | `/guides/*` links into the planner or policy tool | Planned: once per click | Receive plan |
 | `meaningful_plan_interaction` | Planner: first change to country, region, dates, balance or style (`useAppState` engaged setters) | Once per document. **New**: it was declared but never fired before this change | Personalize |
 | `Solve completed` | Planner: each distinct plan, **including the default plan on load** | Many per visit | Not engagement: it fires without input |
 | `holiday_check_opened` | **Not yet wired**: Landing "Check company holidays" | Planned: once per document | Verify holidays |
@@ -135,9 +135,9 @@ it exactly).
 
 | Step | Numerator (unique visitors with…) | Denominator | Tool |
 | --- | --- | --- | --- |
-| Visit | pageview on `/`, `/pto*`, `/2027/*` (filter by page) | — | Plausible Pages, Sources, Campaigns |
+| Visit | pageview on `/`, `/pto*`, `/guides/*` (filter by page) | — | Plausible Pages, Sources, Campaigns |
 | Personalize | `quick_plan_engaged` OR `meaningful_plan_interaction` | Visit | Plausible goals |
-| Receive plan | `landing_plan_opened` OR `guide_plan_opened` OR pageview `/pto` | Visit on `/` or `/2027/*` | Plausible funnel (Business plan) or goal conversion rate filtered by entry page |
+| Receive plan | `landing_plan_opened` OR `guide_plan_opened` OR pageview `/pto` | Visit on `/` or `/guides/*` | Plausible funnel (Business plan) or goal conversion rate filtered by entry page |
 | Verify holidays | `holiday_check_opened` OR `holiday_preference_customized` | Receive plan | Plausible goals |
 | Take action (north star) | any plan-action goal above | Receive plan | Plausible goals |
 | Share | `URL shared`, `partner_share_generated`, `Image copied`, `portrait_image_exported` | Take action | Plausible goals |
@@ -145,7 +145,7 @@ it exactly).
 | Return | `returned_with_saved_url` | `plan_saved` + `first_break_saved`, previous 4 weeks (cohort-free ratio, **Hypothesis** proxy) | Plausible goals |
 
 Acquisition: break every step down by Plausible's Sources, and by Campaigns for links
-tagged with `utm_*`. Guide pages are identified by their `/2027/...` path. No extra event
+tagged with `utm_*`. Guide pages are identified by their `/guides/...` path. No extra event
 is needed for page type.
 
 Vercel Web Analytics on Hobby collects pageviews only (no custom events; 50,000 events a
@@ -178,8 +178,8 @@ Steps:
    `ANALYTICS_EVENTS`, spelled exactly, including the capitals and spaces in
    `Solve completed`, `ICS downloaded`, `Image copied`, `URL shared` and
    `Overlap link opened`. Plausible does not record custom events without a matching goal.
-3. Add **pageview goals** for `/pto*` and `/2027/*` (wildcard) so they can be funnel steps.
-4. On Business only: create funnel "Plan to action": pageview `/` or `/2027/*` → `quick_plan_engaged`
+3. Add **pageview goals** for `/pto*` and `/guides/*` (wildcard) so they can be funnel steps.
+4. On Business only: create funnel "Plan to action": pageview `/` or `/guides/*` → `quick_plan_engaged`
    → `landing_plan_opened` → `meaningful_plan_interaction` → (any plan-action goal; pick
    `request_text_copied` for the stricter version). Use the sequential type. On
    Starter/Growth, read each goal's conversion rate with an entry-page filter instead.
