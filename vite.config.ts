@@ -1,3 +1,4 @@
+import { readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { configDefaults, defineConfig, type Plugin } from 'vitest/config'
@@ -20,6 +21,14 @@ const COUNTRY_SLUGS = ['uk', 'canada', 'australia', 'germany', 'ireland', 'india
 // it is not wired into the build pipeline itself, so a missing or stale generated file is a
 // build error here, not a silent gap).
 const GLOSSARY_TERM_IDS = GLOSSARY_TERMS.map((t) => t.id)
+
+// The 2027 guides: every committed 2027/**/index.html (scripts/generate-guide-html.ts writes
+// one per entry in src/content/guides/guides2027.ts; guideHeads.test.ts fails if the files
+// and that list ever differ). Read from disk so this config never imports the solver.
+const GUIDE_HTML_FILES = (readdirSync(resolve(import.meta.dirname, '2027'), { recursive: true }) as string[])
+  .filter((f) => f === 'index.html' || f.endsWith('/index.html'))
+  .map((f) => `2027/${f}`)
+  .sort()
 
 /**
  * Phase 1: every HTML entry's canonical/og:url/og:image/twitter:image/Plausible
@@ -72,6 +81,10 @@ export default defineConfig({
         ),
         ...Object.fromEntries(
           GLOSSARY_TERM_IDS.map((id) => [`glossary-${id}`, resolve(import.meta.dirname, 'glossary', id, 'index.html')]),
+        ),
+        // 2027 guides (see GUIDE_HTML_FILES above).
+        ...Object.fromEntries(
+          GUIDE_HTML_FILES.map((f) => [`guide-${f.replace(/\/?index\.html$/, '').replace(/\//g, '-')}`, resolve(import.meta.dirname, f)]),
         ),
       },
     },

@@ -46,7 +46,9 @@ export type AnalyticsEvent =
   | 'policy_alert_action_clicked'
   | 'term_opened'
   | 'paragraph_decoded'
-  | 'policy_questions_copied';
+  | 'policy_questions_copied'
+  // A 2027 guide page's "Open this plan" link into /pto (src/ui/GuidePage.tsx). Name only.
+  | 'guide_plan_opened';
 
 interface PlausibleOptions { url: string }
 type PlausibleArguments = [eventName: string, options: PlausibleOptions];
