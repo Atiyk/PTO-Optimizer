@@ -22,7 +22,7 @@ import { FRESH_VISIT_RESERVE_DAYS, readBrowserPlanSearch, readBrowserFullState, 
 import type { DayCategory, ForcedState } from './types';
 import { classifyDay } from './dayCategory';
 import { alternativeForDate as alternativeForDateImpl } from './alternativeForDate';
-import { track, trackReturnOncePerSession, trackSharedLinkOpened } from './analytics';
+import { track, trackOnceInDocument, trackReturnOncePerSession, trackSharedLinkOpened } from './analytics';
 import { validateInputs, isSupportedPlanningRange } from './validation';
 import { defaultRangeEnd, defaultPlanRangeEnd, planStyleOptionsFor, holidayEntriesFor, stateHolidayCandidatesFor, altFridayOffDatesFor, effectiveOffDaysFor, mustIncludeDaysFor, effectiveBlackoutsFor, effectiveBudgetFor, policyAccrualFieldsFor, buildSolveInput, isSuggestedPtoDay, type HolidayEntry } from '../autopilot/planFromSearch';
 import { todayISO } from './today';
@@ -1158,6 +1158,21 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     [breaks, baseOffSet, isWeekendDay, planningPending],
   );
 
+  // 'meaningful_plan_interaction': the person's first own change to a core planner input
+  // (country, region, dates, balance or style), once per document. Only the setters handed
+  // to the UI are wrapped, so mount, URL restore and loading a saved plan never count.
+  const engagedSetters = useMemo(() => {
+    const engaged = <A extends unknown[]>(set: (...args: A) => void) => (...args: A) => {
+      trackOnceInDocument('meaningful_plan_interaction');
+      set(...args);
+    };
+    return {
+      setCountry: engaged(changeCountry), setSubdivision: engaged(changeSubdivision),
+      setRangeStart: engaged(setRangeStart), setRangeEnd: engaged(setRangeEnd),
+      setBudget: engaged(setBudget), setPlanningStyle: engaged(setPlanningStyle),
+    };
+  }, [changeCountry, changeSubdivision, setPlanningStyle]);
+
   return {
     validationIssues,
     solverIssue: solved.issue,
@@ -1171,7 +1186,7 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     planSearch,
     planningVersion,
     planningStyle,
-    setPlanningStyle,
+    setPlanningStyle: engagedSetters.setPlanningStyle,
     season,
     setSeason,
     minimumBreakDays,
@@ -1181,16 +1196,16 @@ export function useAppState(requests: readonly PtoRequest[] = NO_REQUESTS, balan
     holidayFocusDate,
     holidayFocusRun,
     country,
-    setCountry: changeCountry,
+    setCountry: engagedSetters.setCountry,
     subdivision,
-    setSubdivision: changeSubdivision,
+    setSubdivision: engagedSetters.setSubdivision,
     discoveredSubdivisions,
     rangeStart,
-    setRangeStart,
+    setRangeStart: engagedSetters.setRangeStart,
     rangeEnd,
-    setRangeEnd,
+    setRangeEnd: engagedSetters.setRangeEnd,
     budget,
-    setBudget,
+    setBudget: engagedSetters.setBudget,
     reserveDays,
     setReserveDays,
     unlimitedPto,

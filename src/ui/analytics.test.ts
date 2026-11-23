@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
-import { isGenuineReturn, isShareLinkArrival, track, trackReturnOncePerSession, trackBreakAction, trackOnceInDocument, trackSharedLinkOpened, type AnalyticsEvent } from './analytics';
+import { ANALYTICS_EVENTS, isGenuineReturn, isShareLinkArrival, track, trackPageviewOnce, trackReturnOncePerSession, trackBreakAction, trackOnceInDocument, trackSharedLinkOpened, type AnalyticsEvent } from './analytics';
 import analyticsSource from './analytics.ts?raw';
+import privacyPage from '../../public/privacy.html?raw';
 
 beforeEach(() => {
   window.history.replaceState(null, '', '/pto?b=17&s=2027-06-01&e=2027-12-31&eh=private-calendar#private-plan');
@@ -125,6 +126,50 @@ describe('share-link arrivals and subscriptions', () => {
   });
 });
 
+describe('campaign attribution', () => {
+  it('adds only allowlisted utm labels to the Plausible pageview, never to custom events', () => {
+    window.history.replaceState(null, '', '/2027/us?utm_source=Reddit&utm_medium=social&utm_campaign=launch&utm_term=pto&b=15&s=2027-06-01#private');
+    const spy = vi.fn();
+    window.plausible = spy;
+    trackPageviewOnce();
+    track('guide_plan_opened');
+    const route = window.location.origin + '/2027/us';
+    expect(spy.mock.calls).toEqual([
+      ['pageview', { url: `${route}?utm_source=reddit&utm_medium=social&utm_campaign=launch` }],
+      ['guide_plan_opened', { url: route }],
+    ]);
+  });
+
+  it('still suppresses a campaign pageview behind an unsafe incoming referrer', () => {
+    window.history.replaceState(null, '', '/?utm_source=newsletter');
+    vi.spyOn(document, 'referrer', 'get').mockReturnValue('https://mail.example/read?id=person@example.com');
+    const spy = vi.fn();
+    window.plausible = spy;
+    trackPageviewOnce();
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe('event catalog', () => {
+  it('declares the funnel events other surfaces call, and keeps every name in the runtime list', () => {
+    const list = analyticsSource.slice(analyticsSource.indexOf('export const ANALYTICS_EVENTS'), analyticsSource.indexOf('] as const;'));
+    const names = [...list.matchAll(/^\s*'([^']+)',/gm)].map((match) => match[1]);
+    expect([...ANALYTICS_EVENTS].sort()).toEqual([...names].sort());
+    for (const name of ['guide_plan_opened', 'holiday_check_opened', 'landing_plan_opened', 'shared_plan_made_own', 'request_text_copied']) {
+      expect(ANALYTICS_EVENTS).toContain(name);
+    }
+    expect(new Set(ANALYTICS_EVENTS).size).toBe(ANALYTICS_EVENTS.length);
+  });
+
+  it('lists exactly the declared events on the privacy page', () => {
+    const section = privacyPage.slice(privacyPage.indexOf('<section id="analytics"'));
+    const list = section.slice(section.indexOf('<ul>'), section.indexOf('</ul>'));
+    expect(section.indexOf('<ul>')).toBeLessThan(section.indexOf('</section>'));
+    const listed = [...list.matchAll(/<code>([^<]+)<\/code>/g)].map((match) => match[1]);
+    expect([...listed].sort()).toEqual([...ANALYTICS_EVENTS].sort());
+  });
+});
+
 describe('event payload privacy', () => {
   it('sends no event properties, so a balance or date can never ride along', () => {
     const spy = vi.fn();
@@ -140,7 +185,7 @@ describe('event payload privacy', () => {
   });
 
   it('keeps event names free of digits and the public API free of a props argument', () => {
-    const names = [...analyticsSource.matchAll(/^\s*\| '([^']+)'/gm)].map((match) => match[1]);
+    const names: readonly string[] = ANALYTICS_EVENTS;
     expect(names).toContain('shared_link_opened');
     expect(names).toContain('feed_subscribed');
     for (const name of names) expect(name, name).not.toMatch(/\d/);
@@ -160,6 +205,18 @@ describe('returned_with_saved_url: genuine returns only (baseline item 15)', () 
     expect(isGenuineReturn('?c=US&b=15&s=2027-01-01&hx=abc', false)).toBe(false);
     expect(isGenuineReturn('?pp=xyz&s=2027-01-01&b=3', false)).toBe(false);
     expect(isGenuineReturn('', false)).toBe(false);
+  });
+
+  it('does not count a reload or later page in the same tab session as a return (regression)', () => {
+    const spy = vi.fn();
+    window.plausible = spy;
+    // First planner document of the tab: a fresh visit, nothing saved yet.
+    trackReturnOncePerSession('', false);
+    // The person saves a plan, reloads (the address bar now holds s and b) or goes to
+    // another page and back. Same visit: never a return.
+    trackReturnOncePerSession('?c=US&b=15&s=2027-01-01&e=2027-12-31', false);
+    trackReturnOncePerSession('', true);
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('counts a kept private plan link, or any visit with a saved plan, once per session', () => {

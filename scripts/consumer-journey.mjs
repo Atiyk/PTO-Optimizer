@@ -221,7 +221,7 @@ async function verifyAnalyticsTransport() {
   const loads = [];
   report.analytics = { sources: scripts.map(({ body: _body, ...source }) => source), captures, loads,
     fixture: 'Route-backed HTTPS origin; actual unmodified hosted SDKs; mobile user agent and webdriver=false opt into SDK transport; all analytics POSTs fulfilled locally.' };
-  const sensitive = ['139.25', 'qa-sdk-private-note-2027', 'qa-sdk-private-fragment', '2027-01-15', '2027-01-24', '2027-01-01'];
+  const sensitive = ['139.25', 'qa-sdk-private-note-2027', 'qa-sdk-private-fragment', '2027-01-15', '2027-01-24', '2027-01-01', 'qa-utm-private-term', 'qa.person@example.com', 'qa.person%40example.com', 'QA_Newsletter'];
   for (const unsafe of [false, true]) {
     const context = await browser.newContext({ serviceWorkers: 'block', viewport: report.viewport, locale: 'en-US', timezoneId: 'America/New_York',
       userAgent: `Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${browser.version()} Mobile Safari/537.36` });
@@ -262,7 +262,7 @@ async function verifyAnalyticsTransport() {
     const page = await context.newPage();
     await page.clock.setFixedTime(new Date('2027-01-01T17:00:00Z'));
     const referer = unsafe ? `${virtualOrigin}/legacy?cb=139.25&note=qa-sdk-private-note-2027` : `${virtualOrigin}/`;
-    await page.goto(`${virtualOrigin}/policy/?b=7&s=2027-01-15&e=2027-01-24&cb=139.25&bao=2027-01-01&note=qa-sdk-private-note-2027#qa-sdk-private-fragment`, { referer, waitUntil: 'networkidle' });
+    await page.goto(`${virtualOrigin}/policy/?b=7&s=2027-01-15&e=2027-01-24&cb=139.25&bao=2027-01-01&note=qa-sdk-private-note-2027&utm_source=QA_Newsletter&utm_term=qa-utm-private-term&utm_campaign=qa.person@example.com#qa-sdk-private-fragment`, { referer, waitUntil: 'networkidle' });
     await page.getByRole('heading', { level: 1, name: 'How much PTO will I have, and what am I about to lose?', exact: true }).waitFor();
     assert.equal(await page.evaluate(() => navigator.webdriver), false);
     assert.equal(await page.evaluate(() => document.referrer), referer, 'The incoming referrer must be real browser state, including the unsafe canary.');
@@ -288,10 +288,14 @@ async function verifyAnalyticsTransport() {
   for (const entry of captures) {
     assert.notEqual(entry.provider, 'unexpected', 'Unexpected POST transport must be reviewed.');
     const body = JSON.parse(entry.body);
-    assert.equal(entry.provider === 'plausible' ? body.u : body.o, `${virtualOrigin}/policy/`);
+    // Only a Plausible pageview may keep allowlisted campaign labels (lowercased); the
+    // utm_term and the email-shaped utm_campaign are dropped. Vercel never gets them.
+    const expectedUrl = entry.provider === 'plausible' && body.n === 'pageview'
+      ? `${virtualOrigin}/policy/?utm_source=qa_newsletter` : `${virtualOrigin}/policy/`;
+    assert.equal(entry.provider === 'plausible' ? body.u : body.o, expectedUrl);
     const wire = JSON.stringify({ body, headers: entry.headers });
     for (const value of sensitive) assert.ok(!wire.includes(value), `Planning canary leaked into ${entry.provider} wire data: ${value}`);
-    assert.doesNotMatch(wire, /[?&](?:b|s|e|cb|bao|note)=/i);
+    assert.doesNotMatch(wire, /[?&](?:b|s|e|cb|bao|note|utm_term|utm_campaign)=/i);
     assert.ok(!entry.headers.referer, 'Early no-referrer policy must remove HTTP Referer from analytics POSTs.');
   }
   for (const entry of loads) assert.ok(!entry.headers.referer, 'Hosted SDK requests must also have no HTTP Referer.');

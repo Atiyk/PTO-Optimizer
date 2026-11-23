@@ -1,12 +1,14 @@
 import { GLOSSARY_TERMS } from '../src/content/glossary/terms.ts';
 import { GUIDES } from '../src/content/guides/index.ts';
+import { PLAN_GUIDES } from '../src/content/planGuides/planGuides2027.ts';
+import { planGuideHtmlFile } from '../src/content/planGuides/planGuideHead.ts';
 
 /**
  * The one list of every real route this site builds, shared (no side effects - safe to
  * import from anywhere) between scripts/prerender.ts and scripts/build-seo-files.ts, so a
  * route can't exist in the sitemap but not be prerendered, or vice versa.
  */
-export type ComponentKind = 'landing' | 'app' | 'sabbatical' | 'family' | 'faq' | 'dataSources' | 'policy' | 'glossary' | 'glossary-term' | 'guides' | 'guide';
+export type ComponentKind = 'landing' | 'app' | 'sabbatical' | 'family' | 'faq' | 'dataSources' | 'policy' | 'glossary' | 'glossary-term' | 'guides' | 'guide' | 'plan-guide';
 
 export interface Entry {
   /** Path relative to dist/ of the built HTML file to inject into. */
@@ -25,7 +27,11 @@ export interface Entry {
   termId?: string;
   /** Only for component === 'guide': which guide this page renders. */
   guideId?: string;
-  /** sitemap.xml <lastmod> (ISO date), for pages with a real last-edited date. */
+  /** Only for component === 'plan-guide': the page's path (src/content/planGuides/planGuides2027.ts). */
+  planGuidePath?: string;
+  /** sitemap.xml <lastmod> (ISO date), for pages with a real last-edited date: a guide's
+   * `updated`, a plan guide's "Last checked" date. Never the build date, which would claim a
+   * change on every deploy. */
   lastmod?: string;
   /** sitemap.xml priority (scripts/build-seo-files.ts) - kept on the same entry as every
    * other per-route fact so the sitemap can never list a route this file doesn't know
@@ -65,7 +71,7 @@ export const ENTRIES: Entry[] = [
   ),
   {
     file: 'guides/index.html', path: '/guides', component: 'guides', sitemapPriority: 0.7,
-    lastmod: GUIDES.map((g) => g.updated).sort().at(-1),
+    lastmod: [...GUIDES.map((g) => g.updated), ...PLAN_GUIDES.map((g) => g.lastChecked)].sort().at(-1),
   },
   ...GUIDES.map(
     (g): Entry => ({
@@ -75,6 +81,18 @@ export const ENTRIES: Entry[] = [
       guideId: g.id,
       lastmod: g.updated,
       sitemapPriority: 0.7,
+    }),
+  ),
+  // Worked plans from the planner (/guides/<slug>-2027): one entry per page in
+  // src/content/planGuides/planGuides2027.ts, rendered by PlanGuidePage.
+  ...PLAN_GUIDES.map(
+    (g): Entry => ({
+      file: planGuideHtmlFile(g),
+      path: g.path,
+      component: 'plan-guide',
+      planGuidePath: g.path,
+      lastmod: g.lastChecked,
+      sitemapPriority: 0.6,
     }),
   ),
 ];

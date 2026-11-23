@@ -1,9 +1,13 @@
 import { COUNTRIES } from '@daysoff/engine/data/countries';
 import { isoToSerial } from '@daysoff/engine/solver/dateUtils';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import type { WorkWeek } from '@daysoff/engine/solver/types';
 import { defaultPlanRangeEnd, planStyleOptionsFor, solvePlan } from '../autopilot/planFromSearch';
 import { planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
 import { isValidISODate } from './urlState';
+import { requestDeadline, type RequestDeadline } from './requestDeadlineText';
+import type { Break } from '@daysoff/engine/solver/types';
+import type { PlannerOutcome } from './pinPreview';
 
 export interface LandingState {
   country: string;
@@ -20,7 +24,8 @@ const PREVIEW_VERSION = 2;
 const PREVIEW_MINIMUM = 3;
 /** The /pto planner's state for a preview link: no reserve held back by the person
  * (rv=0), the default 14-day notice. The year plan adds its own small reserve. */
-const PREVIEW_PLAN_OPTIONS = planStyleOptionsFor({ noticePeriodDays: 14, noticeUnit: 'calendar', reserveDays: 0 });
+export const PREVIEW_NOTICE_DAYS = 14;
+const PREVIEW_PLAN_OPTIONS = planStyleOptionsFor({ noticePeriodDays: PREVIEW_NOTICE_DAYS, noticeUnit: 'calendar', reserveDays: 0 });
 
 export function computeLandingPlan(state: LandingState, holidays: readonly { date: string }[]) {
   return solvePlan({
@@ -88,4 +93,53 @@ function dateInLandingRange(state: LandingState, date: string): boolean {
 export function landingHolidayHref(state: LandingState, date: string, bridgeDate?: string): string {
   if (!dateInLandingRange(state, date)) return landingPlanHref(state);
   return `${landingPlanHref(state, bridgeDate === date ? undefined : bridgeDate)}&hd=${date}#holiday-focus`;
+}
+
+/** Where the entered PTO days went: planned into breaks, kept back by the year plan's own
+ * reserve (the solver's `meta.reserveKept`, never estimated here), or left over because no
+ * further break fits the dates. The three always add up to the entered budget. */
+export interface LandingPtoAccounting { used: number; reserveKept: number; unplaced: number }
+
+export function landingPtoAccounting(outcome: Pick<PlannerOutcome, 'result' | 'meta'>, budget: number): LandingPtoAccounting {
+  const used = outcome.result.primary.reduce((total, brk) => total + brk.ptoCost, 0);
+  const left = Math.max(0, budget - used);
+  const reserveKept = Math.min(left, Math.max(0, outcome.meta?.reserveKept ?? 0));
+  return { used, reserveKept, unplaced: left - reserveKept };
+}
+
+const ptoDays = (n: number) => `${n} PTO ${n === 1 ? 'day' : 'days'}`;
+
+/** The sentence under the figure when the plan spends fewer PTO days than were entered. */
+export function reserveSentence({ reserveKept, unplaced }: LandingPtoAccounting): string | undefined {
+  const left = reserveKept + unplaced;
+  if (left === 0) return undefined;
+  if (unplaced === 0) return `${ptoDays(left)} kept in reserve for sick days or last-minute plans.`;
+  if (reserveKept === 0) return `${ptoDays(left)} left unplanned: ${unplaced === 1 ? 'it doesn’t' : 'they don’t'} fit a break in these dates.`;
+  return `${ptoDays(left)} left unplanned: ${reserveKept} kept in reserve for sick days or last-minute plans, ${unplaced} that ${unplaced === 1 ? 'doesn’t' : 'don’t'} fit a break in these dates.`;
+}
+
+/** The first break still ahead and its request-by date, from the same requestDeadline the
+ * planner's request panel uses with the preview's own settings (14 calendar days' notice,
+ * Monday to Friday, the preview's holidays as days off). */
+export function landingNextRequest(breaks: readonly Break[], today: string, offDays: readonly string[]): { brk: Break; deadline: RequestDeadline } | undefined {
+  const brk = breaks.filter((candidate) => candidate.start >= today).sort((a, b) => a.start.localeCompare(b.start))[0];
+  if (!brk) return undefined;
+  return { brk, deadline: requestDeadline(brk.start, PREVIEW_NOTICE_DAYS, DEFAULT_WORK_WEEK, today, offDays, 'calendar') };
+}
+
+/** Options for pages that link to /pto with their own style or work week (the 2027 guides,
+ * src/content/guides). computeLandingPlanWith with no options is computeLandingPlan. */
+export interface LandingPlanOptions {
+  style?: PlanningStyle;
+  workWeek?: WorkWeek;
+}
+
+export function computeLandingPlanWith(state: LandingState, holidays: readonly { date: string }[], options: LandingPlanOptions = {}) {
+  const style = options.style ?? PREVIEW_STYLE;
+  return solvePlan({
+    ...state,
+    ...planningStyleSettings(style),
+    offDays: [...new Set(holidays.map(({ date }) => date))],
+    workWeek: options.workWeek ?? DEFAULT_WORK_WEEK,
+  }, PREVIEW_VERSION, PREVIEW_MINIMUM, style, PREVIEW_PLAN_OPTIONS);
 }

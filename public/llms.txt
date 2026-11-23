@@ -16,6 +16,14 @@
 - [Data sources](https://pto-optimizer-seven.vercel.app/data-sources) — public sources and caveats.
 - [Sitemap](https://pto-optimizer-seven.vercel.app/sitemap.xml) — canonical published routes.
 
+## 2027 worked plans (in the PTO guides)
+Worked plans computed by the planner from the committed holiday data; each links to the same plan on /pto.
+- [How to maximize 10 PTO days in 2027](https://pto-optimizer-seven.vercel.app/guides/10-pto-days-2027)
+- [How to maximize 15 PTO days in 2027](https://pto-optimizer-seven.vercel.app/guides/15-pto-days-2027)
+- [2027 long weekends](https://pto-optimizer-seven.vercel.app/guides/long-weekends-2027) — every US federal holiday weekend and the one PTO day that extends it.
+- [PTO on a four-day work week in 2027](https://pto-optimizer-seven.vercel.app/guides/four-day-week-2027)
+- [25 days of leave in England and Wales, 2027](https://pto-optimizer-seven.vercel.app/guides/uk-annual-leave-2027) — the 8 bank holidays and a plan around them.
+
 ## Responsible interpretation
 - Public holidays are a default assumption, not a guarantee that an employer gives the day off.
 - PTO balance and policy calculations are estimates, not legal or HR decisions.

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import shell from '../../index.html?raw';
-import { landingHolidayHref, landingPlanHref, landingSearch, readLandingState, validLandingRange } from './landingState';
+import { requestByDate } from '@daysoff/engine/calendar/requestDeadline';
+import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import { computeLandingPlan, landingHolidayHref, landingNextRequest, landingPlanHref, landingPtoAccounting, landingSearch, readLandingState, reserveSentence, validLandingRange } from './landingState';
 
 describe('homepage planning state', () => {
   const state = { country: 'GB', budget: 17, rangeStart: '2027-02-01', rangeEnd: '2028-02-29' };
@@ -63,5 +65,60 @@ describe('root route migration', () => {
     expect(redirect('/', '?home=1&c=GB&b=17')).not.toHaveBeenCalled();
     expect(redirect('/', '')).not.toHaveBeenCalled();
     expect(redirect('/pto', '?c=US&b=15')).not.toHaveBeenCalled();
+  });
+});
+
+describe('homepage plan facts: reserve and the next request', () => {
+  const brk = (start: string, end: string, ptoCost: number) => ({
+    id: start, start, end, days: [], totalDaysOff: 9, ptoCost, multiplier: 2, tags: [], meanDemand: 1,
+  });
+
+  it('reports the reserve the solver kept, never a guess, and what did not fit', () => {
+    expect(landingPtoAccounting({ result: { primary: [brk('2027-01-16', '2027-01-24', 4), brk('2027-06-12', '2027-06-20', 9)] } as never, meta: { reserveKept: 2 } as never }, 15))
+      .toEqual({ used: 13, reserveKept: 2, unplaced: 0 });
+    expect(landingPtoAccounting({ result: { primary: [brk('2027-01-16', '2027-01-24', 4)] } as never, meta: { reserveKept: 1 } as never }, 8))
+      .toEqual({ used: 4, reserveKept: 1, unplaced: 3 });
+    // A legacy outcome without metadata reserves nothing.
+    expect(landingPtoAccounting({ result: { primary: [brk('2027-01-16', '2027-01-24', 4)] } as never }, 4))
+      .toEqual({ used: 4, reserveKept: 0, unplaced: 0 });
+  });
+
+  it('matches the live engine: 15 US PTO days plan 13 and keep 2 in reserve', () => {
+    const holidays = ['2026-11-26', '2026-12-25', '2027-01-01', '2027-01-18', '2027-02-15', '2027-05-31', '2027-06-18', '2027-07-05', '2027-09-06', '2027-10-11', '2027-11-11'].map((date) => ({ date }));
+    const outcome = computeLandingPlan({ country: 'US', budget: 15, rangeStart: '2026-11-22', rangeEnd: '2027-11-21' }, holidays);
+    const facts = landingPtoAccounting(outcome, 15);
+    expect(facts.reserveKept).toBe(outcome.meta?.reserveKept);
+    expect(facts.reserveKept).toBe(2);
+    expect(facts.used + facts.reserveKept + facts.unplaced).toBe(15);
+  });
+
+  it('words the reserve and any unplaced days in PTO-day terms', () => {
+    expect(reserveSentence({ used: 13, reserveKept: 2, unplaced: 0 })).toBe('2 PTO days kept in reserve for sick days or last-minute plans.');
+    expect(reserveSentence({ used: 7, reserveKept: 1, unplaced: 0 })).toBe('1 PTO day kept in reserve for sick days or last-minute plans.');
+    expect(reserveSentence({ used: 4, reserveKept: 1, unplaced: 3 })).toBe('4 PTO days left unplanned: 1 kept in reserve for sick days or last-minute plans, 3 that don’t fit a break in these dates.');
+    expect(reserveSentence({ used: 4, reserveKept: 0, unplaced: 2 })).toBe('2 PTO days left unplanned: they don’t fit a break in these dates.');
+    expect(reserveSentence({ used: 15, reserveKept: 0, unplaced: 0 })).toBeUndefined();
+  });
+
+  it('asks for the earliest break by the same request-by date the planner shows (14-day notice)', () => {
+    // Jan 18 (MLK Day) is off, so the absence starts Tue Jan 19; 14 days earlier is Tue Jan 5.
+    const next = landingNextRequest([brk('2027-06-12', '2027-06-20', 5), brk('2027-01-16', '2027-01-24', 4)], '2026-11-22', ['2027-01-18']);
+    expect(next?.brk.start).toBe('2027-01-16');
+    expect(next?.deadline.date).toBe(requestByDate('2027-01-16', 14, DEFAULT_WORK_WEEK, ['2027-01-18'], 'calendar'));
+    expect(next?.deadline.date).toBe('2027-01-05');
+    expect(next?.deadline.lead).toBe('Ask by Tue Jan 5');
+  });
+
+  it('rolls a request-by date that lands on a holiday back to the working day before', () => {
+    // Away from Mon Jul 19; 14 days earlier is Mon Jul 5, the observed Independence Day.
+    const next = landingNextRequest([brk('2027-07-17', '2027-07-25', 5)], '2027-05-01', ['2027-07-05']);
+    expect(next?.deadline.date).toBe('2027-07-02');
+    expect(next?.deadline.lead).toBe('Ask by Fri Jul 2');
+  });
+
+  it('skips breaks already under way and has nothing to say for an empty plan', () => {
+    expect(landingNextRequest([], '2026-11-22', [])).toBeUndefined();
+    expect(landingNextRequest([brk('2026-11-20', '2026-11-29', 3)], '2026-11-22', [])).toBeUndefined();
+    expect(landingNextRequest([brk('2026-11-20', '2026-11-29', 3), brk('2027-02-13', '2027-02-21', 4)], '2026-11-22', [])?.brk.start).toBe('2027-02-13');
   });
 });

@@ -34,6 +34,48 @@ afterEach(() => {
   delete window.__PTO_PRELOADED_HOLIDAY_YEARS__;
 });
 
+describe('homepage result: reserve, next request and analytics', () => {
+  it('says plainly how many entered PTO days the plan keeps unplanned, from the solver reserve', async () => {
+    await act(async () => { render(<Landing />); });
+    // 15 entered, 13 planned: the year plan keeps 2 back on its own.
+    expect(screen.getByText(/^13 PTO days \+/)).toBeTruthy();
+    const reserve = screen.getByTestId('landing-reserve');
+    expect(reserve.textContent).toMatch(/^2 PTO days kept in reserve for sick days or last-minute plans\./);
+    // It follows the action (order-2), so the action keeps its place on a small phone.
+    expect(reserve.className).toMatch(/(^| )order-2( |$)/);
+    const change = within(reserve).getByRole('link', { name: 'Change this in the planner' }) as HTMLAnchorElement;
+    expect(change.getAttribute('href')).toMatch(/^\/pto\?.*#planning-assumptions$/);
+    // A plan that spends every entered day says nothing.
+    await act(async () => { fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '5' } }); });
+    expect(screen.queryByTestId('landing-reserve')).toBeNull();
+  });
+
+  it('connects the first break to its request-by date at the default 14-day notice', async () => {
+    await act(async () => { render(<Landing />); });
+    const next = screen.getByTestId('landing-next-request');
+    const first = document.querySelector('[data-landing-breaks] li') as HTMLElement;
+    expect(next.textContent).toMatch(/^Next step: Ask by (Mon|Tue|Wed|Thu|Fri) [A-Z][a-z]{2} \d{1,2} to take /);
+    expect(next.textContent).toContain(first.querySelector('span')!.textContent!);
+    expect(next.textContent).toMatch(/off, if your employer wants 14 days’ notice\.$/);
+  });
+
+  it('records the holiday check opening and the full-plan click by event name only', async () => {
+    const event = vi.fn();
+    window.plausible = event;
+    await act(async () => { render(<Landing />); });
+    const toggle = screen.getByRole('button', { name: /Check company holidays/ });
+    await act(async () => { fireEvent.click(toggle); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Done/ })); });
+    const link = screen.getAllByRole('link', { name: 'See the full plan →' })[0];
+    link.addEventListener('click', (e) => e.preventDefault());
+    await act(async () => { fireEvent.click(link); });
+    const names = event.mock.calls.map((call) => call[0]);
+    expect(names.filter((name) => name === 'holiday_check_opened')).toHaveLength(1);
+    expect(names).toContain('landing_plan_opened');
+    for (const call of event.mock.calls) expect(Object.keys(call[1])).toEqual(['url']);
+  });
+});
+
 describe('live homepage planner', () => {
   it('prerenders a real planning preview from embedded holiday data', () => {
     const html = renderToStaticMarkup(<Landing />);
@@ -67,7 +109,7 @@ describe('live homepage planner', () => {
     const event = vi.fn();
     window.plausible = event;
     await act(async () => { render(<Landing />); });
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Time off that fits your year.');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Find your best days off.');
     expect(screen.getByRole('spinbutton', { name: 'PTO days available' }).getAttribute('value')).toBe('15');
     expect(screen.getByText(/^13 PTO days \+ \d+ weekend and holiday days, across/)).toBeTruthy();
     expect(screen.getByTestId('landing-calendar-days-explainer').textContent).toMatch(/Calendar days within these breaks, not extra PTO days/);
