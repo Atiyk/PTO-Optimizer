@@ -4,6 +4,7 @@ import { Logo } from './Logo';
 import { NAV_GROUPS } from './SiteHeader';
 import { PRODUCT_NAME, TAGLINE } from '../brand';
 import { BUG_REPORT_MAILTO, CONTACT_MAILTO } from './contact';
+import { GUIDES_2027_HUB } from './guideLinkList';
 
 interface FooterProps {
   /** Only the /pto route has a keyboard-shortcuts modal to open - omitted on the landing
@@ -51,6 +52,11 @@ export function Footer({ onShowShortcuts }: FooterProps) {
           ))}
         </Column>
         <Column title="Resources">
+          <li>
+            <a href={GUIDES_2027_HUB.href} className={LINK_CLASS}>
+              {GUIDES_2027_HUB.label}
+            </a>
+          </li>
           <li>
             <a href="/faq" className={LINK_CLASS}>
               FAQ

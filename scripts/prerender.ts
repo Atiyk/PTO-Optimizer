@@ -39,6 +39,7 @@ import { SABBATICAL_FAQ_ITEMS } from '../src/ui/sabbaticalFaqItems.ts';
 import { FAMILY_FAQ_ITEMS } from '../src/ui/familyFaqItems.ts';
 import { ABOUT_FAQ_ITEMS } from '../src/ui/aboutFaqItems.ts';
 import { GLOSSARY_TERMS } from '../src/content/glossary/terms.ts';
+import { guideJsonLd } from '../src/content/guides/guideJsonLd.ts';
 import { rawHolidaysToHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { getSiteUrl } from './siteUrl.ts';
 import { ENTRIES, type Entry, type ComponentKind } from './routes.ts';
@@ -116,6 +117,9 @@ function extractMeta(html: string, fallbackUrl: string): { title: string; descri
  * structured data can never drift from the six questions a visitor actually sees.
  */
 function buildJsonLd(entry: Entry, meta: { title: string; description: string; canonical: string }): object[] {
+  // 2027 guides are articles, not the app: Article + BreadcrumbList + FAQPage, built from the
+  // same guide config and computed facts the visible page renders (guideJsonLd.ts).
+  if (entry.component === 'guide') return guideJsonLd(entry.guidePath ?? '', SITE_URL, meta);
   const webApplication = {
     '@context': 'https://schema.org',
     '@type': 'WebApplication',
@@ -267,6 +271,7 @@ const { DataSources } = await import('../src/ui/DataSources.tsx');
 const { Policy } = await import('../src/ui/Policy.tsx');
 const { Glossary } = await import('../src/ui/Glossary.tsx');
 const { GlossaryTermPage } = await import('../src/ui/GlossaryTermPage.tsx');
+const { GuidePage } = await import('../src/ui/GuidePage.tsx');
 
 /** glossary-term is the one component that needs a per-entry prop (which term), so it's
  * rendered via a small wrapper function rather than through the no-props COMPONENTS map
@@ -275,7 +280,10 @@ function renderEntry(entry: Entry): string {
   if (entry.component === 'glossary-term') {
     return renderToString(React.createElement(GlossaryTermPage, { termId: entry.termId ?? '' }));
   }
-  const COMPONENTS: Record<Exclude<ComponentKind, 'glossary-term'>, React.ComponentType> = {
+  if (entry.component === 'guide') {
+    return renderToString(React.createElement(GuidePage, { path: entry.guidePath ?? '' }));
+  }
+  const COMPONENTS: Record<Exclude<ComponentKind, 'glossary-term' | 'guide'>, React.ComponentType> = {
     app: App,
     landing: Landing,
     sabbatical: Sabbatical,
@@ -297,7 +305,10 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
 
   const renderedDate = todayISO();
   // No build-day dates in static planner links (crawlers, first paint): see prerenderLinks.ts.
-  const html = freshPlanLinks(renderEntry(entry), renderedDate);
+  // Guide links carry a fixed 2027 range on purpose; they must never be rewritten, even on
+  // a build that happens to run on 2027-01-01.
+  const rendered = renderEntry(entry);
+  const html = entry.component === 'guide' ? rendered : freshPlanLinks(rendered, renderedDate);
 
   const filePath = resolve(distDir, entry.file);
   if (!existsSync(filePath)) {
@@ -311,7 +322,10 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
   const hasDefaultPlan = entry.component === 'app' || entry.component === 'landing';
   const content = hasDefaultPlan ? `<p data-prerendered-plan-loading role="status" class="p-6 text-ink">Loading your plan…</p><noscript><p>Enable JavaScript to open a linked plan or change these dates.</p></noscript><div data-prerendered-plan>${html}</div>` : html;
   // Typed input before the client mounts would be discarded: see prerenderShell.ts.
-  const withRoot = original.replace(marker, `<div id="root">${lockPrerenderedControls(content)}</div>`);
+  // Guides hydrate (guide-main.tsx) and have no form controls, so their markup goes in
+  // unwrapped: the lock's fieldset would not match the client tree.
+  const rootHtml = entry.component === 'guide' ? content : lockPrerenderedControls(content);
+  const withRoot = original.replace(marker, `<div id="root">${rootHtml}</div>`);
 
   const meta = extractMeta(original, url);
   const jsonLdScripts = buildJsonLd(entry, meta)
@@ -325,7 +339,8 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
   // (same injection point as the JSON-LD above) is the right place.
   const ssrCountry = entry.countryPreset ?? SSR_DEFAULT_COUNTRY;
   const { holidays, sourceYears } = loadStaticHolidaysForSsr(ssrCountry);
-  const preloadScript = preloadScriptFor(ssrCountry, holidays, sourceYears);
+  // Guides import their own holiday files and never read the preload.
+  const preloadScript = entry.component === 'guide' ? '' : preloadScriptFor(ssrCountry, holidays, sourceYears);
   // The static planner cannot read the viewer's local plan. The home route keeps
   // its simple query guard so its default preview does no additional startup work.
   const guardScript = entry.component === 'app' ? prerenderAppGuard(ssrCountry, renderedDate, !entry.countryPreset)

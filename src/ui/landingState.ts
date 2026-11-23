@@ -1,6 +1,7 @@
 import { COUNTRIES } from '@daysoff/engine/data/countries';
 import { isoToSerial } from '@daysoff/engine/solver/dateUtils';
 import { DEFAULT_WORK_WEEK } from '@daysoff/engine/solver/types';
+import type { WorkWeek } from '@daysoff/engine/solver/types';
 import { defaultPlanRangeEnd, planStyleOptionsFor, solvePlan } from '../autopilot/planFromSearch';
 import { planningStyleSettings, type PlanningStyle } from '../planning/optimizer';
 import { isValidISODate } from './urlState';
@@ -124,4 +125,21 @@ export function landingNextRequest(breaks: readonly Break[], today: string, offD
   const brk = breaks.filter((candidate) => candidate.start >= today).sort((a, b) => a.start.localeCompare(b.start))[0];
   if (!brk) return undefined;
   return { brk, deadline: requestDeadline(brk.start, PREVIEW_NOTICE_DAYS, DEFAULT_WORK_WEEK, today, offDays, 'calendar') };
+}
+
+/** Options for pages that link to /pto with their own style or work week (the 2027 guides,
+ * src/content/guides). computeLandingPlanWith with no options is computeLandingPlan. */
+export interface LandingPlanOptions {
+  style?: PlanningStyle;
+  workWeek?: WorkWeek;
+}
+
+export function computeLandingPlanWith(state: LandingState, holidays: readonly { date: string }[], options: LandingPlanOptions = {}) {
+  const style = options.style ?? PREVIEW_STYLE;
+  return solvePlan({
+    ...state,
+    ...planningStyleSettings(style),
+    offDays: [...new Set(holidays.map(({ date }) => date))],
+    workWeek: options.workWeek ?? DEFAULT_WORK_WEEK,
+  }, PREVIEW_VERSION, PREVIEW_MINIMUM, style, PREVIEW_PLAN_OPTIONS);
 }
