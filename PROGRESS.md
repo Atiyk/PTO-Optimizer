@@ -2943,3 +2943,17 @@ of the spec).
 4. The mark is a calendar page with one solid run. If you want a wordmark-only logo or a
    different mark, `src/ui/logoMark.ts` plus `scripts/build-icons.ts` regenerate every
    icon.
+
+## Launch-readiness sprint (2026-11-22, branch `growth/launch-readiness-20261121`)
+
+See `docs/growth/LAUNCH-READINESS.md` for the full ledger and evidence.
+
+### Questions for Atiyk (launch readiness)
+1. **Vercel quota.** Every push builds two projects, and the Hobby plan's 100 deployments/day ran out on 2026-11-17, so #158 and #159 never reached production. Do you want B2B previews switched off (`"git": {"deploymentEnabled": {"main": true, "*": false}}` in `apps/teams/vercel.json`) and the 120+ stale branches pruned?
+2. **Daily redeploy.** The `VERCEL_DEPLOY_HOOK_URL` secret was never set, so the "Daily redeploy" job has deployed nothing. It now warns instead of passing silently. Add the secret, or remove the job?
+3. **Plausible.** There is no free plan, and the site's public dashboard returns 404. Is there an active Plausible site for `pto-optimizer-seven.vercel.app`? Without it, the funnel events record nothing. Setup steps are in `docs/growth/METRICS.md` §5.
+4. **Support address.** The contact links still use `gaplessreminders@gmail.com` (subjects now say Timebower). Create a Timebower address?
+5. **Saved ("Considering") breaks.** Should they get an ask-by date? Rule N-P1-2 currently gives one only to Planned requests (`docs/growth/ACTIVATION-AUDIT.md` finding 3).
+6. **`/uk` default region.** It opens with no region, so England & Wales Easter Monday and the August bank holiday are missing from its default plan.
+7. **Commercial use.** Vercel Hobby terms forbid commercial use. Any affiliate link or paid tier needs Pro ($20/seat/month) first (`docs/growth/MONETIZATION.md`).
+8. **Domain.** Pick it before submitting the sitemap to Search Console: the guides are canonical on vercel.app today (`docs/growth/APP-AND-DOMAIN-READINESS.md`).
