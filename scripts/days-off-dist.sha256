@@ -37,7 +37,7 @@ e25f987fe90563dcf73ec1f46504f9a9a3133749f5378809a9c980a894de0493  ./assets/main-
 480cecbed96b8bd8050f37549ba742d899f5b80eabc742debcf24d88cf4e8144  ./assets/main-ni5k-Bma.js
 ad1a49a17a4f1fa60795d2596d427a5ec1b656377a34cdd3042e1a3d3f89b8e9  ./assets/pinPreview.worker-YOF8t7e7.js
 667a8fbc2fa690dc7d1c44ae58ab1080cc1b306a20052ae40d2e04e4585b5e59  ./assets/pinnedPlanStore-CS8zo8Xv.js
-575a280c8fde5ca4861095213cba604ff08f0777f00a8c244ecdf5fb9127a3e9  ./assets/plan-guide-main-CWwioYEV.js
+ffdcef64eb4f7836c4ac27930e397b530d975c35d5d940132ac9a00dc5bb632e  ./assets/plan-guide-main-06xHkkqv.js
 32532c89c82d92a909c4d4ab467a43665218fcb7b7ad9f4cfa469a08edbb32e2  ./assets/planComparison-D42mvgn1.js
 b5a47c58048d747daf981650ff05fe6dc2a3d5f2e87a1e64853c281fe8842a41  ./assets/planFromSearch-CTZ_zkJE.js
 243502ffc7f13f8aefc011e1cbd32717efa8ed2b3c87b39a6b50aa8d483a15f7  ./assets/planGuideLinks-DxPzvMWX.js
@@ -108,13 +108,13 @@ a113e1c00fb4a0ceaacbf638941a8b5f29c233f37e668f47d9c4504127782785  ./glossary/pto
 de75425e55e637f3249b18cd955f3bf946f0e216b19d3aedd59de870cacb135e  ./glossary/use-it-or-lose-it/index.html
 dd938b67c127661a4cd25ea268e326e9e568294a0d051216356f1777d2aa4274  ./glossary/vacation/index.html
 78df2158781a22a8b991b9d7027284b06a03b2942479769218bc352a6178d940  ./glossary/waiting-period/index.html
-1bc976b7cd3575ccbbc86c77d8d3e8e1afb0e330a2c95bc75a62a17bcf5e29c5  ./guides/10-pto-days-2027/index.html
-ec0a546c1945dde3297aee591937c09c3cd6e49201974b07168edf8acd0d2f3e  ./guides/15-pto-days-2027/index.html
-6ded22b419f262792eb911ed9b56ab88ca91be21abb8a6b32846a04edd24ade3  ./guides/four-day-week-2027/index.html
+02b84b804378ce02ab10dd72ad155a856efc2afd87fc449bdf8908b8e97b964b  ./guides/10-pto-days-2027/index.html
+d326309eaa0bed8aa6f261f9c6defafb4108bd736cdf2062be41c09ba864e528  ./guides/15-pto-days-2027/index.html
+a79cf91e69aae3662ec295b222cd451cdbd761220548d3fcd4ca1217f7dcde28  ./guides/four-day-week-2027/index.html
 f97e260945e013226bbf9ac86f32c247ef380768f83dbe7d1e99009c385a33af  ./guides/how-pto-accrual-works/index.html
 21bd627280dd56bfaaceba046064a007ddfc8db70271956933ff5b36f810f9bf  ./guides/how-to-ask-for-time-off/index.html
 5e9974163ab5c8e73c1a8b5b5e39eb8b87a4faa9873c054dd1188f45509b9bd4  ./guides/index.html
-372888d6d46f8af604b5f93b9fef2e711bf8cd845116fc291e0366e4f1d6842b  ./guides/long-weekends-2027/index.html
+083b547c0a9bd73b08e920af5b24103052cc8cc2683082d3520b457adc4bf975  ./guides/long-weekends-2027/index.html
 139b2fc117e8a9f2f188daf3433b3999109d9b0eac5803e5ce008fa15ad53277  ./guides/maximize-pto-2027/index.html
 2d1355428d7429ed6db3a2202b0d68a35ea486a802718875794e9249891f6d6e  ./guides/pto-2027-california/index.html
 27f5337be7e5dcc2b07cbdbf11ab186c960a71cbcc789a03732ca5d418a59e42  ./guides/pto-2027-florida/index.html
@@ -124,7 +124,7 @@ b9ee867c3deb8c704323fbd65f0aa39a51ad07a15c9090966e38860dd7c59d10  ./guides/pto-2
 7ddd0ad9c31ea061e6efa53a9ce6d896122c74dca9473a73694f632309aa9c9a  ./guides/pto-expiring-end-of-year/index.html
 e481705f3d4ab8a4d386baa30a6c9bf297dcf4bc5e9fe50ad326092c03945878  ./guides/summer-2027-long-weekends/index.html
 97adfa9fdeb5539297b296ae617c1e3572705d9da46a7db56101c98c8daa1cf8  ./guides/thanksgiving-christmas-2027-pto/index.html
-570dd46aa5536d8a49c7f799053f7e8cd402c9faa1af2dde3800f39eafed1e01  ./guides/uk-annual-leave-2027/index.html
+4882197df2f26c7570d1adcce9bedef1e786b077fa297a812d03e0576b004f6c  ./guides/uk-annual-leave-2027/index.html
 4de43b4ee08acde69ac0cb8842faa6dbe595c97fcfad1e3bd3248370ba42c0a0  ./holidays/AD-2026.json
 f61825512b3c3881d471fa9e28a2dc0ee160c679fdbba8f781fb77d777dcfcb8  ./holidays/AD-2027.json
 b8228f165e91cb23d0fe751bc3f0e30a166e4c7d6fe5495407e8de53190bad16  ./holidays/AD-2028.json
@@ -764,6 +764,6 @@ c6eb6e2d69729b44bd38318338cc432ed5d507ffa8b995f9ee42e644ffb906b5  ./privacy.html
 63731c9b72fe3cae795ebe507bbca96df5cabdb6a3d16068b1f78ad2a59e01a2  ./robots.txt
 936a871a14d02e165dde8c95ebfeb5fb1a955836d04e27e84f64dcdb6bd8c1e0  ./sabbatical/index.html
 06556dc3b22895d4c87e383ed7a18447a0483b243be7becd96862e79ef78ef63  ./sitemap.xml
-12303b7a7b0c3a9991cc32e37b31a38dd19a3e6710e2cb1d4cc3a6257ac7bfd7  ./sw.js
+7ff42fba60d84f4c4c21814a826839712a15dada547d213c480383dff6b58f4f  ./sw.js
 49b3e898c8f68c097a85f7e694223ebc9da0fe057d63ebf322572e8d46fff793  ./terms.html
 506599e941324416d1090ff17b676958d788ed36f57a0f6f8f8b770c9c5042d3  ./uk/index.html

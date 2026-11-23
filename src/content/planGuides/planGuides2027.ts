@@ -85,7 +85,7 @@ export interface PlanGuide extends GuideScope {
 const day = (f: PlanGuideFacts, iso: string) => formatDay(iso, f.guide.dateStyle);
 const range = (f: PlanGuideFacts, start: string, end: string) => formatRange(start, end, f.guide.dateStyle);
 const longest = (plan: GuidePlan) => plan.breaks.reduce((a, b) => (b.totalDaysOff > a.totalDaysOff ? b : a));
-const keptNote = (plan: GuidePlan) => (plan.reserveKept > 0 ? ` It keeps ${plural(plan.reserveKept, 'day')} back for sick days or surprises.` : '');
+const keptNote = (plan: GuidePlan) => (plan.reserveKept > 0 ? ` It keeps ${plural(plan.reserveKept, 'day')} in reserve for sick days.` : '');
 const usTotal = (f: PlanGuideFacts) => f.holidays.length;
 const dec31 = (f: PlanGuideFacts) => f.holidays.some((h) => h.date === `${f.guide.year}-12-31`);
 
@@ -208,7 +208,7 @@ const FIFTEEN: PlanGuide = {
     {
       id: 'why-not-all-15',
       question: 'Why does the plan not use all 15 PTO days?',
-      answer: (f) => `The year-round style keeps ${plural(f.plans[0].reserveKept, 'day')} back for sick days or surprises. The most-days-off plan below it spends all 15. You can change the reserve in the planner.`,
+      answer: (f) => `The year-round style keeps ${plural(f.plans[0].reserveKept, 'day')} in reserve for sick days or surprises. The most-days-off plan below it spends all 15. You can change the reserve in the planner.`,
     },
     {
       id: 'summer',
@@ -394,7 +394,7 @@ const UK: PlanGuide = {
     'England and Wales only. Scotland and Northern Ireland have different bank holidays; pick your region in the planner.',
     'Your employer gives you the 8 bank holidays off on top of your 25 days. Not every employer does, and some contracts count bank holidays inside the total.',
     'You work Monday to Friday, and your leave year runs January to December. If yours starts in April or on your work anniversary, set your own dates in the planner.',
-    'The plan keeps 2 days back and starts no break in the first three weeks of January.',
+    'The plan keeps 2 days in reserve and starts no break in the first three weeks of January.',
   ],
   show: { longWeekends: true },
   faqs: [
