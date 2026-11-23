@@ -37,6 +37,16 @@ export const LOGIN_LINKS_PER_ADDRESS_PER_DAY = 5;
  * digest and forwarded-approval replies together), so no single address, and no one
  * person asking for links to it, can use up the budget for everyone else. */
 export const EMAILS_PER_ADDRESS_PER_DAY = 10;
+/** Share of the site's daily email cap that only the reminder cron may use. Sign-in links
+ * and forwarded-approval replies are sent on demand and could otherwise use up the whole
+ * day's budget before the 13:00 UTC run, so nobody's due reminder went out that day. */
+export const REMINDER_SHARE_OF_DAILY_CAP = 0.25;
+
+/** The cap one kind of mail counts against: reminders may use all of it, on-demand mail
+ * everything but the reminders' share (never less than one). */
+export function dailyCapFor(kind: 'reminder' | 'on-demand', cap: number): number {
+  return kind === 'reminder' ? cap : Math.max(1, cap - Math.floor(cap * REMINDER_SHARE_OF_DAILY_CAP));
+}
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INBOUND_REPLIES_PER_ACCOUNT_PER_DAY = 5;
 const HOUR_MS = 60 * 60 * 1000;
@@ -153,12 +163,12 @@ function isSameOriginJson(request: Request): boolean {
 
 type SendOutcome = 'sent' | 'address-limit' | 'site-limit';
 
-/** Counts the recipient's share first, then the site's daily cap, then sends. Rate keys are
+/** Counts the recipient's share first, then the site's daily cap (see dailyCapFor), then sends. Rate keys are
  * hashed by the store, so no address is kept for this. */
-async function sendBudgeted(deps: AccountDeps, mail: Parameters<SendMail>[0]): Promise<SendOutcome> {
+async function sendBudgeted(deps: AccountDeps, mail: Parameters<SendMail>[0], kind: 'reminder' | 'on-demand' = 'on-demand'): Promise<SendOutcome> {
   const nowMs = (deps.now?.() ?? new Date()).getTime();
   if (!(await deps.store().takeRateSlot(`mail-to:${mail.to.toLowerCase()}`, EMAILS_PER_ADDRESS_PER_DAY, DAY_MS, nowMs))) return 'address-limit';
-  if (!(await deps.store().takeEmailBudget(today(deps), deps.config.dailyEmailCap))) return 'site-limit';
+  if (!(await deps.store().takeEmailBudget(today(deps), dailyCapFor(kind, deps.config.dailyEmailCap)))) return 'site-limit';
   await deps.send()(mail);
   return 'sent';
 }
@@ -304,7 +314,7 @@ export async function handleRemind(request: Request, deps: AccountDeps): Promise
         unsubscribeUrl, accountUrl: `${origin}${row.plan_link ?? row.policy_link}#account`,
       });
       try {
-        const outcome = await sendBudgeted(deps, { to: row.email, ...mail, unsubscribeUrl });
+        const outcome = await sendBudgeted(deps, { to: row.email, ...mail, unsubscribeUrl }, 'reminder');
         if (outcome === 'site-limit') { capped = true; break; }
         if (outcome === 'sent') sent += 1;
       } catch {

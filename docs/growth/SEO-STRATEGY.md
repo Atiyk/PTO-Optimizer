@@ -36,12 +36,12 @@ launch (Search Console is not verified yet: see BASELINE.md "External blockers")
 
 | Page | Intent it answers | Why this page and not another |
 | --- | --- | --- |
-| `/2027` | "best days to take off 2027", "2027 pto calendar" | Hub. It lists every 2027 federal date by weekday and the PTO day that extends each one. It has the full 15-day plan and links to every child. |
-| `/2027/10-pto-days` | "maximize pto 2027" with a small balance | The answer differs by balance. With 10 days, a long weekend beside every holiday wins on the total. |
-| `/2027/15-pto-days` | same, with the most common default on the homepage | With 15 days the plan can also include one or two longer breaks. The page shows that trade-off. |
-| `/2027/long-weekends` | "2027 long weekends", "three day weekends 2027" (**Inferred** phrasing) | A holiday-by-holiday table, separate from any budget. |
-| `/2027/four-day-week` | 4x10 workers | The engine's `ww` param gives a correct, reproducible plan (parity-tested). Four holidays fall on the Friday off. |
-| `/2027/uk-annual-leave` | UK readers: "annual leave 2027", "bank holidays 2027" | The slug avoids competing with `/uk` (which owns "UK bank holidays 2027"). The page is scoped to England and Wales via `sd=GB-ENG`. |
+| ~~`/2027`~~ | (removed in the merge with #162) | Duplicated `/guides/maximize-pto-2027`. The holiday-by-weekday table lives on `/guides/long-weekends-2027`, the Christmas-to-New-Year fill sentence moved there too, and the 2026 year-end section was dropped (`/guides/pto-expiring-end-of-year` covers it). |
+| `/guides/10-pto-days-2027` | "maximize pto 2027" with a small balance | The answer differs by balance. With 10 days, a long weekend beside every holiday wins on the total. |
+| `/guides/15-pto-days-2027` | same, with the most common default on the homepage | With 15 days the plan can also include one or two longer breaks. The page shows that trade-off. |
+| `/guides/long-weekends-2027` | "2027 long weekends", "three day weekends 2027" (**Inferred** phrasing) | A holiday-by-holiday table, separate from any budget. |
+| `/guides/four-day-week-2027` | 4x10 workers | The engine's `ww` param gives a correct, reproducible plan (parity-tested). Four holidays fall on the Friday off. |
+| `/guides/uk-annual-leave-2027` | UK readers: "annual leave 2027", "bank holidays 2027" | The slug avoids competing with `/uk` (which owns "UK bank holidays 2027"). The page is scoped to England and Wales via `sd=GB-ENG`. |
 
 Deferred: a "How to ask for PTO: request email template" evergreen page (strong intent, and no
 competitor has one according to the coordinator's research). It needs the request-text
@@ -80,10 +80,18 @@ verify a BLS figure for paid holidays: the paid-holidays factsheet URL returned 
 5. Vocabulary: "days off" and "PTO days" as in docs/VOCABULARY.md. The UK page alone uses
    "annual leave", once in its definition and in its title. Test-enforced.
 6. The employer-holiday assumption sits next to the numbers. No unsourced statistics.
-7. `npx tsx --tsconfig tsconfig.app.json scripts/generate-guide-html.ts`, then commit `2027/**`
+7. `npx tsx --tsconfig tsconfig.app.json scripts/generate-guide-html.ts`, then commit `guides/<slug>/**`
    (`guideHeads.test.ts` fails on a stale shell).
-8. Build, then check `dist/2027/**/index.html` for the content, title, canonical, JSON-LD and the
+8. Build, then check `dist/guides/<slug>/index.html` for the content, title, canonical, JSON-LD and the
    CTA `href`. With JS disabled the page must still show all of it.
+
+Since the merge with #162 these pages are the "worked plans" half of `/guides`. Their code is
+`src/content/planGuides/` (`planGuides2027.ts`, `planGuidePlan.ts`, `planGuideHead.ts`, ...),
+`src/ui/PlanGuidePage.tsx`, `src/plan-guide-main.tsx` and
+`scripts/generate-plan-guide-html.ts`; the route kind is `'plan-guide'`. The file names in the
+checklist above map as: `guides2027*` → `planGuides2027*`, `guide*.ts` → `planGuide*.ts`,
+`GuidePage.test.tsx` → `PlanGuidePage.test.tsx`, `generate-guide-html.ts` →
+`generate-plan-guide-html.ts`, and the shells are `guides/<slug>/index.html`.
 
 ## 5. Adding a year or a country
 
@@ -95,23 +103,25 @@ verify a BLS figure for paid holidays: the paid-holidays factsheet URL returned 
 3. Add the dated holiday test (checklist item 1). `guides2027.test.ts` already fails when a
    guide's year has no holiday file or a plan comes back empty.
 4. Generate the HTML shells (checklist item 7). `routes.ts` (prerender and sitemap) picks the
-   entries up from `GUIDES`, and `vite.config.ts` reads them from `2027/**` on disk. For a new top
-   folder, add it to the `GUIDE_HTML_FILES` glob in `vite.config.ts`.
-5. Update `src/ui/guideLinkList.ts` (test-enforced to match `GUIDES`) and `public/llms.txt`.
-6. Each November: review the country route titles ("… 2027") and the hub's dated 2026 year-end
-   section, which should be removed or rolled forward after December 31, 2026.
+   entries up from `PLAN_GUIDES`; `vite.config.ts` takes the build inputs from `planGuideLinks.ts`.
+5. Update `src/content/planGuides/planGuideLinks.ts` (test-enforced to match `PLAN_GUIDES`;
+   it feeds the `/guides` index and `vite.config.ts`) and `public/llms.txt`.
+6. Each November: review the country route titles ("… 2027").
 
 ## 6. Internal linking map
 
-- Footer (every page) → `/2027` ("Best days to take off in 2027").
-- `public/llms.txt` → all six guides.
-- Hub `/2027` ↔ every child, through the breadcrumb and the guides list on every page.
-- `/2027/10-pto-days` and `/2027/15-pto-days` → `/2027` for holiday names and weekdays.
+- Footer (every page) → `/guides` ("Guides").
+- `/guides` index → every worked-plan page, in "Worked plans from the planner".
+- Homepage "2027 guides" group → `/guides/maximize-pto-2027`, `/guides/10-pto-days-2027`,
+  `/guides/long-weekends-2027`.
+- `public/llms.txt` → all five worked-plan pages.
+- Every worked-plan page → `/guides` (breadcrumb), the other four, and `/guides/maximize-pto-2027`,
+  `/guides/summer-2027-long-weekends`, `/guides/thanksgiving-christmas-2027-pto`,
+  `/guides/how-to-ask-for-time-off`.
+- `/guides/10-pto-days-2027` and `/guides/15-pto-days-2027` → `/guides/long-weekends-2027` for
+  holiday names and weekdays.
 - Every guide → `/pto` (one primary CTA plus secondary plan links), `/policy`, `/faq`,
-  `/data-sources`. The hub's 2026 year-end section → `/policy`.
-- Homepage: **not edited** (another agent owns `Landing.tsx`). Ready to place:
-  `Guides2027Links` from `src/ui/GuideLinks.tsx`, or the data `GUIDE_LINKS_2027` from
-  `src/ui/guideLinkList.ts` (no solver import).
+  `/data-sources`.
 
 ## 7. Measurement plan
 

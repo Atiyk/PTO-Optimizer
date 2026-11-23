@@ -113,9 +113,9 @@ const ptoDays = (n: number) => `${n} PTO ${n === 1 ? 'day' : 'days'}`;
 export function reserveSentence({ reserveKept, unplaced }: LandingPtoAccounting): string | undefined {
   const left = reserveKept + unplaced;
   if (left === 0) return undefined;
-  if (unplaced === 0) return `${ptoDays(left)} left unplanned, kept for sick days or last-minute plans.`;
+  if (unplaced === 0) return `${ptoDays(left)} kept in reserve for sick days or last-minute plans.`;
   if (reserveKept === 0) return `${ptoDays(left)} left unplanned: ${unplaced === 1 ? 'it doesn’t' : 'they don’t'} fit a break in these dates.`;
-  return `${ptoDays(left)} left unplanned: ${reserveKept} kept for sick days or last-minute plans, ${unplaced} that ${unplaced === 1 ? 'doesn’t' : 'don’t'} fit a break in these dates.`;
+  return `${ptoDays(left)} left unplanned: ${reserveKept} kept in reserve for sick days or last-minute plans, ${unplaced} that ${unplaced === 1 ? 'doesn’t' : 'don’t'} fit a break in these dates.`;
 }
 
 /** The first break still ahead and its request-by date, from the same requestDeadline the

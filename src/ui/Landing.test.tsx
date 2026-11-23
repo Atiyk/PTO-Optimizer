@@ -40,7 +40,7 @@ describe('homepage result: reserve, next request and analytics', () => {
     // 15 entered, 13 planned: the year plan keeps 2 back on its own.
     expect(screen.getByText(/^13 PTO days \+/)).toBeTruthy();
     const reserve = screen.getByTestId('landing-reserve');
-    expect(reserve.textContent).toMatch(/^2 PTO days left unplanned, kept for sick days or last-minute plans\./);
+    expect(reserve.textContent).toMatch(/^2 PTO days kept in reserve for sick days or last-minute plans\./);
     // It follows the action (order-2), so the action keeps its place on a small phone.
     expect(reserve.className).toMatch(/(^| )order-2( |$)/);
     const change = within(reserve).getByRole('link', { name: 'Change this in the planner' }) as HTMLAnchorElement;

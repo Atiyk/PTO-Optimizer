@@ -22,7 +22,7 @@ const distDir = resolve(projectRoot, 'dist');
 const SITE_URL = getSiteUrl();
 
 function buildSitemap(): string {
-  const urlEntries = [
+  const urlEntries: { loc: string; changefreq: string; priority: number; lastmod?: string }[] = [
     ...ENTRIES.map((e) => ({ loc: `${SITE_URL}${e.path}`, changefreq: 'weekly', priority: e.sitemapPriority, lastmod: e.lastmod })),
     // /docs isn't one of prerender's React-mounted entries (it's a plain static page), but
     // it's a real crawlable route and was in the sitemap before this rewrite - kept here
@@ -34,7 +34,7 @@ function buildSitemap(): string {
     { loc: `${SITE_URL}/terms`, changefreq: 'monthly', priority: 0.3 },
   ];
   const body = urlEntries
-    .map((u: { loc: string; changefreq: string; priority: number; lastmod?: string }) => `  <url>\n    <loc>${u.loc}</loc>\n${u.lastmod ? `    <lastmod>${u.lastmod}</lastmod>\n` : ''}    <changefreq>${u.changefreq}</changefreq>\n    <priority>${u.priority.toFixed(1)}</priority>\n  </url>`)
+    .map((u) => `  <url>\n    <loc>${u.loc}</loc>\n${u.lastmod ? `    <lastmod>${u.lastmod}</lastmod>\n` : ''}    <changefreq>${u.changefreq}</changefreq>\n    <priority>${u.priority.toFixed(1)}</priority>\n  </url>`)
     .join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`;
 }

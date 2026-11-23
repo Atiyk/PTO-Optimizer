@@ -1,1 +1,0 @@
-ALTER TABLE "organizations" ADD COLUMN "ai_features_enabled" boolean DEFAULT true NOT NULL;

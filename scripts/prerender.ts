@@ -39,7 +39,10 @@ import { SABBATICAL_FAQ_ITEMS } from '../src/ui/sabbaticalFaqItems.ts';
 import { FAMILY_FAQ_ITEMS } from '../src/ui/familyFaqItems.ts';
 import { ABOUT_FAQ_ITEMS } from '../src/ui/aboutFaqItems.ts';
 import { GLOSSARY_TERMS } from '../src/content/glossary/terms.ts';
-import { guideJsonLd } from '../src/content/guides/guideJsonLd.ts';
+import { planGuideJsonLd } from '../src/content/planGuides/planGuideJsonLd.ts';
+import { PLAN_GUIDES } from '../src/content/planGuides/planGuides2027.ts';
+import { GUIDES } from '../src/content/guides/index.ts';
+import { headingId } from '../src/content/guides/markdown.tsx';
 import { rawHolidaysToHolidays, type Holiday } from '@daysoff/engine/data/holidays';
 import { getSiteUrl } from './siteUrl.ts';
 import { ENTRIES, type Entry, type ComponentKind } from './routes.ts';
@@ -116,10 +119,73 @@ function extractMeta(html: string, fallbackUrl: string): { title: string; descri
  * FAQPage built from FAQ.tsx's own exported ITEMS array, not a duplicated copy, so the
  * structured data can never drift from the six questions a visitor actually sees.
  */
+/** Guides are articles, not the app: Article (or the index's CollectionPage), a three-level
+ * BreadcrumbList, and FAQPage from the SAME faq array the page renders. */
+function buildGuideJsonLd(entry: Entry, meta: { title: string; description: string; canonical: string }): object[] {
+  const publisher = { '@type': 'Organization', name: PRODUCT_NAME, url: `${SITE_URL}/` };
+  const crumbs = [
+    { '@type': 'ListItem', position: 1, name: PRODUCT_NAME, item: `${SITE_URL}/` },
+    { '@type': 'ListItem', position: 2, name: 'Guides', item: `${SITE_URL}/guides` },
+  ];
+  const guide = entry.component === 'guide' ? GUIDES.find((g) => g.id === entry.guideId) : undefined;
+  if (guide) crumbs.push({ '@type': 'ListItem', position: 3, name: guide.title, item: meta.canonical });
+  const result: object[] = [{ '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: crumbs }];
+  if (!guide) {
+    result.push({
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: meta.title,
+      description: meta.description,
+      url: meta.canonical,
+      publisher,
+      hasPart: [
+        ...GUIDES.map((g) => ({ '@type': 'Article', headline: g.title, url: `${SITE_URL}/guides/${g.id}`, dateModified: g.updated })),
+        ...PLAN_GUIDES.map((g) => ({ '@type': 'Article', headline: g.h1, url: `${SITE_URL}${g.path}`, dateModified: g.lastChecked })),
+      ],
+    });
+    return result;
+  }
+  result.push({
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: guide.title,
+    description: guide.description,
+    abstract: guide.summary,
+    url: meta.canonical,
+    mainEntityOfPage: { '@type': 'WebPage', '@id': meta.canonical },
+    datePublished: guide.published,
+    dateModified: guide.updated,
+    inLanguage: 'en-US',
+    image: `${SITE_URL}/og-images/learn.png`,
+    author: publisher,
+    publisher,
+    about: { '@type': 'Thing', name: 'Paid time off' },
+    spatialCoverage: { '@type': 'Country', name: 'United States' },
+    citation: guide.sources.map((s) => s.url),
+  });
+  if (guide.faq.length) {
+    result.push({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      url: meta.canonical,
+      datePublished: guide.published,
+      dateModified: guide.updated,
+      mainEntity: guide.faq.map((item) => ({
+        '@type': 'Question',
+        name: item.question,
+        url: `${meta.canonical}#faq-${headingId(item.question)}`,
+        acceptedAnswer: { '@type': 'Answer', text: item.answer },
+      })),
+    });
+  }
+  return result;
+}
+
 function buildJsonLd(entry: Entry, meta: { title: string; description: string; canonical: string }): object[] {
-  // 2027 guides are articles, not the app: Article + BreadcrumbList + FAQPage, built from the
-  // same guide config and computed facts the visible page renders (guideJsonLd.ts).
-  if (entry.component === 'guide') return guideJsonLd(entry.guidePath ?? '', SITE_URL, meta);
+  // Worked-plan guides: Article + BreadcrumbList + FAQPage, built from the same config and
+  // computed facts the visible page renders (planGuideJsonLd.ts).
+  if (entry.component === 'plan-guide') return planGuideJsonLd(entry.planGuidePath ?? '', SITE_URL, meta);
+  if (entry.component === 'guide' || entry.component === 'guides') return buildGuideJsonLd(entry, meta);
   const webApplication = {
     '@context': 'https://schema.org',
     '@type': 'WebApplication',
@@ -272,6 +338,8 @@ const { Policy } = await import('../src/ui/Policy.tsx');
 const { Glossary } = await import('../src/ui/Glossary.tsx');
 const { GlossaryTermPage } = await import('../src/ui/GlossaryTermPage.tsx');
 const { GuidePage } = await import('../src/ui/GuidePage.tsx');
+const { PlanGuidePage } = await import('../src/ui/PlanGuidePage.tsx');
+const { GuidesIndex } = await import('../src/ui/GuidesIndex.tsx');
 
 /** glossary-term is the one component that needs a per-entry prop (which term), so it's
  * rendered via a small wrapper function rather than through the no-props COMPONENTS map
@@ -281,9 +349,12 @@ function renderEntry(entry: Entry): string {
     return renderToString(React.createElement(GlossaryTermPage, { termId: entry.termId ?? '' }));
   }
   if (entry.component === 'guide') {
-    return renderToString(React.createElement(GuidePage, { path: entry.guidePath ?? '' }));
+    return renderToString(React.createElement(GuidePage, { guideId: entry.guideId ?? '' }));
   }
-  const COMPONENTS: Record<Exclude<ComponentKind, 'glossary-term' | 'guide'>, React.ComponentType> = {
+  if (entry.component === 'plan-guide') {
+    return renderToString(React.createElement(PlanGuidePage, { path: entry.planGuidePath ?? '' }));
+  }
+  const COMPONENTS: Record<Exclude<ComponentKind, 'glossary-term' | 'guide' | 'plan-guide'>, React.ComponentType> = {
     app: App,
     landing: Landing,
     sabbatical: Sabbatical,
@@ -292,6 +363,7 @@ function renderEntry(entry: Entry): string {
     dataSources: DataSources,
     policy: Policy,
     glossary: Glossary,
+    guides: GuidesIndex,
   };
   return renderToString(React.createElement(COMPONENTS[entry.component]));
 }
@@ -305,10 +377,10 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
 
   const renderedDate = todayISO();
   // No build-day dates in static planner links (crawlers, first paint): see prerenderLinks.ts.
-  // Guide links carry a fixed 2027 range on purpose; they must never be rewritten, even on
+  // Plan-guide links carry a fixed 2027 range on purpose; they must never be rewritten, even on
   // a build that happens to run on 2027-01-01.
   const rendered = renderEntry(entry);
-  const html = entry.component === 'guide' ? rendered : freshPlanLinks(rendered, renderedDate);
+  const html = entry.component === 'plan-guide' ? rendered : freshPlanLinks(rendered, renderedDate);
 
   const filePath = resolve(distDir, entry.file);
   if (!existsSync(filePath)) {
@@ -322,9 +394,9 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
   const hasDefaultPlan = entry.component === 'app' || entry.component === 'landing';
   const content = hasDefaultPlan ? `<p data-prerendered-plan-loading role="status" class="p-6 text-ink">Loading your plan…</p><noscript><p>Enable JavaScript to open a linked plan or change these dates.</p></noscript><div data-prerendered-plan>${html}</div>` : html;
   // Typed input before the client mounts would be discarded: see prerenderShell.ts.
-  // Guides hydrate (guide-main.tsx) and have no form controls, so their markup goes in
+  // Plan guides hydrate (plan-guide-main.tsx) and have no form controls, so their markup goes in
   // unwrapped: the lock's fieldset would not match the client tree.
-  const rootHtml = entry.component === 'guide' ? content : lockPrerenderedControls(content);
+  const rootHtml = entry.component === 'plan-guide' ? content : lockPrerenderedControls(content);
   const withRoot = original.replace(marker, `<div id="root">${rootHtml}</div>`);
 
   const meta = extractMeta(original, url);
@@ -339,8 +411,8 @@ async function prerenderEntry(entry: Entry): Promise<{ file: string; bytesInject
   // (same injection point as the JSON-LD above) is the right place.
   const ssrCountry = entry.countryPreset ?? SSR_DEFAULT_COUNTRY;
   const { holidays, sourceYears } = loadStaticHolidaysForSsr(ssrCountry);
-  // Guides import their own holiday files and never read the preload.
-  const preloadScript = entry.component === 'guide' ? '' : preloadScriptFor(ssrCountry, holidays, sourceYears);
+  // Plan guides import their own holiday files and never read the preload.
+  const preloadScript = entry.component === 'plan-guide' ? '' : preloadScriptFor(ssrCountry, holidays, sourceYears);
   // The static planner cannot read the viewer's local plan. The home route keeps
   // its simple query guard so its default preview does no additional startup work.
   const guardScript = entry.component === 'app' ? prerenderAppGuard(ssrCountry, renderedDate, !entry.countryPreset)
