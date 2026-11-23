@@ -1,5 +1,7 @@
 # Timebower verified baseline — 2026-11-22
 
+> **Update, 2026-11-22 evening.** While this sprint ran, `main` gained #160 (B2B `apps/teams` removed), #161 (P3 follow-ups) and #162 (`/guides`, 11 US 2027 pages). Vercel built `c6844cc` (#162) successfully, and the live site serves `/guides`, so **production is now on current `main`**. #158 and #159 are live. `leave_management` no longer has an app to build. The release-state table below is the morning snapshot.
+
 Checked by the launch-readiness orchestrator from GitHub, the live site and the repository.
 Each line is **Observed** unless marked otherwise.
 

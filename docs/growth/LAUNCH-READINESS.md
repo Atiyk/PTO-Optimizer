@@ -14,9 +14,9 @@ a file, test or check that can be rerun. Verified baseline: [BASELINE.md](BASELI
 
 | Task | Priority | Owner | Status | Evidence | Remaining blocker |
 | --- | --- | --- | --- | --- | --- |
-| Find which commit production serves | P0 | Orchestrator | Verified | BASELINE.md: 59 live files fingerprinted; Vercel status per SHA | Production is `767e875` (#157). #158 and #159 were never deployed |
+| Find which commit production serves | P0 | Orchestrator | Verified | BASELINE.md: 59 live files fingerprinted; Vercel status per SHA | Morning: production was `767e875`. Evening: `c6844cc` (current main) deployed and serves `/guides`. Parity restored |
 | Stop the "Daily redeploy" Action from silently passing while deploying nothing | P0 | Orchestrator | Verified | `.github/workflows/daily-redeploy.yml` now warns and writes a step summary; the secret is passed via env | Owner adds the `VERCEL_DEPLOY_HOOK_URL` secret |
-| Avoid exhausting the Vercel Hobby quota (100 deployments/day, two projects build per push) | P0 | Owner | External | Ignored-build-step cancels still count ([Vercel docs](https://vercel.com/docs/projects/project-configuration/ignored-build-step)) | Owner decides: set `"git": {"deploymentEnabled": {"main": true, "*": false}}` in `apps/teams/vercel.json` (stops B2B previews), and/or prune the 120+ stale branches. This sprint pushes once |
+| Avoid exhausting the Vercel Hobby quota (100 deployments/day, two projects build per push) | P0 | Owner | External | Ignored-build-step cancels still count ([Vercel docs](https://vercel.com/docs/projects/project-configuration/ignored-build-step)) | #160 removed `apps/teams`, but the `leave_management` Vercel project is still connected (its last build failed). Owner: disconnect or delete that project, and prune the 120+ stale branches. This PR's preview was rate-limited on 2026-11-22 |
 | Ship one consolidated production release | P0 | Orchestrator, then owner | Owner review | This branch's PR | Merge only after green CI and a critic GO; check Vercel actually built it |
 
 ## Discovery (SEO)
