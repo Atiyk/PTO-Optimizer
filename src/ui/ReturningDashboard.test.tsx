@@ -56,6 +56,21 @@ describe('ReturningDashboard (P3)', () => {
     expect(region.textContent).not.toMatch(/streak|badge|hurry|don’t miss|urgent|!/i);
   });
 
+  it('counts a homepage return once per session and a copied request, by event name only', async () => {
+    sessionStorage.clear();
+    const event = vi.fn();
+    window.plausible = event;
+    renderDashboard();
+    cleanup();
+    renderDashboard();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy request' })); });
+    const names = event.mock.calls.map((call) => call[0]);
+    expect(names.filter((name) => name === 'returned_with_saved_url')).toHaveLength(1);
+    expect(names).toContain('request_text_copied');
+    for (const call of event.mock.calls) expect(Object.keys(call[1])).toEqual(['url']);
+    delete window.plausible;
+  });
+
   it('walks copy → mark requested → mark approved → open plan, saving to My PTO', async () => {
     renderDashboard();
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy request' })); });

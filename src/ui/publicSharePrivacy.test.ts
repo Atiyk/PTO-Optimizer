@@ -5,6 +5,7 @@ import { buildPublicPlanLink, buildPublicPlanSearch, employerLabelsWouldBeShared
 import { planFromSearch } from '../autopilot/planFromSearch';
 import { PLANNER_REVISION } from '@daysoff/engine/solver/revision';
 import { publicHolidayFingerprint } from './shareSnapshot';
+import { PLAN_PRIVATE_KEYS } from './shareFormat';
 
 const calendar = encodeEmployerCalendar({
   version: 1 as const, country: 'US', excluded: ['2027-12-24|PRIVATE_POLICY_EXCLUSION'],
@@ -92,5 +93,23 @@ describe('public plan link privacy', () => {
     expect(readFullStateFromURL(shared.toString(), defaults).sharedSnapshot).toEqual({ plannerRevision: PLANNER_REVISION, holidayFingerprint: fingerprint });
     expect(readFullStateFromURL('c=US&er=2&hf=deadbeef', defaults).sharedSnapshot).toBeUndefined();
     expect(readFullStateFromURL('sv=1&er=x&hf=PRIVATE', defaults).sharedSnapshot).toEqual({});
+  });
+});
+
+describe('shared-plan recipients never receive private keys', () => {
+  it('drops every private planner key and its value from a copied link, whatever the sender set', () => {
+    const sender = new URLSearchParams('c=US&s=2027-01-01&e=2027-12-31&b=12&pv=2&ps=year');
+    for (const key of PLAN_PRIVATE_KEYS) sender.set(key, `SENDER_SECRET_${key}`);
+    sender.set('eh', calendar);
+    const url = new URL(buildPublicPlanLink('https://gapless.example/pto', sender.toString()).url);
+    for (const key of PLAN_PRIVATE_KEYS) expect(url.searchParams.has(key)).toBe(false);
+    expect(url.href).not.toMatch(/SENDER_SECRET|PRIVATE_/);
+    // The recipient's planner reads back the public plan and none of the private settings.
+    const received = readFullStateFromURL(url.search, { rangeStart: '2027-01-01', rangeEnd: '2027-12-31', budget: 8, country: 'US' });
+    expect(received.budget).toBe(12);
+    expect(received.employerCalendar).toBeUndefined();
+    // Private policy fields fall back to the planner's own defaults, never the sender's.
+    expect(received.noticePeriodDays).toBe(14);
+    expect(received.expiryEnabled).toBeFalsy();
   });
 });

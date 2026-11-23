@@ -46,7 +46,11 @@ export type AnalyticsEvent =
   | 'policy_alert_action_clicked'
   | 'term_opened'
   | 'paragraph_decoded'
-  | 'policy_questions_copied';
+  | 'policy_questions_copied'
+  | 'holiday_check_opened'
+  | 'landing_plan_opened'
+  | 'shared_plan_made_own'
+  | 'request_text_copied';
 
 interface PlausibleOptions { url: string }
 type PlausibleArguments = [eventName: string, options: PlausibleOptions];
