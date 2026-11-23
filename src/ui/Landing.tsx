@@ -315,6 +315,12 @@ export function Landing() {
               { href: '/policy', title: 'Check my policy', body: 'Accrual, carryover and expiry deadlines, with calendar reminders before days lapse.' },
               { href: '/glossary', title: 'Learn the terms', body: 'Accrual, carryover and payout, explained in plain language.' },
             ]} />
+            {/* Fixed 2027 guides: worked plans from the same solver, each linking to its exact plan. */}
+            <ToolGroup title="2027 guides" rows={[
+              { href: '/2027', title: 'Best days to take off in 2027', body: 'Every 2027 US holiday, and the one PTO day that turns each into a long weekend.' },
+              { href: '/2027/10-pto-days', title: '10 PTO days in 2027', body: 'Worked plans for a 10-day allowance, on federal and on fewer company holidays.' },
+              { href: '/2027/long-weekends', title: '2027 long weekends', body: 'The three-day and four-day weekends 2027’s holidays make, and what each costs.' },
+            ]} />
           </div>
         </section>
       </Container>
